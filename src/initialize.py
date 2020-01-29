@@ -58,7 +58,6 @@ for ispe in xrange(nspecies):
     nenv[spe] = 0
     for iconf in xrange(ndata):
         nenv[spe] += atom_counting[iconf,ispe]
-    print spe, nenv[spe]
 
 av_coefs = {}
 for spe in spelist:

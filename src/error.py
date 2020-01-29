@@ -60,9 +60,9 @@ for spe in spelist:
 itest=0
 error_density = 0.0
 variance = 0.0
+f = open("errors.dat","w")
+print "Estimating prediction error ..."
 for iconf in testrange:
-    print "-------------------------------"  
-    print "iconf = ", iconf 
     atoms = atomic_symbols[iconf]
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
@@ -94,8 +94,9 @@ for iconf in testrange:
     coeffs_ref -= averages
     var = np.dot(coeffs_ref,projs_ref)
     variance += var 
-    print "error =", np.sqrt(error/var)*100, "%"
+    print >> f, iconf+1, ":", np.sqrt(error/var)*100, "% RMSE"
     itest+=1
 
-print ""
+f.close()
+
 print "% RMSE =", 100*np.sqrt(error_density/variance)
