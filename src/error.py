@@ -10,26 +10,26 @@ from ase.io import read
 import argparse
 
 sys.path.insert(0, './')
-import inputsys
+import inp
 
 sys.path.insert(0, '../../src/')
 import basis
 
 # read species
-spelist = inputsys.species
+spelist = inp.species
 spe_dict = {}
 for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[llmax,lmax,nnmax,nmax] = basis.basiset(inputsys.basis)
+[llmax,lmax,nnmax,nmax] = basis.basiset(inp.basis)
 
 # read system
-xyzfile = read(inputsys.filename,":")
+xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
 # number of sparse environments
-M = inputsys.Menv
+M = inp.Menv
 
 #======================= system parameters
 atomic_symbols = []

@@ -8,11 +8,11 @@ F2PYOPT='-O3'
 LIBS='-lgomp'
 
 # WITH INTEL COMPILERS
-
 #FCOMPILER='intelem' 
 #F90FLAGS='-qopenmp' 
 #F2PYOPT='-O3 -unroll-aggressive -qopt-prefetch -qopt-reportr5'
 #LIBS='-liomp5 -lpthread' # omp libraries with ifort
+
 
 f2py: lib/rmatrix.so lib/matrices.so lib/prediction.so 
 
