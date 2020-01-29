@@ -64,3 +64,9 @@ In the following, the interpolation of the electron density of a dataset of 1000
 9) Print out the predicted scalar field projections in the :code:`projections` folder and estimate the root mean square error both on the individual scalar fields and on the overall test dataset:: 
 
         python ../../src/error.py
+
+
+Contact
+-------
+
+andrea.grisafi@epfl.ch
