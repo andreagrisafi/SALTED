@@ -10,52 +10,58 @@ References
 
 2. Andrea Grisafi, David M. Wilkins, Benjamin A. R. Meyer, Alberto Fabrizio, Clemence Corminboeuf, Michele Ceriotti, "A Transferable Machine-Learning Model of the Electron Density", ACS Central Science 5, 57 (2019)
 
-3. Alberto Fabrizio, Andrea Grisafi, Benjamin A. R. Meyer, Michele Ceriotti, Clemence Corminboeuf, Michele Ceriotti, "Electron density learning of non-covalent systems", Chemical Science 10, 9424-9432 (2019)
+3. Alberto Fabrizio, Andrea Grisafi, Benjamin A. R. Meyer, Michele Ceriotti, Clemence Corminboeuf, "Electron density learning of non-covalent systems", Chemical Science 10, 9424-9432 (2019)
 
 Requirements and Installation
 -----------------------------
 This code is written in a mixture of Python2 and Fortran90 with OpenMP parallelization.
-To install it, just type :code:`make` in the main folder.
 
-Workflow
+To install it, just :code:`make` in the main folder. 
+
+Workflow 
 --------
 
-1) Generate lambda-SOAP representations up to the maxium angular momentum included in the expansion of the density, e.g.,::
+In the following, the interpolation of the electron density of a dataset of 1000 water molecules is considered as an example. For that, go in the example folder :code:`examples/water_monomer`.
 
-        sagpr_get_PS -n 8 -l 6 -rc 4.0 -sg 0.3 -lm 5 -f coords_1000.xyz -s H O -c H O -o PS_5
+1) Generate lambda-SOAP representations up to the maximum angular momentum :code:`-lm` included in the expansion of the scalar field. For instance, when going up to L=3 spherical harmonics:: 
 
-2) Define a sparse set of environments :code:`-m` using the FPS method with the 0-SOAP metric::
+        for i in 0 1 2 3 4 5
+        do
+           $path_to_soapfast/SOAPFAST/soapfast/get_power_spectrum.py -n 8 -l 6 -rc 4.0 -sg 0.3 -f coords_1000.xyz -s H O -lm ${i} -o SOAP-${i}
+        done 
 
-        python environments.py -m 100
+   Type :code:`get_power_spectrum.py -h` for SOAP parameters documentation. Note that to sensibly reduce the feature space size for high angular momenta, the resolution of the SOAP representation can possibly be made coarser as the lambda :code:`-lm` value is increased, without loosing in learning accuracy.
 
-3) Compute the environmental kernel matrices which couple the sparse set with the training set:: 
+2) Extract a sparse set of environments :code:`-m` to reduce the dimensionality of the regression problem. This is done via the farthest point sampling (FPS) method, using the SOAP-0 representation previously computed as a metric to distiguish between two atomic environments::
 
-        python src/kernels.py -m 100
+        python ../../src/sparse_set.py -f coords_1000.xyz -m 100
 
-4) Compute the environmental kernel matrices for the sparse set::  
 
-        python src/rmatrix.py -m 100
+3) Compute the block diagonal kernel matrix for the selected sparse set of atomic environments::  
 
-5) Initialize density projections and and basis set overlaps (depending on the type of input given)::
+        python ../../src/kernel_mm.py 
 
-        python src/initialize.py
+4) For each configuration of the dataset, compute the kernel matrix that couples the atoms of that configuration with the selected sparse set of atomic environments::
 
-6) Compute spherical averages of the density components over the training and use them as baseline values for the density projections::
+        mkdir kernels 
+        python ../../src/kernel_nm.py 
 
-        python src/baseline_projs.py
+5) Compute the spherical averages of the scalar field coefficients over the dataset and use them to baseline the projections of the scalar field on the basis set. Then print out both the baselined projections and overlap matrix into :code:`.dat` files::
 
-7) Compute the regression vector B and the regression matrix A using a given training set fraction `-f`::
+        python ../../src/initialize.py
 
-        python src/get_matrices.py -m 100 -f 1.0
+6) Partition the dataset into training and test set by selecting :code:`-t` training configurations at random and compute the regression vector A and the regression matrix B by using a given training set fraction `-frac`::
 
-8) Do the regression with a given regularization :code:`-r` and jitter :code:`-j` needed for the stability of the matrix inversion::
+        python ../../src/matrices.py -t 200 -frac 1.0
 
-        python src/regression.py -f 1.0 -m 100 -r 1e-06 -jit 1e-08
+7) Do the regression with a given regularization :code:`-r` and jitter value :code:`-j` needed for the stability of the matrix inversion::
 
-9) Perform predictions of the density coefficients on the test set::
+        python ../../src/learn.py -r 1e-08 -jit 1e-10
 
-        python src/prediction.py -f 1.0 -m 100 -r 1e-06 -jit 1e-08
+8) Predict the baselined expansion coefficients of the scalar field over the test set::
 
-10) Estimate the root mean square error on the predicted scalar field:: 
+        python ../../src/predict.py 
 
-        python src/compute_error.py -f 1.0 -m 100 -r 1e-06 -jit 1e-08
+9) Print out the predicted scalar field projections in the :code:`projections` folder and estimate the root mean square error both on the individual predicted scalar fields and on the overall test dataset:: 
+
+        python ../../src/error.py

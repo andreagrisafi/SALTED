@@ -1,9 +1,9 @@
-SUBROUTINE getab(mol,trrange,atomspe,llmax,nnmax,nspecies,ntrain,M,natmax,natoms,cutoff,totsize,&
+SUBROUTINE getab(trrange,atomspe,llmax,nnmax,nspecies,ntrain,M,natmax,natoms,totsize,&
            atomicindx,atomcount,specarray,almax,ancut,totalsizes,kernsizes,Avec,Bmat)
 use omp_lib
 IMPLICIT NONE
 ! allocate I/O variables
-INTEGER:: ntrain,M,natmax,totsize,llmax,nnmax,nspecies,cutoff
+INTEGER:: ntrain,M,natmax,totsize,llmax,nnmax,nspecies
 INTEGER,DIMENSION(natmax,nspecies,ntrain):: atomicindx
 INTEGER,DIMENSION(ntrain,nspecies):: atomcount
 INTEGER,DIMENSION(ntrain):: trrange,natoms,totalsizes,kernsizes 
@@ -17,7 +17,7 @@ REAL*8,DIMENSION(totsize,totsize):: Bmat
 INTEGER:: iat,jat,l1,l2,n1,n2,im1,im2,i1,i2,a1,a2,al1,al2,anc1,anc2,conf,if1,if2,if3,ik1,ik2
 INTEGER:: itrain,iref1,iref2,imm1,imm2,msize1,msize2,icspe1,icspe2,k1,k2,it1,it2,sp1,sp2,sk1,sk2
 REAL*8:: Btemp,contrA,contrB,proj,over,kern
-CHARACTER*16:: conf_str,mol,ref_str,cut_str 
+CHARACTER*16:: conf_str,ref_str
 ! allocatable arrays
 INTEGER,DIMENSION(:,:,:,:,:), ALLOCATABLE :: kernsparseindexes 
 INTEGER,DIMENSION(:,:,:,:), ALLOCATABLE :: sparseindexes 
@@ -25,7 +25,7 @@ REAL*8,DIMENSION(:), ALLOCATABLE :: projections
 REAL*8,DIMENSION(:,:), ALLOCATABLE :: overlaps
 REAL*8,DIMENSION(:), ALLOCATABLE :: kernels 
 
-!f2py intent(in) mol,trrange,atomspe,llmax,nnmax,nspecies,ntrain,M,natmax,natoms,cutoff
+!f2py intent(in) trrange,atomspe,llmax,nnmax,nspecies,ntrain,M,natmax,natoms
 !f2py intent(in) totsize,atomicindx,atomcount,specarray,almax,ancut,totalsizes,kernsizes
 !f2py intent(out) Avec,Bmat 
 !f2py depend(totsize) Avec,Bmat 
@@ -37,7 +37,7 @@ REAL*8,DIMENSION(:), ALLOCATABLE :: kernels
 
 !$OMP PARALLEL DEFAULT(private) &
 !$OMP FIRSTPRIVATE(kernels,projections,overlaps,trrange,atomspe,llmax,nnmax,nspecies,ntrain,natoms) &
-!$OMP FIRSTPRIVATE(M,natmax,totsize,atomicindx,atomcount,specarray,almax,ancut,mol,cutoff) &
+!$OMP FIRSTPRIVATE(M,natmax,totsize,atomicindx,atomcount,specarray,almax,ancut) &
 !$OMP FIRSTPRIVATE(totalsizes,sparseindexes,kernsparseindexes,kernsizes) &
 !$OMP SHARED(Avec,Bmat)
 !$OMP DO SCHEDULE(dynamic)
@@ -56,12 +56,11 @@ do itrain=1,ntrain
    conf = trrange(itrain)
    write(conf_str,*) conf
    write(ref_str,*) M 
-   write(cut_str,*) cutoff
    if1 = itrain + 10
    if2 = itrain + 2000 
    if3 = itrain + 4000
-   open(unit=if1,file='BASELINED_PROJECTIONS/projections_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
-   open(unit=if2,file='OVER_DAT/overlap_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
+   open(unit=if1,file='projections/projections_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
+   open(unit=if2,file='overlaps/overlap_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
    it1 = 1
    do iat=1,natoms(itrain)
       a1 = atomspe(itrain,iat)+1
@@ -97,7 +96,7 @@ do itrain=1,ntrain
    enddo
    close(if2)
    close(if1)
-   open(unit=if3,file='KERNELS/kernel_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
+   open(unit=if3,file='kernels/kernel_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
    ik1 = 1
    do iref1=1,M
       a1 = specarray(iref1) + 1
@@ -106,7 +105,6 @@ do itrain=1,ntrain
          msize1 = 2*(l1-1)+1
          do im1=1,msize1
             do iat=1,atomcount(itrain,a1)
-            !do iat=1,natoms(itrain)
                do imm1=1,msize1
                   read(if3,*) kern 
                   kernels(ik1) = kern

@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 import sys
 import numpy as np
 import time
@@ -11,16 +9,18 @@ import argparse
 
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-m",   "--msize"  ,     type=int,   default=100, help="number of reference environments")
+    parser.add_argument("-m",   "--msize"  ,  type=int,   default=100, help="number of reference environments")
+    parser.add_argument("-f",   "--filename", type=str,   required=False,  nargs='+', help="file of coordinates in xyz format")
     args = parser.parse_args()
     return args
 
 def set_variable_values_contraction(args):
     m = args.msize
-    return [m]
+    f = args.filename
+    return [m,f]
 
 args = add_command_line_arguments_contraction("density regression")
-[M] = set_variable_values_contraction(args)
+[M,filename] = set_variable_values_contraction(args)
 
 def do_fps(x, d=0):
     # Code from Giulio Imbalzano
@@ -38,8 +38,7 @@ def do_fps(x, d=0):
     return iy
 
 #========================== system definition
-filename = "coords_1000.xyz"
-xyzfile = read(filename,":")
+xyzfile = read(filename[0],":")
 ndata = len(xyzfile)
 #======================= system parameters
 atomic_symbols = []
@@ -52,7 +51,6 @@ for i in xrange(ndata):
 natmax = max(natoms)
 #==================== species array
 species = np.sort(list(set(np.array([item for sublist in atomic_valence for item in sublist]))))
-print species
 
 nspecies = len(species)
 spec_list = []
@@ -76,7 +74,7 @@ for iconf in xrange(ndata):
         for icount in xrange(atom_counting[iconf,ispe]):
             atomicindx[iconf,ispe,icount] = indexes[icount]
 #====================== environmental power spectrum
-power = np.load("POWER_SPECTRA/PS_0.npy")
+power = np.load("SOAP-0.npy")
 nfeat = len(power[0,0])
 power_env = np.zeros((nenv,nfeat),complex)
 ienv = 0
@@ -94,5 +92,5 @@ for iconf in xrange(ndata):
 
 fps_indexes = np.array(do_fps(power_env,M),int)
 fps_species = spec_array[fps_indexes]
-np.savetxt("SELECTIONS/refs_selection_"+str(M)+".txt",fps_indexes,fmt='%i')
-np.savetxt("SELECTIONS/spec_selection_"+str(M)+".txt",fps_species,fmt='%i')
+sparse_set = np.vstack((fps_indexes,fps_species)).T
+np.savetxt("sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
