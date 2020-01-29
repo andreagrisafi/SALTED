@@ -23,7 +23,7 @@ Workflow
 
 In the following, the interpolation of the electron density of a dataset of 1000 water molecules is considered as an example. For that, go in the example folder :code:`examples/water_monomer`. There you will find the file :code:`inpsys.py`, containing the input parameters of the calculation. 
 
-1) Generate :math:`{\alpha}`-SOAP representations up to the maximum angular momentum :code:`-lm` included in the expansion of the scalar field. In this case, we need to go up to L=5:: 
+1) Generate :math:`{\lambda}` -SOAP representations up to the maximum angular momentum :code:`-lm` included in the expansion of the scalar field. In this case, we need to go up to L=5:: 
 
         for i in 0 1 2 3 4 5
         do
