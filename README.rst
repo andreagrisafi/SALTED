@@ -27,7 +27,7 @@ In the following, the interpolation of the electron density of a dataset of 1000
 
         for i in 0 1 2 3 4 5
         do
-           $path_to_soapfast/SOAPFAST/soapfast/get_power_spectrum.py -n 8 -l 6 -rc 4.0 -sg 0.3 -f coords_1000.xyz -s H O -lm ${i} -o SOAP-${i}
+           $path_to_soapfast/SOAPFAST/soapfast/get_power_spectrum.py -n 8 -l 6 -rc 4.0 -sg 0.3 -f coords_1000.xyz -c H O -s H O -lm ${i} -o SOAP-${i}
         done 
 
    Type :code:`get_power_spectrum.py -h` for SOAP parameters documentation. Note that to sensibly reduce the feature space size for high angular momenta, the resolution of the SOAP representation can possibly be decreased as the :code:`-lm` value is increased, without loosing in learning accuracy. This means reducing the radial :code:`-n` and angular :code:`-l` cutoffs respectively used to expand the SOAP atomic density.
