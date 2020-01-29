@@ -7,11 +7,10 @@ import ase
 from ase import io
 from ase.io import read
 
+import basis
 sys.path.insert(0, './')
 import inp
 
-sys.path.insert(0, '../../src/')
-import basis
 
 # read species
 spelist = inp.species

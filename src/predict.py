@@ -6,14 +6,12 @@ from ase import io
 from ase.io import read
 import argparse
 
-sys.path.insert(0, '../../lib/')
-import prediction
+import basis
+
+from lib import prediction
 
 sys.path.insert(0, './')
 import inp
-
-sys.path.insert(0, '../../src/')
-import basis
 
 # read species
 spelist = inp.species

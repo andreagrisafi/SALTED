@@ -7,14 +7,13 @@ from ase.io import read
 import argparse
 import random
 
-sys.path.insert(0, '../../lib/')
-import matrices 
+import basis
+
+from lib import matrices 
 
 sys.path.insert(0, './')
 import inp
 
-sys.path.insert(0, '../../src/')
-import basis
 
 # read species
 spelist = inp.species
