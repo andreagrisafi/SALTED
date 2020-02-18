@@ -23,9 +23,9 @@ Input Dataset
 
 The geometry of the training configurations have to be stored in :code:`xyz` format.
 
-The training dataset required to run the regression consists in the projection of the scalar-field over atom-centered basis functions made by radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the raidal functions, which can be either orthogonal or non-orthogonal to each other depending on the user choice. The overlap matrix between the basis functions is also required as an input. The well-conditioning of this matrix is a crucial aspect for the method performance.
+The training dataset required to run the regression consists in the projection of the scalar-field over atom-centered basis functions made of radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the raidal functions, which can be either orthogonal or non-orthogonal to each other depending on the user choice. The overlap matrix between the basis functions is also required as an input. The well-conditioning of this matrix is a crucial aspect for the method performance.
 
-For each dataset configuration, both the scalar-field projection vector and the overlap matrix need to be stored in numpy binary arrays within the folders :code: `projections` and :code:`overlaps` respectively. The dimensionality of these arrays have to correspond to the number of atoms as sorted in the geometry file, times the non-redundant number of basis functions belonging to each atom. The ordering of the basis follows this hierarchical structure: 
+For each dataset configuration, both the scalar-field projection vector and the overlap matrix need to be stored in numpy binary arrays within the folders :code:`projections` and :code:`overlaps` respectively. The dimensionality of these arrays has to correspond to the number of atoms as sorted in the geometry file, times the non-redundant number of basis functions belonging to each atom. The ordering of the basis follows this hierarchical structure: 
 
 1) For a given atomic species S, loop over the possible angular momenta {L}
 
