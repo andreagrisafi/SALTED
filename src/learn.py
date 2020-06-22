@@ -4,7 +4,6 @@ import time
 import ase
 from ase import io
 from ase.io import read
-import argparse
 
 import basis
 sys.path.insert(0, './')
@@ -17,7 +16,16 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[llmax,lmax,nnmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.basis)
+
+llist = []
+nlist = []
+for spe in spelist:
+    llist.append(lmax[spe])
+    for l in xrange(lmax[spe]+1):
+        nlist.append(nmax[(spe,l)])
+llmax = max(llist)
+nnmax = max(nlist)
 
 # read system
 xyzfile = read(inp.filename,":")
@@ -26,20 +34,11 @@ ndata = len(xyzfile)
 # number of sparse environments
 M = inp.Menv
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-r",   "--regular"  ,   type=float, default=1e-06, help="regularization")
-    parser.add_argument("-jit", "--jitter"  ,   type=float, default=1e-10, help="jitter")
-    args = parser.parse_args()
-    return args
+# number of sparse environments
+reg = inp.regul
 
-def set_variable_values_contraction(args):
-    r = args.regular  
-    jit = args.jitter
-    return [r,jit]
-
-args = add_command_line_arguments_contraction("density regression")
-[reg,jit] = set_variable_values_contraction(args)
+# number of sparse environments
+jit = inp.jitter
 
 # system parameters
 atomic_symbols = []

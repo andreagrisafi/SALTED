@@ -21,7 +21,12 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[llmax,lmax,nnmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.basis)
+
+llist = []
+for spe in spelist:
+    llist.append(lmax[spe])
+llmax = max(llist)
 
 # read system
 xyzfile = read(inp.filename,":")
@@ -136,6 +141,6 @@ for l in xrange(llmax+1):
             for iref2 in xrange(M):
                 k_MM[l,iref1*(2*l+1):iref1*(2*l+1)+2*l+1,iref2*(2*l+1):iref2*(2*l+1)+2*l+1] = np.dot(power_ref_sparse[iref1*(2*l+1):iref1*(2*l+1)+2*l+1],power_ref_sparse[iref2*(2*l+1):iref2*(2*l+1)+2*l+1].T) *  k_MM[0,iref1,iref2]**((zeta-1.0)/zeta) 
 
-Rmat = rmatrix.rmatrix(llmax,nnmax,nspecies,M,totsize,fps_species,almax,anmax,k_MM)
+Rmat = rmatrix.rmatrix(llmax,nspecies,M,totsize,fps_species,almax,anmax,k_MM)
 
 np.save("Kmm_matrix.npy", Rmat)

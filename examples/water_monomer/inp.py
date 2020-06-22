@@ -1,14 +1,26 @@
 # system definition in .xyz format
 filename = "coords_1000.xyz"
 
-# basis set used for the decomposition of the scalar field
+# basis set for the scalar-field decomposition 
 basis = "RI-ccpVQZ"
 
-# ordered list of atomic species as defined in the SOAP representations 
+# valence-ordered list of atomic species 
 species = ["H","O"]
 
-# number of atomic environments selected as sparse set
+# number of atomic sparse environments 
 Menv = 100
 
-# kernels non-linearity degree (1,2,...). Going beyond 2 is not recommended (default is 2)
+# number of training configurations 
+Ntrain = 200
+
+# training set fraction
+trainfrac = 1.0
+
+# regularization
+regul = 1e-08
+
+# jitter value
+jitter = 1e-10
+
+# kernel non-linearity degree (1,2,...)
 z = 2.0

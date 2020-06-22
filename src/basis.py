@@ -9,13 +9,11 @@ def basiset(basis):
 
    if basis=="RI-ccpVQZ":
 
-      llmax = 5
       lmax["H"] = 4
       lmax["C"] = 5
       lmax["N"] = 5
       lmax["O"] = 5
 
-      nnmax = 10
       # hydrogen
       nmax[("H",0)] = 4
       nmax[("H",1)] = 3
@@ -46,11 +44,9 @@ def basiset(basis):
    
    if basis=="FHI-aims-first-tier":
 
-      llmax = 4
       lmax["H"] = 2
       lmax["O"] = 4
 
-      nnmax = 6 
       # hydrogen
       nmax[("H",0)] = 3
       nmax[("H",1)] = 2
@@ -64,13 +60,11 @@ def basiset(basis):
       
    if basis=="FHI-aims-third-tier":
 
-      llmax = 5
       lmax["H"] = 5
       lmax["C"] = 5
       lmax["N"] = 5
       lmax["O"] = 5
 
-      nnmax = 11
       # hydrogen
       nmax[("H",0)] = 11
       nmax[("H",1)] = 9
@@ -86,4 +80,22 @@ def basiset(basis):
       nmax[("O",4)] = 8
       nmax[("O",5)] = 5
 
-   return [llmax,lmax,nnmax,nmax]
+   if basis=="FHI-aims-min":
+
+      lmax["H"] = 0
+      lmax["O"] = 2
+      lmax["Al"] = 2
+      lmax["Si"] = 2
+
+      nmax[("H",0)] = 1
+      nmax[("O",0)] = 3
+      nmax[("O",1)] = 2
+      nmax[("O",2)] = 1
+      nmax[("Al",0)] = 7
+      nmax[("Al",1)] = 7
+      nmax[("Al",2)] = 3
+      nmax[("Si",0)] = 7
+      nmax[("Si",1)] = 7
+      nmax[("Si",2)] = 3
+
+   return [lmax,nmax]

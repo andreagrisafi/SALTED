@@ -38,7 +38,7 @@ The possible basis set choices appear in :code:`src/basis.py`. If you want to us
 Workflow 
 --------
 
-In the following, the interpolation of the electron density of a dataset of 1000 water molecules is considered as an example. For that, go in the example folder :code:`examples/water_monomer`. There you will find the file :code:`inp.py`, containing the input parameters of the calculation. 
+In the following, the interpolation of the electron density of a dataset of 1000 water molecules is considered as an example. For that, go into the example folder :code:`examples/water_monomer`. There you will find the file :code:`inp.py`, containing the input parameters of the calculation. 
 
 1) Generate L-SOAP representations up to the maximum angular momentum :code:`-lm` included in the expansion of the scalar field. In this case, we need to go up to L=5:: 
 
@@ -49,9 +49,9 @@ In the following, the interpolation of the electron density of a dataset of 1000
 
    Type :code:`get_power_spectrum.py -h` for SOAP parameters documentation. Note that to sensibly reduce the feature space size for high angular momenta, the resolution of the SOAP representation can possibly be decreased as the :code:`-lm` value is increased, without loosing in learning accuracy. This means reducing the radial :code:`-n` and angular :code:`-l` cutoffs respectively used to expand the SOAP atomic density.
 
-2) Extract a sparse set of environments :code:`-m` to reduce the dimensionality of the regression problem. This is done via the farthest point sampling (FPS) method, using the SOAP-0 representation previously computed as a metric to distiguish between two atomic environments::
+2) Extract a sparse set of environmentsto reduce the dimensionality of the regression problem. This is done via the farthest point sampling (FPS) method, using the SOAP-0 representation previously computed as a metric to distiguish between two atomic environments::
 
-        python ../../src/sparse_set.py -f coords_1000.xyz -m 100
+        python ../../src/sparse_set.py 
 
 
 3) Compute the block diagonal kernel matrix for the selected sparse set of atomic environments::  
@@ -66,19 +66,19 @@ In the following, the interpolation of the electron density of a dataset of 1000
 
         python ../../src/initialize.py
 
-6) Partition the dataset into training and test set by selecting :code:`-t` training configurations at random. Then compute the regression vector A and the regression matrix B using a given training set fraction :code:`-frac`::
+6) Partition the dataset into training and test set by selecting N training configurations at random. Then compute the regression vector A and the regression matrix B using a given training set fraction specified in :code:`inp.py`::
 
-        python ../../src/matrices.py -t 200 -frac 1.0
+        python ../../src/matrices.py 
 
-7) Do the regression with a given regularization :code:`-r` and jitter value :code:`-j` needed for the stability of the matrix inversion::
+7) Do the regression with a given regularization and jitter values specified in :code:`inp.py`, needed for the stability of the matrix inversion::
 
-        python ../../src/learn.py -r 1e-08 -jit 1e-10
+        python ../../src/learn.py 
 
 8) Predict the baselined expansion coefficients of the scalar field over the test set::
 
         python ../../src/predict.py 
 
-9) Print out the predicted scalar field projections in the :code:`projections` folder and estimate the root mean square error both on the individual scalar fields and on the overall test dataset:: 
+9) Print out the predicted scalar field projections in the :code:`projections` folder and estimate the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset:: 
 
         python ../../src/error.py
 

@@ -4,7 +4,6 @@ import time
 import ase
 from ase import io
 from ase.io import read
-import argparse
 
 import basis
 
@@ -20,7 +19,16 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[llmax,lmax,nnmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.basis)
+
+llist = []
+nlist = []
+for spe in spelist:
+    llist.append(lmax[spe])
+    for l in xrange(lmax[spe]+1):
+        nlist.append(nmax[(spe,l)])
+llmax = max(llist)
+nnmax = max(nlist)
 
 # read system
 xyzfile = read(inp.filename,":")

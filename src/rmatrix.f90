@@ -1,9 +1,9 @@
-SUBROUTINE rmatrix(llmax,nnmax,nspecies,M,totsize,specarray,almax,ancut,kMM,Rmat)
+SUBROUTINE rmatrix(llmax,nspecies,M,totsize,specarray,almax,ancut,kMM,Rmat)
 
 use omp_lib
 IMPLICIT NONE
 ! allocate I/O variables
-INTEGER:: M,totsize,llmax,nnmax,nspecies
+INTEGER:: M,totsize,llmax,nspecies
 INTEGER,DIMENSION(M):: specarray
 INTEGER,DIMENSION(nspecies):: almax
 INTEGER,DIMENSION(nspecies,llmax+1):: ancut
@@ -14,7 +14,7 @@ INTEGER:: iat,jat,l1,l2,n1,n2,im1,im2,i1,i2,a1,a2,al1,al2,anc1,anc2,conf,if1,if2
 INTEGER:: iref1,iref2,msize1,msize2,ik1,ik2
 CHARACTER*32:: conf_str 
 
-!f2py intent(in) llmax,nnmax,nspecies,M,totsize,specarray,almax,ancut,kMM
+!f2py intent(in) llmax,nspecies,M,totsize,specarray,almax,ancut,kMM
 !f2py intent(out) Rmat 
 !f2py depend(totsize) Rmat 
 !f2py depend(nspecies) almax,ancut

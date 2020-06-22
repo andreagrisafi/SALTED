@@ -5,22 +5,18 @@ import ase
 from ase import io
 from ase.io import read
 from random import shuffle
-import argparse
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-m",   "--msize"  ,  type=int,   default=100, help="number of reference environments")
-    parser.add_argument("-f",   "--filename", type=str,   required=False,  nargs='+', help="file of coordinates in xyz format")
-    args = parser.parse_args()
-    return args
+sys.path.insert(0, './')
+import inp
 
-def set_variable_values_contraction(args):
-    m = args.msize
-    f = args.filename
-    return [m,f]
+# read system
+xyzfile = read(inp.filename,":")
+ndata = len(xyzfile)
 
-args = add_command_line_arguments_contraction("density regression")
-[M,filename] = set_variable_values_contraction(args)
+# number of sparse environments
+M = inp.Menv
+
+print "Computing a sparse set made of", M, "FPS environments..."
 
 def do_fps(x, d=0):
     # Code from Giulio Imbalzano
@@ -37,9 +33,6 @@ def do_fps(x, d=0):
         dl = np.minimum(dl,nd)
     return iy
 
-#========================== system definition
-xyzfile = read(filename[0],":")
-ndata = len(xyzfile)
 #======================= system parameters
 atomic_symbols = []
 atomic_valence = []

@@ -1,19 +1,12 @@
 import sys
-import numpy as np
-import scipy
-from scipy import special
-import math
 import time
-import ase
-from ase import io
+import numpy as np
 from ase.io import read
-import argparse
 
 import basis
 
 sys.path.insert(0, './')
 import inp
-
 
 # read species
 spelist = inp.species
@@ -22,7 +15,7 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[llmax,lmax,nnmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.basis)
 
 # read system
 xyzfile = read(inp.filename,":")
@@ -40,10 +33,6 @@ for i in xrange(len(xyzfile)):
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_symbols[i]))
 natmax = max(natoms)
-
-#====================================== reference environments
-fps_indexes = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:0]
-fps_species = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:1]
 
 # load predicted coefficients for test structures
 trainrangetot = np.loadtxt("training_set.txt",int)
@@ -99,4 +88,6 @@ for iconf in testrange:
 
 f.close()
 
+print "Error =", np.sqrt(error_density/ntest)
+print "STD =", np.sqrt(variance/ntest)
 print "% RMSE =", 100*np.sqrt(error_density/variance)

@@ -11,7 +11,6 @@ import basis
 sys.path.insert(0, './')
 import inp
 
-
 # read species
 spelist = inp.species
 spe_dict = {}
@@ -19,7 +18,12 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i] 
 
 # read basis
-[llmax,lmax,nnmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.basis)
+
+llist = []
+for spe in spelist:
+    llist.append(lmax[spe])
+llmax = max(llist)
 
 # read system
 xyzfile = read(inp.filename,":")

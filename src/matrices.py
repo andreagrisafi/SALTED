@@ -22,7 +22,16 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[llmax,lmax,nnmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.basis)
+
+llist = []
+nlist = []
+for spe in spelist:
+    llist.append(lmax[spe])
+    for l in xrange(lmax[spe]+1):
+        nlist.append(nmax[(spe,l)])
+llmax = max(llist)
+nnmax = max(nlist)
 
 # read system
 xyzfile = read(inp.filename,":")
@@ -31,20 +40,11 @@ ndata = len(xyzfile)
 # number of sparse environments
 M = inp.Menv
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-t",   "--trainset", type=int,   default=100,   help="maximum number of training points")
-    parser.add_argument("-frac", "--trainfrac", type=float, default=1.0, help="training set fraction")
-    args = parser.parse_args()
-    return args
+# number of training configurations 
+N = inp.Ntrain
 
-def set_variable_values_contraction(args):
-    t = args.trainset
-    frac = args.trainfrac
-    return [t,frac]
-
-args = add_command_line_arguments_contraction("density regression")
-[trainset,frac] = set_variable_values_contraction(args)
+# training set fraction
+frac = inp.trainfrac
 
 # system parameters
 atomic_symbols = []
@@ -106,7 +106,7 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 # training set selection
 dataset = range(ndata)
 random.Random(3).shuffle(dataset)
-trainrangetot = dataset[:trainset]
+trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
