@@ -19,7 +19,7 @@ To install it, :code:`make` in the main folder and :code:`source env.sh`
 
 Dependencies
 ------------
-TENSOAP: <TENSOAP>
+TENSOAP: https://github.com/dilkins/SOAPFAST-public
 
 
 Input Dataset
