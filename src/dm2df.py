@@ -26,6 +26,9 @@ import basis
 sys.path.insert(0, './')
 import inp
 
+xyzfile = read(inp.filename,":")
+ndata = len(xyzfile)
+
 # read basis
 [lmax,nmax] = basis.basiset(inp.basis)
 
@@ -37,7 +40,7 @@ print "Reading geometry and basis sets..."
 
 
 # Initialize geometry
-geom = read("qm-runs/conf_"+str(iconf+1)+"/coords.xyz")
+geom = xyzfile[iconf]
 symb = geom.get_chemical_symbols()
 coords = geom.get_positions()
 natoms = len(coords)

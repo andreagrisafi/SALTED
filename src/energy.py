@@ -23,6 +23,7 @@ for i in xrange(len(spelist)):
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
+hart2kcal = 627.5096080305927
 bohr2ang = 0.52917721067121
 #======================= system parameters
 atomic_symbols = []
@@ -133,7 +134,7 @@ for iconf in testrange:
                         ref_rho[icoeff] = ref_coeffs[itest,iat,l,n,im]
                         rho[icoeff] = coeffs[itest,iat,l,n,im]
                     icoeff +=1
-    geom = read("qm-runs/conf_"+str(iconf+1)+"/coords.xyz")
+    geom = xyzfile[iconf]
     coords = geom.get_positions()
     catoms = []
     for i in xrange(natoms):
@@ -191,3 +192,19 @@ for iconf in testrange:
 
 f.close()
 g.close()
+
+# compute error on electrostatic energy
+hartree_ref = np.loadtxt("hartree_energy.dat")[:,2]
+external_ref = np.loadtxt("external_energy.dat")[:,2]
+electro_ref = hartree_ref + external_ref 
+
+hartree_pre = np.loadtxt("hartree_energy.dat")[:,3]
+external_pre = np.loadtxt("external_energy.dat")[:,3]
+electro_pre = hartree_pre + external_pre
+
+abs_errors = (electro_pre - electro_ref) 
+np.savetxt("electro_errors.dat", abs_errors * hart2kcal)
+rmse = np.sqrt(np.sum(abs_errors**2)/ntest)
+std = np.std(electro_ref)
+
+print "Electrostatic energy error =", rmse*hart2kcal, "kcal/mol", ",", rmse/std*100, "%"
