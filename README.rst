@@ -19,16 +19,16 @@ To install it, :code:`make` in the main folder and :code:`source env.sh`
 
 Dependencies
 ------------
-TENSOAP: https://github.com/dilkins/SOAPFAST-public
+TENSOAP: https://github.com/dilkins/TENSOAP
 
 
 Input Dataset
 -------------
 The geometry of the training configurations have to be stored in :code:`xyz` format.
 
-The training dataset required to run the regression consists in the projection of the scalar-field over atom-centered basis functions made of radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the raidal functions, which can be either orthogonal or non-orthogonal to each other depending on the user choice. The overlap matrix between the basis functions is also required as an input. The well-conditioning of this matrix is a crucial aspect for the method performance.
+The training dataset required to run the regression consists in the projection of the scalar-field over atom-centered basis functions made of radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. The overlap matrix between the basis functions is also required as an input. The well-conditioning of this matrix is a crucial aspect for the method performance.
 
-For each dataset configuration, both the scalar-field projection vector and the overlap matrix need to be stored in numpy binary arrays within the folders :code:`projections` and :code:`overlaps` respectively. The dimensionality of these arrays has to correspond to the number of atoms as sorted in the geometry file, times the non-redundant number of basis functions belonging to each atom. The ordering of the basis follows this hierarchical structure: 
+For each dataset configuration, both the scalar-field projection vector and the overlap matrix need to be stored in numpy binary arrays within folders named :code:`projections` and :code:`overlaps` respectively. The dimensionality of these arrays has to correspond to the number of atoms as sorted in the geometry file, times the non-redundant number of basis functions belonging to each atom. The ordering of the basis follows this hierarchical structure: 
 
 1) For a given atomic species S, loop over the possible angular momenta {L}
 
@@ -39,11 +39,12 @@ For each dataset configuration, both the scalar-field projection vector and the 
 The possible basis set choices appear in :code:`src/basis.py`. If you want to use a basis that is not included in this file, it is easy enough to add a new one together with the proper dimensions.
 
 
+
 Workflow 
 --------
-In the following, the interpolation of the electron density of a dataset of 1000 water molecules is considered as an example. For that, go into the example folder :code:`examples/water_monomer`. There you will find the file :code:`inp.py`, containing the input parameters of the calculation. 
+In the following, the interpolation of the electron density of a dataset made of 1000 water molecules is considered as an example. For that, go into the example folder :code:`examples/water_monomer`. There you will find the file :code:`inp.py`, containing the input parameters of the calculation. 
 
-1) Generate L-SOAP representations up to the maximum angular momentum :code:`-lm` included in the expansion of the scalar field. In this case, we need to go up to L=5:: 
+1) Generate tensorial SOAP representations up to the maximum angular momentum :code:`-lm` included in the expansion of the scalar field. In this case, we need to go up to L=5:: 
 
         for i in 0 1 2 3 4 5
         do
@@ -86,6 +87,13 @@ In the following, the interpolation of the electron density of a dataset of 1000
         python $RHOMLPATH/error.py
 
 
+Dataset generation from 1-electron density matrix
+-------------------------------------------------
+When targeting the electron density, a script is provided that allows to directly generate the dataset from the 1-electron reduced density matrix that is represented on a PySCF-like GTO basis. The wave-function basis set has to correspond to its density-fitted counterpart as specified in :code:`inp.py`. The density matrix has to be saved as a 2D-numpy-binary-array sorted according to the PySCF convention, that is, as -L,...,0,...,+L for L>1 and as +1,-1,0 for L=1. Then generate the folders :code:`projections` and :code:`overlaps` and run::
+
+        python $RHOMLPATH/dm2df.py -dm path_to_dm/density_matrix.npy
+
+
 Contact
 -------
 andrea.grisafi@epfl.ch
@@ -93,4 +101,4 @@ andrea.grisafi@epfl.ch
 
 Contributors
 ------------
-Andrea Grisafi, Alberto Fabrizio, Alan Lewis
+Andrea Grisafi, Alberto Fabrizio, Alan Lewis, Mariana Rossi, Clemence Corminboeuf, Michele Ceriotti
