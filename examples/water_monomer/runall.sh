@@ -1,17 +1,10 @@
 #!/usr/bin/bash
 
-python ../../src/sparse_set.py 
-
-python ../../src/kernel_mm.py 
-
-python ../../src/kernel_nm.py 
-
-python ../../src/initialize.py
-
-python ../../src/matrices.py
-
-python ../../src/learn.py 
-
-python ../../src/predict.py 
-
-python ../../src/error.py
+python $RHOMLPATH/sparse_set.py 
+python $RHOMLPATH/kernel_mm.py 
+python $RHOMLPATH/kernel_nm.py 
+python $RHOMLPATH/initialize.py
+python $RHOMLPATH/matrices.py
+python $RHOMLPATH/learn.py 
+python $RHOMLPATH/predict.py 
+python $RHOMLPATH/error.py
