@@ -1,8 +1,10 @@
-SUBROUTINE getab(trrange,atomspe,llmax,nnmax,nspecies,ntrain,M,natmax,natoms,totsize,&
+SUBROUTINE getab(dirker,dirover,dirprojs,&
+           trrange,atomspe,llmax,nnmax,nspecies,ntrain,M,natmax,natoms,totsize,&
            atomicindx,atomcount,specarray,almax,ancut,totalsizes,kernsizes,Avec,Bmat)
 use omp_lib
 IMPLICIT NONE
 ! allocate I/O variables
+CHARACTER*32:: dirker,dirover,dirprojs 
 INTEGER:: ntrain,M,natmax,totsize,llmax,nnmax,nspecies
 INTEGER,DIMENSION(natmax,nspecies,ntrain):: atomicindx
 INTEGER,DIMENSION(ntrain,nspecies):: atomcount
@@ -25,7 +27,7 @@ REAL*8,DIMENSION(:), ALLOCATABLE :: projections
 REAL*8,DIMENSION(:,:), ALLOCATABLE :: overlaps
 REAL*8,DIMENSION(:), ALLOCATABLE :: kernels 
 
-!f2py intent(in) trrange,atomspe,llmax,nnmax,nspecies,ntrain,M,natmax,natoms
+!f2py intent(in) dirker,dirover,dirprojs,trrange,atomspe,llmax,nnmax,nspecies,ntrain,M,natmax,natoms
 !f2py intent(in) totsize,atomicindx,atomcount,specarray,almax,ancut,totalsizes,kernsizes
 !f2py intent(out) Avec,Bmat 
 !f2py depend(totsize) Avec,Bmat 
@@ -39,7 +41,7 @@ REAL*8,DIMENSION(:), ALLOCATABLE :: kernels
 !$OMP FIRSTPRIVATE(kernels,projections,overlaps,trrange,atomspe,llmax,nnmax,nspecies,ntrain,natoms) &
 !$OMP FIRSTPRIVATE(M,natmax,totsize,atomicindx,atomcount,specarray,almax,ancut) &
 !$OMP FIRSTPRIVATE(totalsizes,sparseindexes,kernsparseindexes,kernsizes) &
-!$OMP SHARED(Avec,Bmat)
+!$OMP SHARED(Avec,Bmat,dirker,dirover,dirprojs)
 !$OMP DO SCHEDULE(dynamic)
 do itrain=1,ntrain
    allocate(projections(totalsizes(itrain)))
@@ -59,8 +61,8 @@ do itrain=1,ntrain
    if1 = itrain + 10
    if2 = itrain + 2000 
    if3 = itrain + 4000
-   open(unit=if1,file='projections/projections_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
-   open(unit=if2,file='overlaps/overlap_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
+   open(unit=if1,file=trim(adjustl(dirprojs))//'projections_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
+   open(unit=if2,file=trim(adjustl(dirover))//'overlap_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
    it1 = 1
    do iat=1,natoms(itrain)
       a1 = atomspe(itrain,iat)+1
@@ -96,7 +98,7 @@ do itrain=1,ntrain
    enddo
    close(if2)
    close(if1)
-   open(unit=if3,file='kernels/kernel_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
+   open(unit=if3,file=trim(adjustl(dirker))//'kernel_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
    ik1 = 1
    do iref1=1,M
       a1 = specarray(iref1) + 1

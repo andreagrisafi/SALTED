@@ -33,6 +33,12 @@ nnmax = max(nlist)
 # read system
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
+# read system
+xyzfile_testing = read(inp.filename_testing,":")
+ndata_testing = len(xyzfile_testing)
+
+#kernel directories
+dirkern = inp.dirkern_testing
 
 # number of sparse environments
 M = inp.Menv
@@ -46,6 +52,15 @@ for i in xrange(len(xyzfile)):
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_symbols[i]))
 natmax = max(natoms)
+# system parameters
+atomic_symbols_testing = []
+atomic_valence_testing = []
+natoms_testing = np.zeros(ndata_testing,int)
+for i in xrange(len(xyzfile_testing)):
+    atomic_symbols_testing.append(xyzfile_testing[i].get_chemical_symbols())
+    atomic_valence_testing.append(xyzfile_testing[i].get_atomic_numbers())
+    natoms_testing[i] = int(len(atomic_symbols_testing[i]))
+natmax_testing = max(natoms_testing)
 
 # atomic species arrays
 species = np.sort(list(set(np.array([item for sublist in atomic_valence for item in sublist]))))
@@ -63,6 +78,22 @@ for iconf in xrange(ndata):
                spec_list_per_conf[iconf].append(ispe)
 spec_array = np.asarray(spec_list,int)
 nenv = len(spec_array)
+# atomic species arrays
+species_testing = np.sort(list(set(np.array([item for sublist in atomic_valence_testing for item in sublist]))))
+nspecies_testing = len(species_testing)
+spec_list_testing = []
+spec_list_per_conf_testing = {}
+atom_counting_testing = np.zeros((ndata_testing,nspecies_testing),int)
+for iconf in xrange(ndata_testing):
+    spec_list_per_conf_testing[iconf] = []
+    for iat in xrange(natoms_testing[iconf]):
+        for ispe in xrange(nspecies_testing):
+            if atomic_valence_testing[iconf][iat] == species_testing[ispe]:
+               atom_counting_testing[iconf,ispe] += 1
+               spec_list_testing.append(ispe)
+               spec_list_per_conf_testing[iconf].append(ispe)
+spec_array_testing = np.asarray(spec_list_testing,int)
+nenv_testing = len(spec_array_testing)
 
 # atomic indexes sorted by valence
 atomicindx = np.zeros((natmax,nspecies,ndata),int)
@@ -71,7 +102,13 @@ for iconf in xrange(ndata):
         indexes = [i for i,x in enumerate(spec_list_per_conf[iconf]) if x==ispe]
         for icount in xrange(atom_counting[iconf,ispe]):
             atomicindx[icount,ispe,iconf] = indexes[icount]
-
+# atomic indexes sorted by valence
+atomicindx_testing = np.zeros((natmax_testing,nspecies_testing,ndata_testing),int)
+for iconf in xrange(ndata_testing):
+    for ispe in xrange(nspecies_testing):
+        indexes = [i for i,x in enumerate(spec_list_per_conf_testing[iconf]) if x==ispe]
+        for icount in xrange(atom_counting_testing[iconf,ispe]):
+            atomicindx_testing[icount,ispe,iconf] = indexes[icount]
 
 #====================================== reference environments 
 fps_indexes = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
@@ -95,22 +132,21 @@ for iref in xrange(1,M):
 totsize = collsize[-1] + bsize[fps_species[-1]]
 
 # dataset partitioning
-trainrangetot = np.loadtxt("training_set.txt",int)
-testrange = np.setdiff1d(range(ndata),trainrangetot)
+testrange = np.array(range(ndata_testing),int)
 ntest = len(testrange)
-natoms_test = natoms[testrange]
+natoms_test = natoms_testing[testrange]
 
 print "Number of test configurations = ", ntest
 print "Predicting the baselined expansion coefficients for the test set ..."
 
 # define testing indexes 
 test_configs = np.array(testrange,int)
-atomicindx_test = atomicindx[:,:,testrange]
-atom_counting_test = atom_counting[testrange]
-test_species = np.zeros((ntest,natmax),int)
+atomicindx_test = atomicindx_testing[:,:,testrange]
+atom_counting_test = atom_counting_testing[testrange]
+test_species = np.zeros((ntest,natmax_testing),int)
 for itest in xrange(ntest):
     for iat in xrange(natoms_test[itest]):
-        test_species[itest,iat] = spec_list_per_conf[testrange[itest]][iat]
+        test_species[itest,iat] = spec_list_per_conf_testing[testrange[itest]][iat]
 
 # sparse kernel sizes 
 kernel_sizes = np.zeros(ntest,int)
@@ -144,7 +180,8 @@ for ienv in xrange(M):
                 ww[ienv,l,n,im] = weights[i] 
                 i += 1
 
-coeffs = prediction.prediction(kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
+
+coeffs = prediction.prediction(dirkern,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies_testing,ntest,natmax_testing,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
 np.save("predictions.npy",coeffs)
 

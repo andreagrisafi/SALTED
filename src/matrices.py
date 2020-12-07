@@ -37,6 +37,10 @@ nnmax = max(nlist)
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
+dirkern = inp.dirkern
+dirprojs = inp.dirprojs
+dirover = inp.dirover
+
 # number of sparse environments
 M = inp.Menv
 
@@ -154,7 +158,7 @@ print "Computing regression matrices ..."
 
 # compute regression arrays
 start = time.time()
-Avec,Bmat = matrices.getab(train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes) 
+Avec,Bmat = matrices.getab(dirkern,dirover,dirprojs,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes) 
 print "Regression matrices computed in", (time.time()-start)/60.0, "minutes"
 
 # save regression arrays

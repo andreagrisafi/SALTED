@@ -29,6 +29,12 @@ llmax = max(llist)
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
+# path to soap 
+dirsoap = inp.dirsoap
+
+# path to kernels
+dirkern = inp.dirkern
+
 # number of sparse environments
 M = inp.Menv
 
@@ -108,7 +114,7 @@ power_ref_sparse = {}
 power_training = {}
 for l in xrange(llmax+1):
 
-    power = np.load("SOAP-"+str(l)+".npy")
+    power = np.load(dirsoap+"SOAP-"+str(l)+".npy")
 
     if l==0:
 
@@ -190,7 +196,7 @@ for iconf in xrange(ndata):
                         for im2 in xrange(msize):
                             ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
                             k_NM[ik] = kern[im2,im1]
-    np.savetxt("kernels/kernel_conf"+str(iconf)+".dat", k_NM,fmt='%.06e')
+    np.savetxt(dirkern+"kernel_conf"+str(iconf)+".dat", k_NM,fmt='%.06e')
 #    print iconf, time.time()-start, "seconds"
 
 print iconf+1, "Knm matrices computed in", (time.time()-startinit)/60.0, "minutes"

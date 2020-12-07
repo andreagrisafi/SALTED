@@ -32,6 +32,8 @@ llmax = max(llist)
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
+dirsoap = inp.dirsoap 
+
 # number of sparse environments
 M = inp.Menv
 
@@ -94,7 +96,7 @@ k_MM = np.zeros((llmax+1,M*(2*llmax+1),M*(2*llmax+1)),float)
 
 for l in xrange(llmax+1):
 
-    power = np.load("SOAP-"+str(l)+".npy")
+    power = np.load(dirsoap+"SOAP-"+str(l)+".npy")
 
     if l==0:
 

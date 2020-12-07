@@ -1,9 +1,10 @@
-SUBROUTINE prediction(kernsizes,specarray,atomcount,atomicindx,nspecies,ntest,natmax,&
+SUBROUTINE prediction(dirkern,kernsizes,specarray,atomcount,atomicindx,nspecies,ntest,natmax,&
                       llmax,nnmax,natoms,testrange,test_species,almax,anmax,M,ww,coeffs)
 
 use omp_lib
 IMPLICIT NONE
 ! allocate I/O variables
+CHARACTER*32:: dirkern
 INTEGER:: ntest,natmax,llmax,nnmax,M,nspecies
 INTEGER,DIMENSION(ntest)::natoms,testrange,kernsizes 
 INTEGER,DIMENSION(ntest,natmax)::test_species 
@@ -21,7 +22,7 @@ REAL*8:: kern
 INTEGER:: itest,iat,ispe,al,l,msize,n,im,iref,imm,conf,ik,a1,sk,ifk,icspe
 CHARACTER*16:: conf_str,ref_str
 
-!f2py intent(in) kernsizes,specarray,atomcount,atomicindx,nspecies,ntest
+!f2py intent(in) dirkern,kernsizes,specarray,atomcount,atomicindx,nspecies,ntest
 !f2py intent(in) natmax,llmax,nnmax,natoms,testrange,test_species,almax,anmax,M,ww
 !f2py intent(out) coeffs 
 !f2py depend(ntest) coeffs,natoms,test_species,testrange,atomcount,atomicindx,kernsizes 
@@ -36,7 +37,7 @@ coeffs(:,:,:,:,:) = 0.d0
 !$OMP PARALLEL DEFAULT(private) &
 !$OMP FIRSTPRIVATE(specarray,atomcount,atomicindx,nspecies,ntest,natmax,llmax,nnmax,natoms) &
 !$OMP FIRSTPRIVATE(testrange,test_species,almax,anmax,M,kernsparseindexes,kernels,kernsizes) &
-!$OMP SHARED(coeffs,ww)
+!$OMP SHARED(coeffs,ww,dirkern)
 !$OMP DO SCHEDULE(dynamic)
 do itest=1,ntest
    allocate(kernels(kernsizes(itest)))
@@ -47,7 +48,7 @@ do itest=1,ntest
    write(conf_str,*) conf
    write(ref_str,*) M
    ifk = itest + 1000
-   open(unit=ifk,file='kernels/kernel_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
+   open(unit=ifk,file=trim(adjustl(dirkern))//'kernel_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
    ik = 1
    do iref=1,M
       ispe = specarray(iref) + 1
