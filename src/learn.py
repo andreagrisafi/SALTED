@@ -16,7 +16,7 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.dfbasis)
 
 llist = []
 nlist = []

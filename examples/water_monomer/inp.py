@@ -1,26 +1,28 @@
-# system definition in .xyz format
-filename = "coords_1000.xyz"
+# system definition 
+# -----------------
+filename = "coords_1000.xyz" # XYZ file
+species = ["H","O"] # ordered list of species
 
-# basis set for the scalar-field decomposition 
-basis = "RI-ccpVQZ"
+# QM variables 
+# ------------
+path2qm = "/local/big_scratch/rho_water_monomer/" # path to density matrices 
+functional = "b3lyp" # DFT functional
+qmbasis = "cc-pvqz" # atomic basis
 
-# valence-ordered list of atomic species 
-species = ["H","O"]
+# RHO variables
+# -------------
+path2overl = "./overlaps/" # path to overlaps                
+path2projs = "./projections/" # path to projections               
+path2preds = "./predictions/" # path to predictions               
+dfbasis = "RI-cc-pvqz" # auxiliary basis
 
-# number of atomic sparse environments 
-Menv = 100
-
-# number of training configurations 
-Ntrain = 200
-
-# training set fraction
-trainfrac = 1.0
-
-# regularization
-regul = 1e-08
-
-# jitter value
-jitter = 1e-10
-
-# kernel non-linearity degree (1,2,...)
-z = 2.0
+# ML variables  
+# ------------
+path2soap = "./soaps/" # path to soap features               
+path2kern = "./kernels/" # path to kernels
+z = 2.0 # kernel exponent 
+Menv = 100 # number of FPS environments
+Ntrain = 500 # number of training structures
+trainfrac = 1.0 # training set fraction
+regul = 1e-08 # regularization
+jitter = 1e-10 # jitter value

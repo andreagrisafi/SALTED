@@ -19,7 +19,7 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.dfbasis)
 
 llist = []
 nlist = []
@@ -33,9 +33,6 @@ nnmax = max(nlist)
 # read system
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
-
-# kernels directory
-dirkern = inp.dirkern
 
 # number of sparse environments
 M = inp.Menv
@@ -147,6 +144,6 @@ for ienv in xrange(M):
                 ww[ienv,l,n,im] = weights[i] 
                 i += 1
 
-coeffs = prediction.prediction(dirkern,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
+coeffs = prediction.prediction(inp.path2kern,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
 np.save("validations.npy",coeffs)

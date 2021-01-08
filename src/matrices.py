@@ -22,7 +22,7 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.dfbasis)
 
 llist = []
 nlist = []
@@ -36,10 +36,6 @@ nnmax = max(nlist)
 # read system
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
-
-dirkern = inp.dirkern
-dirprojs = inp.dirprojs
-dirover = inp.dirover
 
 # number of sparse environments
 M = inp.Menv
@@ -109,7 +105,8 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 
 # training set selection
 dataset = range(ndata)
-random.Random(3).shuffle(dataset)
+random.shuffle(dataset)
+#random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(frac*len(trainrangetot))
@@ -158,7 +155,7 @@ print "Computing regression matrices ..."
 
 # compute regression arrays
 start = time.time()
-Avec,Bmat = matrices.getab(dirkern,dirover,dirprojs,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes) 
+Avec,Bmat = matrices.getab(inp.path2kern,inp.path2overl,inp.path2projs,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes) 
 print "Regression matrices computed in", (time.time()-start)/60.0, "minutes"
 
 # save regression arrays

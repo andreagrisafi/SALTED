@@ -1,5 +1,5 @@
-Machine-learning of three-dimensional scalar fields 
-===================================================
+Symmetry-Adapted Learning of Three-dimensional Electron Densities
+==============================================================
 This repository contains an implementation of sparse Gaussian Process Regression that is suitable to do machine learning of any three-dimensional scalar field, e.g., the electron density of a system, that is expanded on an atom-centered basis made of radial functions and spherical harmonics. 
 
 
@@ -37,7 +37,6 @@ For each dataset configuration, both the scalar-field projection vector and the 
 3) Finally, loop over the angular momentum components sorted as -L,...,0,...,+L
 
 The possible basis set choices appear in :code:`src/basis.py`. If you want to use a basis that is not included in this file, it is easy enough to add a new one together with the proper dimensions.
-
 
 
 Workflow 
@@ -86,6 +85,10 @@ In the following, the interpolation of the electron density of a dataset made of
 
         python $RHOMLPATH/error.py
 
+This gives a RMSE of about 5% of the intrisic variability of the electron density over the test set.
+
+
+This gives a RMSE of about 1.0 kcal/mol on the electrostatic energy, corresponding to about 0.2% of the standard deviation over the test set.
 
 Dataset generation from 1-electron density matrix
 -------------------------------------------------

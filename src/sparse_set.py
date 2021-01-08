@@ -16,8 +16,6 @@ ndata = len(xyzfile)
 # number of sparse environments
 M = inp.Menv
 
-dirsoap = inp.dirsoap
-
 print "Computing a sparse set made of", M, "FPS environments..."
 
 def do_fps(x, d=0):
@@ -69,7 +67,7 @@ for iconf in xrange(ndata):
         for icount in xrange(atom_counting[iconf,ispe]):
             atomicindx[iconf,ispe,icount] = indexes[icount]
 #====================== environmental power spectrum
-power = np.load(dirsoap+"SOAP-0.npy")
+power = np.load(inp.path2soap+"SOAP-0.npy")
 nfeat = len(power[0,0])
 power_env = np.zeros((nenv,nfeat),complex)
 ienv = 0

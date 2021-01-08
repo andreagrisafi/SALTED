@@ -21,7 +21,7 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.dfbasis)
 
 llist = []
 for spe in spelist:
@@ -32,7 +32,7 @@ llmax = max(llist)
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
-dirsoap = inp.dirsoap 
+path2soap = inp.path2soap 
 
 # number of sparse environments
 M = inp.Menv
@@ -96,7 +96,7 @@ k_MM = np.zeros((llmax+1,M*(2*llmax+1),M*(2*llmax+1)),float)
 
 for l in xrange(llmax+1):
 
-    power = np.load(dirsoap+"SOAP-"+str(l)+".npy")
+    power = np.load(path2soap+"SOAP-"+str(l)+".npy")
 
     if l==0:
 
@@ -106,12 +106,13 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata,natmax,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            iat = 0
-            for ispe in xrange(nspecies):
-                for icount in xrange(atom_counting[iconf,ispe]):
-                    jat = atomicindx[iconf,ispe,icount]
-                    power_per_conf[iconf,jat] = power[iconf,iat]
-                    iat+=1
+            power_per_conf[iconf] = power[iconf]
+            #iat = 0
+            #for ispe in xrange(nspecies):
+            #    for icount in xrange(atom_counting[iconf,ispe]):
+            #        jat = atomicindx[iconf,ispe,icount]
+            #        power_per_conf[iconf,jat] = power[iconf,iat]
+            #        iat+=1
             for iat in xrange(natoms[iconf]):
                 power_env[ienv] = power_per_conf[iconf,iat]
                 ienv += 1
@@ -128,12 +129,13 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata,natmax,2*l+1,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            iat = 0
-            for ispe in xrange(nspecies):
-                for icount in xrange(atom_counting[iconf,ispe]):
-                    jat = atomicindx[iconf,ispe,icount]
-                    power_per_conf[iconf,jat] = power[iconf,iat]
-                    iat+=1
+            power_per_conf[iconf] = power[iconf]
+            #iat = 0
+            #for ispe in xrange(nspecies):
+            #    for icount in xrange(atom_counting[iconf,ispe]):
+            #        jat = atomicindx[iconf,ispe,icount]
+            #        power_per_conf[iconf,jat] = power[iconf,iat]
+            #        iat+=1
             for iat in xrange(natoms[iconf]):
                 power_env[ienv] = power_per_conf[iconf,iat]
                 ienv += 1

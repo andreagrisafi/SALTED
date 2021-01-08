@@ -38,7 +38,7 @@ xyzfile_testing = read(inp.filename_testing,":")
 ndata_testing = len(xyzfile_testing)
 
 #kernel directories
-dirkern = inp.dirkern_testing
+path2kern = inp.path2kern_testing
 
 # number of sparse environments
 M = inp.Menv
@@ -181,7 +181,7 @@ for ienv in xrange(M):
                 i += 1
 
 
-coeffs = prediction.prediction(dirkern,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies_testing,ntest,natmax_testing,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
+coeffs = prediction.prediction(path2kern,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies_testing,ntest,natmax_testing,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
 np.save("predictions.npy",coeffs)
 

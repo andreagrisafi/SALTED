@@ -7,7 +7,7 @@ def basiset(basis):
    lmax = {}
    nmax = {}
 
-   if basis=="RI-ccpVQZ":
+   if basis=="RI-cc-pvqz":
 
       lmax["H"] = 4
       lmax["C"] = 5

@@ -18,7 +18,7 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i] 
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.dfbasis)
 
 llist = []
 for spe in spelist:
@@ -28,10 +28,6 @@ llmax = max(llist)
 # read system
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
-
-# path to projections and overlaps
-dirprojs = inp.dirprojs
-dirover = inp.dirover
 
 #======================= system parameters
 atomic_symbols = []
@@ -74,8 +70,8 @@ print "computing averages..."
 for iconf in xrange(ndata):
     atoms = atomic_symbols[iconf]
     #==================================================
-    Proj = np.load(dirprojs+"projections_conf"+str(iconf)+".npy")
-    Over = np.load(dirover+"overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(inp.path2projs+"projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2overl+"overlap_conf"+str(iconf)+".npy")
     Coef = np.linalg.solve(Over,Proj)
     #==================================================
     i = 0
@@ -102,8 +98,8 @@ for iconf in xrange(ndata):
         for l in xrange(lmax[atoms[iat]]+1):
             totsize += nmax[(atoms[iat],l)]*(2*l+1)
     #==================================================
-    Proj = np.load(dirprojs+"projections_conf"+str(iconf)+".npy")
-    Over = np.load(dirover+"overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(inp.path2projs+"projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2overl+"overlap_conf"+str(iconf)+".npy")
     #==================================================
     Av_coeffs = np.zeros(totsize,float)
     i = 0
@@ -117,5 +113,5 @@ for iconf in xrange(ndata):
                     i += 1
     #==================================================
     Proj -= np.dot(Over,Av_coeffs)
-    np.savetxt(dirprojs+"projections_conf"+str(iconf)+".dat",Proj, fmt='%.10e')
-    np.savetxt(dirover+"overlap_conf"+str(iconf)+".dat", np.concatenate(Over), fmt='%.10e')
+    np.savetxt(inp.path2projs+"projections_conf"+str(iconf)+".dat",Proj, fmt='%.10e')
+    np.savetxt(inp.path2overl+"overlap_conf"+str(iconf)+".dat", np.concatenate(Over), fmt='%.10e')

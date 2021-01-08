@@ -15,7 +15,7 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.dfbasis)
 
 # read system
 xyzfile = read(inp.filename,":")
@@ -23,10 +23,6 @@ ndata = len(xyzfile)
 
 # number of sparse environments
 M = inp.Menv
-
-dirover = inp.dirover
-dirprojs = inp.dirprojs
-
 
 #======================= system parameters
 atomic_symbols = []
@@ -44,7 +40,7 @@ testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
-coeffs = np.load("validations.npy")
+coeffs = np.load("pred_coeffs.npy")
 
 av_coefs = {}
 for spe in spelist:
@@ -60,8 +56,8 @@ for iconf in testrange:
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
     #================================================
-    projs_ref = np.load(dirprojs+"projections_conf"+str(iconf)+".npy")
-    overl = np.load(dirover+"overlap_conf"+str(iconf)+".npy")
+    projs_ref = np.load(inp.path2projs+"projections_conf"+str(iconf)+".npy")
+    overl = np.load(inp.path2overl+"overlap_conf"+str(iconf)+".npy")
     coeffs_ref = np.linalg.solve(overl,projs_ref)
     size_coeffs = coeffs_ref.shape
     #================================================
@@ -79,7 +75,7 @@ for iconf in testrange:
                         coefficients[icoeff] = coeffs[itest,iat,l,n,im] 
                     icoeff +=1
     projections = np.dot(overl,coefficients)
-    np.save(dirprojs+"prediction_conf"+str(iconf)+".npy",projections)
+    np.save(inp.path2preds+"prediction_conf"+str(iconf)+".npy",projections)
     #================================================
     error = np.dot(coefficients-coeffs_ref,projections-projs_ref)
     error_density += error 

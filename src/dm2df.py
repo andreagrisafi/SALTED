@@ -7,7 +7,7 @@ import argparse
 
 def add_command_line_arguments(parsetext):
     parser = argparse.ArgumentParser(description=parsetext,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("-i", "--confidx",  type=int, default=1, help="Structure index")
+    parser.add_argument("-iconf", "--confidx",  type=int, default=1, help="Structure index")
     args = parser.parse_args()
     return args
 
@@ -18,8 +18,9 @@ def set_variable_values(args):
 args = add_command_line_arguments("")
 iconf = set_variable_values(args)
 
-# 0-based indexing
-iconf -= 1 
+print ""
+print "conf", iconf
+iconf -= 1 # 0-based indexing 
 
 import basis
 
@@ -30,7 +31,7 @@ xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.dfbasis)
 
 print "PySCF orders all angular momentum components for L>1 as -L,...,0,...,+L," 
 print "and as +1,-1,0 for L=1, corresponding to X,Y,Z in Cartesian-SPH."
@@ -50,8 +51,9 @@ for i in range(natoms):
     atoms.append([symb[i],(coord[0],coord[1],coord[2])])
 
 # Get PySCF objects for wave-function and density-fitted basis
-mol = gto.M(atom=atoms,basis="cc-pvqz")
-auxmol = gto.M(atom=atoms,basis="cc-pvqz jkfit")
+mol = gto.M(atom=atoms,basis=inp.qmbasis)
+ribasis = inp.qmbasis+" jkfit"
+auxmol = gto.M(atom=atoms,basis=ribasis)
 pmol = mol + auxmol
 
 print "Computing overlap matrix..."
@@ -71,7 +73,7 @@ eri2c = auxmol.intor('int2c2e_sph')
 eri3c = pmol.intor('int3c2e_sph', shls_slice=(0,mol.nbas,0,mol.nbas,mol.nbas,mol.nbas+auxmol.nbas))
 eri3c = eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
 # Load 1-electron reduced density-matrix
-dm=np.load("qm-runs/conf_"+str(iconf+1)+"/density_matrix.npy")
+dm=np.load(inp.path2qm+"dm_conf"+str(iconf+1)+".npy")
 # Compute density fitted coefficients
 rho = np.einsum('ijp,ij->p', eri3c, dm)
 rho = np.linalg.solve(eri2c, rho)
@@ -124,23 +126,23 @@ for iat in xrange(natoms):
 Proj = np.dot(Over,Coef)
 
 # Save projections and overlaps
-np.save("projections/projections_conf"+str(iconf)+".npy",Proj)
-np.save("overlaps/overlap_conf"+str(iconf)+".npy",Over)
+np.save(inp.path2projs+"projections_conf"+str(iconf)+".npy",Proj)
+np.save(inp.path2overl+"overlap_conf"+str(iconf)+".npy",Over)
 
 # --------------------------------------------------
 
-print "Computing ab-initio energies.."
-
-# Hartree energy
-J = np.einsum('Q,mnQ->mn', rho, eri3c)
-e_h = np.einsum('ij,ji', J, dm) * 0.5
-f = open("qm-runs/conf_"+str(iconf+1)+"/hartree_energy.dat", 'w') 
-print >> f, e_h
-f.close()
-
-# Nuclear-electron energy
-h = mol.intor_symmetric('int1e_nuc')
-e_Ne = np.einsum('ij,ji', h, dm) 
-f = open("qm-runs/conf_"+str(iconf+1)+"/external_energy.dat", 'w') 
-print >> f, e_Ne
-f.close()
+#print "Computing ab-initio energies.."
+#
+## Hartree energy
+#J = np.einsum('Q,mnQ->mn', rho, eri3c)
+#e_h = np.einsum('ij,ji', J, dm) * 0.5
+#f = open("hartree_energy.dat", 'a') 
+#print >> f, e_h
+#f.close()
+#
+## Nuclear-electron energy
+#h = mol.intor_symmetric('int1e_nuc')
+#e_Ne = np.einsum('ij,ji', h, dm) 
+#f = open("external_energy.dat", 'a') 
+#print >> f, e_Ne
+#f.close()
