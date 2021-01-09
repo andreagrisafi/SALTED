@@ -146,4 +146,4 @@ for ienv in xrange(M):
 
 coeffs = prediction.prediction(inp.path2kern,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
-np.save("validations.npy",coeffs)
+np.save("pred_coeffs.npy",coeffs)
