@@ -154,14 +154,6 @@ for iconf in testrange:
     # RI
     matrix_of_coefficients = np.outer(ref_rho,ref_rho)
     E_H_ref = np.einsum('ij,ji',eri2c,matrix_of_coefficients)*0.5
-    # QM
-    dm=np.load(inp.path2qm+"dm_conf"+str(iconf+1)+".npy")
-    eri3c = pmol.intor('int3c2e_sph', shls_slice=(0,mol.nbas,0,mol.nbas,mol.nbas,mol.nbas+auxmol.nbas))
-    eri3c = eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
-    rho = np.einsum('ijp,ij->p', eri3c, dm)
-    rho = np.linalg.solve(eri2c, rho)
-    J = np.einsum('Q,mnQ->mn', rho, eri3c)
-    E_H_ab = np.einsum('ij,ji', J, dm) * 0.5
     # Compute electron-nuclear energy
     E_eN = 0.0
     E_eN_ref = 0.0
@@ -199,22 +191,20 @@ for iconf in testrange:
         E_eN_ref += ref_contr*valences[iat]
     E_eN *= -np.sqrt(4.0*np.pi)
     E_eN_ref *= -np.sqrt(4.0*np.pi)
-    h = mol.intor_symmetric('int1e_nuc')
-    E_eN_ab = np.einsum('ij,ji', h, dm)
-    print >> f, iconf+1, E_H_ab, E_H_ref, E_H
-    print >> g, iconf+1, E_eN_ab, E_eN_ref, E_eN
+    print >> f, iconf+1, E_H_ref, E_H
+    print >> g, iconf+1, E_eN_ref, E_eN
     itest+=1
 
 f.close()
 g.close()
 
 # compute error on electrostatic energy
-hartree_ref = np.loadtxt("hartree_energy.dat")[:,2]
-external_ref = np.loadtxt("external_energy.dat")[:,2]
+hartree_ref = np.loadtxt("hartree_energy.dat")[:,1]
+external_ref = np.loadtxt("external_energy.dat")[:,1]
 electro_ref = hartree_ref + external_ref 
 
-hartree_pre = np.loadtxt("hartree_energy.dat")[:,3]
-external_pre = np.loadtxt("external_energy.dat")[:,3]
+hartree_pre = np.loadtxt("hartree_energy.dat")[:,2]
+external_pre = np.loadtxt("external_energy.dat")[:,2]
 electro_pre = hartree_pre + external_pre
 
 abs_errors = (electro_pre - electro_ref) 

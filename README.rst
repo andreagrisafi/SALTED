@@ -55,54 +55,59 @@ In this example, we consider the interpolation of the electron density of a data
 
    The projections and overlaps, saved as :code:`projections_conf#.npy` and :code:`overlap_conf#.npy`, can be found in the directory specified.   
 
-3) In case you skipped points 1 and 2, you can find precomputed projection vectors and the overlap matrices at the RI-cc-pvqz level in the :code:`./projections/` and :code:`./overlaps/` folders.
+3) In case you skipped points 1 and 2, you can find precomputed projection vectors and the overlap matrices at the RI-cc-pvqz level in the :code:`./projections/` and :code:`./overlaps/` folders. To initialize the regression targets, run::
 
-1) Generate tensorial SOAP representations up to the maximum angular momentum :code:`-lm` included in the expansion of the scalar field. In this case, we need to go up to L=5:: 
+       python $SALTEDPATH/initialize.py
+
+   This will compute the mean spherical density projections over the dataset and used them as a baseline value for the density projections. 
+
+4) Using the TENSOAP package, generate the L-SOAP structural features up to the maximum angular momentum :code:`-lm` included in the expansion of the density field. In this case, we need to go up to L=5:: 
 
         for i in 0 1 2 3 4 5
-        do
-           sagpr_get_PS -n 8 -l 6 -rc 4.0 -sg 0.3 -f coords_1000.xyz -c H O -s H O -lm ${i} -o SOAP-${i}
+        do      
+           sagpr_get_PS -f coords_1000.xyz -lm ${i} -o path2soap/SOAP-${i}
         done 
 
-   Type :code:`get_power_spectrum.py -h` for SOAP parameters documentation. Note that to sensibly reduce the feature space size for high angular momenta, the resolution of the SOAP representation can possibly be decreased as the :code:`-lm` value is increased, without loosing in learning accuracy. This means reducing the radial :code:`-n` and angular :code:`-l` cutoffs respectively used to expand the SOAP atomic density.
+   Once computed, the path to the folder that you used to save the L-SOAP features need to be specified in :code:`inp.py` using the :code:`path2soap` variable. 
 
-2) Extract a sparse set of environmentsto reduce the dimensionality of the regression problem. This is done via the farthest point sampling (FPS) method, using the SOAP-0 representation previously computed as a metric to distiguish between two atomic environments::
+5) Extract a sparse set of atomic environments to reduce the dimensionality of the regression problem. The number of these environments is specified by the input variable :code:`Menv = 100`. This is done via the farthest point sampling (FPS) method, using the 0-SOAP features previously computed as a metric to distiguish between any pair of atomic environments::
 
-        python $RHOMLPATH/sparse_set.py 
-
-
-3) Compute the block diagonal kernel matrix for the selected sparse set of atomic environments::  
-
-        python $RHOMLPATH/kernel_mm.py 
-
-4) For each configuration of the dataset, compute the kernel matrix that couples the atoms of that configuration with the selected sparse set of atomic environments. For that, first generate a folder as :code:`mkdir kernels` where the kernel matrices for each configuration will be saved as text files::
-
-        python $RHOMLPATH/kernel_nm.py 
-
-5) Compute the spherical averages of the scalar field coefficients over the dataset and use them to baseline the projections of the scalar field on the basis set. Then print out both the baselined projections and overlap matrices as text files::
-
-        python $RHOMLPATH/initialize.py
-
-6) Partition the dataset into training and test set by selecting N training configurations at random. Then compute the regression vector A and the regression matrix B using a given training set fraction specified in :code:`inp.py`::
-
-        python $RHOMLPATH/matrices.py 
-
-7) Do the regression with a given regularization and jitter values specified in :code:`inp.py`, needed for the stability of the matrix inversion::
-
-        python $RHOMLPATH/learn.py 
-
-8) Predict the baselined expansion coefficients of the scalar field over the test set::
-
-        python $RHOMLPATH/predict.py 
-
-9) Print out the predicted scalar field projections in the :code:`projections` folder and estimate the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset:: 
-
-        python $RHOMLPATH/error.py
-
-This gives a RMSE of about 5% of the intrisic variability of the electron density over the test set.
+        python $SALTEDPATH/sparse_set.py 
 
 
-This gives a RMSE of about 1.0 kcal/mol on the electrostatic energy, corresponding to about 0.2% of the standard deviation over the test set.
+5) Compute the block diagonal kernel matrix for the selected sparse set of atomic environments::  
+
+        python $SALTEDPATH/kernel_mm.py 
+
+6) For each configuration of the dataset, compute the kernel matrix that couples the atoms of that configuration with the selected sparse set of atomic environments. The path to the folder used to save the kernels of each configuration needs to be set using the :code:`path2kern` variables. Then run:: 
+
+        python $SALTEDPATH/kernel_nm.py 
+
+7) Partition the dataset into training and validation set by selecting :code:`Ntrain = 500` training configurations at random. Then, compute the regression vector A and the regression matrix B using a given training set fraction :code:`trainfrac = 1.0`::
+
+        python $SALTEDPATH/matrices.py 
+
+8) Perform the regression with a given regularization :code:`regul = 1e-08` and jitter value :code:`jitter = 1e-10`, needed for the stabilize of the solution::
+
+        python $SALTEDPATH/learn.py 
+
+9) Predict the baselined expansion coefficients of the scalar field over the validation set::
+
+        python $SALTEDPATH/validate.py 
+   
+   which will be saved as :code:`pred_coeffs.npy`.
+
+10) Print out the predicted scalar field projections in the folder specified using the :code:`path2pred` variable and compute the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset (printed out to screen):: 
+
+        python $SALTEDPATH/error_validation.py
+
+   This gives a RMSE of about 5% of the intrisic variability of the electron density over the test set.
+
+11) On top of the predicted density components, compute the Hartree energy and the external energy of the system compared against the RI reference values::
+
+        python $SALTEDPATH/electrostatics.py
+
+   This gives a RMSE of about 1.0 kcal/mol on the final electrostatic energy, corresponding to about 0.2% of the standard deviation over the validation set.
 
 
 Contact
