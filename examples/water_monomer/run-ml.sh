@@ -1,11 +1,11 @@
 #!/usr/bin/bash
 
-python $RHOMLPATH/sparse_set.py 
-python $RHOMLPATH/kernel_mm.py 
-python $RHOMLPATH/kernel_nm.py 
-python $RHOMLPATH/initialize.py
-python $RHOMLPATH/matrices.py
-python $RHOMLPATH/learn.py 
-python $RHOMLPATH/validate.py 
-python $RHOMLPATH/error_validation.py
-python $RHOMLPATH/electrostatics.py
+python $SALTEDPATH/sparse_set.py 
+python $SALTEDPATH/kernel_mm.py 
+python $SALTEDPATH/kernel_nm.py 
+python $SALTEDPATH/initialize.py
+python $SALTEDPATH/matrices.py
+python $SALTEDPATH/learn.py 
+python $SALTEDPATH/validate.py 
+python $SALTEDPATH/error_validation.py
+python $SALTEDPATH/electrostatics.py
