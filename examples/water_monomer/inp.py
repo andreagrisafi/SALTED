@@ -13,13 +13,13 @@ qmbasis = "cc-pvqz" # atomic basis
 # -------------
 path2overl = "./overlaps/" # path to overlaps                
 path2projs = "./projections/" # path to projections               
-path2preds = "./predictions/" # path to predictions               
 dfbasis = "RI-cc-pvqz" # auxiliary basis
 
 # ML variables  
 # ------------
 path2soap = "./soaps/" # path to soap features               
 path2kern = "./kernels/" # path to kernels
+path2preds = "./predictions/" # path to predictions               
 z = 2.0 # kernel exponent 
 Menv = 100 # number of FPS environments
 Ntrain = 500 # number of training structures
