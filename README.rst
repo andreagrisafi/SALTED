@@ -34,20 +34,20 @@ For each dataset configuration, both the scalar-field projection vector and the 
 
 2) For a given combination (X,L), loop over the radial functions {n} 
 
-3) Loop over the angular function sorted as -L,...,0,...,+L
+3) Loop over the angular functions sorted as -L,...,0,...,+L
 
 The possible basis set choices appear in :code:`src/basis.py`. If you want to use a basis that is not included in this file, it is easy enough to add a new one together with the proper dimensions.
 
 
 Regression workflow 
 -------------------
-In this example, we consider the interpolation of the electron density of a dataset made of 1000 water molecules. For that, go into the example folder :code:`examples/water_monomer`. The file :code:`inp.py` contains the input parameters of the calculation, while the file :code:`coords_1000.xyz` contains the atomic coordinates of the system. Both the file-name of the input geometry and an ordered list of the atomic species included in the dataset need to be specified in :code:`inp.py`. In the following, we consider the possibility of generating the input densities from scratch. In case you already have the one-electron reduced density matrices of the system, you can jump to point 2). In case you already have the basis set projections of density and the basis set overlaps, as described in the previous section, you can jump to point 3).
+In this example, we consider the interpolation of the electron density of a dataset made of 1000 water molecules. For that, go into the example folder :code:`examples/water_monomer`. The file :code:`inp.py` contains the input parameters of the calculation, while the file :code:`coords_1000.xyz` contains the atomic coordinates of the system. Both the file-name of the input geometry and an ordered list of the atomic species included in the dataset need to be specified in :code:`inp.py`. In the following, we consider the possibility of generating the input densities from scratch. In case you already have the one-electron reduced density matrices of the system, you can jump to point 2. In case you already have the basis set projections of density and the basis set overlaps, as described in the previous section, you can jump to point 3.
 
 1) We start generating the density matrices associated with a KS-DFT calculation using PySCF. The QM variables needed as input are the path to the directory where the density matrices will be saved (:code:`path2qm`), the DFT functional (:code:`functional = "b3lyp"`) and the wave-function basis set (:code:`qmbasis = "cc-pvqz"`). To run the QM calculations for each structure in the dataset:: 
 
         for i in {1..1000}; do python $RHOMLPATH/run_pyscf.py -iconf ${i}; done 
 
-The density matrices, saved as :code:`dm_conf#.npy`, will be saved in the directory specified.
+   The density matrices, saved as :code:`dm_conf#.npy`, can be found in the directory specified.
 
 1) Generate tensorial SOAP representations up to the maximum angular momentum :code:`-lm` included in the expansion of the scalar field. In this case, we need to go up to L=5:: 
 
