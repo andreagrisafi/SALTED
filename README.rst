@@ -99,7 +99,7 @@ In this example, we consider the interpolation of the electron density of a data
 
 10) Print out the predicted scalar field projections in the folder specified using the :code:`path2pred` variable and compute the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset (printed out to screen):: 
 
-        python $SALTEDPATH/error_validation.py
+        $python $SALTEDPATH/error_validation.py
 
  This gives a RMSE of about 0.2% of the intrisic variability of the electron density over the test set.
 
