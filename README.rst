@@ -97,19 +97,19 @@ In this example, we consider the interpolation of the electron density of a data
    
    which will be saved as :code:`pred_coeffs.npy`.
 
-10) Print out the predicted scalar field projections in the folder specified using the :code:`path2pred` variable and compute the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset (printed out to screen):: 
+10) Print out the predicted scalar field projections in the folder specified using the :code:`path2preds` variable and compute the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset (printed out to screen):: 
 
         python $SALTEDPATH/error_validation.py
 
 
- This gives a RMSE of about 0.2% of the intrisic variability of the electron density over the test set.
+   This gives a RMSE of about 0.2% of the intrisic variability of the electron density over the test set.
 
 11) On top of the predicted density components, compute the Hartree energy and the external energy of the system compared against the RI reference values::
 
         python $SALTEDPATH/electrostatics.py
 
 
- This gives a RMSE of about 0.2 kcal/mol on the final electrostatic energy, corresponding to about 0.03% of the standard deviation over the validation set.
+   This gives a RMSE of about 0.2 kcal/mol on the final electrostatic energy, corresponding to about 0.03% of the standard deviation over the validation set.
 
 
 Contact
