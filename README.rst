@@ -49,7 +49,7 @@ In this example, we consider the interpolation of the electron density of a data
 
    The density matrices, saved as :code:`dm_conf#.npy`, can be found in the directory specified.
 
-2) From the density matrices, the resolution of the identity (RI) method can be used to compute the density components on a linear auxiliary basis. The density matrix is assumed to be saved according to the PySCF convention, that is, as -L,...,0,...,+L for L>1 and as +1,-1,0 for L=1. The RI-auxiliary basis has to correspond to its wave-function counterpart and can be set as :code:`dfbasis = "RI-cc-pvqz"`. The path to the folder where the RI-density projections and the RI-overlap matrices will be saved can be specified using the variables :code:`path2projs` and :code:`path2overl`, respectively. To compute the RI projections and overlaps for each structure of the dataset, run::
+2) From the density matrices, the resolution of the identity (RI) method can be used to compute the density components on a linear auxiliary basis. The density matrix is assumed to be saved according to the PySCF convention, that is, as -L,...,0,...,+L for L>1 and as +1,-1,0 for L=1. The RI-auxiliary basis has to correspond to its wave-function counterpart and can be set as :code:`dfbasis = "RI-cc-pvqz"`. The path to the folders where the RI-density projections and the RI-overlap matrices will be saved can be specified using the variables :code:`path2projs` and :code:`path2overl`, respectively. To compute the RI projections and overlaps for each structure of the dataset, run::
 
        for i in {1..1000}; do python $SALTEDPATH/dm2df.py -iconf ${i}; done
 
@@ -59,7 +59,7 @@ In this example, we consider the interpolation of the electron density of a data
 
        python $SALTEDPATH/initialize.py
 
-   This will compute the mean spherical density projections over the dataset and used them as a baseline value for the density projections. 
+   This will compute the mean spherical density projections over the dataset and use them as a baseline value for the density projections. 
 
 4) Using the TENSOAP package, generate the L-SOAP structural features up to the maximum angular momentum :code:`-lm` included in the expansion of the density field. In this case, we need to go up to L=5:: 
 
@@ -79,7 +79,7 @@ In this example, we consider the interpolation of the electron density of a data
 
         python $SALTEDPATH/kernel_mm.py 
 
-6) For each configuration of the dataset, compute the kernel matrix that couples the atoms of that configuration with the selected sparse set of atomic environments. The path to the folder used to save the kernels of each configuration needs to be set using the :code:`path2kern` variables. Then run:: 
+6) For each configuration of the dataset, compute the kernel matrix that couples the atoms of that configuration with the selected sparse set of atomic environments. The path to the folder used to save the kernels of each configuration needs to be set using the :code:`path2kern` variable. Then run:: 
 
         python $SALTEDPATH/kernel_nm.py 
 
@@ -97,15 +97,17 @@ In this example, we consider the interpolation of the electron density of a data
    
    which will be saved as :code:`pred_coeffs.npy`.
 
-10. Print out the predicted scalar field projections in the folder specified using the :code:`path2pred` variable and compute the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset (printed out to screen):: 
+10) Print out the predicted scalar field projections in the folder specified using the :code:`path2pred` variable and compute the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset (printed out to screen):: 
 
         python $SALTEDPATH/error_validation.py
+
 
  This gives a RMSE of about 0.2% of the intrisic variability of the electron density over the test set.
 
 11) On top of the predicted density components, compute the Hartree energy and the external energy of the system compared against the RI reference values::
 
         python $SALTEDPATH/electrostatics.py
+
 
  This gives a RMSE of about 0.2 kcal/mol on the final electrostatic energy, corresponding to about 0.03% of the standard deviation over the validation set.
 
