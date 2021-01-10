@@ -49,7 +49,7 @@ In this example, we consider the interpolation of the electron density of a data
 
    The density matrices, saved as :code:`dm_conf#.npy`, can be found in the directory specified.
 
-2) From the density matrices, the resolution of the identity (RI) method can be used to compute the density components on a linear auxiliary basis. The density matrix is assumed to be saved according to the PySCF convention, that is, as -L,...,0,...,+L for L>1 and as +1,-1,0 for L=1. The RI-auxiliary basis has to correspond to its wave-function counterpart and can be set as :code:`dfbasis = "RI-cc-pvqz"`. The path to the folder where the RI-density projections and the RI-overlap matrices will be saved can be specified using the variables :code:`path2projs` and :code:`path2overl`, respectively. The RI-auxiliary basis has to correspond to its wave-function counterpart and can be set as :code:`dfbasis = "RI-cc-pvqz"`. To compute the RI projections and overlaps for each structure of the dataset, run::
+2) From the density matrices, the resolution of the identity (RI) method can be used to compute the density components on a linear auxiliary basis. The density matrix is assumed to be saved according to the PySCF convention, that is, as -L,...,0,...,+L for L>1 and as +1,-1,0 for L=1. The RI-auxiliary basis has to correspond to its wave-function counterpart and can be set as :code:`dfbasis = "RI-cc-pvqz"`. The path to the folder where the RI-density projections and the RI-overlap matrices will be saved can be specified using the variables :code:`path2projs` and :code:`path2overl`, respectively. To compute the RI projections and overlaps for each structure of the dataset, run::
 
        for i in {1..1000}; do python $SALTEDPATH/dm2df.py -iconf ${i}; done
 
@@ -97,7 +97,7 @@ In this example, we consider the interpolation of the electron density of a data
    
    which will be saved as :code:`pred_coeffs.npy`.
 
-10) Print out the predicted scalar field projections in the folder specified using the :code:`path2pred` variable and compute the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset (printed out to screen):: 
+10. Print out the predicted scalar field projections in the folder specified using the :code:`path2pred` variable and compute the root mean square error both on the individual scalar fields (:code:`errors.dat`) and on the overall test dataset (printed out to screen):: 
 
         python $SALTEDPATH/error_validation.py
 
