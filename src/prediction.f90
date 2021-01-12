@@ -4,7 +4,7 @@ SUBROUTINE prediction(dirkern,kernsizes,specarray,atomcount,atomicindx,nspecies,
 use omp_lib
 IMPLICIT NONE
 ! allocate I/O variables
-CHARACTER*32:: dirkern
+CHARACTER*64:: dirkern
 INTEGER:: ntest,natmax,llmax,nnmax,M,nspecies
 INTEGER,DIMENSION(ntest)::natoms,testrange,kernsizes 
 INTEGER,DIMENSION(ntest,natmax)::test_species 

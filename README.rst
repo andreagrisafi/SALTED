@@ -102,7 +102,7 @@ In this example, we consider the interpolation of the electron density of a data
         python $SALTEDPATH/error_validation.py
 
 
-    This gives a RMSE of about 0.2% of the intrisic variability of the electron density over the test set.
+    This gives a RMSE of about 0.2% of the intrinsic variability of the electron density over the test set.
 
 11) On top of the predicted density components, compute the Hartree energy and the external energy of the system compared against the RI reference values::
 

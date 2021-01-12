@@ -105,8 +105,8 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 
 # training set selection
 dataset = range(ndata)
-random.shuffle(dataset)
-#random.Random(3).shuffle(dataset)
+#random.shuffle(dataset)
+random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(frac*len(trainrangetot))

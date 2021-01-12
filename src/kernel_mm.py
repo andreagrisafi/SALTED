@@ -106,13 +106,13 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata,natmax,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            power_per_conf[iconf] = power[iconf]
-            #iat = 0
-            #for ispe in xrange(nspecies):
-            #    for icount in xrange(atom_counting[iconf,ispe]):
-            #        jat = atomicindx[iconf,ispe,icount]
-            #        power_per_conf[iconf,jat] = power[iconf,iat]
-            #        iat+=1
+            #power_per_conf[iconf] = power[iconf]
+            iat = 0
+            for ispe in xrange(nspecies):
+                for icount in xrange(atom_counting[iconf,ispe]):
+                    jat = atomicindx[iconf,ispe,icount]
+                    power_per_conf[iconf,jat] = power[iconf,iat]
+                    iat+=1
             for iat in xrange(natoms[iconf]):
                 power_env[ienv] = power_per_conf[iconf,iat]
                 ienv += 1
@@ -129,13 +129,13 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata,natmax,2*l+1,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            power_per_conf[iconf] = power[iconf]
-            #iat = 0
-            #for ispe in xrange(nspecies):
-            #    for icount in xrange(atom_counting[iconf,ispe]):
-            #        jat = atomicindx[iconf,ispe,icount]
-            #        power_per_conf[iconf,jat] = power[iconf,iat]
-            #        iat+=1
+            #power_per_conf[iconf] = power[iconf]
+            iat = 0
+            for ispe in xrange(nspecies):
+                for icount in xrange(atom_counting[iconf,ispe]):
+                    jat = atomicindx[iconf,ispe,icount]
+                    power_per_conf[iconf,jat] = power[iconf,iat]
+                    iat+=1
             for iat in xrange(natoms[iconf]):
                 power_env[ienv] = power_per_conf[iconf,iat]
                 ienv += 1

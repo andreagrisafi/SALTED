@@ -19,7 +19,7 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.dfbasis)
 
 llist = []
 nlist = []
@@ -31,14 +31,11 @@ llmax = max(llist)
 nnmax = max(nlist)
 
 # read system
-xyzfile = read(inp.filename,":")
+xyzfile = read(inp.path2ref+inp.filename_ref,":")
 ndata = len(xyzfile)
 # read system
-xyzfile_testing = read(inp.filename_testing,":")
+xyzfile_testing = read(inp.filename,":")
 ndata_testing = len(xyzfile_testing)
-
-#kernel directories
-path2kern = inp.path2kern_testing
 
 # number of sparse environments
 M = inp.Menv
@@ -111,8 +108,8 @@ for iconf in xrange(ndata_testing):
             atomicindx_testing[icount,ispe,iconf] = indexes[icount]
 
 #====================================== reference environments 
-fps_indexes = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
-fps_species = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,1]
+fps_indexes = np.loadtxt(inp.path2ref+"sparse_set_"+str(M)+".txt",int)[:,0]
+fps_species = np.loadtxt(inp.path2ref+"sparse_set_"+str(M)+".txt",int)[:,1]
 
 # basis set arrays 
 bsize = np.zeros(nspecies,int)
@@ -164,7 +161,7 @@ for iconf in testrange:
     itest += 1
 
 # load regression weights 
-weights = np.load("weights.npy")
+weights = np.load(inp.path2ref+"weights.npy")
 
 # unravel regression weights with explicit indexing
 ww = np.zeros((M,llmax+1,nnmax,2*llmax+1),float)
@@ -181,7 +178,7 @@ for ienv in xrange(M):
                 i += 1
 
 
-coeffs = prediction.prediction(path2kern,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies_testing,ntest,natmax_testing,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
+coeffs = prediction.prediction(inp.path2kern,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies_testing,ntest,natmax_testing,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
-np.save("predictions.npy",coeffs)
+np.save("pred_coeffs.npy",coeffs)
 

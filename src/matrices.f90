@@ -4,7 +4,7 @@ SUBROUTINE getab(dirker,dirover,dirprojs,&
 use omp_lib
 IMPLICIT NONE
 ! allocate I/O variables
-CHARACTER*32:: dirker,dirover,dirprojs 
+CHARACTER*64:: dirker,dirover,dirprojs 
 INTEGER:: ntrain,M,natmax,totsize,llmax,nnmax,nspecies
 INTEGER,DIMENSION(natmax,nspecies,ntrain):: atomicindx
 INTEGER,DIMENSION(ntrain,nspecies):: atomcount

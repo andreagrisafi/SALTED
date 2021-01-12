@@ -18,7 +18,7 @@ for i in xrange(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.basis)
+[lmax,nmax] = basis.basiset(inp.dfbasis)
 
 llist = []
 for spe in spelist:
@@ -26,17 +26,12 @@ for spe in spelist:
 llmax = max(llist)
 
 # read training system
-xyzfile = read(inp.filename,":")
+xyzfile = read(inp.path2ref+inp.filename_ref,":")
 ndata = len(xyzfile)
 
 # read testing system
-xyzfile_testing = read(inp.filename_testing,":")
+xyzfile_testing = read(inp.filename,":")
 ndata_testing = len(xyzfile_testing)
-
-
-path2soap = inp.path2soap
-path2soap_testing = inp.path2soap_testing
-path2kern_testing = inp.path2kern_testing
 
 # number of sparse environments
 M = inp.Menv
@@ -124,8 +119,8 @@ for iconf in xrange(ndata_testing):
         for icount in xrange(atom_counting_testing[iconf,ispe]):
             atomicindx_testing[iconf,ispe,icount] = indexes[icount]
 #====================================== reference environments 
-fps_indexes = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
-fps_species = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,1]
+fps_indexes = np.loadtxt(inp.path2ref+"sparse_set_"+str(M)+".txt",int)[:,0]
+fps_species = np.loadtxt(inp.path2ref+"sparse_set_"+str(M)+".txt",int)[:,1]
 #==================================== BASIS SET SIZE ARRAYS
 bsize = np.zeros(nspecies,int)
 almax = np.zeros(nspecies,int)
@@ -148,7 +143,7 @@ print "Computing Ktm matrices for each dataset configuration ..."
 power_ref_sparse = {}
 for l in xrange(llmax+1):
 
-    power = np.load(path2soap+"SOAP-"+str(l)+".npy")
+    power = np.load(inp.path2soap_ref+"SOAP-"+str(l)+".npy")
 
     if l==0:
 
@@ -158,13 +153,13 @@ for l in xrange(llmax+1):
         power_env = np.zeros((nenv,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            power_per_conf[iconf] = power[iconf]
-            #iat = 0
-            #for ispe in xrange(nspecies):
-            #    for icount in xrange(atom_counting[iconf,ispe]):
-            #        jat = atomicindx[iconf,ispe,icount]
-            #        power_per_conf[iconf,jat] = power[iconf,iat]
-            #        iat+=1
+            #power_per_conf[iconf] = power[iconf]
+            iat = 0
+            for ispe in xrange(nspecies):
+                for icount in xrange(atom_counting[iconf,ispe]):
+                    jat = atomicindx[iconf,ispe,icount]
+                    power_per_conf[iconf,jat] = power[iconf,iat]
+                    iat+=1
             for iat in xrange(natoms[iconf]):
                 power_env[ienv] = power_per_conf[iconf,iat]
                 ienv += 1
@@ -178,13 +173,13 @@ for l in xrange(llmax+1):
         power_env = np.zeros((nenv,2*l+1,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            power_per_conf[iconf] = power[iconf]
-            #iat = 0
-            #for ispe in xrange(nspecies):
-            #    for icount in xrange(atom_counting[iconf,ispe]):
-            #        jat = atomicindx[iconf,ispe,icount]
-            #        power_per_conf[iconf,jat] = power[iconf,iat]
-            #        iat+=1
+            #power_per_conf[iconf] = power[iconf]
+            iat = 0
+            for ispe in xrange(nspecies):
+                for icount in xrange(atom_counting[iconf,ispe]):
+                    jat = atomicindx[iconf,ispe,icount]
+                    power_per_conf[iconf,jat] = power[iconf,iat]
+                    iat+=1
             for iat in xrange(natoms[iconf]):
                 power_env[ienv] = power_per_conf[iconf,iat]
                 ienv += 1
@@ -194,7 +189,7 @@ for l in xrange(llmax+1):
 power_testing = {}
 for l in xrange(llmax+1):
 
-    power = np.load(path2soap_testing+"SOAP-"+str(l)+".npy")
+    power = np.load(inp.path2soap+"SOAP-"+str(l)+".npy")
 
     if l==0:
 
@@ -203,13 +198,13 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata_testing,natmax_testing,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata_testing):
-            power_per_conf[iconf] = power[iconf]
-            #iat = 0
-            #for ispe in xrange(nspecies_testing):
-            #    for icount in xrange(atom_counting_testing[iconf,ispe]):
-            #        jat = atomicindx_testing[iconf,ispe,icount]
-            #        power_per_conf[iconf,jat] = power[iconf,iat]
-            #        iat+=1
+            #power_per_conf[iconf] = power[iconf]
+            iat = 0
+            for ispe in xrange(nspecies_testing):
+                for icount in xrange(atom_counting_testing[iconf,ispe]):
+                    jat = atomicindx_testing[iconf,ispe,icount]
+                    power_per_conf[iconf,jat] = power[iconf,iat]
+                    iat+=1
         power_testing[l] = power_per_conf
 
     else:
@@ -219,13 +214,13 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata_testing,natmax_testing,2*l+1,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata_testing):
-            power_per_conf[iconf] = power[iconf]
-            #iat = 0
-            #for ispe in xrange(nspecies_testing):
-            #    for icount in xrange(atom_counting_testing[iconf,ispe]):
-            #        jat = atomicindx_testing[iconf,ispe,icount]
-            #        power_per_conf[iconf,jat] = power[iconf,iat]
-            #        iat+=1
+            #power_per_conf[iconf] = power[iconf]
+            iat = 0
+            for ispe in xrange(nspecies_testing):
+                for icount in xrange(atom_counting_testing[iconf,ispe]):
+                    jat = atomicindx_testing[iconf,ispe,icount]
+                    power_per_conf[iconf,jat] = power[iconf,iat]
+                    iat+=1
         power_testing[l] = power_per_conf
 
 startinit = time.time()
@@ -268,7 +263,7 @@ for iconf in xrange(ndata_testing):
                         for im2 in xrange(msize):
                             ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
                             k_TM[ik] = kern[im2,im1]
-    np.savetxt(path2kern_testing+"kernel_conf"+str(iconf)+".dat", k_TM,fmt='%.06e')
+    np.savetxt(inp.path2kern+"kernel_conf"+str(iconf)+".dat", k_TM,fmt='%.06e')
 #    print iconf, time.time()-start, "seconds"
 
 print iconf+1, "Ktm matrices computed in", (time.time()-startinit)/60.0, "minutes"

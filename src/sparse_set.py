@@ -82,6 +82,9 @@ for iconf in xrange(ndata):
     for iat in xrange(natoms[iconf]):
         power_env[ienv,:] = power_per_conf[iat,:]
         ienv += 1 
+    #for iat in xrange(natoms[iconf]):
+    #    power_env[ienv,:] = power[iconf,iat,:]
+    #    ienv += 1 
 
 fps_indexes = np.array(do_fps(power_env,M),int)
 fps_species = spec_array[fps_indexes]

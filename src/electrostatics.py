@@ -100,7 +100,7 @@ g = open("external_energy.dat","w")
 print "Computing Hartree and external energy..."
 itest=0
 for iconf in testrange:
-    print "testing conf. number:", itest+1, "/", len(testrange)
+    #print "testing conf. number:", itest+1, "/", len(testrange)
     atoms = atomic_symbols[iconf]
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
