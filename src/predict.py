@@ -178,7 +178,9 @@ for ienv in xrange(M):
                 i += 1
 
 
-coeffs = prediction.prediction(inp.path2kern,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies_testing,ntest,natmax_testing,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
+path2kerns = inp.path2data+"kernels/"
+
+coeffs = prediction.prediction(path2kerns,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies_testing,ntest,natmax_testing,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
 np.save("pred_coeffs.npy",coeffs)
 

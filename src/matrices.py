@@ -105,8 +105,7 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 
 # training set selection
 dataset = range(ndata)
-#random.shuffle(dataset)
-random.Random(3).shuffle(dataset)
+random.shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(frac*len(trainrangetot))
@@ -153,9 +152,13 @@ for iconf in trainrange:
 
 print "Computing regression matrices ..."
 
+path2kerns = inp.path2data+"kernels/"
+path2overl = inp.path2data+"overlaps/"
+path2projs = inp.path2data+"projections/"
+
 # compute regression arrays
 start = time.time()
-Avec,Bmat = matrices.getab(inp.path2kern,inp.path2overl,inp.path2projs,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes) 
+Avec,Bmat = matrices.getab(path2kerns,path2overl,path2projs,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes) 
 print "Regression matrices computed in", (time.time()-start)/60.0, "minutes"
 
 # save regression arrays

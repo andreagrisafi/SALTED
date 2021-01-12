@@ -1,3 +1,4 @@
+import os
 import sys
 import numpy as np
 import time
@@ -31,8 +32,6 @@ llmax = max(llist)
 # read system
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
-
-path2soap = inp.path2soap 
 
 # number of sparse environments
 M = inp.Menv
@@ -96,7 +95,7 @@ k_MM = np.zeros((llmax+1,M*(2*llmax+1),M*(2*llmax+1)),float)
 
 for l in xrange(llmax+1):
 
-    power = np.load(path2soap+"SOAP-"+str(l)+".npy")
+    power = np.load(inp.path2data+"soaps/SOAP-"+str(l)+".npy")
 
     if l==0:
 
@@ -106,7 +105,6 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata,natmax,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            #power_per_conf[iconf] = power[iconf]
             iat = 0
             for ispe in xrange(nspecies):
                 for icount in xrange(atom_counting[iconf,ispe]):
@@ -129,7 +127,6 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata,natmax,2*l+1,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            #power_per_conf[iconf] = power[iconf]
             iat = 0
             for ispe in xrange(nspecies):
                 for icount in xrange(atom_counting[iconf,ispe]):

@@ -1,11 +1,17 @@
 # system definition 
 # -----------------
-filename = "water_monomers_1k.xyz" # XYZ file
+filename = "water_dimers_10.xyz" # XYZ file
 species = ["H","O"] # ordered list of species
 
-# path to data
-# ------------
-path2data = "/local/big_scratch/water_monomer/" 
+# reference system
+# ----------------
+path2ref = "../water_monomer/"
+filename_ref = "water_monomers_1k.xyz" # XYZ file
+
+# paths to data
+# -------------
+path2data = "/local/big_scratch/water_dimer/"
+path2data_ref = "/local/big_scratch/water_monomer/"
 
 # QM variables 
 # ------------
@@ -20,7 +26,3 @@ dfbasis = "RI-cc-pvqz" # auxiliary basis
 # ------------
 z = 2.0 # kernel exponent 
 Menv = 100 # number of FPS environments
-Ntrain = 500 # number of training structures
-trainfrac = 1.0 # training set fraction
-regul = 1e-08 # regularization
-jitter = 1e-10 # jitter value

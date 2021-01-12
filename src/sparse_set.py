@@ -67,7 +67,7 @@ for iconf in xrange(ndata):
         for icount in xrange(atom_counting[iconf,ispe]):
             atomicindx[iconf,ispe,icount] = indexes[icount]
 #====================== environmental power spectrum
-power = np.load(inp.path2soap+"SOAP-0.npy")
+power = np.load(inp.path2data+"soaps/SOAP-0.npy")
 nfeat = len(power[0,0])
 power_env = np.zeros((nenv,nfeat),complex)
 ienv = 0
@@ -82,9 +82,6 @@ for iconf in xrange(ndata):
     for iat in xrange(natoms[iconf]):
         power_env[ienv,:] = power_per_conf[iat,:]
         ienv += 1 
-    #for iat in xrange(natoms[iconf]):
-    #    power_env[ienv,:] = power[iconf,iat,:]
-    #    ienv += 1 
 
 fps_indexes = np.array(do_fps(power_env,M),int)
 fps_species = spec_array[fps_indexes]

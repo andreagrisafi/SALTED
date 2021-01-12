@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import numpy as np
@@ -45,6 +46,10 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load(inp.path2ref+"averages_"+str(spe)+".npy")
 
+dirpath = os.path.join(inp.path2data, "predictions")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+
 itest=0
 error_density = 0.0
 variance = 0.0
@@ -55,8 +60,8 @@ for iconf in testrange:
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
     #================================================
-    projs_ref = np.load(inp.path2projs+"projections_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2overl+"overlap_conf"+str(iconf)+".npy")
+    projs_ref = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
+    overl = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
     coeffs_ref = np.linalg.solve(overl,projs_ref)
     size_coeffs = coeffs_ref.shape
     #================================================
@@ -74,7 +79,7 @@ for iconf in testrange:
                         coefficients[icoeff] = coeffs[itest,iat,l,n,im] 
                     icoeff +=1
     projections = np.dot(overl,coefficients)
-    np.save(inp.path2preds+"prediction_conf"+str(iconf)+".npy",projections)
+    np.save(inp.path2data+"predictions/prediction_conf"+str(iconf)+".npy",projections)
     #================================================
     error = np.dot(coefficients-coeffs_ref,projections-projs_ref)
     error_density += error 

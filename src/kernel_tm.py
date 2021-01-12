@@ -1,3 +1,4 @@
+import os
 import sys
 import numpy as np
 import time
@@ -143,7 +144,7 @@ print "Computing Ktm matrices for each dataset configuration ..."
 power_ref_sparse = {}
 for l in xrange(llmax+1):
 
-    power = np.load(inp.path2soap_ref+"SOAP-"+str(l)+".npy")
+    power = np.load(inp.path2data_ref+"soaps/SOAP-"+str(l)+".npy")
 
     if l==0:
 
@@ -153,7 +154,6 @@ for l in xrange(llmax+1):
         power_env = np.zeros((nenv,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            #power_per_conf[iconf] = power[iconf]
             iat = 0
             for ispe in xrange(nspecies):
                 for icount in xrange(atom_counting[iconf,ispe]):
@@ -173,7 +173,6 @@ for l in xrange(llmax+1):
         power_env = np.zeros((nenv,2*l+1,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata):
-            #power_per_conf[iconf] = power[iconf]
             iat = 0
             for ispe in xrange(nspecies):
                 for icount in xrange(atom_counting[iconf,ispe]):
@@ -189,7 +188,7 @@ for l in xrange(llmax+1):
 power_testing = {}
 for l in xrange(llmax+1):
 
-    power = np.load(inp.path2soap+"SOAP-"+str(l)+".npy")
+    power = np.load(inp.path2data+"soaps/SOAP-"+str(l)+".npy")
 
     if l==0:
 
@@ -198,7 +197,6 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata_testing,natmax_testing,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata_testing):
-            #power_per_conf[iconf] = power[iconf]
             iat = 0
             for ispe in xrange(nspecies_testing):
                 for icount in xrange(atom_counting_testing[iconf,ispe]):
@@ -214,7 +212,6 @@ for l in xrange(llmax+1):
         power_per_conf = np.zeros((ndata_testing,natmax_testing,2*l+1,nfeat),float)
         ienv = 0
         for iconf in xrange(ndata_testing):
-            #power_per_conf[iconf] = power[iconf]
             iat = 0
             for ispe in xrange(nspecies_testing):
                 for icount in xrange(atom_counting_testing[iconf,ispe]):
@@ -222,6 +219,10 @@ for l in xrange(llmax+1):
                     power_per_conf[iconf,jat] = power[iconf,iat]
                     iat+=1
         power_testing[l] = power_per_conf
+
+dirpath = os.path.join(inp.path2data, "kernels")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
 
 startinit = time.time()
 # compute sparse kernel matrix
@@ -263,7 +264,7 @@ for iconf in xrange(ndata_testing):
                         for im2 in xrange(msize):
                             ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
                             k_TM[ik] = kern[im2,im1]
-    np.savetxt(inp.path2kern+"kernel_conf"+str(iconf)+".dat", k_TM,fmt='%.06e')
+    np.savetxt(inp.path2data+"kernels/kernel_conf"+str(iconf)+".dat", k_TM,fmt='%.06e')
 #    print iconf, time.time()-start, "seconds"
 
 print iconf+1, "Ktm matrices computed in", (time.time()-startinit)/60.0, "minutes"

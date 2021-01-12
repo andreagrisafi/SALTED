@@ -111,8 +111,8 @@ for iconf in testrange:
        for n in xrange(nmax[(spe,0)]):
            coeffs[itest,jat,0,n,0] += av_coefs[atoms[jat]][n]
     # Compute Hartree energy
-    projs = np.load(inp.path2projs+"projections_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2overl+"overlap_conf"+str(iconf)+".npy")
+    projs = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
+    overl = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
     rcoeffs = np.linalg.solve(overl,projs)
     ref_coeffs = np.zeros_like(coeffs)
     rho = np.zeros(projs.shape,float)

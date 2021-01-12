@@ -1,3 +1,4 @@
+import os
 import sys
 import numpy as np
 from pyscf import gto
@@ -45,4 +46,9 @@ m.xc = inp.functional
 # Save density matrix
 m.kernel()
 dm = m.make_rdm1()
-np.save(inp.path2qm+"/dm_conf"+str(iconf+1)+".npy",dm)
+
+dirpath = os.path.join(inp.path2data, "density_matrices")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+
+np.save(inp.path2data+"density_matrices/dm_conf"+str(iconf+1)+".npy",dm)
