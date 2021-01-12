@@ -68,7 +68,7 @@ In this example, we consider the interpolation of the electron density of a data
            sagpr_get_PS -f coords_1000.xyz -lm ${i} -c H O -s H O -l 4 -n 5 -o path2soap/SOAP-${i}
         done 
 
-   Note that the sorting of the species used as atomic centers, defined by the :code:`-c H O` must follow the same order specified in :code:`inp.py`. Before proceeing to the next step, the path to the folder that you used to save the L-SOAP features need to be specified using the :code:`path2soap` variable. 
+   Note that the sorting of the species used as atomic centers, defined by the flag :code:`-c H O` must follow the same order specified in :code:`inp.py`. Before proceeing to the next step, the path to the folder that you used to save the L-SOAP features need to be specified using the :code:`path2soap` variable. 
 
 5) Extract a sparse set of atomic environments to reduce the dimensionality of the regression problem. The number of these environments is specified by the input variable :code:`Menv = 100`. This is done via the farthest point sampling (FPS) method, using the 0-SOAP features previously computed as a metric to distiguish between any pair of atomic environments::
 
