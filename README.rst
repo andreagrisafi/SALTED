@@ -141,7 +141,7 @@ In this example, we will predict the electron density of 10 water dimers at a la
 
         python $SALTEDPATH/predict.py
 
-4) Compute the error associated of the predictions::
+4) Compute the error associated with the predictions::
 
         python $SALTEDPATH/error_prediction.py
 
