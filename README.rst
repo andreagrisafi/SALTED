@@ -118,30 +118,21 @@ In this example, we consider the interpolation of the electron density of a data
 
 ED of water dimers from SALTED water molecules
 ----------------------------------------------
-In this example, we will predict the electron density of 10 water dimers at a large reciprocal distance based on the SALTED exercise carried out for the dataset of isolated water molecules. The input file specifies the file-name of the reference (:code:`water_monomers_1k.xyz`) and new geometry (:code:`water_dimers_10.xyz`), together with the path to the folder where the SALTED exercise has been carried out (:code:`path2ref = ../water_monomer`). Please also specify the path that you used to save the heavy reference data (:code:`path2data_ref`) and the path that you will use to save the new heavy data (:code:`path2data`).
+In this example, we will predict the electron density of 10 water dimers at a large reciprocal distance based on the SALTED exercise carried out for the dataset of isolated water molecules. The input file specifies the file-name of the reference (:code:`water_monomers_1k.xyz`) and new geometry (:code:`water_dimers_10.xyz`), together with the path to the folder where the SALTED exercise has been carried out (:code:`path2ref = ../water_monomer`). Please also specify the path that you used to save the heavy reference data (:code:`path2data_ref`) and the path that you will use to save the new heavy data (:code:`path2data`). 
 
-1) Compute the L-SOAP features of the water dimers, in agreement with what you did for the isolated molecules::
+Before starting, you need to: i) generate the reference RI-overlaps and RI-density projections of the 10 water dimers as described in points 1)-2) of the previous example, using the very same basis already adopted for the water molecules, ii) compute the L-SOAP features as described in point 4) of the previous example, using the very same parameters adopted for the isolated molecules. The new steps to be undertaken are then described as follows:
 
-        cd path2data 
-        mkdir soaps
-        cd -
-        
-        for i in 0 1 2 3 4 5
-        do
-           /local/scratch/source/SOAPFAST/soapfast/get_power_spectrum.py -f water_dimers_10.xyz -lm ${i} -c H O -s H O -l 4 -n 5 -o path2data/soaps/SOAP-${i}
-        done
-
-2) Compute the cross kernel between the monomers and dimers features::
+1) Compute the cross kernel between the monomers and dimers features::
 
         python $SALTEDPATH/kernel_tm.py
 
    The kernel matrices can be found in the folder :code:`path2data/kernels/`.
 
-3) Predict the water dimers densities combining the kernels so computed with the regression weights obtained during the previous example (:code:`path2ref/weights.npy`)::
+2) Predict the water dimers densities combining the kernels so computed with the regression weights obtained during the previous example (:code:`path2ref/weights.npy`)::
 
         python $SALTEDPATH/predict.py
 
-4) Compute the error associated with the predictions::
+3) Compute the error associated with the predictions::
 
         python $SALTEDPATH/error_prediction.py
 
