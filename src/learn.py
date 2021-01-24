@@ -79,7 +79,10 @@ Bmat = np.load("B_matrix.npy")
 Rmat = np.load("Kmm_matrix.npy")
 
 print "Solving regression problem of dimension =", totsize
+start = time.time()
 weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(totsize),Avec)
+#weights = np.linalg.lstsq(Bmat,Avec,rcond=None)[0]
+print time.time() - start, "seconds"
 
 # save
 np.save("weights.npy",weights)

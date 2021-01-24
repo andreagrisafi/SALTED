@@ -91,7 +91,7 @@ In this example, we consider the interpolation of the electron density of a data
 
         python $SALTEDPATH/matrices.py 
 
-8) Perform the regression with a given regularization :code:`regul = 1e-08` and jitter value :code:`jitter = 1e-10`, needed for the stabilize of the solution::
+8) Perform the regression with a given regularization :code:`regul = 1e-08` and jitter value :code:`jitter = 1e-10`, needed to stabilize the matrix inversion::
 
         python $SALTEDPATH/learn.py 
 
