@@ -1,3 +1,4 @@
 [submodule "TENSOAP"]
 	path = TENSOAP
 	url = https://github.com/dilkins/TENSOAP
+	branch = sorted-species
