@@ -41,7 +41,7 @@ testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
-coeffs = np.load("pred_coeffs.npy")
+ortho_coeffs = np.load("predictions.npy")
 
 av_coefs = {}
 for spe in spelist:
@@ -52,10 +52,8 @@ if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
 itest=0
-error_density = 0.0
 Oerror_density = 0.0
 variance = 0.0
-f = open("errors_validation.dat","w")
 print "Estimating prediction error ..."
 for iconf in testrange:
     atoms = atomic_symbols[iconf]
@@ -66,6 +64,22 @@ for iconf in testrange:
     overl = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
     coeffs_ref = np.linalg.solve(overl,projs_ref)
     size_coeffs = coeffs_ref.shape
+    # compute orthogonalization matrix
+    eigenvalues, unitary = np.linalg.eig(overl)
+    sqrteigen = np.sqrt(eigenvalues)
+    diagoverlap = np.diag(1.0/sqrteigen)
+    orthomatrix = np.dot(np.conj(unitary),np.dot(diagoverlap,unitary.T))
+    #newoverlap = np.dot(np.conj(unitary),np.dot(diagoverlap,unitary.T))
+    #orthomatrix = np.linalg.inv(newoverlap)
+    OCoeffs = np.zeros(len(overl))
+    i = 0
+    for iat in xrange(natoms[iconf]):
+        for l in xrange(lmax[atoms[iat]]+1):
+            for n in xrange(nmax[(atoms[iat],l)]):
+                for im in xrange(2*l+1):
+                    OCoeffs[i] = ortho_coeffs[itest,iat,l,n,im]
+                    i+=1
+    OCoef = np.dot(orthomatrix,OCoeffs)
     #================================================
     coefficients = np.zeros(size_coeffs,float)
     averages = np.zeros(size_coeffs,float)
@@ -75,23 +89,17 @@ for iconf in testrange:
             for n in xrange(nmax[(atoms[iat],l)]):
                 for im in xrange(2*l+1):
                     if l==0:
-                        coefficients[icoeff] = coeffs[itest,iat,l,n,im] + av_coefs[atoms[iat]][n]
+                        OCoef[icoeff] += av_coefs[atoms[iat]][n]
                         averages[icoeff] = av_coefs[atoms[iat]][n]
-                    else:
-                        coefficients[icoeff] = coeffs[itest,iat,l,n,im] 
                     icoeff +=1
-    projections = np.dot(overl,coefficients)
-    np.save(inp.path2data+"predictions/prediction_conf"+str(iconf)+".npy",projections)
+    OProj = np.dot(overl,OCoef)
     #================================================
-    error = np.dot(coefficients-coeffs_ref,projections-projs_ref)
-    error_density += error 
+    Oerror = np.dot(OCoef-coeffs_ref,OProj-projs_ref)
+    Oerror_density += Oerror 
     projs_ref -= np.dot(overl,averages)
     coeffs_ref -= averages
     var = np.dot(coeffs_ref,projs_ref)
     variance += var 
-    print >> f, iconf+1, ":", np.sqrt(error/var)*100, "% RMSE"
     itest+=1
 
-f.close()
-
-print "% RMSE =", 100*np.sqrt(error_density/variance)
+print "% RMSE =", 100*np.sqrt(Oerror_density/variance)
