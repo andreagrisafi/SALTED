@@ -46,6 +46,9 @@ nostechio = False
 if np.linalg.matrix_rank(covariance) < nspecies:
     print "Dataset has uniform distribution of species: no stochiometric baseline is applied."
     nostechio = True
+elif nspecies==1:
+    print "Dataset has uniform distribution of species: no stochiometric baseline is applied."
+    nostechio = True
 else:
     print "Dataset has non-uniform distribution of species: a stochiometric baseline is applied."
     vector = np.dot(stechio.T,energies)
