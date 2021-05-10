@@ -136,11 +136,13 @@ for frac in [0.01,0.025,0.05,0.075,0.1,0.25,0.5,0.75,1.0]:
     if nostechio==False:
         tr_energ = (energies[trainrange] - baseline[trainrange])/natoms_train 
     else:    
-        tr_energ = energies[trainrange]/natoms_train 
+        tr_energ = (energies[trainrange] - np.mean(energies[trainrange]))/natoms_train 
     
     ml_energ = np.dot(ktest, np.linalg.solve(ktrain + reg*k_MM + jit*np.eye(M), np.dot(k_NM[trainrange].T,tr_energ)))
     ml_energ *= natoms_test
     if nostechio==False:
-        ml_energ += baseline[testrange] 
+        ml_energ += baseline[testrange]
+    else:
+        ml_energ += np.mean(energies[trainrange])
     error = np.sum((ml_energ-te_energ)**2)/float(len(te_energ))
     print "N =", ntrain,"RMSE =", np.sqrt(error) , "[energy units]"
