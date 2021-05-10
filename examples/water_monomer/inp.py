@@ -2,6 +2,7 @@
 # -----------------
 filename = "water_monomers_1k.xyz" # XYZ file
 species = ["H","O"] # ordered list of species
+propname = "potential" 
 
 # path to data
 # ------------
@@ -20,7 +21,7 @@ dfbasis = "RI-cc-pvqz" # auxiliary basis
 # ------------
 z = 2.0 # kernel exponent 
 Menv = 100 # number of FPS environments
-Ntrain = 500 # number of training structures
+Ntrain = 800 # number of training structures
 trainfrac = 1.0 # training set fraction
-regul = 1e-08 # regularization
+regul = 1e-10 # regularization
 jitter = 1e-10 # jitter value
