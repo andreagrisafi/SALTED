@@ -5,16 +5,11 @@ species = ["H","O"] # ordered list of species
 
 # path to data
 # ------------
-path2data = "/local/big_scratch/water_monomer_periodic/" 
-
-# QM variables 
-# ------------
-functional = "b3lyp" # DFT functional
-qmbasis = "cc-pvqz" # atomic basis
+path2data = "/scratch/grisafi/lowdin/water_monomer/" 
 
 # RHO variables
 # -------------
-dfbasis = "RI-cc-pvqz" # auxiliary basis
+dfbasis = "CP2K-LRI-DZVP-MOLOPT-GTH-MEDIUM" # auxiliary basis
 
 # ML variables  
 # ------------

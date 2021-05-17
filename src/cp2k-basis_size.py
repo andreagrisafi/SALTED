@@ -1,12 +1,14 @@
 import numpy as np
 import sys
 
-species = ["H","O"]
+sys.path.insert(0, './')
+import inp
+
 lmax = {}
 nmax = {}
 
 ispe = 0
-for spe in species:
+for spe in inp.species:
     print("species:", spe)
     f = open(spe+"-LRI-DZVP-MOLOPT-GTH-MEDIUM_info.txt","r")
     lines = f.readlines()
