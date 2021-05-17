@@ -59,7 +59,7 @@ lvals = {}
 atom_count = {}
 nbas = {}
 for spe in species:
-    f = open("/home/grisafi/Work/lowdin/lri_basis/"+spe+"-LRI-DZVP-MOLOPT-GTH-MEDIUM_info.txt","r")
+    f = open(spe+"-LRI-DZVP-MOLOPT-GTH-MEDIUM_info.txt","r")
     lines = f.readlines()
     f.close()
     nbas[spe] = int(lines[0]) # basis set size
