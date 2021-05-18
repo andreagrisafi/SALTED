@@ -64,9 +64,10 @@ for spe in spelist:
 for iconf in xrange(ndata):
     species = atomic_symbols[iconf]
     #==================================================
-    Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
-    Coef = np.linalg.solve(Over,Proj)
+    Coef = np.load(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    #Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
+    #Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    #Coef = np.linalg.solve(Over,Proj)
     #==================================================
     i = 0
     for iat in xrange(natoms[iconf]):
@@ -98,9 +99,10 @@ for iconf in xrange(ndata):
             for n in xrange(nmax[(spe,l)]):
                 projs[(spe,l,n)] = np.zeros((natoms_spe[iconf,spe],(2*l+1)))
     # compute coefficients
-    Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
+    Coef = np.load(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    #Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
     Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
-    Coef = np.linalg.solve(Over,Proj)
+    #Coef = np.linalg.solve(Over,Proj)
     # remove L=0 average
     i = 0
     for iat in xrange(natoms[iconf]):

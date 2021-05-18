@@ -166,6 +166,9 @@ Proj = np.dot(Ovlp,Coef)
 print "projections computed"
 
 # Make data directories if not already existing
+dirpath = os.path.join(inp.path2data, "coefficients")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
 dirpath = os.path.join(inp.path2data, "projections")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
@@ -176,6 +179,7 @@ if not os.path.exists(dirpath):
 print "saving projection vector and overlap matrix"
 
 # Save projections and overlaps
+np.save(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy",Coef)
 np.save(inp.path2data+"projections/projections_conf"+str(iconf)+".npy",Proj)
 np.save(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy",Ovlp)
 

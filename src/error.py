@@ -62,7 +62,8 @@ for iconf in testrange:
     #================================================
     projs_ref = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
     overl = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
-    coeffs_ref = np.linalg.solve(overl,projs_ref)
+    coeffs_ref = np.load(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    #coeffs_ref = np.linalg.solve(overl,projs_ref)
     size_coeffs = coeffs_ref.shape
     # compute orthogonalization matrix
     eigenvalues, unitary = np.linalg.eig(overl)
