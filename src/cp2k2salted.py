@@ -5,6 +5,7 @@ from pyscf import gto
 from ase.io import read
 from scipy import special
 import argparse
+import time
 
 def add_command_line_arguments(parsetext):
     parser = argparse.ArgumentParser(description=parsetext,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -72,6 +73,10 @@ for iatom in range(natoms):
     spe = symbols[iatom]
     total_size += nbas[spe] 
 
+print "total size =", total_size
+
+start = time.time()
+
 # extract coefficients and overlap from CP2K calculation
 Coef = np.zeros(total_size)
 Ovlp = np.zeros((total_size,total_size))
@@ -104,16 +109,23 @@ for iatom in range(natoms):
     for jatom in xrange(natoms):
         spe2 = symbols[jatom]
         # load CP2K overlap atomic blocks if available
+        transposed = False
         try:
             o = np.loadtxt(inp.path2data+"runs/conf_"+str(iconf+1)+"/overlaps/overlap_"+str(iatom+1)+"-"+str(jatom+1)+".dat")
             o = o.reshape(nbas[spe1],nbas[spe2])
-            transposed = False
         except:
             transposed = True
         # otherwise load transposed
-        if transposed == True: 
-            o = np.loadtxt(inp.path2data+"runs/conf_"+str(iconf+1)+"/overlaps/overlap_"+str(jatom+1)+"-"+str(iatom+1)+".dat")
-            o = o.reshape(nbas[spe2],nbas[spe1]).T
+        ozeros = False
+        if transposed == True:
+            try: 
+                o = np.loadtxt(inp.path2data+"runs/conf_"+str(iconf+1)+"/overlaps/overlap_"+str(jatom+1)+"-"+str(iatom+1)+".dat")
+                o = o.reshape(nbas[spe2],nbas[spe1]).T
+            except:
+                ozeros = True
+        # if also the tranposed is not available, then set it as a matrix of zeros
+        if ozeros == True:
+            o = np.zeros((nbas[spe1],nbas[spe2]),float)
         # single out the overlap dimensions in a multi-dimensional array
         overlap = np.zeros((llmax+1,llmax+1,nnmax,nnmax,2*llmax+1,2*llmax+1))
         n_count1 = {}
@@ -146,8 +158,12 @@ for iatom in range(natoms):
         iblock2 += nbas[spe2] 
     iblock1 += nbas[spe1] 
 
+print "overlap matrix succesfully filled up"
+
 # Compute density projections on auxiliary functions
 Proj = np.dot(Ovlp,Coef)
+
+print "projections computed"
 
 # Make data directories if not already existing
 dirpath = os.path.join(inp.path2data, "projections")
@@ -157,6 +173,10 @@ dirpath = os.path.join(inp.path2data, "overlaps")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
+print "saving projection vector and overlap matrix"
+
 # Save projections and overlaps
 np.save(inp.path2data+"projections/projections_conf"+str(iconf)+".npy",Proj)
 np.save(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy",Ovlp)
+
+print (time.time()-start)/60.0, "min"
