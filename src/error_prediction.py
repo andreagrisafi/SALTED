@@ -73,7 +73,7 @@ for iconf in testrange:
             for n in xrange(nmax[(atoms[iat],l)]):
                 for im in xrange(2*l+1):
                     if l==0:
-                        coefficients[icoeff] = coeffs[itest,iat,l,n,im] + av_coefs[atoms[iat]][n]
+                        coefficients[icoeff] = coeffs[itest,iat,l,n,im] #+ av_coefs[atoms[iat]][n]
                         averages[icoeff] = av_coefs[atoms[iat]][n]
                     else:
                         coefficients[icoeff] = coeffs[itest,iat,l,n,im] 

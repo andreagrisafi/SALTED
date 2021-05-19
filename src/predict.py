@@ -182,5 +182,15 @@ path2kerns = inp.path2data+"kernels/"
 
 coeffs = prediction.prediction(path2kerns,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies_testing,ntest,natmax_testing,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
+av_coefs = {}
+for spe in spelist:
+    av_coefs[spe] = np.load(inp.path2ref+"averages_"+str(spe)+".npy")
+
+for iconf in testrange:
+    atoms = atomic_symbols_testing[iconf]
+    for iat in xrange(natoms_testing[iconf]):
+        for n in xrange(nmax[(atoms[iat],0)]):
+            coeffs[iconf,iat,0,n,0] += av_coefs[atoms[iat]][n]
+
 np.save("pred_coeffs.npy",coeffs)
 

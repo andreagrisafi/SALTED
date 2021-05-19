@@ -4,10 +4,24 @@ import time
 import ase
 from ase import io
 from ase.io import read
+import argparse
 
 import basis
 sys.path.insert(0, './')
 import inp
+
+def add_command_line_arguments_contraction(parsetext):
+    parser = argparse.ArgumentParser(description=parsetext)
+    parser.add_argument("-r", "--regul", type=float, default=None, help="Read regularization parameter at run-time")
+    parser.add_argument("-p", "--partial", type=int, default=0, help="Calculate A and B for the pth ten structures in the training set")
+
+    args = parser.parse_args()
+    return args
+
+args = add_command_line_arguments_contraction("density regression")
+reg = args.regul
+p = args.partial
+xv = inp.xv
 
 # read species
 spelist = inp.species
@@ -35,7 +49,7 @@ ndata = len(xyzfile)
 M = inp.Menv
 
 # number of sparse environments
-reg = inp.regul
+if reg is None: reg = inp.regul
 
 # number of sparse environments
 jit = inp.jitter
@@ -73,16 +87,47 @@ for iref in xrange(1,M):
     collsize[iref] = collsize[iref-1] + bsize[fps_species[iref-1]]
 totsize = collsize[-1] + bsize[fps_species[-1]]
 
-print "Loading regression matrices ..."
-Avec = np.load("A_vector.npy")
-Bmat = np.load("B_matrix.npy")
-Rmat = np.load("Kmm_matrix.npy")
+iters = 1
+if xv: iters = 2
 
-print "Solving regression problem of dimension =", totsize
-start = time.time()
-weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(totsize),Avec)
-#weights = np.linalg.lstsq(Bmat,Avec,rcond=None)[0]
-print time.time() - start, "seconds"
+for count in range(iters):
 
-# save
-np.save("weights.npy",weights)
+    print "Loading regression matrices ..."
+    if p > 0:
+       for i in range(1,p+1):
+           print i
+
+           if count == 0:
+               Avec_p = np.load(inp.path2data+"matrices/A_"+str(i)+"_vector.npy")
+               Bmat_p = np.load(inp.path2data+"matrices/B_"+str(i)+"_matrix.npy")
+           elif count == 1:
+               Avec_p = np.load(inp.path2data+"matrices/Ap_"+str(i)+"_vector.npy")
+               Bmat_p = np.load(inp.path2data+"matrices/Bp_"+str(i)+"_matrix.npy")
+           if i == 1:
+               Avec = Avec_p.copy()
+               Bmat = Bmat_p.copy()
+           else:
+               Avec += Avec_p
+               Bmat += Bmat_p
+
+    else:
+        if count == 0:
+           Avec = np.load(inp.path2data+"matrices/A_vector.npy")
+           Bmat = np.load(inp.path2data+"matrices/B_matrix.npy")
+        else:
+           Avec = np.load(inp.path2data+"matrices/Ap_vector.npy")
+           Bmat = np.load(inp.path2data+"matrices/Bp_matrix.npy")
+    
+    Rmat = np.load("Kmm_matrix.npy")
+
+    print "Solving regression problem of dimension =", totsize
+    start = time.time()
+    #weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(totsize),Avec)
+    weights = np.linalg.lstsq(Bmat+reg*Rmat,Avec,rcond=None)[0]
+    print time.time() - start, "seconds"
+
+    # save
+    if count == 0:
+        np.save("weights.npy",weights)
+    elif count == 1:
+        np.save("weights_p.npy",weights)

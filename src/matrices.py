@@ -14,6 +14,16 @@ from lib import matrices
 sys.path.insert(0, './')
 import inp
 
+def add_command_line_arguments_contraction(parsetext):
+    parser = argparse.ArgumentParser(description=parsetext)
+    parser.add_argument("-p", "--partial", type=int, default=0, help="Calculate A and B for the pth ten structures in the training set")
+
+    args = parser.parse_args()
+    return args
+
+args = add_command_line_arguments_contraction("density regression")
+p = args.partial
+xv = inp.xv
 
 # read species
 spelist = inp.species
@@ -105,62 +115,86 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 
 # training set selection
 dataset = range(ndata)
-random.Random(3).shuffle(dataset)
+random.Random(4).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
-natoms_train = natoms[trainrange]
-print "Number of training configurations =", ntrain
+validate_range = np.setdiff1d(dataset,trainrange).tolist()
 
-# training set arrays
-train_configs = np.array(trainrange,int)
-atomicindx_training = atomicindx[:,:,trainrange]
-atom_counting_training = atom_counting[trainrange] 
-atomic_species = np.zeros((ntrain,natmax),int)
-for itrain in xrange(ntrain):
-    for iat in xrange(natoms_train[itrain]):
-        atomic_species[itrain,iat] = spec_list_per_conf[trainrange[itrain]][iat]
+iters = 1
+if xv: iters = 2
+for count in range(iters):
+    if count == 1: trainrange = validate_range
+    natoms_train = natoms[trainrange]
+    print "Number of training configurations =", ntrain
 
-# sparse overlap and projection indexes 
-total_sizes = np.zeros(ntrain,int)
-itrain = 0
-for iconf in trainrange:
-    atoms = atomic_symbols[iconf]
-    for iat in xrange(natoms[iconf]):
-        for l in xrange(lmax[atoms[iat]]+1):
-            msize = 2*l+1
-            for n in xrange(nmax[(atoms[iat],l)]):
+    if p > 0:
+        print 'Calculating the ',p,'th 10 configurations'
+        ntrain = 10
+        trainrange = trainrange[10*(p-1):10*p]
+        natoms_train = natoms[trainrange]
+    
+    # training set arrays
+    train_configs = np.array(trainrange,int)
+    atomicindx_training = atomicindx[:,:,trainrange]
+    atom_counting_training = atom_counting[trainrange] 
+    atomic_species = np.zeros((ntrain,natmax),int)
+    for itrain in xrange(ntrain):
+        for iat in xrange(natoms_train[itrain]):
+            atomic_species[itrain,iat] = spec_list_per_conf[trainrange[itrain]][iat]
+
+    # sparse overlap and projection indexes 
+    total_sizes = np.zeros(ntrain,int)
+    itrain = 0
+    for iconf in trainrange:
+        atoms = atomic_symbols[iconf]
+        for iat in xrange(natoms[iconf]):
+            for l in xrange(lmax[atoms[iat]]+1):
+                msize = 2*l+1
+                for n in xrange(nmax[(atoms[iat],l)]):
+                    for im in xrange(msize):
+                        total_sizes[itrain] += 1
+        itrain += 1
+
+    # sparse kernel indexes 
+    kernel_sizes = np.zeros(ntrain,int)
+    itrain = 0
+    for iconf in trainrange:
+        for iref in xrange(M):
+            ispe = fps_species[iref]
+            spe = spe_dict[ispe]
+            for l in xrange(lmax[spe]+1):
+                msize = 2*l+1
                 for im in xrange(msize):
-                    total_sizes[itrain] += 1
-    itrain += 1
+                    for iat in xrange(atom_counting_training[itrain,ispe]):
+                        for imm in xrange(msize):
+                            kernel_sizes[itrain] += 1
+        itrain += 1
 
-# sparse kernel indexes 
-kernel_sizes = np.zeros(ntrain,int)
-itrain = 0
-for iconf in trainrange:
-    for iref in xrange(M):
-        ispe = fps_species[iref]
-        spe = spe_dict[ispe]
-        for l in xrange(lmax[spe]+1):
-            msize = 2*l+1
-            for im in xrange(msize):
-                for iat in xrange(atom_counting_training[itrain,ispe]):
-                    for imm in xrange(msize):
-                        kernel_sizes[itrain] += 1
-    itrain += 1
+    print "Computing regression matrices ..."
 
-print "Computing regression matrices ..."
+    path2kerns = inp.path2data+"kernels/"
+    path2overl = inp.path2indata+"overlaps/"
+    path2projs = inp.path2indata+"projections/"
 
-path2kerns = inp.path2data+"kernels/"
-path2overl = inp.path2data+"overlaps/"
-path2projs = inp.path2data+"projections/"
+    # compute regression arrays
+    start = time.time()
+    Avec,Bmat = matrices.getab(path2kerns,path2overl,path2projs,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes) 
+    print "Regression matrices computed in", (time.time()-start)/60.0, "minutes"
 
-# compute regression arrays
-start = time.time()
-Avec,Bmat = matrices.getab(path2kerns,path2overl,path2projs,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes) 
-print "Regression matrices computed in", (time.time()-start)/60.0, "minutes"
-
-# save regression arrays
-np.save("A_vector.npy", Avec)
-np.save("B_matrix.npy", Bmat)
+    # save regression arrays
+    if count == 0:
+       if p > 0:
+           np.save(inp.path2data+"matrices/A_"+str(p)+"_vector.npy", Avec)
+           np.save(inp.path2data+"matrices/B_"+str(p)+"_matrix.npy", Bmat)
+       else:
+           np.save(inp.path2data+"matrices/A_vector.npy", Avec)
+           np.save(inp.path2data+"matrices/B_matrix.npy", Bmat)
+    if count == 1:
+       if p > 0:
+           np.save(inp.path2data+"matrices/Ap_"+str(p)+"_vector.npy", Avec)
+           np.save(inp.path2data+"matrices/Bp_"+str(p)+"_matrix.npy", Bmat)
+       else:
+           np.save(inp.path2data+"matrices/Ap_vector.npy", Avec)
+           np.save(inp.path2data+"matrices/Bp_matrix.npy", Bmat)
