@@ -22,10 +22,9 @@ dfbasis = "RI-cc-pvqz" # auxiliary basis
 # ------------
 z = 2.0 # kernel exponent 
 Menv = 100 # number of FPS environments
-Ntrain = 800 # number of training structures
+Ntrain = 200 # number of training structures
 trainfrac = 1.0 # training set fraction
 regul = 1e-10 # regularization
 jitter = 1e-10 # jitter value
-
 xv = False
 svd = False
