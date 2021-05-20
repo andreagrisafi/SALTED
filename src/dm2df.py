@@ -74,7 +74,7 @@ eri2c = auxmol.intor('int2c2e_sph')
 eri3c = pmol.intor('int3c2e_sph', shls_slice=(0,mol.nbas,0,mol.nbas,mol.nbas,mol.nbas+auxmol.nbas))
 eri3c = eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
 # Load 1-electron reduced density-matrix
-dm=np.load(inp.path2data+"density_matrices/dm_conf"+str(iconf+1)+".npy")
+dm=np.load(inp.path2indata+"density_matrices/dm_conf"+str(iconf+1)+".npy")
 # Compute density fitted coefficients
 rho = np.einsum('ijp,ij->p', eri3c, dm)
 rho = np.linalg.solve(eri2c, rho)
@@ -126,16 +126,16 @@ for iat in xrange(natoms):
 # Compute density projections on auxiliary functions
 Proj = np.dot(Over,Coef)
 
-dirpath = os.path.join(inp.path2data, "projections")
+dirpath = os.path.join(inp.path2indata, "projections")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2data, "overlaps")
+dirpath = os.path.join(inp.path2indata, "overlaps")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
 # Save projections and overlaps
-np.save(inp.path2data+"projections/projections_conf"+str(iconf)+".npy",Proj)
-np.save(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy",Over)
+np.save(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy",Proj)
+np.save(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy",Over)
 
 # --------------------------------------------------
 

@@ -47,8 +47,8 @@ m.xc = inp.functional
 m.kernel()
 dm = m.make_rdm1()
 
-dirpath = os.path.join(inp.path2data, "density_matrices")
+dirpath = os.path.join(inp.path2indata, "density_matrices")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
-np.save(inp.path2data+"density_matrices/dm_conf"+str(iconf+1)+".npy",dm)
+np.save(inp.path2indata+"density_matrices/dm_conf"+str(iconf+1)+".npy",dm)

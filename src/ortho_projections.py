@@ -64,8 +64,8 @@ for spe in spelist:
 for iconf in xrange(ndata):
     species = atomic_symbols[iconf]
     #==================================================
-    Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
     Coef = np.linalg.solve(Over,Proj)
     #==================================================
     i = 0
@@ -84,7 +84,7 @@ for spe in spelist:
     np.save("averages_"+str(spe)+".npy",av_coefs[spe])
     for l in xrange(lmax[spe]+1):
         for n in xrange(nmax[(spe,l)]):
-            dirpath = os.path.join(inp.path2data+"projections", "spe"+str(spe)+"_l"+str(l)+"_n"+str(n))
+            dirpath = os.path.join(inp.path2indata+"projections", "spe"+str(spe)+"_l"+str(l)+"_n"+str(n))
             if not os.path.exists(dirpath):
                 os.mkdir(dirpath)
 
@@ -98,8 +98,8 @@ for iconf in xrange(ndata):
             for n in xrange(nmax[(spe,l)]):
                 projs[(spe,l,n)] = np.zeros((natoms_spe[iconf,spe],(2*l+1)))
     # compute coefficients
-    Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
     Coef = np.linalg.solve(Over,Proj)
     # remove L=0 average
     i = 0
@@ -140,4 +140,4 @@ for iconf in xrange(ndata):
     for spe in spelist:
         for l in xrange(lmax[spe]+1):
             for n in xrange(nmax[(spe,l)]):
-                np.save(inp.path2data+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy",projs[(spe,l,n)].reshape(natoms_spe[(iconf,spe)]*(2*l+1)))
+                np.save(inp.path2indata+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy",projs[(spe,l,n)].reshape(natoms_spe[(iconf,spe)]*(2*l+1)))

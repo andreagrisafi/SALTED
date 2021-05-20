@@ -42,19 +42,19 @@ The possible basis set choices appear in :code:`src/basis.py`. If you want to us
 
 SALTED water molecules
 ----------------------
-In this example, we consider the interpolation of the electron density of a dataset made of 1000 isolated water molecules. For that, go into the example folder :code:`examples/water_monomer`. The file :code:`inp.py` contains the input parameters of the calculation, while the file :code:`water_monomers_1k.xyz` contains the atomic coordinates of the system. Both the file-name of the input geometry and an ordered list of the atomic species included in the dataset need to be specified in :code:`inp.py`. Moreover, the path to the folder used to save the heavy data must be set using the :code:`path2data` variable. In the following, we consider the possibility of generating the input densities from scratch. If you want to use your own density matrices, then jump to point 2. If you want to use your own RI-density projections and overlaps, then jump to point 3. 
+In this example, we consider the interpolation of the electron density of a dataset made of 1000 isolated water molecules. For that, go into the example folder :code:`examples/water_monomer`. The file :code:`inp.py` contains the input parameters of the calculation, while the file :code:`water_monomers_1k.xyz` contains the atomic coordinates of the system. Both the file-name of the input geometry and an ordered list of the atomic species included in the dataset need to be specified in :code:`inp.py`. The path to the folder used to save the heavy input data (overlaps and projections) must be set using the :code:`path2indata` variable; the path to the folder used to save the heavy data produced by SALTED (SOAP descriptors, kernels, etc.) must be set using the :code:`path2data` variable. In the following, we consider the possibility of generating the input densities from scratch. If you want to use your own density matrices, then jump to point 2. If you want to use your own RI-density projections and overlaps, then jump to point 3. 
 
 1) We start generating the density matrices associated with a KS-DFT calculation using PySCF. The QM variables needed as input are the DFT functional (:code:`functional = "b3lyp"`) and the wave-function basis set (:code:`qmbasis = "cc-pvqz"`). To run the QM calculations for each structure in the dataset:: 
 
         for i in {1..1000}; do python $SALTEDPATH/run_pyscf.py -iconf ${i}; done 
 
-   The density matrices, saved as :code:`dm_conf#.npy`, can be found in the folder :code:`path2data/density_matrices/`.
+   The density matrices, saved as :code:`dm_conf#.npy`, can be found in the folder :code:`path2indata/density_matrices/`.
 
 2) From the density matrices, the resolution of the identity (RI) method can be used to compute the density components on a linear auxiliary basis. The density matrix is assumed to be saved according to the PySCF convention, that is, as -L,...,0,...,+L for L>1 and as +1,-1,0 for L=1. The RI-auxiliary basis must correspond to its wave-function counterpart and can be set as :code:`dfbasis = "RI-cc-pvqz"`. To compute the RI projections and overlaps for each structure of the dataset, run::
 
        for i in {1..1000}; do python $SALTEDPATH/dm2df.py -iconf ${i}; done
 
-   The projections and overlaps, saved as :code:`projections_conf#.npy` and :code:`overlap_conf#.npy`, can be found in the folders :code:`path2data/projections/` and :code:`path2data/overlaps`, respectively.   
+   The projections and overlaps, saved as :code:`projections_conf#.npy` and :code:`overlap_conf#.npy`, can be found in the folders :code:`path2indata/projections/` and :code:`path2indata/overlaps`, respectively.   
 
 3) We now need to compute the mean spherical density projections over the dataset in order to use them as a baseline value for the RI-density projections. To do so, run::
 
@@ -119,7 +119,7 @@ In this example, we consider the interpolation of the electron density of a data
 
 ED of water dimers from SALTED water molecules
 ----------------------------------------------
-In this example, we will predict the electron density of 10 water dimers at a large reciprocal distance based on the SALTED exercise carried out for the dataset of isolated water molecules. The input file specifies the file-name of the reference (:code:`water_monomers_1k.xyz`) and new geometry (:code:`water_dimers_10.xyz`), together with the path to the folder where the SALTED exercise has been carried out (:code:`path2ref = ../water_monomer`). Please also specify the path that you used to save the heavy reference data (:code:`path2data_ref`) and the path that you will use to save the new heavy data (:code:`path2data`). 
+In this example, we will predict the electron density of 10 water dimers at a large reciprocal distance based on the SALTED exercise carried out for the dataset of isolated water molecules. The input file specifies the file-name of the reference (:code:`water_monomers_1k.xyz`) and new geometry (:code:`water_dimers_10.xyz`), together with the path to the folder where the SALTED exercise has been carried out (:code:`path2ref = ../water_monomer`). Please also specify the path that you used to save the heavy reference data (:code:`path2data_ref`) and the path that you will use to save the new heavy data (:code:`path2data`). If the error associated with the predictions is calculated, the overlaps and projections should be stored at `path2indata`.
 
 Before starting, you need to: i) generate the reference RI-overlaps and RI-density projections of the 10 water dimers as described in points 1)-2) of the previous example, using the very same basis already adopted for the water molecules, ii) compute the L-SOAP features as described in point 4) of the previous example, using the very same parameters adopted for the isolated molecules. The new steps to be undertaken are then described as follows:
 

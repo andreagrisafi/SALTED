@@ -140,11 +140,11 @@ dirpath = os.path.join(inp.path2data, "matrices")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
-for i in range(2):
+for iloop in range(2):
     # Two loops only performed when cross-validating
-    if i == 1 and not xv: continue
+    if iloop == 1 and not xv: continue
 
-    if i == 1 : trainrange = validate_range
+    if iloop == 1 : trainrange = validate_range
     natoms_train = natoms[trainrange]
     print "Number of training configurations =", ntrain
 
@@ -154,10 +154,12 @@ for i in range(2):
         ntrain_tot = ntrain
         if b*(p-1) >= ntrain_tot: sys.exit('The requested block contains no structures. Reduce -p or -b')
         ntrain = b
-        if b*p >= ntrain_tot:
+        if b*p > ntrain_tot:
             ntrain = ntrain_tot - b*(p-1)
             print 'WARNING: The ',p,'th block contains only ',ntrain,' structures, fewer than the requested block size, because the end of the dataset was reached'
-        trainrange = trainrange[b*(p-1):b*p]
+            trainrange = trainrange[b*(p-1):ntrain_tot]
+        else:
+            trainrange = trainrange[b*(p-1):b*p]
         natoms_train = natoms[trainrange]
     
     # training set arrays
@@ -209,13 +211,13 @@ for i in range(2):
     print "Regression matrices computed in", (time.time()-start)/60.0, "minutes"
 
     # save regression arrays
-    if i == 0:
+    if iloop == 0:
        if p > 0:
            np.save(inp.path2data+"matrices/A_"+str(p)+"_vector.npy", Avec)
            np.save(inp.path2data+"matrices/B_"+str(p)+"_matrix.npy", Bmat)
        else:
            np.save(inp.path2data+"matrices/A_vector.npy", Avec)
            np.save(inp.path2data+"matrices/B_matrix.npy", Bmat)
-    if i == 1:
+    if iloop == 1:
         np.save(inp.path2data+"matrices/Ap_vector.npy", Avec)
         np.save(inp.path2data+"matrices/Bp_matrix.npy", Bmat)

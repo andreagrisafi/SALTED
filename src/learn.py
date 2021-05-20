@@ -64,7 +64,6 @@ if not svd: jit = inp.jitter
 # system parameters
 atomic_symbols = []
 atomic_valence = []
-print ndata
 natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
@@ -95,9 +94,9 @@ for iref in xrange(1,M):
     collsize[iref] = collsize[iref-1] + bsize[fps_species[iref-1]]
 totsize = collsize[-1] + bsize[fps_species[-1]]
 
-for i in range(2):
+for iloop in range(2):
     # Two loops only performed when cross-validating
-    if i == 1 and not xv: continue
+    if iloop == 1 and not xv: continue
 
     print "Loading regression matrices ..."
 
@@ -116,7 +115,7 @@ for i in range(2):
                Bmat += Bmat_p
 
     else:
-        if i == 0:
+        if iloop == 0:
            Avec = np.load(inp.path2data+"matrices/A_vector.npy")
            Bmat = np.load(inp.path2data+"matrices/B_matrix.npy")
         else:
@@ -134,7 +133,7 @@ for i in range(2):
     print time.time() - start, "seconds"
 
     # save
-    if i == 0:
+    if iloop == 0:
         np.save("weights.npy",weights)
-    elif i == 1:
+    else:
         np.save("weights_p.npy",weights)

@@ -70,8 +70,8 @@ print "computing averages..."
 for iconf in xrange(ndata):
     atoms = atomic_symbols[iconf]
     #==================================================
-    Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
     Coef = np.linalg.solve(Over,Proj)
     #==================================================
     i = 0
@@ -98,8 +98,8 @@ for iconf in xrange(ndata):
         for l in xrange(lmax[atoms[iat]]+1):
             totsize += nmax[(atoms[iat],l)]*(2*l+1)
     #==================================================
-    Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
     #==================================================
     Av_coeffs = np.zeros(totsize,float)
     i = 0
@@ -113,5 +113,5 @@ for iconf in xrange(ndata):
                     i += 1
     #==================================================
     Proj -= np.dot(Over,Av_coeffs)
-    np.savetxt(inp.path2data+"projections/projections_conf"+str(iconf)+".dat",Proj, fmt='%.10e')
-    np.savetxt(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".dat", np.concatenate(Over), fmt='%.10e')
+    np.savetxt(inp.path2indata+"projections/projections_conf"+str(iconf)+".dat",Proj, fmt='%.10e')
+    np.savetxt(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".dat", np.concatenate(Over), fmt='%.10e')

@@ -102,11 +102,11 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 trainrangetot = np.loadtxt("training_set.txt",int)
 testrange = np.setdiff1d(range(ndata),trainrangetot)
 
-for i in range(2):
+for iloop in range(2):
     # Two loops only performed when cross-validating
-    if i == 1 and not xv: continue
+    if iloop == 1 and not xv: continue
     
-    if i == 1: testrange = trainrangetot
+    if iloop == 1: testrange = trainrangetot
     ntest = len(testrange)
     natoms_test = natoms[testrange]
 
@@ -139,7 +139,7 @@ for i in range(2):
 
 # load regression weights
 
-    if i == 0:
+    if iloop == 0:
         weights = np.load("weights.npy")
     else:
         weights = np.load("weights_p.npy")
@@ -172,7 +172,7 @@ for i in range(2):
             for n in xrange(nmax[(atoms[iat],0)]):
                 coeffs[itest,iat,0,n,0] += av_coefs[atoms[iat]][n]
 
-    if i == 0:
+    if iloop == 0:
         np.save("pred_coeffs.npy",coeffs)
     else:
         np.save("pred_coeffs_p.npy",coeffs)

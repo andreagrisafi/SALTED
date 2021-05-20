@@ -60,8 +60,8 @@ for iconf in testrange:
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
     #================================================
-    projs_ref = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    projs_ref = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
+    overl = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
     coeffs_ref = np.linalg.solve(overl,projs_ref)
     size_coeffs = coeffs_ref.shape
     # compute orthogonalization matrix
