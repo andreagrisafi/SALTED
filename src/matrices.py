@@ -1,4 +1,5 @@
 import sys
+import os
 import numpy as np
 import time
 import ase
@@ -16,14 +17,20 @@ import inp
 
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-p", "--partial", type=int, default=0, help="Calculate A and B for the pth ten structures in the training set")
+    parser.add_argument("-p", "--partial", type=int, default=0, help="Calculate A and B for the pth block of structures in the training set")
+    parser.add_argument("-b", "--partial_blocks", type=int, default=10, help="The number of structures included in each block, when using --partial")
 
     args = parser.parse_args()
     return args
 
 args = add_command_line_arguments_contraction("density regression")
+# read partial matrix information
 p = args.partial
+b = args.partial_blocks
+
+# Is automatic cross-validation requested?
 xv = inp.xv
+if xv and (p > 0): sys.exit('The options xv and --partial are not compatible')
 
 # read species
 spelist = inp.species
@@ -55,6 +62,13 @@ N = inp.Ntrain
 
 # training set fraction
 frac = inp.trainfrac
+
+# when performing an internal cross-validation,
+# Ntrain and frac are set to include half of the dataset
+if xv:
+    print "Automatic cross-validation requested. Ntrain and frac set automatically"
+    N = ndata//2
+    frac = 1.0
 
 # system parameters
 atomic_symbols = []
@@ -122,17 +136,28 @@ ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 validate_range = np.setdiff1d(dataset,trainrange).tolist()
 
-iters = 1
-if xv: iters = 2
-for count in range(iters):
-    if count == 1: trainrange = validate_range
+dirpath = os.path.join(inp.path2data, "matrices")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+
+for i in range(2):
+    # Two loops only performed when cross-validating
+    if i == 1 and not xv: continue
+
+    if i == 1 : trainrange = validate_range
     natoms_train = natoms[trainrange]
     print "Number of training configurations =", ntrain
 
+    # Include only the pth block of b training structures
     if p > 0:
-        print 'Calculating the ',p,'th 10 configurations'
-        ntrain = 10
-        trainrange = trainrange[10*(p-1):10*p]
+        print 'Calculating the ',p,'th block of ', b,' configurations'
+        ntrain_tot = ntrain
+        if b*(p-1) >= ntrain_tot: sys.exit('The requested block contains no structures. Reduce -p or -b')
+        ntrain = b
+        if b*p >= ntrain_tot:
+            ntrain = ntrain_tot - b*(p-1)
+            print 'WARNING: The ',p,'th block contains only ',ntrain,' structures, fewer than the requested block size, because the end of the dataset was reached'
+        trainrange = trainrange[b*(p-1):b*p]
         natoms_train = natoms[trainrange]
     
     # training set arrays
@@ -184,17 +209,13 @@ for count in range(iters):
     print "Regression matrices computed in", (time.time()-start)/60.0, "minutes"
 
     # save regression arrays
-    if count == 0:
+    if i == 0:
        if p > 0:
            np.save(inp.path2data+"matrices/A_"+str(p)+"_vector.npy", Avec)
            np.save(inp.path2data+"matrices/B_"+str(p)+"_matrix.npy", Bmat)
        else:
            np.save(inp.path2data+"matrices/A_vector.npy", Avec)
            np.save(inp.path2data+"matrices/B_matrix.npy", Bmat)
-    if count == 1:
-       if p > 0:
-           np.save(inp.path2data+"matrices/Ap_"+str(p)+"_vector.npy", Avec)
-           np.save(inp.path2data+"matrices/Bp_"+str(p)+"_matrix.npy", Bmat)
-       else:
-           np.save(inp.path2data+"matrices/Ap_vector.npy", Avec)
-           np.save(inp.path2data+"matrices/Bp_matrix.npy", Bmat)
+    if i == 1:
+        np.save(inp.path2data+"matrices/Ap_vector.npy", Avec)
+        np.save(inp.path2data+"matrices/Bp_matrix.npy", Bmat)

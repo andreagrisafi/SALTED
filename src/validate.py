@@ -12,6 +12,8 @@ from lib import prediction
 
 sys.path.insert(0, './')
 import inp
+
+# Is automatic cross-validation requested?
 xv = inp.xv
 
 # read species
@@ -100,10 +102,11 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 trainrangetot = np.loadtxt("training_set.txt",int)
 testrange = np.setdiff1d(range(ndata),trainrangetot)
 
-iters = 1
-if xv: iters = 2
-for count in range(iters):
-    if count == 1: testrange = trainrangetot
+for i in range(2):
+    # Two loops only performed when cross-validating
+    if i == 1 and not xv: continue
+    
+    if i == 1: testrange = trainrangetot
     ntest = len(testrange)
     natoms_test = natoms[testrange]
 
@@ -136,7 +139,7 @@ for count in range(iters):
 
 # load regression weights
 
-    if count == 0:
+    if i == 0:
         weights = np.load("weights.npy")
     else:
         weights = np.load("weights_p.npy")
@@ -159,7 +162,17 @@ for count in range(iters):
 
     coeffs = prediction.prediction(path2kerns,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
-    if count == 0:
+    av_coefs = {}
+    for spe in spelist:
+        av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
+
+    for itest,iconf in enumerate(testrange):
+        atoms = atomic_symbols[iconf]
+        for iat in xrange(natoms[iconf]):
+            for n in xrange(nmax[(atoms[iat],0)]):
+                coeffs[itest,iat,0,n,0] += av_coefs[atoms[iat]][n]
+
+    if i == 0:
         np.save("pred_coeffs.npy",coeffs)
     else:
         np.save("pred_coeffs_p.npy",coeffs)

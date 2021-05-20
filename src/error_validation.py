@@ -42,10 +42,11 @@ testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
-iters = 1
-if xv: iters = 2
-for count in range(iters):
-    if count == 0:
+for i in range(2):
+    # Two loops only performed when cross-validating
+    if i == 1 and not xv: continue
+    
+    if i == 0:
         coeffs = np.load("pred_coeffs.npy")
     else:
         coeffs = np.load("pred_coeffs_p.npy")
@@ -63,7 +64,11 @@ for count in range(iters):
     error_density = 0.0
     Oerror_density = 0.0
     variance = 0.0
-    f = open("errors_validation.dat","w")
+    if i == 0:
+        f = open("errors_validation.dat","w")
+    else:
+        f = open("errors_validation_p.dat","w")
+
     print "Estimating prediction error ..."
     for iconf in testrange:
         atoms = atomic_symbols[iconf]
@@ -83,7 +88,7 @@ for count in range(iters):
                 for n in xrange(nmax[(atoms[iat],l)]):
                     for im in xrange(2*l+1):
                         if l==0:
-                            coefficients[icoeff] = coeffs[itest,iat,l,n,im] + av_coefs[atoms[iat]][n]
+                            coefficients[icoeff] = coeffs[itest,iat,l,n,im]
                             averages[icoeff] = av_coefs[atoms[iat]][n]
                         else:
                             coefficients[icoeff] = coeffs[itest,iat,l,n,im] 
@@ -102,7 +107,7 @@ for count in range(iters):
 
     f.close()
 
-    if xv and count == 0: averr = 100*np.sqrt(error_density/variance)
-    if xv and count == 1: averr += 100*np.sqrt(error_density/variance)
+    if xv and i == 0: averr = 100*np.sqrt(error_density/variance)
+    if xv and i == 1: averr += 100*np.sqrt(error_density/variance)
     print "% RMSE =", 100*np.sqrt(error_density/variance)
-    if xv and count == 1: print "Av % RMSE =", averr*0.5
+    if xv and i == 1: print "XV % RMSE =", averr*0.5

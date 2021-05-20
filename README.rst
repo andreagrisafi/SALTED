@@ -96,7 +96,7 @@ In this example, we consider the interpolation of the electron density of a data
 
         python $SALTEDPATH/learn.py 
 
-9) Predict the baselined expansion coefficients of the scalar field over the validation set::
+9) Predict the expansion coefficients of the scalar field over the validation set::
 
         python $SALTEDPATH/validate.py 
    
@@ -139,6 +139,19 @@ Before starting, you need to: i) generate the reference RI-overlaps and RI-densi
 
    This gives a RMSE of about 0.2%, according to the isolated molecule case.
 
+
+Additional Options
+------------------
+
+Setting `xv = True` in inp.py will perform an internal cross-validation (M=1) when following the example above. The dataset will automatically be partitioned into a training and validation set of equal size, overriding the Ntrain and frac options. Two sets of regression vectors A, matrices B weights and predicted coefficients will be produced, one labelled with `p`. `error_validation.py` will print the RMSE for each half of the cross-validation, along with the average of the two errors.
+
+Setting `svd = True` will result in the singular value decomposition method of `numpy.linalg.lstsq` being used to solve the regression problem in `learn.py`. This is slower, but generally leads to a more stable solution, particular when the resulting weights are applied to a test set. In this case the `jitter` parameter is ignored.
+
+At runtime, `matrices.py` may be called with the options `-p` and `-b` (`--partial` and `--partial_block`). These options divide the training configurations into blocks of size `b`, and calculates the regression vector A and matrix B for just the `pth` block of structures, outputting `A_p_vector.npy` and `B_p_vector.npy`. This allows the calculation of the matrices to be parallelised across many nodes, since the full vector and matrix can be obtained simply by summing these partial matrices.
+
+If the regression matrices are calculated in blocks, `learn.py` may also be called with the runtime option `-np` (--number_partial). This will contruct the regression vector and matrix from the first `np` partial matrices. This enables the efficient construction of a learning curve, avoiding unnecessary recalculations of the regression matrices.
+
+The runtime options `-p` (or `-np`) are incompatible with the option `xv`.
 
 
 Contact

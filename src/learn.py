@@ -13,15 +13,24 @@ import inp
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
     parser.add_argument("-r", "--regul", type=float, default=None, help="Read regularization parameter at run-time")
-    parser.add_argument("-p", "--partial", type=int, default=0, help="Calculate A and B for the pth ten structures in the training set")
+    parser.add_argument("-np", "--number_partial", type=int, default=0, help="Build A and B from the first p blocks of structures in the training set")
 
     args = parser.parse_args()
     return args
 
 args = add_command_line_arguments_contraction("density regression")
+# Read the regularization parameter at runtime (this will override inp.py)
 reg = args.regul
-p = args.partial
+
+# Read the number of blocks of structures to include in the regression matrix and vector
+p = args.number_partial
+
+# Is automatic cross-validation requested?
 xv = inp.xv
+
+# Use Singular Value Decomposition to find the regression weights
+svd = inp.svd
+if xv and (p > 0): sys.exit('The options xv and -np are not compatible')
 
 # read species
 spelist = inp.species
@@ -48,15 +57,14 @@ ndata = len(xyzfile)
 # number of sparse environments
 M = inp.Menv
 
-# number of sparse environments
 if reg is None: reg = inp.regul
 
-# number of sparse environments
-jit = inp.jitter
+if not svd: jit = inp.jitter
 
 # system parameters
 atomic_symbols = []
 atomic_valence = []
+print ndata
 natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
@@ -87,23 +95,20 @@ for iref in xrange(1,M):
     collsize[iref] = collsize[iref-1] + bsize[fps_species[iref-1]]
 totsize = collsize[-1] + bsize[fps_species[-1]]
 
-iters = 1
-if xv: iters = 2
-
-for count in range(iters):
+for i in range(2):
+    # Two loops only performed when cross-validating
+    if i == 1 and not xv: continue
 
     print "Loading regression matrices ..."
-    if p > 0:
-       for i in range(1,p+1):
-           print i
 
-           if count == 0:
-               Avec_p = np.load(inp.path2data+"matrices/A_"+str(i)+"_vector.npy")
-               Bmat_p = np.load(inp.path2data+"matrices/B_"+str(i)+"_matrix.npy")
-           elif count == 1:
-               Avec_p = np.load(inp.path2data+"matrices/Ap_"+str(i)+"_vector.npy")
-               Bmat_p = np.load(inp.path2data+"matrices/Bp_"+str(i)+"_matrix.npy")
-           if i == 1:
+    # Include the first np blocks of structures in A and B
+    if p > 0:
+       for j in range(1,p+1):
+
+           Avec_p = np.load(inp.path2data+"matrices/A_"+str(j)+"_vector.npy")
+           Bmat_p = np.load(inp.path2data+"matrices/B_"+str(j)+"_matrix.npy")
+
+           if j == 1:
                Avec = Avec_p.copy()
                Bmat = Bmat_p.copy()
            else:
@@ -111,7 +116,7 @@ for count in range(iters):
                Bmat += Bmat_p
 
     else:
-        if count == 0:
+        if i == 0:
            Avec = np.load(inp.path2data+"matrices/A_vector.npy")
            Bmat = np.load(inp.path2data+"matrices/B_matrix.npy")
         else:
@@ -122,12 +127,14 @@ for count in range(iters):
 
     print "Solving regression problem of dimension =", totsize
     start = time.time()
-    #weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(totsize),Avec)
-    weights = np.linalg.lstsq(Bmat+reg*Rmat,Avec,rcond=None)[0]
+    if svd:
+        weights = np.linalg.lstsq(Bmat+reg*Rmat,Avec,rcond=None)[0]
+    else:
+        weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(totsize),Avec)
     print time.time() - start, "seconds"
 
     # save
-    if count == 0:
+    if i == 0:
         np.save("weights.npy",weights)
-    elif count == 1:
+    elif i == 1:
         np.save("weights_p.npy",weights)
