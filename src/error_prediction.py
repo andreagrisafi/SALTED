@@ -60,8 +60,8 @@ for iconf in testrange:
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
     #================================================
-    projs_ref = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    projs_ref = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
+    overl = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
     coeffs_ref = np.linalg.solve(overl,projs_ref)
     size_coeffs = coeffs_ref.shape
     #================================================
@@ -73,7 +73,7 @@ for iconf in testrange:
             for n in xrange(nmax[(atoms[iat],l)]):
                 for im in xrange(2*l+1):
                     if l==0:
-                        coefficients[icoeff] = coeffs[itest,iat,l,n,im] + av_coefs[atoms[iat]][n]
+                        coefficients[icoeff] = coeffs[itest,iat,l,n,im]
                         averages[icoeff] = av_coefs[atoms[iat]][n]
                     else:
                         coefficients[icoeff] = coeffs[itest,iat,l,n,im] 

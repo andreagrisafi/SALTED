@@ -4,6 +4,7 @@ import time
 import ase
 from ase import io
 from ase.io import read
+#import argparse
 
 import basis
 
@@ -11,6 +12,9 @@ from lib import prediction
 
 sys.path.insert(0, './')
 import inp
+
+# Is automatic cross-validation requested?
+xv = inp.xv
 
 # read species
 spelist = inp.species
@@ -97,55 +101,78 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 # dataset partitioning
 trainrangetot = np.loadtxt("training_set.txt",int)
 testrange = np.setdiff1d(range(ndata),trainrangetot)
-ntest = len(testrange)
-natoms_test = natoms[testrange]
 
-print "Number of test configurations = ", ntest
-print "Predicting the baselined expansion coefficients for the test set ..."
+for iloop in range(2):
+    # Two loops only performed when cross-validating
+    if iloop == 1 and not xv: continue
+    
+    if iloop == 1: testrange = trainrangetot
+    ntest = len(testrange)
+    natoms_test = natoms[testrange]
 
-# define testing indexes 
-test_configs = np.array(testrange,int)
-atomicindx_test = atomicindx[:,:,testrange]
-atom_counting_test = atom_counting[testrange]
-test_species = np.zeros((ntest,natmax),int)
-for itest in xrange(ntest):
-    for iat in xrange(natoms_test[itest]):
-        test_species[itest,iat] = spec_list_per_conf[testrange[itest]][iat]
+    print "Number of test configurations = ", ntest
+    print "Predicting the baselined expansion coefficients for the test set ..."
 
-# sparse kernel sizes 
-kernel_sizes = np.zeros(ntest,int)
-itest = 0
-for iconf in testrange:
-    for iref in xrange(M):
-        ispe = fps_species[iref]
-        spe = spe_dict[ispe]
-        for l in xrange(lmax[spe]+1):
+    # define testing indexes 
+    test_configs = np.array(testrange,int)
+    atomicindx_test = atomicindx[:,:,testrange]
+    atom_counting_test = atom_counting[testrange]
+    test_species = np.zeros((ntest,natmax),int)
+    for itest in xrange(ntest):
+        for iat in xrange(natoms_test[itest]):
+            test_species[itest,iat] = spec_list_per_conf[testrange[itest]][iat]
+
+    # sparse kernel sizes 
+    kernel_sizes = np.zeros(ntest,int)
+    itest = 0
+    for iconf in testrange:
+        for iref in xrange(M):
+            ispe = fps_species[iref]
+            spe = spe_dict[ispe]
+            for l in xrange(lmax[spe]+1):
+                msize = 2*l+1
+                for im in xrange(msize):
+                    for iat in xrange(atom_counting_test[itest,ispe]):
+                        for imm in xrange(msize):
+                            kernel_sizes[itest] += 1
+        itest += 1
+
+# load regression weights
+
+    if iloop == 0:
+        weights = np.load("weights.npy")
+    else:
+        weights = np.load("weights_p.npy")
+
+    # unravel regression weights with explicit indexing
+    ww = np.zeros((M,llmax+1,nnmax,2*llmax+1),float)
+    i = 0
+    for ienv in xrange(M):
+        ispe = fps_species[ienv]
+        al = almax[ispe]
+        for l in xrange(al):
             msize = 2*l+1
-            for im in xrange(msize):
-                for iat in xrange(atom_counting_test[itest,ispe]):
-                    for imm in xrange(msize):
-                        kernel_sizes[itest] += 1
-    itest += 1
+            anc = anmax[ispe,l]
+            for n in xrange(anc):
+                for im in xrange(msize):
+                    ww[ienv,l,n,im] = weights[i] 
+                    i += 1
 
-# load regression weights 
-weights = np.load("weights.npy")
+    path2kerns = inp.path2data+"kernels/"
 
-# unravel regression weights with explicit indexing
-ww = np.zeros((M,llmax+1,nnmax,2*llmax+1),float)
-i = 0
-for ienv in xrange(M):
-    ispe = fps_species[ienv]
-    al = almax[ispe]
-    for l in xrange(al):
-        msize = 2*l+1
-        anc = anmax[ispe,l]
-        for n in xrange(anc):
-            for im in xrange(msize):
-                ww[ienv,l,n,im] = weights[i] 
-                i += 1
+    coeffs = prediction.prediction(path2kerns,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
-path2kerns = inp.path2data+"kernels/"
+    av_coefs = {}
+    for spe in spelist:
+        av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-coeffs = prediction.prediction(path2kerns,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
+    for itest,iconf in enumerate(testrange):
+        atoms = atomic_symbols[iconf]
+        for iat in xrange(natoms[iconf]):
+            for n in xrange(nmax[(atoms[iat],0)]):
+                coeffs[itest,iat,0,n,0] += av_coefs[atoms[iat]][n]
 
-np.save("pred_coeffs.npy",coeffs)
+    if iloop == 0:
+        np.save("pred_coeffs.npy",coeffs)
+    else:
+        np.save("pred_coeffs_p.npy",coeffs)

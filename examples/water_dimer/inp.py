@@ -7,11 +7,12 @@ species = ["H","O"] # ordered list of species
 # ----------------
 path2ref = "../water_monomer/"
 filename_ref = "water_monomers_1k.xyz" # XYZ file
+path2data_ref = "/local/big_scratch/water_monomer/"
 
 # paths to data
 # -------------
 path2data = "/local/big_scratch/water_dimer/"
-path2data_ref = "/local/big_scratch/water_monomer/"
+path2indata = "/local/big_scratch/water_dimer/"
 
 # QM variables 
 # ------------
