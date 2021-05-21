@@ -19,15 +19,6 @@ for i in xrange(len(spelist)):
 # read basis
 [lmax,nmax] = basis.basiset(inp.dfbasis)
 
-llist = []
-nlist = []
-for spe in spelist:
-    llist.append(lmax[spe])
-    for l in xrange(lmax[spe]+1):
-        nlist.append(nmax[(spe,l)])
-llmax = max(llist)
-nnmax = max(nlist)
-
 # read system
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
@@ -43,6 +34,12 @@ for i in xrange(len(xyzfile)):
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_symbols[i]))
 natmax = max(natoms)
+
+# load predicted coefficients for test structures
+trainrangetot = np.loadtxt("training_set.txt",int)
+testrange = np.setdiff1d(range(ndata),trainrangetot)
+ntest = len(testrange)
+natoms_test = natoms[testrange]
 
 def complex_to_real_transformation(sizes):
     """Transformation matrix from complex to real spherical harmonics"""
@@ -92,36 +89,35 @@ def radint2(lval,alp,d):
     rint2 = 0.5*np.exp(-alp*d**2)/alp
     return rint2/np.sqrt(inner)
 
-f = open("hartree_energy.dat","w")
-g = open("external_energy.dat","w")
+coeffs = np.load("pred_coeffs.npy")
+
+electro_ref = np.loadtxt("electrostatic_energy.dat")
+electro_pre = np.zeros(len(testrange))
+f = open("predicted_electrostatic_energies.dat","w")
 print "Computing Hartree and external energy..."
 itest=0
-for iconf in xrange(ndata):
-    print "conf. number:", iconf+1, "/", ndata
+for iconf in testrange:
+    print "testing conf. number:", itest+1, "/", len(testrange)
     atoms = atomic_symbols[iconf]
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
     natoms = len(atoms)
     # Load projections and overlaps
     projs = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
-    rcoeffs = np.linalg.solve(overl,projs)
-    ref_coeffs = np.zeros((natoms,llmax+1,nnmax,2*llmax+1))
-    ref_rho = np.zeros(projs.shape,float)
+    rho = np.zeros(projs.shape,float)
     icoeff = 0
     for iat in xrange(natoms):
         for l in xrange(lmax[atoms[iat]]+1):
             for n in xrange(nmax[(atoms[iat],l)]):
                 for im in xrange(2*l+1):
-                    ref_coeffs[iat,l,n,im] = rcoeffs[icoeff]
                     if l==1:
                         if im != 2:
-                           ref_rho[icoeff+1] = rcoeffs[icoeff]
+                           rho[icoeff+1] = coeffs[itest,iat,l,n,im]
                         elif im == 2:
-                           ref_rho[icoeff-2] = rcoeffs[icoeff]
+                           rho[icoeff-2] = coeffs[itest,iat,l,n,im]
 
                     else:
-                        ref_rho[icoeff] = rcoeffs[icoeff]
+                        rho[icoeff] = coeffs[itest,iat,l,n,im]
                     icoeff +=1
     geom = xyzfile[iconf]
     coords = geom.get_positions()
@@ -135,14 +131,14 @@ for iconf in xrange(ndata):
     ribasis = inp.qmbasis+" jkfit" 
     auxmol = gto.M(atom=catoms,basis=ribasis)
     pmol = mol + auxmol
-    # RI
+    # ML
     eri2c = auxmol.intor('int2c2e_sph')
-    matrix_of_coefficients = np.outer(ref_rho,ref_rho)
-    E_H_ref = np.einsum('ij,ji',eri2c,matrix_of_coefficients)*0.5
+    matrix_of_coefficients = np.outer(rho,rho)
+    E_H = np.einsum('ij,ji',eri2c,matrix_of_coefficients)*0.5
     # Compute electron-nuclear energy
-    E_eN_ref = 0.0
+    E_eN = 0.0
     for iat in xrange(natoms):
-        ref_contr = 0.0
+        contr = 0.0
         for jat in xrange(natoms):
             spe = atoms[jat]
             if iat==jat:
@@ -150,7 +146,7 @@ for iconf in xrange(ndata):
                 for n in xrange(nmax[(spe,0)]):
                     alpha=auxmol._basis[spe][idx][1][0]
                     r0 = radint0(alpha)
-                    ref_contr += ref_coeffs[jat,0,n,0]*r0
+                    contr += coeffs[itest,jat,0,n,0]*r0
                     idx+=1
             else:
                 dist = coords[iat]-coords[jat]
@@ -164,20 +160,19 @@ for iconf in xrange(ndata):
                         alpha=auxmol._basis[spe][idx][1][0]
                         r1 = radint1(l,alpha,dij)/(dij**(l+1))
                         r2 = radint2(l,alpha,dij)*(dij**l)
-                        rotated_coeffs = np.dot(wigner_real,ref_coeffs[jat,l,n,:2*l+1])
-                        ref_contr += (r1 + r2)*rotated_coeffs
+                        rotated_coeffs = np.dot(wigner_real,coeffs[itest,jat,l,n,:2*l+1])
+                        contr += (r1 + r2)*rotated_coeffs
                         idx+=1
-        E_eN_ref += ref_contr*valences[iat]
-    E_eN_ref *= -np.sqrt(4.0*np.pi)
-    print >> f, E_H_ref
-    print >> g, E_eN_ref
+        E_eN += contr*valences[iat]
+    E_eN *= -np.sqrt(4.0*np.pi)
+    electro_pre[itest] = E_H+E_eN
+    print >> f, iconf+1, electro_ref[iconf], electro_pre[itest]
     itest+=1
-
 f.close()
-g.close()
 
-# compute error on electrostatic energy
-hartree_ref = np.loadtxt("hartree_energy.dat")
-external_ref = np.loadtxt("external_energy.dat")
-electro_ref = hartree_ref + external_ref 
-np.savetxt("electrostatic_energy.dat",electro_ref)
+abs_errors = (electro_pre - electro_ref[testrange]) 
+np.savetxt("electro_errors.dat", abs_errors * hart2kcal)
+rmse = np.sqrt(np.sum(abs_errors**2)/ntest)
+std = np.std(electro_ref)
+
+print "Electrostatic energy error =", rmse*hart2kcal, "kcal/mol", ",", rmse/std*100, "%"

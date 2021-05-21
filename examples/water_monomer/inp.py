@@ -2,7 +2,7 @@
 # -----------------
 filename = "water_monomers_1k.xyz" # XYZ file
 species = ["H","O"] # ordered list of species
-propname = "potential" 
+propname = "electro" 
 
 # path to data
 # ------------
