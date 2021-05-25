@@ -79,29 +79,30 @@ preds = np.zeros((ntest,natmax,llmax+1,nnmax,2*llmax+1))
 for spe in spelist:
 
     for l in xrange(lmax[spe]+1):
-        
-        KMM = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/kmm_M"+str(M)+".npy")
-        
+      
+        # get truncated size
+        Mcut = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(0)+"_M"+str(M)+".npy").shape[1]
+
         # compute B matrix
-        B = np.zeros((M*(2*l+1),M*(2*l+1)))
+        B = np.zeros((Mcut,Mcut))
         for iconf in trainrange:
-            kernel_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/knm_conf"+str(iconf)+"_M"+str(M)+".npy")
-            B += np.dot(kernel_nm.T,kernel_nm)
+            psi_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
+            B += np.dot(psi_nm.T,psi_nm)
         
         for n in xrange(nmax[(spe,l)]): 
         
             # compute A vector
-            A = np.zeros(M*(2*l+1))
+            A = np.zeros(Mcut)
             for iconf in trainrange:
-                kernel_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/knm_conf"+str(iconf)+"_M"+str(M)+".npy")
+                psi_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
                 ortho_projs = np.load(inp.path2data+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")
-                A += np.dot(kernel_nm.T,ortho_projs)
+                A += np.dot(psi_nm.T,ortho_projs)
            
             print ""
             print "spe:",spe,"L:",l,"n:",n
             print "------------------------"
             
-            x = np.linalg.solve( B + reg*KMM + jit*np.eye(M*(2*l+1)) , A )
+            x = np.linalg.solve( B + reg*np.eye(Mcut) , A )
 
             error_total = 0 
             variance = 0
@@ -109,8 +110,8 @@ for spe in spelist:
             for iconf in testrange:
 
                 # predict
-                kernel_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/knm_conf"+str(iconf)+"_M"+str(M)+".npy")
-                ortho_projs = np.dot(kernel_nm,x)
+                psi_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
+                ortho_projs = np.dot(psi_nm,x)
               
                 # reference
                 ortho_projs_ref = np.load(inp.path2data+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")

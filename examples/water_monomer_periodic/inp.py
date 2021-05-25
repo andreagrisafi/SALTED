@@ -5,7 +5,7 @@ species = ["H","O"] # ordered list of species
 
 # path to data
 # ------------
-path2data = "/scratch/grisafi/lowdin/water_monomer/" 
+path2data = "/local/big_scratch/water_monomer_periodic/" 
 
 # RHO variables
 # -------------

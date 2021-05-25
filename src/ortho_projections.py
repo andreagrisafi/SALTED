@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import scipy
 from scipy import special
+from scipy.sparse.linalg import eigsh 
 import time
 import ase
 from ase import io
@@ -65,8 +66,8 @@ for iconf in xrange(ndata):
     species = atomic_symbols[iconf]
     #==================================================
     Coef = np.load(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy")
-    #Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    #Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
     #Coef = np.linalg.solve(Over,Proj)
     #==================================================
     i = 0
@@ -91,6 +92,7 @@ for spe in spelist:
 
 print "computing baselined orthogonal projections..."
 for iconf in xrange(ndata):
+    print "conf:", iconf+1
     species = atomic_symbols[iconf]
     # init orthogonal projections
     projs = {}
@@ -116,6 +118,7 @@ for iconf in xrange(ndata):
     # compute baselined projections
     DProj = np.dot(Over,Coef)
     # compute orthogonalization matrix
+    #eigenvalues, unitary = eigsh(Over,300)
     eigenvalues, unitary = np.linalg.eig(Over)
     sqrteigen = np.sqrt(eigenvalues) 
     diagoverlap = np.diag(1.0/sqrteigen)
