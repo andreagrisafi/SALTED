@@ -31,12 +31,12 @@ atomic_symbol = []
 natoms = np.zeros(ndata,int)
 energies = np.zeros(ndata)
 stechio = np.zeros((ndata,nspecies),float)
-for iconf in xrange(ndata):
+for iconf in range(ndata):
     energies[iconf] = xyzfile[iconf].info[inp.propname]
     symbols = xyzfile[iconf].get_chemical_symbols()
     atomic_symbol.append(symbols)
     natoms[iconf] = len(symbols)
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         ispe = species[symbols[iat]]
         stechio[iconf,ispe] += 1.0 
 natmax = max(natoms)
@@ -44,45 +44,23 @@ covariance = np.dot(stechio.T,stechio)
 
 nostechio = False
 if np.linalg.matrix_rank(covariance) < nspecies:
-    print "Dataset has uniform distribution of species: no stochiometric baseline is applied."
+    print("Dataset has uniform distribution of species: no stochiometric baseline is applied.")
     nostechio = True
 elif nspecies==1:
-    print "Dataset has uniform distribution of species: no stochiometric baseline is applied."
+    print("Dataset has uniform distribution of species: no stochiometric baseline is applied.")
     nostechio = True
 else:
-    print "Dataset has non-uniform distribution of species: a stochiometric baseline is applied."
+    print("Dataset has non-uniform distribution of species: a stochiometric baseline is applied.")
     vector = np.dot(stechio.T,energies)
     weights = np.linalg.solve(covariance,vector)
     baseline = np.dot(stechio,weights)
 
-print "STD =", np.std(energies), "[energy units]"
+print("STD =", np.std(energies), "[energy units]")
 
-
-#====================================== reference environments 
+# load reference environments 
 fps_indexes = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
-fps_species = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,1] 
 
-spec_list = []
-spec_list_per_conf = {}
-atom_counting = np.zeros((ndata,nspecies),int)
-for iconf in xrange(ndata):
-    spec_list_per_conf[iconf] = []
-    for iat in xrange(natoms[iconf]):
-        for ispe in xrange(nspecies):
-            if atomic_symbol[iconf][iat] == inp.species[ispe]:
-               atom_counting[iconf,ispe] += 1
-               spec_list.append(ispe)
-               spec_list_per_conf[iconf].append(ispe)
-spec_array = np.asarray(spec_list,int)
-nenv = len(spec_array)
-#===================== atomic indexes sorted by species
-atomicindx = np.zeros((ndata,nspecies,natmax),int)
-for iconf in xrange(ndata):
-    for ispe in xrange(nspecies):
-        indexes = [i for i,x in enumerate(spec_list_per_conf[iconf]) if x==ispe]
-        for icount in xrange(atom_counting[iconf,ispe]):
-            atomicindx[iconf,ispe,icount] = indexes[icount]
-
+# load training set and define test set accordingly
 trainrangetot = np.loadtxt("training_set.txt",int)
 ntrain = len(trainrangetot)
 trainrange = trainrangetot[0:ntrain]
@@ -91,62 +69,81 @@ testrange = np.array(np.setdiff1d(range(ndata),trainrangetot),int)
 natoms_test = natoms[testrange]
 te_energ = energies[testrange]
 
-total_species = np.zeros((ndata,natmax),int)
-for iconf in xrange(ndata):
-    for iat in xrange(natoms[iconf]):
-        total_species[iconf,iat] = spec_list_per_conf[iconf][iat]
+# load feature vector and define sparse feature vector
+power_per_conf = np.load(inp.path2data+"/soaps/FEAT-0.npy")
+nfeat = power_per_conf.shape[-1]
+power_ref_sparse = power_per_conf.reshape(ndata*3,nfeat)[fps_indexes]
 
-power = np.load(inp.path2data+"/soaps/SOAP-0.npy")
-# power spectrum
-nfeat = len(power[0,0])
-power_env = np.zeros((nenv,nfeat),float)
-power_per_conf = np.zeros((ndata,natmax,nfeat),float)
-ienv = 0
-for iconf in xrange(ndata):
-    iat = 0
-    for ispe in xrange(nspecies):
-        for icount in xrange(atom_counting[iconf,ispe]):
-            jat = atomicindx[iconf,ispe,icount]
-            power_per_conf[iconf,jat] = power[iconf,iat]
-            iat+=1
-    for iat in xrange(natoms[iconf]):
-        power_env[ienv] = power_per_conf[iconf,iat]
-        ienv += 1
-power_ref_sparse = power_env[fps_indexes]
-
-# kernel NM
+# compute kernel that couples N structure with M environments
 k_NM = np.zeros((ndata,M),float)
-for iconf in xrange(ndata):
-    for iat in xrange(natoms[iconf]):
-        for iref in xrange(M):
+for iconf in range(ndata):
+    for iref in range(M):
+        for iat in range(natoms[iconf]):
             k_NM[iconf,iref] += np.dot(power_per_conf[iconf,iat],power_ref_sparse[iref].T)**zeta
-    k_NM[iconf,iref] /= natoms[iconf]
+        k_NM[iconf,iref] /= natoms[iconf]
 
-# kernel MM
+# DECOMMENT BELOW FOR FULL GPR
+#k_NN = np.zeros((ndata,ndata),float)
+#for iconf in range(ndata):
+#    for jconf in range(ndata):
+#        for iat in range(natoms[iconf]):
+#            for jat in range(natoms[jconf]):
+#                k_NN[iconf,jconf] += np.dot(power_per_conf[iconf,iat],power_per_conf[jconf,jat].T)**zeta
+
+# compute environmental kernel for M environments
 k_MM = np.zeros((M,M),float)
-for iref1 in xrange(M):
-    for iref2 in xrange(M):
+for iref1 in range(M):
+    for iref2 in range(M):
         k_MM[iref1,iref2] = np.dot(power_ref_sparse[iref1],power_ref_sparse[iref2].T)**zeta
 
-for frac in [0.01,0.025,0.05,0.075,0.1,0.25,0.5,0.75,1.0]:
+# compute the RKHS of K_MM^-1 cutting small/negative eigenvalues
+eva, eve = np.linalg.eigh(k_MM)
+eva = eva[::-1]
+eve = eve[:,::-1]
+eva = eva[eva>inp.eigcut]
+Mcut = len(eva)
+eve = eve[:,:Mcut]
+V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+
+# span training set fraction
+for frac in [0.025,0.05,0.1,0.2,0.4,1.0]:
+
+    # define training set
     ntrain = int(frac*len(trainrangetot))
     trainrange = trainrangetot[0:ntrain]
     natoms_train = natoms[trainrange]
    
-    ktrain = np.dot(k_NM[trainrange].T,k_NM[trainrange])
-    ktest = k_NM[testrange]
-  
+    # compute the RKHS of K_NM * K_MM^-1 * K_MN^T
+    Phi = np.dot(k_NM[trainrange],V)
+    Phi_test = np.dot(k_NM[testrange],V)
+    
+    # DECOMMENT BELOW FOR FULL GPR
+    #ktrain = k_NN[trainrange][:,trainrange]
+    #ktest = k_NN[testrange][:,trainrange]
+   
+    # baseline property 
     if nostechio==False:
         tr_energ = (energies[trainrange] - baseline[trainrange])/natoms_train 
     else:    
-        tr_energ = energies[trainrange]/natoms_train - np.mean(energies[trainrange]/natoms_train) 
+        tr_energ = (energies[trainrange]/natoms_train - np.mean(energies[trainrange]/natoms_train))
     
-    ml_energ = np.dot(ktest, np.linalg.solve(ktrain + reg*k_MM + jit*np.eye(M), np.dot(k_NM[trainrange].T,tr_energ)))
+    # DECOMMENT BELOW FOR FULL GPR
+    #ml_energ = np.dot(ktest, np.linalg.solve(ktrain + reg*np.eye(ntrain), tr_energ))
+   
+    # DECOMMENT FOR UNSTABLE SPARSE GPR
+    #ml_energ = np.dot(ktest, np.linalg.solve(ktrain + reg*k_MM + jit*np.eye(M), np.dot(k_NM[trainrange].T,tr_energ)))
+
+    # perform regression and prediction
+    ml_energ = np.dot(Phi_test, np.linalg.solve(np.dot(Phi.T,Phi) + reg*np.eye(Mcut), np.dot(Phi.T,tr_energ)))
+
+    # reconstruct property
     if nostechio==False:
         ml_energ *= natoms_test
         ml_energ += baseline[testrange]
     else:
         ml_energ += np.mean(energies[trainrange]/natoms_train)
         ml_energ *= natoms_test
+    
+    # compute prediction error
     error = np.sum((ml_energ-te_energ)**2)/float(len(te_energ))
-    print "N =", ntrain,"RMSE =", np.sqrt(error) , "[energy units]"
+    print("N =", ntrain,"RMSE =", np.sqrt(error) , "[energy units]")

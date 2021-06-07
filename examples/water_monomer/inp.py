@@ -20,12 +20,13 @@ dfbasis = "RI-cc-pvqz" # auxiliary basis
 
 # ML variables  
 # ------------
-z = 2.0 # kernel exponent 
-Menv = 200 # number of FPS environments
-Ntrain = 500 # number of training structures
-trainfrac = 1.0 # training set fraction
-regul = 1e-05 # regularization
-jitter = 1e-10# jitter value
-eigcut = 1e-05
+z = 2.0           # kernel exponent 
+Menv = 100        # number of FPS environments
+Ntrain = 200      # number of training structures
+trainfrac = 1.0   # training set fraction
+regul = 1e-06     # regularization
+eigcut = 1e-08    # eigenvalues cutoff
+
 xv = False
 svd = False
+jitter = 1e-10    # jitter value

@@ -6,7 +6,7 @@ from pyscf import scf,dft
 from ase.io import read
 from scipy import special
 import argparse
-
+from pyscf import grad
 
 def add_command_line_arguments(parsetext):
     parser = argparse.ArgumentParser(description=parsetext,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -39,12 +39,19 @@ for i in range(natoms):
 
 # Get PySCF objects for wave-function and density-fitted basis
 mol = gto.M(atom=atoms,basis=inp.qmbasis)
-# Run restricted hartree-fock calculation
-#m = scf.RHF(mol)
 m = dft.RKS(mol)
-m.xc = inp.functional 
+m.xc = inp.functional
 # Save density matrix
 m.kernel()
+
+#ks_scanner = m.apply(grad.RKS).as_scanner()
+#etot, grad = ks_scanner(mol)
+#
+#f = open("gradients/grad_conf"+str(iconf+1)+".dat","w")
+#for i in range(natoms):
+#    print >> f, symb[i], grad[i,0], grad[i,1], grad[i,2]
+#f.close()
+
 dm = m.make_rdm1()
 
 dirpath = os.path.join(inp.path2indata, "density_matrices")

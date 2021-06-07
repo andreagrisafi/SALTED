@@ -100,7 +100,7 @@ for spe in spelist:
             print ""
             print "spe:",spe,"L:",l,"n:",n
             print "------------------------"
-            
+           
             x = np.linalg.solve( B + reg*KMM + jit*np.eye(M*(2*l+1)) , A )
 
             error_total = 0 
@@ -130,4 +130,4 @@ for spe in spelist:
 
             print "% RMSE =", 100*np.sqrt(error_total/variance)
 
-np.save("predictions.npy",preds)
+np.save("ortho_predictions.npy",preds)

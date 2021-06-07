@@ -18,6 +18,15 @@ for i in xrange(len(spelist)):
 # read basis
 [lmax,nmax] = basis.basiset(inp.dfbasis)
 
+llist = []
+nlist = []
+for spe in spelist:
+    llist.append(lmax[spe])
+    for l in xrange(lmax[spe]+1):
+        nlist.append(nmax[(spe,l)])
+llmax = max(llist)
+nnmax = max(nlist)
+
 # read system
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
@@ -41,7 +50,7 @@ testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
-ortho_coeffs = np.load("predictions.npy")
+ortho_coeffs = np.load("ortho_predictions.npy")
 
 av_coefs = {}
 for spe in spelist:
@@ -51,10 +60,13 @@ dirpath = os.path.join(inp.path2data, "predictions")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
+print ""
+print "Estimating prediction error ..."
+
 itest=0
 Oerror_density = 0.0
 variance = 0.0
-print "Estimating prediction error ..."
+preds = np.zeros((ntest,natmax,llmax+1,nnmax,2*llmax+1))
 for iconf in testrange:
     atoms = atomic_symbols[iconf]
     valences = atomic_valence[iconf]
@@ -92,6 +104,7 @@ for iconf in testrange:
                     if l==0:
                         OCoef[icoeff] += av_coefs[atoms[iat]][n]
                         averages[icoeff] = av_coefs[atoms[iat]][n]
+                    preds[itest,iat,l,n,im] = OCoef[icoeff]
                     icoeff +=1
     OProj = np.dot(overl,OCoef)
     #================================================
@@ -104,3 +117,4 @@ for iconf in testrange:
     itest+=1
 
 print "% RMSE =", 100*np.sqrt(Oerror_density/variance)
+np.save("pred_coeffs.npy",preds)

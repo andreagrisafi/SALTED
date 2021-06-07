@@ -29,22 +29,23 @@ llmax = max(llist)
 M = inp.Menv
 zeta = inp.z
 
-print "Computing a sparse set made of", M, "FPS environments..."
+print "Computing RKHS of sparse GPR..."
+print ""
 
-def do_fps(x, d=0):
-    # Code from Giulio Imbalzano
-    if d == 0 : d = len(x)
-    n = len(x)
-    iy = np.zeros(d,int)
-    iy[0] = 0
-    # Faster evaluation of Euclidean distance
-    n2 = np.sum((x*np.conj(x)),axis=1)
-    dl = n2 + n2[iy[0]] - 2*np.real(np.dot(x,np.conj(x[iy[0]])))
-    for i in xrange(1,d):
-        iy[i] = np.argmax(dl)
-        nd = n2 + n2[iy[i]] - 2*np.real(np.dot(x,np.conj(x[iy[i]])))
-        dl = np.minimum(dl,nd)
-    return iy
+#def do_fps(x, d=0):
+#    # Code from Giulio Imbalzano
+#    if d == 0 : d = len(x)
+#    n = len(x)
+#    iy = np.zeros(d,int)
+#    iy[0] = 0
+#    # Faster evaluation of Euclidean distance
+#    n2 = np.sum((x*np.conj(x)),axis=1)
+#    dl = n2 + n2[iy[0]] - 2*np.real(np.dot(x,np.conj(x[iy[0]])))
+#    for i in xrange(1,d):
+#        iy[i] = np.argmax(dl)
+#        nd = n2 + n2[iy[i]] - 2*np.real(np.dot(x,np.conj(x[iy[i]])))
+#        dl = np.minimum(dl,nd)
+#    return iy
 
 # system parameters
 atomic_symbols = []
@@ -93,34 +94,45 @@ for iconf in xrange(ndata):
         atom_idx[(iconf,spe)].append(iat)
         natom_dict[(iconf,spe)] += 1 
 
+# load sparse set of environments
+fps_environ = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
+fps_species = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,1]
+
+# divide sparse set per species
 fps_indexes = {}
+for spe in spelist:
+    fps_indexes[spe] = []
+for iref in xrange(M):
+    fps_indexes[spelist[fps_species[iref]]].append(fps_environ[iref])
+Mspe = {}
+for spe in spelist:
+    Mspe[spe] = len(fps_indexes[spe])
+
+# lambda = 0
 power_env_sparse = {}
 kernel0_mm = {}
 kernel0_nm = {}
 for spe in spelist:
 
-    # compute FPS of atomic environments for each species using lambda=0 metric
-    fps_indexes[spe] = np.array(do_fps(power_env[spe],M),int)
-    np.savetxt(spe+"_sparse_set_"+str(M)+".txt",fps_indexes[spe],fmt='%i')
-    
-    # compute sparse kernel kmm for each atomic species and lambda=0
-    power_env_sparse[spe] = power_env[spe][fps_indexes[spe]]
+    # compute sparse kernel K_MM for each atomic species 
+    power_env_sparse[spe] = power.reshape(ndata*natoms[0],power.shape[-1])[np.array(fps_indexes[spe],int)]
     kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
     kernel_mm = kernel0_mm[spe]**zeta
     
+    # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
     eva, eve = np.linalg.eigh(kernel_mm)
-    eva = eva[eva>1e-08]
+    eva = eva[eva>inp.eigcut]
     eve = eve[:,-len(eva):]
     V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
 
-    # compute k_nm 
+    # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
     for iconf in xrange(ndata):
         kernel0_nm[(iconf,spe)] = np.dot(power[iconf,atom_idx[(iconf,spe)]],power_env_sparse[spe].T)
         kernel_nm = kernel0_nm[(iconf,spe)]**zeta
         psi_nm = np.real(np.dot(kernel_nm,V))
         np.save(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(0)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy",psi_nm)
 
-# cycle over lambda>0
+# lambda>0
 for l in xrange(1,llmax+1):
 
     # load power spectrum
@@ -142,23 +154,27 @@ for l in xrange(1,llmax+1):
 
     power_env_sparse = {}
     for spe in spelist:
-        # compute sparse power spectruma for each atomic species
-        power_env_sparse[spe] = power_env[spe][fps_indexes[spe]].reshape(M*(2*l+1),nfeat)
-        # compute k_mm 
+
+        # get sparse feature vector for each atomic species
+        power_env_sparse[spe] = power.reshape(ndata*natoms[0],2*l+1,power.shape[-1])[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
+        
+        # compute K_MM 
         kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T) 
-        for i1 in xrange(M):
-            for i2 in xrange(M):
+        for i1 in xrange(Mspe[spe]):
+            for i2 in xrange(Mspe[spe]):
                 kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_mm[spe][i1,i2]**(zeta-1)
+    
+        # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
         eva, eve = np.linalg.eigh(kernel_mm)
-        eva = eva[eva>1e-08]
+        eva = eva[eva>inp.eigcut]
         eve = eve[:,-len(eva):]
         V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
 
-        # compute k_nm 
+        # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
         for iconf in xrange(ndata):
             kernel_nm = np.dot(power[iconf,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat),power_env_sparse[spe].T) 
             for i1 in xrange(natom_dict[(iconf,spe)]):
-                for i2 in xrange(M):
+                for i2 in xrange(Mspe[spe]):
                     kernel_nm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
             psi_nm = np.real(np.dot(kernel_nm,V))
             np.save(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy",psi_nm)

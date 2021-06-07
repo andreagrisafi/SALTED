@@ -75,18 +75,18 @@ testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
-preds = np.zeros((ntest,natmax,llmax+1,nnmax,2*llmax+1))
+ortho_preds = np.zeros((ntest,natmax,llmax+1,nnmax,2*llmax+1))
 for spe in spelist:
 
     for l in xrange(lmax[spe]+1):
       
         # get truncated size
         Mcut = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(0)+"_M"+str(M)+".npy").shape[1]
-
         # compute B matrix
         B = np.zeros((Mcut,Mcut))
         for iconf in trainrange:
             psi_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
+            #psi_nm = np.vstack((psi_nm,reg*np.eye(Mcut)))
             B += np.dot(psi_nm.T,psi_nm)
         
         for n in xrange(nmax[(spe,l)]): 
@@ -96,12 +96,16 @@ for spe in spelist:
             for iconf in trainrange:
                 psi_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
                 ortho_projs = np.load(inp.path2data+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")
+                
+                #psi_nm = np.vstack((psi_nm,reg*np.eye(Mcut)))
+                #ortho_projs = np.concatenate((ortho_projs,np.zeros(Mcut)))
                 A += np.dot(psi_nm.T,ortho_projs)
            
             print ""
             print "spe:",spe,"L:",l,"n:",n
             print "------------------------"
             
+            #x = np.linalg.solve( B , A )
             x = np.linalg.solve( B + reg*np.eye(Mcut) , A )
 
             error_total = 0 
@@ -125,10 +129,10 @@ for spe in spelist:
                 i = 0
                 for iat in atom_idx[(iconf,spe)]:
                     for im in xrange(2*l+1):
-                        preds[itest,iat,l,n,im] = ortho_projs.reshape(len(atom_idx[(iconf,spe)]),2*l+1)[i,im]
+                        ortho_preds[itest,iat,l,n,im] = ortho_projs.reshape(len(atom_idx[(iconf,spe)]),2*l+1)[i,im]
                     i+=1
                 itest += 1
 
             print "% RMSE =", 100*np.sqrt(error_total/variance)
 
-np.save("predictions.npy",preds)
+np.save("ortho_predictions.npy",ortho_preds)
