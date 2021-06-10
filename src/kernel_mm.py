@@ -145,11 +145,3 @@ for l in xrange(llmax+1):
 Rmat = rmatrix.rmatrix(llmax,nspecies,M,totsize,fps_species,almax,anmax,k_MM)
 
 np.save("Kmm_"+str(M)+".npy", Rmat)
-
-eva, eve = np.linalg.eigh(Rmat)
-eva = eva[eva>inp.eigcut]
-Mcut = len(eva)
-eve = eve[:,-Mcut:]
-V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-np.save("Vmm_"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+".npy",V)
-
