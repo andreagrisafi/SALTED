@@ -24,9 +24,6 @@ ndata = len(xyzfile)
 # number of sparse environments
 M = inp.Menv
 
-print "Computing RKHS of sparse GPR..."
-print ""
-
 # system parameters
 atomic_symbols = []
 natoms = np.zeros(ndata,int)
@@ -34,24 +31,50 @@ for i in xrange(ndata):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     natoms[i] = int(len(atomic_symbols[i]))
 
+# initialize useful dictionaries
 A = {}
 B = {}
 Mcut = {}
+av_coefs = {}
+nenv = {}
 totsize = 0
 for spe in spelist:
+    av_coefs[spe] = np.zeros(nmax[(spe,0)],float)
+    nenv[spe] = 0
     for l in xrange(lmax[spe]+1):
-        Mcut[(spe,l)] = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(0)+"_M"+str(M)+".npy").shape[1]
+        Mcut[(spe,l)] = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(0)+"_M"+str(M)+".npy").shape[1]
         for n in xrange(nmax[(spe,l)]):
             totsize += Mcut[(spe,l)]
             A[(spe,l,n)] = np.zeros(Mcut[(spe,l)])
             for spe2 in spelist:
                 for l2 in xrange(lmax[spe2]+1):
-                    Mcut[(spe2,l2)] = np.load(inp.path2data+"kernels/spe"+str(spe2)+"_l"+str(l2)+"/psi-nm_conf"+str(0)+"_M"+str(M)+".npy").shape[1]
+                    Mcut[(spe2,l2)] = np.load(inp.path2ml+"kernels/spe"+str(spe2)+"_l"+str(l2)+"/psi-nm_conf"+str(0)+"_M"+str(M)+".npy").shape[1]
                     for n2 in xrange(nmax[(spe2,l2)]):
                         B[(spe,l,n,spe2,l2,n2)] = np.zeros((Mcut[(spe,l)],Mcut[(spe2,l2)]))
 
 print "problem dimensionality =", totsize
 print ""
+
+for iconf in xrange(ndata):
+    Coef = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    #Proj = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+    #Over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
+    #Coef = np.linalg.solve(Over,Proj)
+    i = 0
+    for iat in xrange(natoms[iconf]):
+        spe = atomic_symbols[iconf][iat]
+        nenv[spe] += 1
+        for l in xrange(lmax[spe]+1):
+            for n in xrange(nmax[(spe,l)]):
+                for im in xrange(2*l+1):
+                    if l==0:
+                       av_coefs[spe][n] += Coef[i]
+                    i += 1
+
+print "computing mean spherical averages..."
+for spe in spelist:
+    av_coefs[spe] /= nenv[spe]
+    np.save("averages_"+str(spe)+".npy",av_coefs[spe])
 
 dataset = range(ndata)
 random.Random(3).shuffle(dataset)
@@ -60,23 +83,43 @@ np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(inp.trainfrac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 
+print "collecting contributions from training structures..."
+print ""
 for iconf in trainrange:
     print iconf
-    P = np.loadtxt(inp.path2data+"projections/projections_conf"+str(iconf)+".dat")
 
-    S = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    # compute S^{1/2} cutting small/negative eigenvalues
+    S = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
     eva, eve = np.linalg.eigh(S)
     eva = eva[eva>1e-08]
     eve = eve[:,-len(eva):]
     Ssqrt = np.dot(eve,np.diag(np.sqrt(eva)))
+  
+    # fill array of spherical averages
+    Av_coeffs = np.zeros(len(S))
+    i = 0
+    for iat in xrange(natoms[iconf]):
+        spe = atomic_symbols[iconf][iat]
+        for l in xrange(lmax[spe]+1):
+            for n in xrange(nmax[(spe,l)]):
+                for im in xrange(2*l+1):
+                    if l==0:
+                       Av_coeffs[i] = av_coefs[spe][n]
+                    i += 1
     
+    # center density projections about spherical averages
+    P = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+    P -= np.dot(S,Av_coeffs)
+
+    # load Phi-vectors
     psi_nm = {}
     ispe = {}
     for spe in spelist:
         ispe[spe] = 0
         for l in xrange(lmax[spe]+1):
-            psi_nm[(spe,l)] = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
+            psi_nm[(spe,l)] = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
 
+    # compute A-vector and B-matrix
     i = 0
     for iat in xrange(natoms[iconf]):
         spe = atomic_symbols[iconf][iat] 
@@ -102,6 +145,7 @@ for iconf in trainrange:
                 i += 2*l+1
         ispe[spe] += 1
 
+# fill arrays for A-vector and B-matrix
 Avec = np.zeros(totsize)
 Bmat = np.zeros((totsize,totsize))
 isize = 0

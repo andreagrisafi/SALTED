@@ -6,8 +6,8 @@ propname = "electro"
 
 # path to data
 # ------------
-path2data = "/local/big_scratch/water_monomer/" 
-path2indata = "/local/big_scratch/water_monomer/" 
+path2ml = "/local/big_scratch/water_monomer/" 
+path2qm = "/local/big_scratch/water_monomer/" 
 
 # QM variables 
 # ------------

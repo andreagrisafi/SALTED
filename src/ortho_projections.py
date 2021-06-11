@@ -81,9 +81,9 @@ for spe in spelist:
 for iconf in xrange(ndata):
     species = atomic_symbols[iconf]
     #==================================================
-    Coef = np.load(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy")
-    #Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    #Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    Coef = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    #Proj = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+    #Over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
     #Coef = np.linalg.solve(Over,Proj)
     #==================================================
     i = 0
@@ -103,16 +103,17 @@ for spe in spelist:
     np.save("averages_"+str(spe)+".npy",av_coefs[spe])
     for l in xrange(lmax[spe]+1):
         for n in xrange(nmax[(spe,l)]):
-            dirpath = os.path.join(inp.path2data+"projections", "spe"+str(spe)+"_l"+str(l)+"_n"+str(n))
+            dirpath = os.path.join(inp.path2qm+"projections", "spe"+str(spe)+"_l"+str(l)+"_n"+str(n))
             if not os.path.exists(dirpath):
                 os.mkdir(dirpath)
 
+print "computing orthogonal projections..."
 #for iconf in xrange(istart,iend):
 #for iconf in [isel]:
 for iconf in xrange(ndata):
+    print iconf+1
     
     start = time.time()
-    print "computing orthogonal projections for strucure", iconf+1
     species = atomic_symbols[iconf]
     # init orthogonal projections
     projs = {}
@@ -121,9 +122,9 @@ for iconf in xrange(ndata):
             for n in xrange(nmax[(spe,l)]):
                 projs[(spe,l,n)] = np.zeros((natoms_spe[iconf,spe],(2*l+1)))
     # compute coefficients
-    Coef = np.load(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy")
-    #Proj = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    Over = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    Coef = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    #Proj = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
     #Coef = np.linalg.solve(Over,Proj)
     # remove L=0 average
     i = 0
@@ -144,7 +145,7 @@ for iconf in xrange(ndata):
     sqrteigen = np.sqrt(eigenvalues) 
     diagoverlap = np.diag(1.0/sqrteigen)
     orthomatrix = np.dot(np.conj(unitary[:,-Mcut:]),np.dot(diagoverlap,unitary[:,-Mcut:].T))
-    np.save(inp.path2data+"overlaps/orthomatrix_"+str(iconf)+".npy",orthomatrix)
+    np.save(inp.path2qm+"overlaps/orthomatrix_"+str(iconf)+".npy",orthomatrix)
     # orthogonalize projections
     OProj = np.dot(orthomatrix,DProj)
     # init species counting 
@@ -165,6 +166,6 @@ for iconf in xrange(ndata):
     for spe in spelist:
         for l in xrange(lmax[spe]+1):
             for n in xrange(nmax[(spe,l)]):
-                np.save(inp.path2data+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy",projs[(spe,l,n)].reshape(natoms_spe[(iconf,spe)]*(2*l+1)))
+                np.save(inp.path2qm+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy",projs[(spe,l,n)].reshape(natoms_spe[(iconf,spe)]*(2*l+1)))
 
     print (time.time()-start)/60.0, "minutes"

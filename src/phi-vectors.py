@@ -29,23 +29,21 @@ llmax = max(llist)
 M = inp.Menv
 zeta = inp.z
 
-print "Computing RKHS of sparse GPR..."
-print ""
 
-#def do_fps(x, d=0):
-#    # Code from Giulio Imbalzano
-#    if d == 0 : d = len(x)
-#    n = len(x)
-#    iy = np.zeros(d,int)
-#    iy[0] = 0
-#    # Faster evaluation of Euclidean distance
-#    n2 = np.sum((x*np.conj(x)),axis=1)
-#    dl = n2 + n2[iy[0]] - 2*np.real(np.dot(x,np.conj(x[iy[0]])))
-#    for i in xrange(1,d):
-#        iy[i] = np.argmax(dl)
-#        nd = n2 + n2[iy[i]] - 2*np.real(np.dot(x,np.conj(x[iy[i]])))
-#        dl = np.minimum(dl,nd)
-#    return iy
+def do_fps(x, d=0):
+    # FPS code from Giulio Imbalzano
+    if d == 0 : d = len(x)
+    n = len(x)
+    iy = np.zeros(d,int)
+    iy[0] = 0
+    # Faster evaluation of Euclidean distance
+    n2 = np.sum((x*np.conj(x)),axis=1)
+    dl = n2 + n2[iy[0]] - 2*np.real(np.dot(x,np.conj(x[iy[0]])))
+    for i in xrange(1,d):
+        iy[i] = np.argmax(dl)
+        nd = n2 + n2[iy[i]] - 2*np.real(np.dot(x,np.conj(x[iy[i]])))
+        dl = np.minimum(dl,nd)
+    return iy
 
 # system parameters
 atomic_symbols = []
@@ -53,31 +51,40 @@ natoms = np.zeros(ndata,int)
 for i in xrange(ndata):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     natoms[i] = int(len(atomic_symbols[i]))
+natmax = max(natoms)
 
 # compute number of atomic environments for each species
-nenv = {}
+ispe = 0
+species_idx = {}
 for spe in spelist:
-    nenv[spe] = 0
+    species_idx[spe] = ispe
+    ispe += 1
 
+species_array = [] 
 for iconf in xrange(ndata):
     for iat in xrange(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
-        nenv[spe] += 1
+        species_array.append(species_idx[spe]) 
 
-# load lambda=0 power spectrum
-power = np.load(inp.path2data+"soaps/FEAT-0.npy")
+# load lambda=0 power spectrum 
+power = np.load(inp.path2ml+"soaps/FEAT-0.npy")
 nfeat = power.shape[-1]
 
-power_env = {}
-ispe = {}
+# compute sparse set with FPS
+fps_idx = np.array(do_fps(power.reshape(ndata*natmax,nfeat),M),int)
+fps_species = np.array(species_array,int)[fps_idx]
+sparse_set = np.vstack((fps_idx,fps_species)).T
+print "Computed sparse set made of ", M, "environments"
+np.savetxt("sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
+
+# make directories if not exisiting
 for spe in spelist:
-    power_env[spe] = np.zeros((nenv[spe],nfeat))
-    ispe[spe] = 0
     for l in xrange(llmax+1):
-        dirpath = os.path.join(inp.path2data+"kernels", "spe"+str(spe)+"_l"+str(l))
+        dirpath = os.path.join(inp.path2ml+"kernels", "spe"+str(spe)+"_l"+str(l))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
-    
+
+# initialize useful arrays
 atom_idx = {}
 natom_dict = {}
 for iconf in xrange(ndata):
@@ -89,24 +96,20 @@ for iconf in xrange(ndata):
 for iconf in xrange(ndata):
     for iat in xrange(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
-        power_env[spe][ispe[spe]] = power[iconf,iat]
-        ispe[spe] += 1
         atom_idx[(iconf,spe)].append(iat)
         natom_dict[(iconf,spe)] += 1 
-
-# load sparse set of environments
-fps_environ = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
-fps_species = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,1]
 
 # divide sparse set per species
 fps_indexes = {}
 for spe in spelist:
     fps_indexes[spe] = []
 for iref in xrange(M):
-    fps_indexes[spelist[fps_species[iref]]].append(fps_environ[iref])
+    fps_indexes[spelist[fps_species[iref]]].append(fps_idx[iref])
 Mspe = {}
 for spe in spelist:
     Mspe[spe] = len(fps_indexes[spe])
+
+print "Computing RKHS of symmetry-adapted sparse kernel approximations..."
 
 # lambda = 0
 power_env_sparse = {}
@@ -115,7 +118,7 @@ kernel0_nm = {}
 for spe in spelist:
 
     # compute sparse kernel K_MM for each atomic species 
-    power_env_sparse[spe] = power.reshape(ndata*natoms[0],power.shape[-1])[np.array(fps_indexes[spe],int)]
+    power_env_sparse[spe] = power.reshape(ndata*natmax,power.shape[-1])[np.array(fps_indexes[spe],int)]
     kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
     kernel_mm = kernel0_mm[spe]**zeta
     
@@ -130,33 +133,20 @@ for spe in spelist:
         kernel0_nm[(iconf,spe)] = np.dot(power[iconf,atom_idx[(iconf,spe)]],power_env_sparse[spe].T)
         kernel_nm = kernel0_nm[(iconf,spe)]**zeta
         psi_nm = np.real(np.dot(kernel_nm,V))
-        np.save(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(0)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy",psi_nm)
+        np.save(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(0)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy",psi_nm)
 
 # lambda>0
 for l in xrange(1,llmax+1):
 
     # load power spectrum
-    power = np.load(inp.path2data+"soaps/FEAT-"+str(l)+".npy")
+    power = np.load(inp.path2ml+"soaps/FEAT-"+str(l)+".npy")
     nfeat = power.shape[-1]
-
-    power_env = {}
-    ispe = {}
-    for spe in spelist:
-        power_env[spe] = np.zeros((nenv[spe],2*l+1,nfeat))
-        ispe[spe] = 0
-
-    # extract species-dependent power spectrum from lambda=0 FPS
-    for iconf in xrange(ndata):
-        for iat in xrange(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
-            power_env[spe][ispe[spe]] = power[iconf,iat]
-            ispe[spe] += 1
 
     power_env_sparse = {}
     for spe in spelist:
 
         # get sparse feature vector for each atomic species
-        power_env_sparse[spe] = power.reshape(ndata*natoms[0],2*l+1,power.shape[-1])[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
+        power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,power.shape[-1])[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
         
         # compute K_MM 
         kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T) 
@@ -177,4 +167,4 @@ for l in xrange(1,llmax+1):
                 for i2 in xrange(Mspe[spe]):
                     kernel_nm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
             psi_nm = np.real(np.dot(kernel_nm,V))
-            np.save(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy",psi_nm)
+            np.save(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy",psi_nm)

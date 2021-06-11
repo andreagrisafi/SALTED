@@ -21,6 +21,15 @@ ndata = len(xyzfile)
 # read basis
 [lmax,nmax] = basis.basiset(inp.dfbasis)
 
+llist = []
+nlist = []
+for spe in spelist:
+    llist.append(lmax[spe])
+    for l in xrange(lmax[spe]+1):
+        nlist.append(nmax[(spe,l)])
+llmax = max(llist)
+nnmax = max(nlist)
+
 # number of sparse environments
 M = inp.Menv
 
@@ -33,6 +42,7 @@ natoms = np.zeros(ndata,int)
 for i in xrange(ndata):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     natoms[i] = int(len(atomic_symbols[i]))
+natmax = max(natoms)
 
 av_coefs = {}
 for spe in spelist:
@@ -49,12 +59,13 @@ testrange = np.setdiff1d(range(ndata),trainrangetot)
 itest = 0
 error_density = 0
 variance = 0
+coeffs = np.zeros((len(testrange),natmax,llmax+1,nnmax,2*llmax+1))
 for iconf in testrange:
 
     # load reference
-    ref_projs = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    ref_coefs = np.load(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
+    ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+    ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
     Tsize = len(ref_coefs)
 
     # compute predictions per channel
@@ -64,7 +75,7 @@ for iconf in testrange:
     for spe in spelist:
         ispe[spe] = 0
         for l in xrange(lmax[spe]+1):
-            psi_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy") 
+            psi_nm = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy") 
             Mcut = psi_nm.shape[1]
             for n in xrange(nmax[(spe,l)]):
                 C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
@@ -87,7 +98,15 @@ for iconf in testrange:
     # rebuild predictions
     pred_coefs += Av_coeffs
     pred_projs = np.dot(overl,pred_coefs)
-    np.save(inp.path2data+"predictions/prediction_conf"+str(iconf)+".npy",pred_projs)
+    np.save(inp.path2qm+"predictions/prediction_conf"+str(iconf)+".npy",pred_projs)
+    i = 0
+    for iat in xrange(natoms[iconf]):
+        spe = atomic_symbols[iconf][iat]
+        for l in xrange(lmax[spe]+1):
+            for n in xrange(nmax[(spe,l)]):
+                for im in xrange(2*l+1):
+                    coeffs[itest,iat,l,n,im] = pred_coefs[i]
+                    i += 1
     
     # compute error
     error = np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
@@ -101,3 +120,5 @@ for iconf in testrange:
 
 print ""
 print "% RMSE =", 100*np.sqrt(error_density/variance)
+
+np.save("pred_coeffs.npy",coeffs)

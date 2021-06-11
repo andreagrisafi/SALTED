@@ -97,13 +97,13 @@ f = open("predicted_electrostatic_energies.dat","w")
 print "Computing Hartree and external energy..."
 itest=0
 for iconf in testrange:
-    print "testing conf. number:", itest+1, "/", len(testrange)
+    #print "testing conf. number:", itest+1, "/", len(testrange)
     atoms = atomic_symbols[iconf]
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
     natoms = len(atoms)
     # Load projections and overlaps
-    projs = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
+    projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
     rho = np.zeros(projs.shape,float)
     icoeff = 0
     for iat in xrange(natoms):

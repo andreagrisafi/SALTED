@@ -81,11 +81,11 @@ for spe in spelist:
     for l in xrange(lmax[spe]+1):
       
         # get truncated size
-        Mcut = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(0)+"_M"+str(M)+".npy").shape[1]
+        Mcut = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(0)+"_M"+str(M)+".npy").shape[1]
         # compute B matrix
         B = np.zeros((Mcut,Mcut))
         for iconf in trainrange:
-            psi_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
+            psi_nm = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
             #psi_nm = np.vstack((psi_nm,reg*np.eye(Mcut)))
             B += np.dot(psi_nm.T,psi_nm)
         
@@ -94,8 +94,8 @@ for spe in spelist:
             # compute A vector
             A = np.zeros(Mcut)
             for iconf in trainrange:
-                psi_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
-                ortho_projs = np.load(inp.path2data+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")
+                psi_nm = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
+                ortho_projs = np.load(inp.path2qm+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")
                 
                 #psi_nm = np.vstack((psi_nm,reg*np.eye(Mcut)))
                 #ortho_projs = np.concatenate((ortho_projs,np.zeros(Mcut)))
@@ -114,11 +114,11 @@ for spe in spelist:
             for iconf in testrange:
 
                 # predict
-                psi_nm = np.load(inp.path2data+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
+                psi_nm = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy")
                 ortho_projs = np.dot(psi_nm,x)
               
                 # reference
-                ortho_projs_ref = np.load(inp.path2data+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")
+                ortho_projs_ref = np.load(inp.path2qm+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")
 
                 # compute error
                 delta = ortho_projs-ortho_projs_ref

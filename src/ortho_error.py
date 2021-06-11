@@ -56,7 +56,7 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-dirpath = os.path.join(inp.path2data, "predictions")
+dirpath = os.path.join(inp.path2qm, "predictions")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -72,9 +72,9 @@ for iconf in testrange:
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
     #================================================
-    projs_ref = np.load(inp.path2data+"projections/projections_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy")
-    coeffs_ref = np.load(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    projs_ref = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+    overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
+    coeffs_ref = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
     #coeffs_ref = np.linalg.solve(overl,projs_ref)
     size_coeffs = coeffs_ref.shape
     # compute orthogonalization matrix
