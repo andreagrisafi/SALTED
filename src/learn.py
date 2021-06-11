@@ -104,8 +104,8 @@ for iloop in range(2):
     if p > 0:
        for j in range(1,p+1):
 
-           Avec_p = np.load(inp.path2data+"matrices/A_"+str(j)+"_vector.npy")
-           Bmat_p = np.load(inp.path2data+"matrices/B_"+str(j)+"_matrix.npy")
+           Avec_p = np.load(inp.path2ml+"matrices/A_"+str(j)+"_vector.npy")
+           Bmat_p = np.load(inp.path2ml+"matrices/B_"+str(j)+"_matrix.npy")
 
            if j == 1:
                Avec = Avec_p.copy()
@@ -116,13 +116,13 @@ for iloop in range(2):
 
     else:
         if iloop == 0:
-           Avec = np.load(inp.path2data+"matrices/A_vector.npy")
-           Bmat = np.load(inp.path2data+"matrices/B_matrix.npy")
+           Avec = np.load(inp.path2ml+"matrices/A_vector.npy")
+           Bmat = np.load(inp.path2ml+"matrices/B_matrix.npy")
         else:
-           Avec = np.load(inp.path2data+"matrices/Ap_vector.npy")
-           Bmat = np.load(inp.path2data+"matrices/Bp_matrix.npy")
+           Avec = np.load(inp.path2ml+"matrices/Ap_vector.npy")
+           Bmat = np.load(inp.path2ml+"matrices/Bp_matrix.npy")
     
-    Rmat = np.load("Kmm_matrix.npy")
+    Rmat = np.load("Kmm_"+str(M)+".npy")
 
     print "Solving regression problem of dimension =", totsize
     start = time.time()

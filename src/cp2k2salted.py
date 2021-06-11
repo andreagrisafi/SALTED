@@ -87,7 +87,7 @@ for iatom in range(natoms):
     spe1 = symbols[iatom]
     # load CP2K coefficients counting the number of atoms per species
     atom_count[spe1] += 1 
-    c = np.loadtxt(inp.path2data+"runs/conf_"+str(iconf+1)+"/coefficients/coefs_type"+str(ispe[spe1])+"_atom"+str(atom_count[spe1])+".dat")
+    c = np.loadtxt(inp.path2qm+"runs/conf_"+str(iconf+1)+"/coefficients/coefs_type"+str(ispe[spe1])+"_atom"+str(atom_count[spe1])+".dat")
     # single out the coefficients dimensions in a multi-dimensional array
     n_count = {}
     for l in xrange(lmax[spe1]+1):
@@ -111,7 +111,7 @@ for iatom in range(natoms):
         # load CP2K overlap atomic blocks if available
         transposed = False
         try:
-            o = np.loadtxt(inp.path2data+"runs/conf_"+str(iconf+1)+"/overlaps/overlap_"+str(iatom+1)+"-"+str(jatom+1)+".dat")
+            o = np.loadtxt(inp.path2qm+"runs/conf_"+str(iconf+1)+"/overlaps/overlap_"+str(iatom+1)+"-"+str(jatom+1)+".dat")
             o = o.reshape(nbas[spe1],nbas[spe2])
         except:
             transposed = True
@@ -119,7 +119,7 @@ for iatom in range(natoms):
         ozeros = False
         if transposed == True:
             try: 
-                o = np.loadtxt(inp.path2data+"runs/conf_"+str(iconf+1)+"/overlaps/overlap_"+str(jatom+1)+"-"+str(iatom+1)+".dat")
+                o = np.loadtxt(inp.path2qm+"runs/conf_"+str(iconf+1)+"/overlaps/overlap_"+str(jatom+1)+"-"+str(iatom+1)+".dat")
                 o = o.reshape(nbas[spe2],nbas[spe1]).T
             except:
                 ozeros = True
@@ -166,21 +166,21 @@ Proj = np.dot(Ovlp,Coef)
 print "projections computed"
 
 # Make data directories if not already existing
-dirpath = os.path.join(inp.path2data, "coefficients")
+dirpath = os.path.join(inp.path2qm, "coefficients")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2data, "projections")
+dirpath = os.path.join(inp.path2qm, "projections")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2data, "overlaps")
+dirpath = os.path.join(inp.path2qm, "overlaps")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
 print "saving projection vector and overlap matrix"
 
 # Save projections and overlaps
-np.save(inp.path2data+"coefficients/coefficients_conf"+str(iconf)+".npy",Coef)
-np.save(inp.path2data+"projections/projections_conf"+str(iconf)+".npy",Proj)
-np.save(inp.path2data+"overlaps/overlap_conf"+str(iconf)+".npy",Ovlp)
+np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",Coef)
+np.save(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy",Proj)
+np.save(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy",Ovlp)
 
 print (time.time()-start)/60.0, "min"

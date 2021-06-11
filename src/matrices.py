@@ -129,14 +129,14 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 
 # training set selection
 dataset = range(ndata)
-random.Random(4).shuffle(dataset)
+random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 validate_range = np.setdiff1d(dataset,trainrange).tolist()
 
-dirpath = os.path.join(inp.path2data, "matrices")
+dirpath = os.path.join(inp.path2ml, "matrices")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -201,9 +201,9 @@ for iloop in range(2):
 
     print "Computing regression matrices ..."
 
-    path2kerns = inp.path2data+"kernels/"
-    path2overl = inp.path2indata+"overlaps/"
-    path2projs = inp.path2indata+"projections/"
+    path2kerns = inp.path2ml+"kernels/"
+    path2overl = inp.path2qm+"overlaps/"
+    path2projs = inp.path2qm+"projections/"
 
     # compute regression arrays
     start = time.time()
@@ -213,11 +213,11 @@ for iloop in range(2):
     # save regression arrays
     if iloop == 0:
        if p > 0:
-           np.save(inp.path2data+"matrices/A_"+str(p)+"_vector.npy", Avec)
-           np.save(inp.path2data+"matrices/B_"+str(p)+"_matrix.npy", Bmat)
+           np.save(inp.path2ml+"matrices/A_"+str(p)+"_vector.npy", Avec)
+           np.save(inp.path2ml+"matrices/B_"+str(p)+"_matrix.npy", Bmat)
        else:
-           np.save(inp.path2data+"matrices/A_vector.npy", Avec)
-           np.save(inp.path2data+"matrices/B_matrix.npy", Bmat)
+           np.save(inp.path2ml+"matrices/A_vector.npy", Avec)
+           np.save(inp.path2ml+"matrices/B_matrix.npy", Bmat)
     if iloop == 1:
-        np.save(inp.path2data+"matrices/Ap_vector.npy", Avec)
-        np.save(inp.path2data+"matrices/Bp_matrix.npy", Bmat)
+        np.save(inp.path2ml+"matrices/Ap_vector.npy", Avec)
+        np.save(inp.path2ml+"matrices/Bp_matrix.npy", Bmat)

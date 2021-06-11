@@ -56,7 +56,7 @@ for iloop in range(2):
     for spe in spelist:
         av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-    dirpath = os.path.join(inp.path2data, "predictions")
+    dirpath = os.path.join(inp.path2qm, "predictions")
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
 
@@ -75,8 +75,8 @@ for iloop in range(2):
         valences = atomic_valence[iconf]
         nele = np.sum(valences)
         #================================================
-        projs_ref = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
-        overl = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
+        projs_ref = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+        overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
         coeffs_ref = np.linalg.solve(overl,projs_ref)
         size_coeffs = coeffs_ref.shape
         #================================================
@@ -94,7 +94,7 @@ for iloop in range(2):
                             coefficients[icoeff] = coeffs[itest,iat,l,n,im] 
                         icoeff +=1
         projections = np.dot(overl,coefficients)
-        np.save(inp.path2data+"predictions/prediction_conf"+str(iconf)+".npy",projections)
+        np.save(inp.path2qm+"predictions/prediction_conf"+str(iconf)+".npy",projections)
         #================================================
         error = np.dot(coefficients-coeffs_ref,projections-projs_ref)
         error_density += error 

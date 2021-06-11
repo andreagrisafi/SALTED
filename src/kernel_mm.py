@@ -95,7 +95,7 @@ k_MM = np.zeros((llmax+1,M*(2*llmax+1),M*(2*llmax+1)),float)
 
 for l in xrange(llmax+1):
 
-    power = np.load(inp.path2data+"soaps/SOAP-"+str(l)+".npy")
+    power = np.load(inp.path2ml+"soaps/SOAP-"+str(l)+".npy")
 
     if l==0:
 

@@ -109,7 +109,7 @@ power_ref_sparse = {}
 power_training = {}
 for l in xrange(llmax+1):
 
-    power = np.load(inp.path2data+"soaps/SOAP-"+str(l)+".npy")
+    power = np.load(inp.path2ml+"soaps/SOAP-"+str(l)+".npy")
 
     if l==0:
 
@@ -151,7 +151,7 @@ for l in xrange(llmax+1):
         power_ref_sparse[l] = power_env[fps_indexes]
         power_training[l] = power_per_conf
 
-dirpath = os.path.join(inp.path2data, "kernels")
+dirpath = os.path.join(inp.path2ml, "kernels")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -195,7 +195,7 @@ for iconf in xrange(ndata):
                         for im2 in xrange(msize):
                             ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
                             k_NM[ik] = kern[im2,im1]
-    np.savetxt(inp.path2data+"kernels/kernel_conf"+str(iconf)+".dat", k_NM,fmt='%.06e')
+    np.savetxt(inp.path2ml+"kernels/kernel_conf"+str(iconf)+".dat", k_NM,fmt='%.06e')
 #    print iconf, time.time()-start, "seconds"
 
 print iconf+1, "Knm matrices computed in", (time.time()-startinit)/60.0, "minutes"

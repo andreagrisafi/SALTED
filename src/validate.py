@@ -158,7 +158,7 @@ for iloop in range(2):
                     ww[ienv,l,n,im] = weights[i] 
                     i += 1
 
-    path2kerns = inp.path2data+"kernels/"
+    path2kerns = inp.path2ml+"kernels/"
 
     coeffs = prediction.prediction(path2kerns,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
