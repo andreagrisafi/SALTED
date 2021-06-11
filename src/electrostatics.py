@@ -103,11 +103,10 @@ for iconf in xrange(ndata):
     nele = np.sum(valences)
     natoms = len(atoms)
     # Load projections and overlaps
-    projs = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
-    rcoeffs = np.linalg.solve(overl,projs)
+    rcoeffs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
     ref_coeffs = np.zeros((natoms,llmax+1,nnmax,2*llmax+1))
-    ref_rho = np.zeros(projs.shape,float)
+    ref_rho = np.zeros(len(rcoeffs))
     icoeff = 0
     for iat in xrange(natoms):
         for l in xrange(lmax[atoms[iat]]+1):
