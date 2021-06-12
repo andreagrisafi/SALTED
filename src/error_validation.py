@@ -90,8 +90,10 @@ for iloop in range(2):
                         if l==0:
                             coefficients[icoeff] = coeffs[itest,iat,l,n,im]
                             averages[icoeff] = av_coefs[atoms[iat]][n]
+                            coeffs[itest,iat,l,n,im] += 1e-20
                         else:
                             coefficients[icoeff] = coeffs[itest,iat,l,n,im] 
+                            coeffs[itest,iat,l,n,im] += 1e-20
                         icoeff +=1
         projections = np.dot(overl,coefficients)
         np.save(inp.path2data+"predictions/prediction_conf"+str(iconf)+".npy",projections)
@@ -111,3 +113,8 @@ for iloop in range(2):
     if xv and iloop == 1: averr += 100*np.sqrt(error_density/variance)
     print "% RMSE =", 100*np.sqrt(error_density/variance)
     if xv and iloop == 1: print "XV % RMSE =", averr*0.5
+
+    if iloop == 0:
+        np.save("pred_coeffs.npy",coeffs)
+    else:
+        np.save("pred_coeffs_p.npy",coeffs)

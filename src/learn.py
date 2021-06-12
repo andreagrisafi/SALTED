@@ -13,6 +13,7 @@ import inp
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
     parser.add_argument("-r", "--regul", type=float, default=None, help="Read regularization parameter at run-time")
+    parser.add_argument("-j", "--jitter", type=float, default=None, help="Read jitter parameter at run-time")
     parser.add_argument("-np", "--number_partial", type=int, default=0, help="Build A and B from the first p blocks of structures in the training set")
 
     args = parser.parse_args()
@@ -21,6 +22,7 @@ def add_command_line_arguments_contraction(parsetext):
 args = add_command_line_arguments_contraction("density regression")
 # Read the regularization parameter at runtime (this will override inp.py)
 reg = args.regul
+jit = args.jitter
 
 # Read the number of blocks of structures to include in the regression matrix and vector
 p = args.number_partial
@@ -59,7 +61,7 @@ M = inp.Menv
 
 if reg is None: reg = inp.regul
 
-if not svd: jit = inp.jitter
+if not svd and jit is None: jit = inp.jitter
 
 # system parameters
 atomic_symbols = []
