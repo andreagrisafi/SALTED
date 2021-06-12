@@ -9,6 +9,7 @@ References
 
 2. Alberto Fabrizio, Andrea Grisafi, Benjamin A. R. Meyer, Michele Ceriotti, Clemence Corminboeuf, "Electron density learning of non-covalent systems", Chemical Science 10, 9424-9432 (2019)
 
+3. Alan M. Lewis, Andrea Grisafi, Michele Ceriotti, Mariana Rossi, "Learning electron densities in the condensed-phase", arXiv:2106.05364
 
 Requirements and Installation
 -----------------------------
@@ -19,9 +20,10 @@ To install it, :code:`make` in the main folder and :code:`source env.sh`
 
 Dependencies
 ------------
-TENSOAP: https://github.com/dilkins/TENSOAP
 
-TENSOAP is set up as a submodule of SALTED. To get the program run :code:`git submodule update --init` in the main folder. Then, go into the TENSOAP folder and install the package.
+The legacy version of SALTED uses a legacy version of TENSOAP  called SOAPFAST. It is included in this branch, since it is no longer available through the TENSOAP repository. Note that it requires Python3, while the rest of SALTED uses Python2.
+
+TENSOAP: https://github.com/dilkins/TENSOAP
 
 Input Dataset
 -------------
@@ -60,7 +62,7 @@ In this example, we consider the interpolation of the electron density of a data
 
        python $SALTEDPATH/initialize.py
 
-4) Using the TENSOAP package, we then need to generate the L-SOAP structural features up to the maximum angular momentum :code:`-lm` included in the expansion of the density field (up to L=5 in this case). To do so, run:: 
+4) Using the SOAPFAST package, we then need to generate the L-SOAP structural features up to the maximum angular momentum :code:`-lm` included in the expansion of the density field (up to L=5 in this case). To do so, run:: 
 
         cd path2data
         mkdir soaps
@@ -68,7 +70,7 @@ In this example, we consider the interpolation of the electron density of a data
 
         for i in 0 1 2 3 4 5
         do      
-           sagpr_get_PS -f coords_water_monomers_1k.xyz -lm ${i} -cs -c H O -s H O -l 4 -n 5 -o path2data/soaps/SOAP-${i}
+           python SOAPFAST/soapfast/get_power_spectrum.py -f coords_water_monomers_1k.xyz -lm ${i} -cs -c H O -s H O -l 4 -n 5 -o path2data/soaps/SOAP-${i}
         done 
 
    Note that the species of the atoms used as expansion centers, defined by the list :code:`-c H O`, must be sorted exactly as specified in :code:`inp.py`. The centers sorting option is activated by the flag :code:`-cs`.
@@ -88,7 +90,7 @@ In this example, we consider the interpolation of the electron density of a data
 
    The kernel matrices can be found in the folder :code:`path2data/kernels/`. 
 
-7) Partition the dataset into training and validation set by selecting :code:`Ntrain = 500` training configurations at random. Then, compute the regression vector A and the regression matrix B using a given training set fraction :code:`trainfrac = 1.0`::
+7) Partition the dataset into training and validation set by selecting :code:`Ntrain = 200` training configurations at random. Then, compute the regression vector A and the regression matrix B using a given training set fraction :code:`trainfrac = 1.0`::
 
         python $SALTEDPATH/matrices.py 
 
@@ -107,14 +109,14 @@ In this example, we consider the interpolation of the electron density of a data
         python $SALTEDPATH/error_validation.py
 
 
-    This gives a RMSE of about 0.2% of the intrinsic variability of the electron density over the test set.
+    This gives a RMSE of about 0.6% of the intrinsic variability of the electron density over the test set.
 
 11) On top of the predicted density components, compute the Hartree energy and the external energy of the system compared against the RI reference values::
 
         python $SALTEDPATH/electrostatics.py
 
 
-    This gives a RMSE of about 0.2 kcal/mol on the final electrostatic energy, corresponding to about 0.03% of the standard deviation over the validation set.
+    This gives a RMSE of about 0.9 kcal/mol on the final electrostatic energy, corresponding to about 0.17% of the standard deviation over the validation set.
 
 
 b) ED of water dimers from SALTED water molecules
@@ -137,7 +139,7 @@ Before starting, you need to: i) generate the reference RI-overlaps and RI-densi
 
         python $SALTEDPATH/error_prediction.py
 
-   This gives a RMSE of about 0.2%, according to the isolated molecule case.
+   This gives a RMSE of about 0.3%, according to the isolated molecule case.
 
 
 Additional Options
@@ -161,4 +163,4 @@ andrea.grisafi@epfl.ch
 
 Contributors
 ------------
-Andrea Grisafi, Alberto Fabrizio, Alan Lewis, Mariana Rossi, Clemence Corminboeuf, Michele Ceriotti
+Andrea Grisafi, Alan Lewis, Alberto Fabrizio, Clemence Corminboeuf, Mariana Rossi, Michele Ceriotti
