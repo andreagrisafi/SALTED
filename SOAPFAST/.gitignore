@@ -1,0 +1,12 @@
+*.pyc
+*.so
+soapfast/utils/build/
+*.bak
+*.sw*
+*.npy
+*.c
+example/*/*.txt
+temp.*
+tmp.*
+test/*/
+test/*.txt
