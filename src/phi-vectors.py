@@ -78,6 +78,9 @@ print "Computed sparse set made of ", M, "environments"
 np.savetxt("sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
 
 # make directories if not exisiting
+dirpath = os.path.join(inp.path2ml, "kernels")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
 for spe in spelist:
     for l in xrange(llmax+1):
         dirpath = os.path.join(inp.path2ml+"kernels", "spe"+str(spe)+"_l"+str(l))
