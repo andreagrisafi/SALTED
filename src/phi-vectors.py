@@ -28,7 +28,11 @@ llmax = max(llist)
 # number of sparse environments
 M = inp.Menv
 zeta = inp.z
+eigcut = inp.eigcut
+print "M =", M, "eigcut =", eigcut
 
+sdir = inp.soapdir
+kdir = inp.kerndir
 
 def do_fps(x, d=0):
     # FPS code from Giulio Imbalzano
@@ -67,7 +71,8 @@ for iconf in xrange(ndata):
         species_array.append(species_idx[spe]) 
 
 # load lambda=0 power spectrum 
-power = np.load(inp.path2ml+"soaps/FEAT-0.npy")
+power = np.load(inp.path2ml+sdir+"FEAT-0.npy")
+#power = np.load(inp.path2ml+"soaps/FEAT-0.npy")
 nfeat = power.shape[-1]
 
 # compute sparse set with FPS
@@ -78,9 +83,18 @@ print "Computed sparse set made of ", M, "environments"
 np.savetxt("sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
 
 # make directories if not exisiting
+dirpath = os.path.join(inp.path2ml, kdir)
+#dirpath = os.path.join(inp.path2ml, "kernels")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
 for spe in spelist:
     for l in xrange(llmax+1):
-        dirpath = os.path.join(inp.path2ml+"kernels", "spe"+str(spe)+"_l"+str(l))
+        dirpath = os.path.join(inp.path2ml+kdir, "spe"+str(spe)+"_l"+str(l))
+        #dirpath = os.path.join(inp.path2ml+"kernels", "spe"+str(spe)+"_l"+str(l))
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+        dirpath = os.path.join(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+        #dirpath = os.path.join(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
 
@@ -116,6 +130,8 @@ power_env_sparse = {}
 kernel0_mm = {}
 kernel0_nm = {}
 for spe in spelist:
+    print "lambda = 0", "species:", spe
+    start = time.time()
 
     # compute sparse kernel K_MM for each atomic species 
     power_env_sparse[spe] = power.reshape(ndata*natmax,power.shape[-1])[np.array(fps_indexes[spe],int)]
@@ -124,7 +140,7 @@ for spe in spelist:
     
     # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
     eva, eve = np.linalg.eigh(kernel_mm)
-    eva = eva[eva>inp.eigcut]
+    eva = eva[eva>eigcut]
     eve = eve[:,-len(eva):]
     V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
 
@@ -133,17 +149,25 @@ for spe in spelist:
         kernel0_nm[(iconf,spe)] = np.dot(power[iconf,atom_idx[(iconf,spe)]],power_env_sparse[spe].T)
         kernel_nm = kernel0_nm[(iconf,spe)]**zeta
         psi_nm = np.real(np.dot(kernel_nm,V))
-        np.save(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(0)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy",psi_nm)
+        np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
+        #np.save(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
+    print (time.time()-start)/60.0
 
 # lambda>0
 for l in xrange(1,llmax+1):
 
     # load power spectrum
-    power = np.load(inp.path2ml+"soaps/FEAT-"+str(l)+".npy")
+    print "loading lambda =", l
+    start = time.time()
+    power = np.load(inp.path2ml+sdir+"FEAT-"+str(l)+".npy")
+    #power = np.load(inp.path2ml+"soaps/FEAT-"+str(l)+".npy"
     nfeat = power.shape[-1]
+    print (time.time()-start)/60.0
 
     power_env_sparse = {}
     for spe in spelist:
+        print "lambda = ", l, "species:", spe
+        start = time.time()
 
         # get sparse feature vector for each atomic species
         power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,power.shape[-1])[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
@@ -156,7 +180,7 @@ for l in xrange(1,llmax+1):
     
         # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
         eva, eve = np.linalg.eigh(kernel_mm)
-        eva = eva[eva>inp.eigcut]
+        eva = eva[eva>eigcut]
         eve = eve[:,-len(eva):]
         V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
 
@@ -167,4 +191,6 @@ for l in xrange(1,llmax+1):
                 for i2 in xrange(Mspe[spe]):
                     kernel_nm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
             psi_nm = np.real(np.dot(kernel_nm,V))
-            np.save(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/psi-nm_conf"+str(iconf)+"_M"+str(M)+".npy",psi_nm)
+            np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
+            #np.save(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
+        print (time.time()-start)/60.0
