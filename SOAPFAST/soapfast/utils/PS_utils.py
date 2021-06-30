@@ -5,7 +5,6 @@ import numpy as np
 from sympy.physics.wigner import wigner_3j
 from scipy import special
 from . import initsoap
-from .LODE import gvectors,fourier_integrals,direct_potential,direct_ewald,fourier_ewald,fourier_ewald_fixed
 
 #############################################################################################
 
