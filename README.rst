@@ -9,13 +9,11 @@ References
 
 2. Alberto Fabrizio, Andrea Grisafi, Benjamin A. R. Meyer, Michele Ceriotti, Clemence Corminboeuf, "Electron density learning of non-covalent systems", Chemical Science 10, 9424-9432 (2019)
 
+3. Alan M. Lewis, Andrea Grisafi, Michele Ceriotti, Mariana Rossi, "Learning electron densities in the condensed-phase", arXiv:2106.05364
 
-Requirements and Installation
+Installation
 -----------------------------
-This code is written in a mixture of Python2 and Fortran90 with OpenMP parallelization.
-
-To install it, :code:`make` in the main folder and :code:`source env.sh`  
-
+To install it :code:`source env.sh`  
 
 Dependencies
 ------------
@@ -27,7 +25,7 @@ Input Dataset
 -------------
 Geometries of the input structures are required in :code:`xyz` format.
 
-The training target consists in the projection of the scalar-field over atom-centered basis functions made of radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Given the basis is non-orthogonal, the overlap matrix between the basis functions is also required as an input. Note that the well-conditioning of this matrix is a crucial aspect for the method performance.
+The training target consists in the projection of the scalar-field over atom-centered basis functions made of radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Given the basis is non-orthogonal, the overlap matrix between the basis functions is also required as an input. 
 
 For each dataset configuration, both the scalar-field projection vector and the overlap matrix are needed. The dimensionality of these arrays has to correspond to the number of atoms, as sorted in the geometry file, times the non-redundant number of basis functions belonging to each atom. The ordering of the basis set follows a hierarchical structure: 
 
@@ -42,36 +40,30 @@ The possible basis set choices appear in :code:`src/basis.py`. If you want to us
 
 a) SALTED water molecules
 --------------------------
-In this example, we consider the interpolation of the electron density of a dataset made of 1000 isolated water molecules. For that, go into the example folder :code:`examples/water_monomer`. The file :code:`inp.py` contains the input parameters of the calculation, while the file :code:`water_monomers_1k.xyz` contains the atomic coordinates of the system. Both the file-name of the input geometry and an ordered list of the atomic species included in the dataset need to be specified in :code:`inp.py`. The path to the folder used to save the heavy input data (overlaps and projections) must be set using the :code:`path2indata` variable; the path to the folder used to save the heavy data produced by SALTED (SOAP descriptors, kernels, etc.) must be set using the :code:`path2data` variable. In the following, we consider the possibility of generating the input densities from scratch. If you want to use your own density matrices, then jump to point 2. If you want to use your own RI-density projections and overlaps, then jump to point 3. 
+In this example, we consider the regression of the electron density of a dataset made of 1000 isolated water molecules. For that, go into the example folder :code:`examples/water_monomer`. The file :code:`inp.py` contains the input parameters of the calculation, while the file :code:`water_monomers_1k.xyz` contains the atomic coordinates of the system. Both the file-name of the input geometry and an ordered list of the atomic species included in the dataset need to be specified in :code:`inp.py`. The path to the folder used to save the QM data (overlaps, density coefficients and density projections) must be set using the :code:`path2qm` variable; the path to the folder used to save the ML data produced by SALTED (descriptors, kernels, etc...) must be set using the :code:`path2ml` variable. In the following, we consider the possibility of generating the input densities from scratch. If you want to use your own density matrices, then jump to point 2. If you want to use your own RI-density projections and overlaps, then jump to point 3. 
 
 1) We start generating the density matrices associated with a KS-DFT calculation using PySCF. The QM variables needed as input are the DFT functional (:code:`functional = "b3lyp"`) and the wave-function basis set (:code:`qmbasis = "cc-pvqz"`). To run the QM calculations for each structure in the dataset:: 
 
         for i in {1..1000}; do python $SALTEDPATH/run_pyscf.py -iconf ${i}; done 
 
-   The density matrices, saved as :code:`dm_conf#.npy`, can be found in the folder :code:`path2indata/density_matrices/`.
+   The density matrices are saved as :code:`path2qm/density_matrices/dm_conf#.npy`.
 
-2) From the density matrices, the resolution of the identity (RI) method can be used to compute the density components on a linear auxiliary basis. The density matrix is assumed to be saved according to the PySCF convention, that is, as -L,...,0,...,+L for L>1 and as +1,-1,0 for L=1. The RI-auxiliary basis must correspond to its wave-function counterpart and can be set as :code:`dfbasis = "RI-cc-pvqz"`. To compute the RI projections and overlaps for each structure of the dataset, run::
+2) From the density matrices, the resolution of the identity (RI) method can be used to compute the density components on a linear auxiliary basis. The density matrix is assumed to follow the PySCF convention, that is, basis functions are ordered as -L,...,0,...,+L for L>1 and as +1,-1,0 for L=1. The RI (aka density-fitting) auxiliary basis must correspond to its wave-function counterpart and can be set as :code:`dfbasis = "RI-cc-pvqz"`. To compute the RI density coefficients, projections and overlaps for each structure of the dataset, run::
 
        for i in {1..1000}; do python $SALTEDPATH/dm2df.py -iconf ${i}; done
 
-   The projections and overlaps, saved as :code:`projections_conf#.npy` and :code:`overlap_conf#.npy`, can be found in the folders :code:`path2indata/projections/` and :code:`path2indata/overlaps`, respectively.   
+   These are saved as :code:`path2qm/projections/projections_conf#.npy`, :code:`path2qm/coefficients/coefficients_conf#.npy` and :code:`path2indata/overlaps/overlap_conf#.npy`, respectively.   
 
-3) We now need to compute the mean spherical density projections over the dataset in order to use them as a baseline value for the RI-density projections. To do so, run::
+3) Using the TENSOAP package, we then need to generate the λ-SOAP structural features up to the maximum angular momentum :code:`-lm` included in the expansion of the density field (up to λ=5 in this case). To do so, run:: 
 
-       python $SALTEDPATH/initialize.py
-
-4) Using the TENSOAP package, we then need to generate the L-SOAP structural features up to the maximum angular momentum :code:`-lm` included in the expansion of the density field (up to L=5 in this case). To do so, run:: 
-
-        cd path2data
+        cd $path2ml
         mkdir soaps
         cd -
 
         for i in 0 1 2 3 4 5
         do      
-           sagpr_get_PS -f coords_water_monomers_1k.xyz -lm ${i} -cs -c H O -s H O -l 4 -n 5 -o path2data/soaps/SOAP-${i}
+           sagpr_get_PS -f coords_water_monomers_1k.xyz -lm ${i} -s H O -l 4 -n 5 -o $path2ml/soaps/SOAP-${i}
         done 
-
-   Note that the species of the atoms used as expansion centers, defined by the list :code:`-c H O`, must be sorted exactly as specified in :code:`inp.py`. The centers sorting option is activated by the flag :code:`-cs`.
 
 5) Extract a sparse set of atomic environments to reduce the dimensionality of the regression problem. The number of these environments is specified by the input variable :code:`Menv = 100`. This is done via the farthest point sampling (FPS) method, using the 0-SOAP features previously computed as a metric to distiguish between any pair of atomic environments::
 
@@ -140,20 +132,6 @@ Before starting, you need to: i) generate the reference RI-overlaps and RI-densi
    This gives a RMSE of about 0.2%, according to the isolated molecule case.
 
 
-Additional Options
-------------------
-
--- PARALLEL TRAINING: At runtime, :code:`matrices.py` may be called with the options :code:`-p` and :code:`-b` (:code:`--partial` and :code:`--partial_block`). These options divide the training configurations into blocks of size :code:`b`, and calculates the regression vector A and matrix B for just the :code:`pth` block of structures, outputting :code:`A_p_vector.npy` and :code:`B_p_vector.npy`. This allows the calculation of the matrices to be parallelised across many nodes, since the full vector and matrix can be obtained simply by summing these partial matrices.
-
--- CROSS-VALIDATION: Setting :code:`xv = True` in :code:`inp.py` will perform a two-fold cross-validation on the training set when following example a). The dataset will automatically be partitioned into a training and validation set of equal size, overriding the `:code:Ntrain` and :code:`frac` options. Two sets of regression vectors A, matrices B, weights and predicted coefficients will be produced, one labelled with the training set fraction implicitly defined. :code:`error_validation.py` will print the RMSE for each half of the cross-validation, along with the average of the two errors.
-
--- SVD SOLUTION: Setting :code:`svd = True` will result in the singular value decomposition method of :code:`numpy.linalg.lstsq` being used to solve the regression problem in :code:`learn.py`. This is slower, but generally leads to a more stable solution, particular when the resulting weights are applied to a test set. In this case the :code:`jitter` parameter is ignored.
-
--- EFFICIENT LEARNING CURVES: If the regression matrices are calculated in blocks, :code:`learn.py` may also be called with the runtime option :code:`-np` (--number_partial). This will contruct the regression vector and matrix from the first :code:`np` partial matrices. This enables the efficient construction of a learning curve, avoiding unnecessary recalculations of the regression matrices.
-
-NB: The runtime options :code:`-p` (or :code:`-np`) are incompatible with the option :code:`xv`.
-
-
 Contact
 -------
 andrea.grisafi@epfl.ch
@@ -161,4 +139,4 @@ andrea.grisafi@epfl.ch
 
 Contributors
 ------------
-Andrea Grisafi, Alberto Fabrizio, Alan Lewis, Mariana Rossi, Clemence Corminboeuf, Michele Ceriotti
+Andrea Grisafi, Alan Lewis, Alberto Fabrizio, Clemence Corminboeuf, Mariana Rossi, Michele Ceriotti
