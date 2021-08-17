@@ -126,6 +126,9 @@ for iat in xrange(natoms):
 # Compute density projections on auxiliary functions
 Proj = np.dot(Over,Coef)
 
+dirpath = os.path.join(inp.path2qm, "coefficients")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
 dirpath = os.path.join(inp.path2qm, "projections")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
@@ -134,7 +137,7 @@ if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
 # Save projections and overlaps
-np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",Proj)
+np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",Coef)
 np.save(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy",Proj)
 np.save(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy",Over)
 

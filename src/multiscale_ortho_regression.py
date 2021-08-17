@@ -73,7 +73,7 @@ if not os.path.exists(dirpath):
 
 # training set selection
 dataset = range(ndata)
-random.Random(3).shuffle(dataset)
+random.Random(4).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(frac*len(trainrangetot))
@@ -85,7 +85,7 @@ ntest = len(testrange)
 natoms_test = natoms[testrange]
 
 kdir = {}
-rcuts = [3,4,5,6]
+rcuts = [2,3,4,5,6]
 # get truncated size
 for rc in rcuts:
     kdir[rc] = "kernels_rc"+str(rc)+".0-sg0."+str(rc)+"/"

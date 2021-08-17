@@ -30,6 +30,7 @@ M = inp.Menv
 zeta = inp.z
 eigcut = inp.eigcut
 print "M =", M, "eigcut =", eigcut
+print zeta
 
 sdir = inp.soapdir
 kdir = inp.kerndir
@@ -170,7 +171,7 @@ for l in xrange(1,llmax+1):
         start = time.time()
 
         # get sparse feature vector for each atomic species
-        power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,power.shape[-1])[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
+        power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,nfeat)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
         
         # compute K_MM 
         kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T) 

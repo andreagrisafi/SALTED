@@ -73,9 +73,10 @@ if not os.path.exists(dirpath):
 
 # training set selection
 dataset = range(ndata)
-random.Random(3).shuffle(dataset)
+random.Random(4).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
+#trainrangetot = np.loadtxt("training_set_alan.txt",int)
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 natoms_train = natoms[trainrange]

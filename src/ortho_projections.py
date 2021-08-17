@@ -29,6 +29,8 @@ import basis
 sys.path.insert(0, './')
 import inp
 
+ocut = inp.overcut
+
 # read species
 spelist = inp.species
 
@@ -82,9 +84,10 @@ for iconf in xrange(ndata):
     species = atomic_symbols[iconf]
     #==================================================
     Coef = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
-    #Proj = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
-    #Over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
-    #Coef = np.linalg.solve(Over,Proj)
+#    Proj = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+#    Over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
+#    Coef = np.linalg.solve(Over,Proj)
+#    np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",Coef)
     #==================================================
     i = 0
     for iat in xrange(natoms[iconf]):
@@ -140,7 +143,7 @@ for iconf in xrange(ndata):
     DProj = np.dot(Over,Coef)
     # compute orthogonalization matrix
     eigenvalues, unitary = np.linalg.eigh(Over)
-    eigenvalues = eigenvalues[eigenvalues>1e-08]
+    eigenvalues = eigenvalues[eigenvalues>ocut]
     Mcut = len(eigenvalues)
     sqrteigen = np.sqrt(eigenvalues) 
     diagoverlap = np.diag(1.0/sqrteigen)

@@ -124,6 +124,7 @@ for iconf in testrange:
 #    sys.exit(0) 
     itest+=1
 
+
 print("% RMSE =", 100*np.sqrt(Oerror_density/variance))
 np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/pred-coeffs_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy",preds)
 #np.save(inp.path2qm+"predictions/M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/pred-coeffs_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy",preds)

@@ -8,6 +8,9 @@ propname = "electro"
 # ------------
 path2ml = "/local/big_scratch/water_monomer/" 
 path2qm = "/local/big_scratch/water_monomer/" 
+soapdir = "soaps/"
+kerndir = "kernels/"
+preddir = "predictions/"
 
 # QM variables 
 # ------------
@@ -17,15 +20,16 @@ qmbasis = "cc-pvqz" # atomic basis
 # RHO variables
 # -------------
 dfbasis = "RI-cc-pvqz" # auxiliary basis
+overcut = 1e-08
 
 # ML variables  
 # ------------
 z = 2.0           # kernel exponent 
 Menv = 100        # number of FPS environments
-Ntrain = 200      # number of training structures
+Ntrain = 100      # number of training structures
 trainfrac = 1.0   # training set fraction
-regul = 1e-06     # regularization
-eigcut = 1e-08    # eigenvalues cutoff
+regul = 1e-10     # regularization
+eigcut = 1e-10    # eigenvalues cutoff
 
 xv = False
 svd = False
