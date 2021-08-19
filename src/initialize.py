@@ -68,11 +68,13 @@ for spe in spelist:
 
 print "computing averages..."
 for iconf in xrange(ndata):
+    print iconf+1
     atoms = atomic_symbols[iconf]
     #==================================================
-    Proj = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
-    Over = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
     Coef = np.linalg.solve(Over,Proj)
+    #np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",Coef)
     #==================================================
     i = 0
     for iat in xrange(natoms[iconf]):
@@ -89,8 +91,14 @@ for spe in spelist:
     av_coefs[spe] /= nenv[spe]
     np.save("averages_"+str(spe)+".npy",av_coefs[spe])
 
+av_coefs = {}
+for spe in spelist:
+    av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
+
 print "computing baselined projections..."
 for iconf in xrange(ndata):
+    start = time.time()
+    print iconf+1
     atoms = atomic_symbols[iconf]
     #==================================================
     totsize = 0
@@ -98,8 +106,8 @@ for iconf in xrange(ndata):
         for l in xrange(lmax[atoms[iat]]+1):
             totsize += nmax[(atoms[iat],l)]*(2*l+1)
     #==================================================
-    Proj = np.load(inp.path2indata+"projections/projections_conf"+str(iconf)+".npy")
-    Over = np.load(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
     #==================================================
     Av_coeffs = np.zeros(totsize,float)
     i = 0
@@ -113,5 +121,6 @@ for iconf in xrange(ndata):
                     i += 1
     #==================================================
     Proj -= np.dot(Over,Av_coeffs)
-    np.savetxt(inp.path2indata+"projections/projections_conf"+str(iconf)+".dat",Proj, fmt='%.10e')
-    np.savetxt(inp.path2indata+"overlaps/overlap_conf"+str(iconf)+".dat", np.concatenate(Over), fmt='%.10e')
+    np.savetxt(inp.path2qm+"projections/projections_conf"+str(iconf)+".dat",Proj, fmt='%.10e')
+    np.savetxt(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".dat", np.concatenate(Over), fmt='%.10e')
+    print time.time() - start

@@ -22,7 +22,7 @@ def add_command_line_arguments_contraction(parsetext):
 args = add_command_line_arguments_contraction("dataset subselection")
 # dataset slice boundaries 
 istart = args.istart-1
-iend = args.iend-1
+iend = args.iend
 isel = args.iselection # 0 based
 
 import basis
