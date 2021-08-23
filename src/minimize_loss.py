@@ -37,12 +37,23 @@ eigcut = inp.eigcut
 kdir = inp.kerndir
 pdir = inp.preddir
 
+atoms_per_spe = {}
+natoms_per_spe = {}
+for iconf in xrange(ndata):
+    for spe in spelist:
+        atoms_per_spe[(iconf,spe)] = []
+        natoms_per_spe[(iconf,spe)] = 0
+
 # system parameters
 atomic_symbols = []
 natoms = np.zeros(ndata,int)
-for i in xrange(ndata):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    natoms[i] = int(len(atomic_symbols[i]))
+for iconf in xrange(ndata):
+    atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
+    natoms[iconf] = int(len(atomic_symbols[iconf]))
+    for iat in xrange(natoms[iconf]):
+        spe = atomic_symbols[iconf][iat]
+        atoms_per_spe[(iconf,spe)].append(iat)
+        natoms_per_spe[(iconf,spe)] += 1
 natmax = max(natoms)
 
 av_coefs = {}
@@ -103,8 +114,10 @@ def minim_func(weights):
         for iat in xrange(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
             for l in xrange(lmax[spe]+1):
+                i1 = ispe[spe]*(2*l+1)
+                i2 = ispe[spe]*(2*l+1)+2*l+1
                 for n in xrange(nmax[(spe,l)]):
-                    pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1] 
+                    pred_coefs[i:i+2*l+1] = C[(spe,l,n)][i1:i2] 
                     if l==0:
                        Av_coeffs[i] = av_coefs[spe][n]
                     i += 2*l+1
@@ -130,20 +143,22 @@ def grad_func(weights):
     start = time.time()
     gradient = np.zeros(totsize)
 
+    time_block = 0.0
     for iconf in trainrange:
-    
+   
         # load reference
         ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
         ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
         overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
         Tsize = len(ref_coefs)
         
+        start_load = time.time()
         Psi = {}
         for spe in spelist:
             for l in xrange(lmax[spe]+1):
-                psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+                lsize = natoms_per_spe[(iconf,spe)]*(2*l+1) 
                 for n in xrange(nmax[(spe,l)]):
-                    Psi[(spe,l,n)] = np.zeros((psi_nm.shape[0],totsize)) 
+                    Psi[(spe,l,n)] = np.zeros((lsize,totsize)) 
 
         C = {}
         ispe = {}
@@ -157,6 +172,7 @@ def grad_func(weights):
                     Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
                     C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
                     isize += Mcut
+        time_block += time.time()-start_load 
    
         psi_vector = np.zeros((Tsize,totsize))
         Av_coeffs = np.zeros(Tsize)
@@ -165,9 +181,11 @@ def grad_func(weights):
         for iat in xrange(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
             for l in xrange(lmax[spe]+1):
+                i1 = ispe[spe]*(2*l+1)
+                i2 = ispe[spe]*(2*l+1)+2*l+1
                 for n in xrange(nmax[(spe,l)]):
-                    psi_vector[i:i+2*l+1] = Psi[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1] 
-                    pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1] 
+                    psi_vector[i:i+2*l+1] = Psi[(spe,l,n)][i1:i2] 
+                    pred_coefs[i:i+2*l+1] = C[(spe,l,n)][i1:i2] 
                     if l==0:
                        Av_coeffs[i] = av_coefs[spe][n]
                     i += 2*l+1
@@ -180,14 +198,15 @@ def grad_func(weights):
         gradient += 2.0 * np.dot(psi_vector.T,pred_projs-ref_projs)
     
     gradient += 2.0 * inp.regul * weights
+    print "time block:", time_block
     print "time gradient:", time.time()-start
 
     return gradient
 
 # initialize the weight vector
-w0 = np.ones(totsize)*1e-10
-res = minimize(minim_func,w0,method='CG',jac=grad_func,options={'gtol': 1e-10})
-#res = minimize(minim_func,w0,method='BFGS',jac=grad_func,options={'gtol': 1e-04})
+w0 = np.ones(totsize)*1e-04
+#res = minimize(minim_func,w0,method='CG',jac=grad_func,options={'gtol': 1e-04})
+res = minimize(minim_func,w0,method='BFGS',jac=grad_func,options={'gtol': 1e-04})
 wopt = res.x
 
 np.save("weights.npy",wopt)
