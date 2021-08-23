@@ -48,10 +48,8 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-Avec = np.load("Avec.npy")
-Bmat = np.load("Bmat.npy")
-Msize = len(Avec)
-weights = np.linalg.solve(Bmat+inp.regul*np.eye(Msize),Avec)
+weights = np.load("weights.npy")
+Msize = len(weights)
 
 trainrangetot = np.loadtxt("training_set.txt",int)
 testrange = np.setdiff1d(range(ndata),trainrangetot)

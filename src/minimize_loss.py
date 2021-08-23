@@ -5,21 +5,22 @@ import time
 import ase
 from ase import io
 from ase.io import read
-from random import shuffle
-from scipy.optimize import minimize
 import random
+from random import shuffle
+
+from scipy.optimize import minimize
 
 import basis
 
 sys.path.insert(0, './')
 import inp
 
+# system definition
 spelist = inp.species
-# read system
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
-# read basis
+# basis definition
 [lmax,nmax] = basis.basiset(inp.dfbasis)
 
 llist = []
@@ -31,12 +32,15 @@ for spe in spelist:
 llmax = max(llist)
 nnmax = max(nlist)
 
-# number of sparse environments
+# sparse-GPR parameters
 M = inp.Menv
 eigcut = inp.eigcut
+
+# paths to data
 kdir = inp.kerndir
 pdir = inp.preddir
 
+# species dependent arrays
 atoms_per_spe = {}
 natoms_per_spe = {}
 for iconf in xrange(ndata):
@@ -44,7 +48,6 @@ for iconf in xrange(ndata):
         atoms_per_spe[(iconf,spe)] = []
         natoms_per_spe[(iconf,spe)] = 0
 
-# system parameters
 atomic_symbols = []
 natoms = np.zeros(ndata,int)
 for iconf in xrange(ndata):
@@ -56,11 +59,12 @@ for iconf in xrange(ndata):
         natoms_per_spe[(iconf,spe)] += 1
 natmax = max(natoms)
 
+# load average density coefficients
 av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-# compute the total size of weight vectors
+# compute the weight-vector size 
 Mcut = {}
 totsize = 0
 for spe in spelist:
@@ -71,7 +75,7 @@ for spe in spelist:
 
 print "problem dimensionality:", totsize
 
-# define training set
+# define training set at random
 dataset = range(ndata)
 random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:inp.Ntrain]
@@ -79,16 +83,18 @@ np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(inp.trainfrac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 
-def minim_func(weights):
+def loss_func(weights):
+    """Given the weight-vector of the RKHS, compute the electron-density loss function."""
   
     start = time.time()
 
-    #print weights
+    # init loss function
     loss = 0.0
-    
+   
+    # loop over training structures 
     for iconf in trainrange:
 
-        # load reference
+        # load reference QM data
         ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
         ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
         overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
@@ -107,7 +113,7 @@ def minim_func(weights):
                     C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
                     isize += Mcut
             
-        # fill vector of predictions
+        # fill in vector of predictions
         pred_coefs = np.zeros(Tsize)
         Av_coeffs = np.zeros(Tsize)
         i = 0
@@ -123,36 +129,42 @@ def minim_func(weights):
                     i += 2*l+1
             ispe[spe] += 1
     
-        # rebuild predictions
+        # rebuild predicted coefficients 
         pred_coefs += Av_coeffs
+
+        # compute predicted density projections
         pred_projs = np.dot(overl,pred_coefs)
         
-        # collect error
+        # collect error contributions 
         loss += np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
     
-    
+    # add regularization term 
     loss += inp.regul * np.dot(weights,weights)
+    
     print "time loss:", time.time()-start
-    print loss
+    print "loss value =", loss
     print ""
 
     return loss
 
 def grad_func(weights):
+    """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
   
     start = time.time()
+
+    # init gradient
     gradient = np.zeros(totsize)
 
-    time_block = 0.0
+    # loop over training structures
     for iconf in trainrange:
    
-        # load reference
+        # load reference QM data
         ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
         ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
         overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
         Tsize = len(ref_coefs)
         
-        start_load = time.time()
+        # initialize RKHS feature vectors for each channel 
         Psi = {}
         for spe in spelist:
             for l in xrange(lmax[spe]+1):
@@ -160,6 +172,7 @@ def grad_func(weights):
                 for n in xrange(nmax[(spe,l)]):
                     Psi[(spe,l,n)] = np.zeros((lsize,totsize)) 
 
+        # load the RKHS feature vectors and compute predictions for each channel
         C = {}
         ispe = {}
         isize = 0
@@ -172,8 +185,8 @@ def grad_func(weights):
                     Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
                     C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
                     isize += Mcut
-        time_block += time.time()-start_load 
    
+        # fill in a single array for RKHS feature vector and predictions
         psi_vector = np.zeros((Tsize,totsize))
         Av_coeffs = np.zeros(Tsize)
         pred_coefs = np.zeros(Tsize)
@@ -191,23 +204,31 @@ def grad_func(weights):
                     i += 2*l+1
             ispe[spe] += 1
         
-        # rebuild predictions
+        # rebuild predicted coefficients
         pred_coefs += Av_coeffs
+
+        # compute predicted density projections
         pred_projs = np.dot(overl,pred_coefs)
     
+        # collect gradient contributions
         gradient += 2.0 * np.dot(psi_vector.T,pred_projs-ref_projs)
-    
+   
+    # add regularization term
     gradient += 2.0 * inp.regul * weights
-    print "time block:", time_block
+
     print "time gradient:", time.time()-start
 
     return gradient
 
-# initialize the weight vector
+# initialize the weight-vector
 w0 = np.ones(totsize)*1e-04
-#res = minimize(minim_func,w0,method='CG',jac=grad_func,options={'gtol': 1e-04})
-res = minimize(minim_func,w0,method='BFGS',jac=grad_func,options={'gtol': 1e-04})
+
+# minimize the loss function with precomputed gradient
+res = minimize(loss_func,w0,method='BFGS',jac=grad_func,options={'gtol': 1e-04})
+
+# get the optimal weights
 wopt = res.x
 
+# save
 np.save("weights.npy",wopt)
 
