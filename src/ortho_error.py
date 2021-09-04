@@ -47,25 +47,17 @@ for i in range(len(xyzfile)):
 natmax = max(natoms)
 
 # load predicted coefficients for test structures
-trainrangetot = np.loadtxt("training_set.txt",int)
+trainrangetot = np.loadtxt("training_set1.txt",int)
 ntrain = int(inp.trainfrac*len(trainrangetot))
 testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
 ortho_coeffs = np.load(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/ortho-predictions_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy")
-#ortho_coeffs = np.load(inp.path2qm+"predictions/M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/ortho-predictions_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy")
 
 av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
-
-#dirpath = os.path.join(inp.path2qm, "predictions")
-#if not os.path.exists(dirpath):
-#    os.mkdir(dirpath)
-
-#print("")
-#print("Estimating prediction error ...")
 
 itest=0
 Oerror_density = 0.0
@@ -120,11 +112,10 @@ for iconf in testrange:
     coeffs_ref -= averages
     var = np.dot(coeffs_ref,projs_ref)
     variance += var
+    #print iconf+1, ":", np.sqrt(Oerror/var)*100, "% RMSE"
 #    print("time:",time.time()-start)
-#    sys.exit(0) 
     itest+=1
 
 
 print("% RMSE =", 100*np.sqrt(Oerror_density/variance))
 np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/pred-coeffs_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy",preds)
-#np.save(inp.path2qm+"predictions/M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/pred-coeffs_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy",preds)

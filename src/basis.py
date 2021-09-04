@@ -41,8 +41,7 @@ def basiset(basis):
       nmax[("O",6)] = 4
       nmax[("O",7)] = 2
       nmax[("O",8)] = 1
-
-
+ 
    if basis=="RI-cc-pvqz":
 
       lmax["H"] = 4

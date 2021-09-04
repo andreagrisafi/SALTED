@@ -63,20 +63,18 @@ for iconf in xrange(ndata):
         atom_idx[(iconf,spe)].append(iat)
 
 dirpath = os.path.join(inp.path2qm, pdir)
-#dirpath = os.path.join(inp.path2qm, "predictions")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-#dirpath = os.path.join(inp.path2qm+"predictions/", "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
 # training set selection
 dataset = range(ndata)
-random.Random(4).shuffle(dataset)
+random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
-#trainrangetot = np.loadtxt("training_set_alan.txt",int)
+#trainrangetot = np.loadtxt("training_set2.txt",int)
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 natoms_train = natoms[trainrange]
@@ -92,13 +90,10 @@ for spe in spelist:
       
         # get truncated size
         Mcut = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
-        #Mcut = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
         # compute B matrix
         B = np.zeros((Mcut,Mcut))
         for iconf in trainrange:
             psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy")
-            #psi_nm = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy")
-            #psi_nm = np.vstack((psi_nm,reg*np.eye(Mcut)))
             B += np.dot(psi_nm.T,psi_nm)
         
         for n in xrange(nmax[(spe,l)]): 
@@ -107,7 +102,6 @@ for spe in spelist:
             A = np.zeros(Mcut)
             for iconf in trainrange:
                 psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy")
-                #psi_nm = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy")
                 ortho_projs = np.load(inp.path2qm+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")
                 
                 A += np.dot(psi_nm.T,ortho_projs)
@@ -125,7 +119,6 @@ for spe in spelist:
 
                 # predict
                 psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy")
-                #psi_nm = np.load(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy")
                 ortho_projs = np.dot(psi_nm,x)
               
                 # reference
@@ -147,4 +140,3 @@ for spe in spelist:
             print "% RMSE =", 100*np.sqrt(error_total/variance)
 
 np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/ortho-predictions_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy",ortho_preds)
-#np.save(inp.path2qm+"predictions/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/ortho-predictions_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy",ortho_preds)

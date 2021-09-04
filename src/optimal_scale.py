@@ -20,7 +20,7 @@ spelist = inp.species
 # read basis
 [lmax,nmax] = basis.basiset(inp.dfbasis)
 
-errors = np.loadtxt("errors_multiscale.dat")
+errors = np.loadtxt("average_errors_matrix.dat")
 rcuts = [2.0,3.0,4.0,5.0,6.0]
 
 f = open("errors_optimal.dat","w")

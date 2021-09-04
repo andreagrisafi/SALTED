@@ -73,7 +73,6 @@ for iconf in xrange(ndata):
 
 # load lambda=0 power spectrum 
 power = np.load(inp.path2ml+sdir+"FEAT-0.npy")
-#power = np.load(inp.path2ml+"soaps/FEAT-0.npy")
 nfeat = power.shape[-1]
 
 # compute sparse set with FPS
@@ -85,17 +84,14 @@ np.savetxt("sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
 
 # make directories if not exisiting
 dirpath = os.path.join(inp.path2ml, kdir)
-#dirpath = os.path.join(inp.path2ml, "kernels")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 for spe in spelist:
     for l in xrange(llmax+1):
         dirpath = os.path.join(inp.path2ml+kdir, "spe"+str(spe)+"_l"+str(l))
-        #dirpath = os.path.join(inp.path2ml+"kernels", "spe"+str(spe)+"_l"+str(l))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
         dirpath = os.path.join(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-        #dirpath = os.path.join(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
 
@@ -151,7 +147,6 @@ for spe in spelist:
         kernel_nm = kernel0_nm[(iconf,spe)]**zeta
         psi_nm = np.real(np.dot(kernel_nm,V))
         np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
-        #np.save(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
     print (time.time()-start)/60.0
 
 # lambda>0
@@ -161,7 +156,6 @@ for l in xrange(1,llmax+1):
     print "loading lambda =", l
     start = time.time()
     power = np.load(inp.path2ml+sdir+"FEAT-"+str(l)+".npy")
-    #power = np.load(inp.path2ml+"soaps/FEAT-"+str(l)+".npy"
     nfeat = power.shape[-1]
     print (time.time()-start)/60.0
 
@@ -193,5 +187,4 @@ for l in xrange(1,llmax+1):
                     kernel_nm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
             psi_nm = np.real(np.dot(kernel_nm,V))
             np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
-            #np.save(inp.path2ml+"kernels/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
         print (time.time()-start)/60.0
