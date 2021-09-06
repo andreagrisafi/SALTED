@@ -48,6 +48,14 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
+kdir = {}
+rcuts = [2.0,3.0,4.0,5.0,6.0]
+# get truncated size
+for rc in rcuts:
+    kdir[rc] = "kernels_rc"+str(rc)+"-sg"+str(rc/10)+"/"
+
+orcuts = np.loadtxt("optimal_rcuts.dat")
+
 trainrangetot = np.loadtxt("training_set.txt",int)
 ntrain = int(inp.trainfrac*len(trainrangetot))
 testrange = np.setdiff1d(range(ndata),trainrangetot)
@@ -70,14 +78,17 @@ for iconf in testrange:
     C = {}
     ispe = {}
     isize = 0
+    iii = 0
     for spe in spelist:
         ispe[spe] = 0
         for l in xrange(lmax[spe]+1):
-            psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
-            Mcut = psi_nm.shape[1]
             for n in xrange(nmax[(spe,l)]):
+                rc = orcuts[iii]
+                psi_nm = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+                Mcut = psi_nm.shape[1]
                 C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
                 isize += Mcut
+                iii += 1
         
     # fill vector of predictions
     pred_coefs = np.zeros(Tsize)

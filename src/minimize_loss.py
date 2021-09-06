@@ -303,10 +303,10 @@ def hess_func(weights):
     hessian /= ntrain
 
     # add regularization term
-    hessian += 2.0 * inp.regul * np.eye(totsize,totsize) 
+    hessian += 2.0 * inp.regul * np.eye(totsize) 
 
 #    print "time loop", time_loop
-    print "time gradient:", time.time()-start
+    print "time hessian:", time.time()-start
 
     return hessian 
 
@@ -315,7 +315,7 @@ w0 = np.ones(totsize)*1e-04
 
 # minimize the loss function with precomputed gradient
 #res = minimize(loss_func,w0,method='BFGS',jac=grad_func,options={'gtol': 1e-05})
-res = minimize(loss_func,w0,method='Newton-CG',jac=grad_func,hess=hess_func,options={'gtol': 1e-06})
+res = minimize(loss_func,w0,method='Newton-CG',jac=grad_func,hess=hess_func)
 
 print "number of minimization steps:", icount
 
@@ -323,5 +323,5 @@ print "number of minimization steps:", icount
 wopt = res.x
 
 # save
-np.save("weights.npy",wopt)
+np.save("weights_N"+str(ntrain)+".npy",wopt)
 
