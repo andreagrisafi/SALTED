@@ -36,10 +36,6 @@ nnmax = max(nlist)
 M = inp.Menv
 eigcut = inp.eigcut
 
-# paths to data
-kdir = inp.kerndir
-pdir = inp.preddir
-
 # species dependent arrays
 atoms_per_spe = {}
 natoms_per_spe = {}
@@ -66,19 +62,33 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
+kdir = {}
+rcuts = [2.0,3.0,4.0,5.0,6.0]
+# get truncated size
+for rc in rcuts:
+    kdir[rc] = "kernels_rc"+str(rc)+"-sg"+str(rc/10)+"/"
+
+orcuts = np.loadtxt("optimal_rcuts.dat")
+
 # compute the weight-vector size 
 Mcut = {}
 totsize = 0
+iii=0
 for spe in spelist:
     for l in xrange(lmax[spe]+1):
         for n in xrange(nmax[(spe,l)]):
-            Mcut[(spe,l,n)] = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
+            rc = orcuts[iii]
+            Mcut[(spe,l,n)] = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
             totsize += Mcut[(spe,l,n)]
+            iii+=1
 
 print "problem dimensionality:", totsize
 
 
-dirpath = os.path.join(inp.path2ml+kdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+dirpath = os.path.join(inp.path2ml, "phi-vectors_multiscale")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+dirpath = os.path.join(inp.path2ml+"phi-vectors_multiscale/", "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -103,14 +113,17 @@ for iconf in xrange(ndata):
     C = {}
     ispe = {}
     isize = 0
+    iii = 0
     for spe in spelist:
         ispe[spe] = 0
         for l in xrange(lmax[spe]+1):
-            psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
-            Mcut = psi_nm.shape[1]
             for n in xrange(nmax[(spe,l)]):
+                rc = orcuts[iii]
+                psi_nm = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+                Mcut = psi_nm.shape[1]
                 Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
                 isize += Mcut
+                iii += 1
 
     # fill in a single array for RKHS feature vector and predictions
     psi_vector = np.zeros((Tsize,totsize))
@@ -125,7 +138,7 @@ for iconf in xrange(ndata):
                 i += 2*l+1
         ispe[spe] += 1
 
-    np.save(inp.path2ml+kdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_vector)
+    np.save(inp.path2ml+"phi-vectors_multiscale/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_vector)
 
     print time.time()-start
 
