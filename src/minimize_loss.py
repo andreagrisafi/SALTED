@@ -11,7 +11,6 @@ from random import shuffle
 from scipy.optimize import minimize
 
 import basis
-import optimize
 
 sys.path.insert(0, './')
 import inp
