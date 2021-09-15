@@ -36,11 +36,6 @@ nnmax = max(nlist)
 M = inp.Menv
 eigcut = inp.eigcut
 
-# paths to data
-kdir = inp.kerndir
-hdir = inp.hessdir
-pdir = inp.preddir
-
 # species dependent arrays
 atoms_per_spe = {}
 natoms_per_spe = {}
