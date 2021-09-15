@@ -127,9 +127,10 @@ def precond_func(ovlp_list,psi_list):
     
     for iconf in xrange(ntrain):
         print iconf
+        ovlp_times_psi = np.dot(ovlp_list[iconf],psi_list[iconf])
         for m in xrange(totsize):
             psi_vector_m = psi_list[iconf][:,m]
-            diag_hessian[m] += 2.0 * np.dot(psi_vector_m,np.dot(ovlp_list[iconf],psi_vector_m))
+            diag_hessian[m] += 2.0 * np.dot(psi_vector_m,ovlp_times_psi[:,m])
   
     diag_hessian /= ntrain
     diag_hessian += 2.0 * inp.regul * np.ones(totsize) 
