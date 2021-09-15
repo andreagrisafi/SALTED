@@ -95,6 +95,7 @@ for spe in spelist:
         for iconf in trainrange:
             psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy")
             B += np.dot(psi_nm.T,psi_nm)
+        B /= ntrain
         
         for n in xrange(nmax[(spe,l)]): 
         
@@ -105,7 +106,8 @@ for spe in spelist:
                 ortho_projs = np.load(inp.path2qm+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")
                 
                 A += np.dot(psi_nm.T,ortho_projs)
-           
+            A /= ntrain
+
             print ""
             print "spe:",spe,"L:",l,"n:",n
             print "------------------------"

@@ -163,5 +163,5 @@ for spe in spelist:
                         isize2 += Mcut[(spe2,l2)]
             isize += Mcut[(spe,l)]
 
-np.save("Avec.npy",Avec)
-np.save("Bmat.npy",Bmat)
+np.save("Avec.npy",Avec/ntrain)
+np.save("Bmat.npy",Bmat/ntrain)

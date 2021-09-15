@@ -78,7 +78,10 @@ for spe in spelist:
 print "problem dimensionality:", totsize
 
 
-dirpath = os.path.join(inp.path2ml+kdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+dirpath = os.path.join(inp.path2ml, "psi-vectors")
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+dirpath = os.path.join(inp.path2ml+"psi-vectors/", "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -125,7 +128,7 @@ for iconf in xrange(ndata):
                 i += 2*l+1
         ispe[spe] += 1
 
-    np.save(inp.path2ml+kdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_vector)
+    np.save(inp.path2ml+"psi-vectors/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_vector)
 
     print time.time()-start
 

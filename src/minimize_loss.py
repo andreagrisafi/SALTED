@@ -11,6 +11,7 @@ from random import shuffle
 from scipy.optimize import minimize
 
 import basis
+import optimize
 
 sys.path.insert(0, './')
 import inp
@@ -38,6 +39,7 @@ eigcut = inp.eigcut
 
 # paths to data
 kdir = inp.kerndir
+hdir = inp.hessdir
 pdir = inp.preddir
 
 # species dependent arrays
@@ -66,17 +68,6 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-# compute the weight-vector size 
-Mcut = {}
-totsize = 0
-for spe in spelist:
-    for l in xrange(lmax[spe]+1):
-        Mcut[(spe,l)] = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
-        for n in xrange(nmax[(spe,l)]):
-            totsize += Mcut[(spe,l)]
-
-print "problem dimensionality:", totsize
-
 # define training set at random
 dataset = range(ndata)
 random.Random(3).shuffle(dataset)
@@ -85,243 +76,132 @@ np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(inp.trainfrac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 
-icount = 0
 
-def loss_func(weights):
-    """Given the weight-vector of the RKHS, compute the electron-density loss function."""
- 
-    global icount 
-    icount += 1
-
-    start = time.time()
-
-    # init loss function
-    loss = 0.0
-   
-    # loop over training structures 
-    for iconf in trainrange:
-
-        print iconf
-
-        # load reference QM data
-        ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
-        ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
-        overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
-        Tsize = len(ref_coefs)
-    
-        # compute predictions per channel
-        C = {}
-        ispe = {}
-        isize = 0
-        for spe in spelist:
-            ispe[spe] = 0
-            for l in xrange(lmax[spe]+1):
-                psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
-                Mcut = psi_nm.shape[1]
-                for n in xrange(nmax[(spe,l)]):
-                    C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
-                    isize += Mcut
-            
-        # fill in vector of predictions
-        pred_coefs = np.zeros(Tsize)
-        Av_coeffs = np.zeros(Tsize)
-        i = 0
-        for iat in xrange(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
-            for l in xrange(lmax[spe]+1):
-                i1 = ispe[spe]*(2*l+1)
-                i2 = ispe[spe]*(2*l+1)+2*l+1
-                for n in xrange(nmax[(spe,l)]):
-                    pred_coefs[i:i+2*l+1] = C[(spe,l,n)][i1:i2] 
-                    if l==0:
-                       Av_coeffs[i] = av_coefs[spe][n]
-                    i += 2*l+1
-            ispe[spe] += 1
-    
-        # rebuild predicted coefficients 
-        pred_coefs += Av_coeffs
-
-        # compute predicted density projections
-        pred_projs = np.dot(overl,pred_coefs)
-        
-        # collect error contributions 
-        loss += np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
-    
-    loss /= ntrain
-
-    # add regularization term 
-    loss += inp.regul * np.dot(weights,weights)
-    
-    print "time loss:", time.time()-start
-    print "loss value =", loss
-    print ""
-
-    return loss
-
-def grad_func(weights):
+def grad_func(weights,ovlp_list,psi_list):
     """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
   
-    start = time.time()
+    global totsize 
+
+#    start = time.time()
 
     # init gradient
     gradient = np.zeros(totsize)
 
-#    time_loop = 0.0
-
     # loop over training structures
-    for iconf in trainrange:
+    for iconf in xrange(ntrain):
    
-        print iconf
+#        print iconf
         # load reference QM data
-        ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
-        ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
-        overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
-        Tsize = len(ref_coefs)
+        ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(trainrange[iconf])+".npy")
+        ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(trainrange[iconf])+".npy")
        
-        start1 = time.time()
-
-        # initialize RKHS feature vectors for each channel 
-        Psi = {}
-        for spe in spelist:
-            for l in xrange(lmax[spe]+1):
-                lsize = natoms_per_spe[(iconf,spe)]*(2*l+1) 
-                for n in xrange(nmax[(spe,l)]):
-                    Psi[(spe,l,n)] = np.zeros((lsize,totsize)) 
-
-        # load the RKHS feature vectors and compute predictions for each channel
-        C = {}
-        ispe = {}
-        isize = 0
-        for spe in spelist:
-            ispe[spe] = 0
-            for l in xrange(lmax[spe]+1):
-                psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
-                Mcut = psi_nm.shape[1]
-                for n in xrange(nmax[(spe,l)]):
-                    Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
-                    C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
-                    isize += Mcut
-   
-        # fill in a single array for RKHS feature vector and predictions
-        psi_vector = np.zeros((Tsize,totsize))
-        Av_coeffs = np.zeros(Tsize)
-        pred_coefs = np.zeros(Tsize)
+        Av_coeffs = np.zeros(ref_coefs.shape[0])
         i = 0
         for iat in xrange(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
             for l in xrange(lmax[spe]+1):
-                i1 = ispe[spe]*(2*l+1)
-                i2 = ispe[spe]*(2*l+1)+2*l+1
                 for n in xrange(nmax[(spe,l)]):
-                    psi_vector[i:i+2*l+1] = Psi[(spe,l,n)][i1:i2] 
-                    pred_coefs[i:i+2*l+1] = C[(spe,l,n)][i1:i2] 
                     if l==0:
                        Av_coeffs[i] = av_coefs[spe][n]
                     i += 2*l+1
-            ispe[spe] += 1
 
-#        time_loop += time.time()-start1
-        
         # rebuild predicted coefficients
+        pred_coefs = np.dot(psi_list[iconf],weights)
         pred_coefs += Av_coeffs
 
         # compute predicted density projections
-        pred_projs = np.dot(overl,pred_coefs)
-    
+        pred_projs = np.dot(ovlp_list[iconf],pred_coefs)
+
         # collect gradient contributions
-        gradient += 2.0 * np.dot(psi_vector.T,pred_projs-ref_projs)
-   
+        gradient += 2.0 * np.dot(psi_list[iconf].T,pred_projs-ref_projs)
+
     gradient /= ntrain
 
     # add regularization term
     gradient += 2.0 * inp.regul * weights
 
-#    print "time loop", time_loop
-    print "time gradient:", time.time()-start
+#    print "time gradient:", time.time()-start
 
     return gradient
 
-def hess_func(weights):
-    """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
-  
-    start = time.time()
+def precond_func(ovlp_list,psi_list):
+    """Compute preconditioning."""
 
-    # init gradient
-    hessian = np.zeros((totsize,totsize))
+    global totsize
 
-#    time_loop = 0.0
-
-    # loop over training structures
-    for iconf in trainrange:
-   
+    diag_hessian = np.zeros((totsize))
+    
+    for iconf in xrange(ntrain):
         print iconf
-        # load reference QM data
-        overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
-        Tsize = len(overl)
-       
-        start1 = time.time()
+        for m in xrange(totsize):
+            psi_vector_m = psi_list[iconf][:,m]
+            diag_hessian[m] += 2.0 * np.dot(psi_vector_m,np.dot(ovlp_list[iconf],psi_vector_m))
+  
+    diag_hessian /= ntrain
+    diag_hessian += 2.0 * inp.regul * np.ones(totsize) 
 
-        # initialize RKHS feature vectors for each channel 
-        Psi = {}
-        for spe in spelist:
-            for l in xrange(lmax[spe]+1):
-                lsize = natoms_per_spe[(iconf,spe)]*(2*l+1) 
-                for n in xrange(nmax[(spe,l)]):
-                    Psi[(spe,l,n)] = np.zeros((lsize,totsize)) 
+    return 1.0/diag_hessian 
 
-        # load the RKHS feature vectors and compute predictions for each channel
-        C = {}
-        ispe = {}
-        isize = 0
-        for spe in spelist:
-            ispe[spe] = 0
-            for l in xrange(lmax[spe]+1):
-                psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
-                Mcut = psi_nm.shape[1]
-                for n in xrange(nmax[(spe,l)]):
-                    Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
-                    isize += Mcut
+def curv_func(cg_dire,ovlp_list,psi_list):
+    """Compute curvature on the given CG-direction."""
+  
+    global totsize
+
+#    start = time.time()
+    Ap = np.zeros((totsize))
+
+    for iconf in xrange(ntrain):
+#        print iconf
+        psi_x_dire = np.dot(psi_list[iconf],cg_dire)
+        Ap += 2.0 * np.dot(psi_list[iconf].T,np.dot(ovlp_list[iconf],psi_x_dire))
    
-        # fill in a single array for RKHS feature vector and predictions
-        psi_vector = np.zeros((Tsize,totsize))
-        i = 0
-        for iat in xrange(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
-            for l in xrange(lmax[spe]+1):
-                i1 = ispe[spe]*(2*l+1)
-                i2 = ispe[spe]*(2*l+1)+2*l+1
-                for n in xrange(nmax[(spe,l)]):
-                    psi_vector[i:i+2*l+1] = Psi[(spe,l,n)][i1:i2] 
-                    i += 2*l+1
-            ispe[spe] += 1
-
-#        time_loop += time.time()-start1
-        
-        # collect gradient contributions
-        hessian += 2.0 * np.dot(psi_vector.T,np.dot(overl,psi_vector))
-   
-    hessian /= ntrain
-
+    Ap /= ntrain
     # add regularization term
-    hessian += 2.0 * inp.regul * np.eye(totsize) 
+    Ap += 2.0 * inp.regul * cg_dire
+#    print "time curvature:", time.time()-start
 
-#    print "time loop", time_loop
-    print "time hessian:", time.time()-start
+    return Ap
 
-    return hessian 
+print "loading matrices..."
+ovlp_list = [] 
+psi_list = [] 
+for iconf in trainrange:
+    print iconf
+    ovlp_list.append(np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy"))
+    psi_list.append(np.load(inp.path2ml+"psi-vectors/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy"))
 
-# initialize the weight-vector
-w0 = np.ones(totsize)*1e-04
+totsize = psi_list[0].shape[1]
+print "problem dimensionality:", totsize
 
-# minimize the loss function with precomputed gradient
-#res = minimize(loss_func,w0,method='BFGS',jac=grad_func,options={'gtol': 1e-05})
-res = minimize(loss_func,w0,method='Newton-CG',jac=grad_func,hess=hess_func)
+start = time.time()
+tol = inp.gradtol 
+w = np.ones(totsize)*1e-04
+r = - grad_func(w,ovlp_list,psi_list)
+print "computing preconditioning matrix..."
+P = precond_func(ovlp_list,psi_list)
+d = np.multiply(P,r)
+delnew = np.dot(r,d)
 
-print "number of minimization steps:", icount
+print "minimizing..."
+for i in xrange(2000):
+    Ad = curv_func(d,ovlp_list,psi_list)
+    curv = np.dot(d,Ad)
+    alpha = delnew/curv
+    w = w + alpha*d
+    r -= alpha * Ad 
+    print i+1, "gradient norm:", np.sqrt(np.sum((r**2)))
+    if np.sqrt(np.sum((r**2))) < tol:
+        break
+    else:
+        s = np.multiply(P,r)
+        delold = delnew.copy()
+        delnew = np.dot(r,s)
+        beta = delnew/delold
+        d = s + beta*d
 
-# get the optimal weights
-wopt = res.x
+np.save("weights_N"+str(ntrain)+".npy",w)
 
-# save
-np.save("weights_N"+str(ntrain)+".npy",wopt)
+print "minimization compleated succesfully!"
+print "minimization time:", (time.time()-start)/60, "minutes"
+
 
