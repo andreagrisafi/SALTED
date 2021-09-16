@@ -75,7 +75,6 @@ dataset = range(ndata)
 random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
-#trainrangetot = np.loadtxt("training_set1.txt",int)
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 natoms_train = natoms[trainrange]
@@ -107,7 +106,8 @@ for spe in spelist:
             for iconf in trainrange:
                 psi_nm = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy")
                 B[rc] += np.dot(psi_nm.T,psi_nm)
-        
+            B[rc] /= ntrain       
+ 
         for n in xrange(nmax[(spe,l)]): 
      
             rc = orcuts[iii]
@@ -120,7 +120,8 @@ for spe in spelist:
                 ortho_projs = np.load(inp.path2qm+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy")
                 
                 A += np.dot(psi_nm.T,ortho_projs)
-           
+            A /= ntrain          
+ 
             print ""
             print "spe:",spe,"L:",l,"n:",n
             print "------------------------"

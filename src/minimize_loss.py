@@ -7,7 +7,7 @@ from ase import io
 from ase.io import read
 import random
 from random import shuffle
-
+from scipy import sparse
 from scipy.optimize import minimize
 
 import basis
@@ -100,14 +100,16 @@ def grad_func(weights,ovlp_list,psi_list):
                     i += 2*l+1
 
         # rebuild predicted coefficients
-        pred_coefs = np.dot(psi_list[iconf],weights)
+        psi_vector = psi_list[iconf].toarray()
+        pred_coefs = np.dot(psi_vector,weights)
         pred_coefs += Av_coeffs
 
         # compute predicted density projections
-        pred_projs = np.dot(ovlp_list[iconf],pred_coefs)
+        ovlp = ovlp_list[iconf]
+        pred_projs = np.dot(ovlp,pred_coefs)
 
         # collect gradient contributions
-        gradient += 2.0 * np.dot(psi_list[iconf].T,pred_projs-ref_projs)
+        gradient += 2.0 * np.dot(psi_vector.T,pred_projs-ref_projs)
 
     gradient /= ntrain
 
@@ -123,15 +125,12 @@ def precond_func(ovlp_list,psi_list):
 
     global totsize
 
-    diag_hessian = np.zeros((totsize))
-    
     for iconf in xrange(ntrain):
         print iconf
-        ovlp_times_psi = np.dot(ovlp_list[iconf],psi_list[iconf])
-        for m in xrange(totsize):
-            psi_vector_m = psi_list[iconf][:,m]
-            diag_hessian[m] += 2.0 * np.dot(psi_vector_m,ovlp_times_psi[:,m])
-  
+        psi_vector = psi_list[iconf].toarray()
+        ovlp_times_psi = np.dot(ovlp_list[iconf],psi_vector)
+        diag_hessian = np.sum(np.multiply(ovlp_times_psi,psi_vector),axis=0)    
+ 
     diag_hessian /= ntrain
     diag_hessian += 2.0 * inp.regul * np.ones(totsize) 
 
@@ -147,8 +146,9 @@ def curv_func(cg_dire,ovlp_list,psi_list):
 
     for iconf in xrange(ntrain):
 #        print iconf
-        psi_x_dire = np.dot(psi_list[iconf],cg_dire)
-        Ap += 2.0 * np.dot(psi_list[iconf].T,np.dot(ovlp_list[iconf],psi_x_dire))
+        psi_vector = psi_list[iconf].toarray()
+        psi_x_dire = np.dot(psi_vector,cg_dire)
+        Ap += 2.0 * np.dot(psi_vector.T,np.dot(ovlp_list[iconf],psi_x_dire))
    
     Ap /= ntrain
     # add regularization term
@@ -163,7 +163,10 @@ psi_list = []
 for iconf in trainrange:
     print iconf
     ovlp_list.append(np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy"))
-    psi_list.append(np.load(inp.path2ml+"psi-vectors/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy"))
+    # load feature vector as a numpy array
+#    psi_list.append(np.load(inp.path2ml+"psi-vectors/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy"))
+    # load feature vector as a scipy sparse object
+    psi_list.append(sparse.load_npz(inp.path2ml+"psi-vectors/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz"))
 
 totsize = psi_list[0].shape[1]
 print "problem dimensionality:", totsize

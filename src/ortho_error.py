@@ -47,7 +47,7 @@ for i in range(len(xyzfile)):
 natmax = max(natoms)
 
 # load predicted coefficients for test structures
-trainrangetot = np.loadtxt("training_set1.txt",int)
+trainrangetot = np.loadtxt("training_set.txt",int)
 ntrain = int(inp.trainfrac*len(trainrangetot))
 testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 ntest = len(testrange)
@@ -112,7 +112,7 @@ for iconf in testrange:
     coeffs_ref -= averages
     var = np.dot(coeffs_ref,projs_ref)
     variance += var
-    #print iconf+1, ":", np.sqrt(Oerror/var)*100, "% RMSE"
+    print iconf+1, ":", np.sqrt(Oerror/var)*100, "% RMSE"
 #    print("time:",time.time()-start)
     itest+=1
 

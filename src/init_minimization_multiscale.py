@@ -7,8 +7,7 @@ from ase import io
 from ase.io import read
 import random
 from random import shuffle
-
-from scipy.optimize import minimize
+from scipy import sparse
 
 import basis
 
@@ -85,22 +84,22 @@ for spe in spelist:
 print "problem dimensionality:", totsize
 
 
-dirpath = os.path.join(inp.path2ml, "psi-vectors_multiscale")
+dirpath = os.path.join(inp.path2ml, "psi-vectors")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2ml+"psi-vectors_multiscale/", "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+dirpath = os.path.join(inp.path2ml+"psi-vectors/", "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
 for iconf in xrange(ndata):
 
-
     start = time.time()
     print iconf
+
     # load reference QM data
-    overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
-    Tsize = len(overl)
-   
+    coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    Tsize = len(coefs)
+
     # initialize RKHS feature vectors for each channel 
     Psi = {}
     for spe in spelist:
@@ -110,7 +109,6 @@ for iconf in xrange(ndata):
                 Psi[(spe,l,n)] = np.zeros((lsize,totsize)) 
 
     # load the RKHS feature vectors and compute predictions for each channel
-    C = {}
     ispe = {}
     isize = 0
     iii = 0
@@ -138,7 +136,18 @@ for iconf in xrange(ndata):
                 i += 2*l+1
         ispe[spe] += 1
 
-    np.save(inp.path2ml+"psi-vectors_multiscale/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_vector)
+    # save sparse feature-vector 
+    nrows = psi_vector.shape[0]
+    ncols = psi_vector.shape[1]
+    srows = np.nonzero(psi_vector)[0]
+    scols = np.nonzero(psi_vector)[1]
+    ssize = len(srows)
+    psi_nonzero = psi_vector[srows,scols] 
+    ij = np.vstack((srows,scols))
+    sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
+    sparse.save_npz(inp.path2ml+"psi-vectors/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz", sparse_psi)
+ 
+    #np.save(inp.path2ml+"psi-vectors/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_vector)
 
     print time.time()-start
 
