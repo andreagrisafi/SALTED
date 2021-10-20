@@ -25,7 +25,7 @@ llist = []
 nlist = []
 for spe in spelist:
     llist.append(lmax[spe])
-    for l in xrange(lmax[spe]+1):
+    for l in range(lmax[spe]+1):
         nlist.append(nmax[(spe,l)])
 llmax = max(llist)
 nnmax = max(nlist)
@@ -33,13 +33,15 @@ nnmax = max(nlist)
 # number of sparse environments
 M = inp.Menv
 eigcut = inp.eigcut
+reg = inp.regul
+
 kdir = inp.kerndir
 pdir = inp.preddir
 
 # system parameters
 atomic_symbols = []
 natoms = np.zeros(ndata,int)
-for i in xrange(ndata):
+for i in range(ndata):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     natoms[i] = int(len(atomic_symbols[i]))
 natmax = max(natoms)
@@ -47,6 +49,13 @@ natmax = max(natoms)
 av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
+
+dirpath = os.path.join(inp.path2qm, pdir)
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
 
 kdir = {}
 rcuts = [2.0,3.0,4.0,5.0,6.0]
@@ -58,9 +67,13 @@ orcuts = np.loadtxt("optimal_rcuts.dat")
 
 trainrangetot = np.loadtxt("training_set.txt",int)
 ntrain = int(inp.trainfrac*len(trainrangetot))
-testrange = np.setdiff1d(range(ndata),trainrangetot)
+testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
-weights = np.load("weights_N"+str(ntrain)+".npy")
+dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+
+weights = np.load("weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
 
 itest = 0
 error_density = 0
@@ -81,8 +94,8 @@ for iconf in testrange:
     iii = 0
     for spe in spelist:
         ispe[spe] = 0
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
                 rc = orcuts[iii]
                 psi_nm = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
                 Mcut = psi_nm.shape[1]
@@ -94,10 +107,10 @@ for iconf in testrange:
     pred_coefs = np.zeros(Tsize)
     Av_coeffs = np.zeros(Tsize)
     i = 0
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
                 pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1] 
                 if l==0:
                    Av_coeffs[i] = av_coefs[spe][n]
@@ -106,14 +119,14 @@ for iconf in testrange:
 
     # rebuild predictions
     pred_coefs += Av_coeffs
+    np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
     pred_projs = np.dot(overl,pred_coefs)
-    np.save(inp.path2qm+pdir+"prediction_conf"+str(iconf)+".npy",pred_projs)
     i = 0
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
-                for im in xrange(2*l+1):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                for im in range(2*l+1):
                     coeffs[itest,iat,l,n,im] = pred_coefs[i]
                     i += 1
     
@@ -124,10 +137,10 @@ for iconf in testrange:
     ref_coefs -= Av_coeffs
     var = np.dot(ref_coefs,ref_projs)
     variance += var
-    print iconf+1, ":", np.sqrt(error/var)*100, "% RMSE"
+    print(iconf+1, ":", np.sqrt(error/var)*100, "% RMSE")#,flush=True)
     itest+=1
 
-print ""
-print "% RMSE =", 100*np.sqrt(error_density/variance)
+print("")
+print("% RMSE =", 100*np.sqrt(error_density/variance))
 
-np.save("pred_coeffs.npy",coeffs)
+#np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/pred_coeffs.npy",coeffs)

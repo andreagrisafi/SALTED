@@ -33,6 +33,7 @@ ndata = len(xyzfile)
 
 # number of sparse environments
 M = inp.Menv
+eigcut = inp.eigcut
 
 pdir = inp.preddir
 
@@ -52,6 +53,10 @@ ntrain = int(inp.trainfrac*len(trainrangetot))
 testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
+
+dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
 
 ortho_coeffs = np.load(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/ortho-predictions_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy")
 
@@ -103,6 +108,7 @@ for iconf in testrange:
                         averages[icoeff] = av_coefs[atoms[iat]][n]
                     preds[itest,iat,l,n,im] = OCoef[icoeff]
                     icoeff +=1
+    np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(iconf)+".npy",OCoef)
     overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
     OProj = np.dot(overl,OCoef)
     #================================================
@@ -112,10 +118,10 @@ for iconf in testrange:
     coeffs_ref -= averages
     var = np.dot(coeffs_ref,projs_ref)
     variance += var
-    print iconf+1, ":", np.sqrt(Oerror/var)*100, "% RMSE"
+    print(iconf+1, ":", np.sqrt(Oerror/var)*100, "% RMSE",flush=True)
 #    print("time:",time.time()-start)
     itest+=1
 
 
 print("% RMSE =", 100*np.sqrt(Oerror_density/variance))
-np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/pred-coeffs_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy",preds)
+#np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/pred-coeffs_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy",preds)

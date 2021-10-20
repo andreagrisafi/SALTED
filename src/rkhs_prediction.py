@@ -25,7 +25,7 @@ llist = []
 nlist = []
 for spe in spelist:
     llist.append(lmax[spe])
-    for l in xrange(lmax[spe]+1):
+    for l in range(lmax[spe]+1):
         nlist.append(nmax[(spe,l)])
 llmax = max(llist)
 nnmax = max(nlist)
@@ -39,7 +39,7 @@ pdir = inp.preddir
 # system parameters
 atomic_symbols = []
 natoms = np.zeros(ndata,int)
-for i in xrange(ndata):
+for i in range(ndata):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     natoms[i] = int(len(atomic_symbols[i]))
 natmax = max(natoms)
@@ -50,7 +50,7 @@ for spe in spelist:
 
 trainrangetot = np.loadtxt("training_set.txt",int)
 ntrain = int(inp.trainfrac*len(trainrangetot))
-testrange = np.setdiff1d(range(ndata),trainrangetot)
+testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
 weights = np.load("weights_N"+str(ntrain)+".npy")
 
@@ -72,10 +72,10 @@ for iconf in testrange:
     isize = 0
     for spe in spelist:
         ispe[spe] = 0
-        for l in xrange(lmax[spe]+1):
+        for l in range(lmax[spe]+1):
             psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
             Mcut = psi_nm.shape[1]
-            for n in xrange(nmax[(spe,l)]):
+            for n in range(nmax[(spe,l)]):
                 C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
                 isize += Mcut
         
@@ -83,10 +83,10 @@ for iconf in testrange:
     pred_coefs = np.zeros(Tsize)
     Av_coeffs = np.zeros(Tsize)
     i = 0
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
                 pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1] 
                 if l==0:
                    Av_coeffs[i] = av_coefs[spe][n]
@@ -98,11 +98,11 @@ for iconf in testrange:
     pred_projs = np.dot(overl,pred_coefs)
     np.save(inp.path2qm+pdir+"prediction_conf"+str(iconf)+".npy",pred_projs)
     i = 0
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
-                for im in xrange(2*l+1):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                for im in range(2*l+1):
                     coeffs[itest,iat,l,n,im] = pred_coefs[i]
                     i += 1
     
@@ -113,10 +113,10 @@ for iconf in testrange:
     ref_coefs -= Av_coeffs
     var = np.dot(ref_coefs,ref_projs)
     variance += var
-    print iconf+1, ":", np.sqrt(error/var)*100, "% RMSE"
+    print(iconf+1, ":", np.sqrt(error/var)*100, "% RMSE")
     itest+=1
 
-print ""
-print "% RMSE =", 100*np.sqrt(error_density/variance)
+print("")
+print("% RMSE =", 100*np.sqrt(error_density/variance))
 
 np.save("pred_coeffs.npy",coeffs)

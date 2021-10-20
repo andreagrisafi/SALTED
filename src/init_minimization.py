@@ -7,8 +7,19 @@ from ase import io
 from ase.io import read
 import random
 from random import shuffle
+import argparse
 
-from scipy.optimize import minimize
+def add_command_line_arguments_contraction(parsetext):
+    parser = argparse.ArgumentParser(description=parsetext)
+    parser.add_argument("-j1", "--istart", type=int, default=0, help="starting index")
+    parser.add_argument("-j2", "--iend",   type=int, default=0, help="ending index")
+    args = parser.parse_args()
+    return args
+
+args = add_command_line_arguments_contraction("dataset subselection")
+# dataset slice boundaries 
+istart = args.istart-1
+iend = args.iend
 
 import basis
 
@@ -85,8 +96,8 @@ dirpath = os.path.join(inp.path2ml+"psi-vectors/", "M"+str(M)+"_eigcut"+str(int(
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
-for iconf in xrange(ndata):
-
+#for iconf in xrange(ndata):
+for iconf in xrange(istart,iend):
 
     start = time.time()
     print iconf

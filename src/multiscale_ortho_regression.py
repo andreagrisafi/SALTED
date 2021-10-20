@@ -63,7 +63,6 @@ for iconf in xrange(ndata):
         atom_idx[(iconf,spe)].append(iat)
 
 dirpath = os.path.join(inp.path2qm, pdir)
-#dirpath = os.path.join(inp.path2qm, "predictions")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
@@ -111,7 +110,6 @@ for spe in spelist:
         for n in xrange(nmax[(spe,l)]): 
      
             rc = orcuts[iii]
-            print rc
  
             # compute A vector
             A = np.zeros(Mcut[rc])
@@ -132,6 +130,7 @@ for spe in spelist:
             variance = 0
             itest = 0
             for iconf in testrange:
+            #for iconf in [352]:
 
                 # predict
                 psi_nm = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy")
@@ -144,7 +143,7 @@ for spe in spelist:
                 delta = ortho_projs-ortho_projs_ref
                 error_total += np.dot(delta,delta)
                 variance += np.dot(ortho_projs_ref,ortho_projs_ref)
-                #print iconf+1, ":", np.sqrt(error/var)*100, "% RMSE"
+                #print iconf+1, ":", np.sqrt(np.dot(delta,delta)/np.dot(ortho_projs_ref,ortho_projs_ref))*100, "% RMSE"
 
                 i = 0
                 for iat in atom_idx[(iconf,spe)]:
