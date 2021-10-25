@@ -1,11 +1,11 @@
 import os
 import sys
 import numpy as np
-from pyscf import gto
 from ase.io import read
 from scipy import special
 import argparse
 import time
+from itertools import islice
 
 def add_command_line_arguments(parsetext):
     parser = argparse.ArgumentParser(description=parsetext,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -20,7 +20,7 @@ def set_variable_values(args):
 args = add_command_line_arguments("")
 iconf = set_variable_values(args)
 
-print "conf", iconf
+print("conf", iconf)
 iconf -= 1 # 0-based indexing 
 
 import basis
@@ -44,7 +44,7 @@ llist = []
 nlist = []
 for spe in species:
     llist.append(lmax[spe])
-    for l in xrange(lmax[spe]+1):
+    for l in range(lmax[spe]+1):
         nlist.append(nmax[(spe,l)])
 llmax = max(llist)
 nnmax = max(nlist)
@@ -55,17 +55,28 @@ symbols = geom.get_chemical_symbols()
 coords = geom.get_positions()
 natoms = len(coords)
 
-# get CP2K information for accessing the LRI basis
+# get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT 
 lvals = {}
 atom_count = {}
 nbas = {}
 for spe in species:
-    f = open(spe+"-LRI-DZVP-MOLOPT-GTH-MEDIUM_info.txt","r")
-    lines = f.readlines()
-    f.close()
-    nbas[spe] = int(lines[0]) # basis set size
-    lvals[spe] = np.asarray(lines[2:],int) # list of angular momenta
+    nbas[spe] = 0
     atom_count[spe] = 0
+    lvals[spe] = []
+    with open("BASIS_LRIGPW_AUXMOLOPT") as f:
+         for line in f:
+             if line.rstrip().split()[0] == spe and line.rstrip().split()[-1] == "LRI-DZVP-MOLOPT-GTH-MEDIUM":
+                nalphas = int(list(islice(f, 1))[0])
+                lines = list(islice(f, 1+2*nalphas))
+                for ialpha in range(nalphas):
+                    lbools = np.array(lines[1+2*ialpha].split())[1:]
+                    l = 0
+                    for ibool in lbools: 
+                        lvals[spe].append(l)
+                        nbas[spe] += 2*l+1
+                        l += 1
+                break
+    print(spe+" LRI-basis set size:", nbas[spe])
 
 # compute total size of the coefficients vector and overlap matrix 
 total_size = 0
@@ -73,7 +84,7 @@ for iatom in range(natoms):
     spe = symbols[iatom]
     total_size += nbas[spe] 
 
-print "total size =", total_size
+print("total size =", total_size)
 
 start = time.time()
 
@@ -90,7 +101,7 @@ for iatom in range(natoms):
     c = np.loadtxt(inp.path2qm+"runs/conf_"+str(iconf+1)+"/coefficients/coefs_type"+str(ispe[spe1])+"_atom"+str(atom_count[spe1])+".dat")
     # single out the coefficients dimensions in a multi-dimensional array
     n_count = {}
-    for l in xrange(lmax[spe1]+1):
+    for l in range(lmax[spe1]+1):
         n_count[l] = 0
     i = 0
     coeffs = np.zeros((llmax+1,nnmax,2*llmax+1))
@@ -99,14 +110,14 @@ for iatom in range(natoms):
         n_count[l] += 1
         i += 2*l+1
     # fill coefficient vector
-    for l in xrange(lmax[spe1]+1):
-        for n in xrange(nmax[(spe1,l)]):
-            for im in xrange(2*l+1):
+    for l in range(lmax[spe1]+1):
+        for n in range(nmax[(spe1,l)]):
+            for im in range(2*l+1):
                 Coef[isgf] = coeffs[l,n,im]
                 isgf += 1
     iblock2 = 0
     # loop over 2nd atom
-    for jatom in xrange(natoms):
+    for jatom in range(natoms):
         spe2 = symbols[jatom]
         # load CP2K overlap atomic blocks if available
         transposed = False
@@ -129,12 +140,12 @@ for iatom in range(natoms):
         # single out the overlap dimensions in a multi-dimensional array
         overlap = np.zeros((llmax+1,llmax+1,nnmax,nnmax,2*llmax+1,2*llmax+1))
         n_count1 = {}
-        for l1 in xrange(lmax[spe1]+1):
+        for l1 in range(lmax[spe1]+1):
             n_count1[l1] = 0
         i1 = 0
         for l1 in lvals[spe1]:
             n_count2 = {}
-            for l2 in xrange(lmax[spe2]+1):
+            for l2 in range(lmax[spe2]+1):
                 n_count2[l2] = 0
             i2 = 0
             for l2 in lvals[spe2]:
@@ -145,25 +156,23 @@ for iatom in range(natoms):
             i1 += 2*l1+1
         # fill overlap matrix 
         isgf1 = iblock1 
-        for l1 in xrange(lmax[spe1]+1):
-            for n1 in xrange(nmax[(spe1,l1)]):
-                for im1 in xrange(2*l1+1):
+        for l1 in range(lmax[spe1]+1):
+            for n1 in range(nmax[(spe1,l1)]):
+                for im1 in range(2*l1+1):
                     isgf2 = iblock2
-                    for l2 in xrange(lmax[spe2]+1):
-                        for n2 in xrange(nmax[(spe2,l2)]):
-                            for im2 in xrange(2*l2+1):
+                    for l2 in range(lmax[spe2]+1):
+                        for n2 in range(nmax[(spe2,l2)]):
+                            for im2 in range(2*l2+1):
                                 Ovlp[isgf1,isgf2] = overlap[l1,l2,n1,n2,im1,im2]
                                 isgf2 += 1
                     isgf1 += 1
         iblock2 += nbas[spe2] 
     iblock1 += nbas[spe1] 
 
-print "overlap matrix succesfully filled up"
+print("overlap matrix succesfully filled up")
 
 # Compute density projections on auxiliary functions
 Proj = np.dot(Ovlp,Coef)
-
-print "projections computed"
 
 # Make data directories if not already existing
 dirpath = os.path.join(inp.path2qm, "coefficients")
@@ -176,11 +185,9 @@ dirpath = os.path.join(inp.path2qm, "overlaps")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
-print "saving projection vector and overlap matrix"
-
-# Save projections and overlaps
+# Save projections, coefficients and overlaps
 np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",Coef)
 np.save(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy",Proj)
 np.save(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy",Ovlp)
 
-print (time.time()-start)/60.0, "min"
+print((time.time()-start)/60.0, "min")
