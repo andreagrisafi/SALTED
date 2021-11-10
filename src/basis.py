@@ -133,21 +133,37 @@ def basiset(basis):
       nmax[("Si",1)] = 7
       nmax[("Si",2)] = 3
 
-   if basis=="CP2K-LRI-DZVP-MOLOPT-GTH-MEDIUM":
+   if basis=="LRI-DZVP-MOLOPT-GTH-MEDIUM":
       
       lmax["H"] = 3
       lmax["O"] = 4
+      lmax["Cu"] = 6
 
-      # hydrogen
+      # H
       nmax[("H",0)] = 10
       nmax[("H",1)] = 9 
       nmax[("H",2)] = 8 
       nmax[("H",3)] = 6
-      # oxygen
+      # O
       nmax[("O",0)] = 15
       nmax[("O",1)] = 13
       nmax[("O",2)] = 12
       nmax[("O",3)] = 11
       nmax[("O",4)] = 9
+      # Cu    
+      nmax[("Cu",0)] = 15 
+      nmax[("Cu",1)] = 13
+      nmax[("Cu",2)] = 12
+      nmax[("Cu",3)] = 11
+      nmax[("Cu",4)] = 10
+      nmax[("Cu",5)] = 9
+      nmax[("Cu",6)] = 8
+
+   if basis=="CP2K-LRI-SZV-MOLOPT-GTH-MEDIUM":
+
+      lmax["H"] = 0
+
+      # H
+      nmax[("H",0)] = 10  
 
    return [lmax,nmax]

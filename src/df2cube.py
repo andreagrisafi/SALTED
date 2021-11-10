@@ -67,7 +67,7 @@ rcuts = {}
 for spe in species:
     with open("BASIS_LRIGPW_AUXMOLOPT") as f:
          for line in f:
-             if line.rstrip().split()[0] == spe and line.rstrip().split()[-1] == "LRI-DZVP-MOLOPT-GTH-MEDIUM":
+             if line.rstrip().split()[0] == spe and line.rstrip().split()[-1] == inp.dfbasis:
                 nalphas = int(list(islice(f, 1))[0])
                 lines = list(islice(f, 1+2*nalphas))
                 nval = {}
@@ -79,94 +79,102 @@ for spe in species:
                     l = 0
                     for ibool in lbools:
                         alphas[(spe,l,nval[l])] = float(alpha)
-                        sigmas[(spe,l,nval[l])] = np.sqrt(0.5/alphas[(spe,l,nval[l])]) # bohr assumed here! 
-                        rcuts[(spe,l,nval[l])] = sigmas[(spe,l,nval[l])]*10.0 # bohr
+                        sigmas[(spe,l,nval[l])] = np.sqrt(0.5/alphas[(spe,l,nval[l])]) # bohr
+                        rcuts[spe] = sigmas[(spe,l,nval[l])]*6.0 # bohr
                         nval[l]+=1
                         l += 1
                 break
 
-def radial_GTO(rval,alphaval,lval):
-    """Evaluate radial part of Gaussian type orbitals"""
-    f = (rval**lval)*np.exp(-alphaval*(rval)**2)
-    return f
-
-# compute GTOs on a 1D radial mesh #TODO this can be done once and for all
+# compute GTOs on a 1D radial mesh 
 ngrid = 10000
 rvec = {}
 radial = {}
+interp_radial = {}
 for spe in species:
     for l in range(lmax[spe]+1):
         for n in range(nmax[(spe,l)]):
-            rvec[(spe,l,n)] = np.zeros(ngrid)
-            radial[(spe,l,n)] = np.zeros(ngrid)
-            dxx = rcuts[(spe,l,n)]/float(ngrid-1)
-            #inner = np.sqrt(np.pi)*math.factorial(2*l+2)/(2.0**(l+3)*math.factorial(l+1)*(2*alphas[(spe,l,n)])**(l+1.5))
+            rvec = np.zeros(ngrid)
+            radial = np.zeros(ngrid)
+            dxx = rcuts[spe]/float(ngrid-1)
             inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5)
             for ir in range(ngrid):
                 r = ir*dxx
-                rvec[(spe,l,n)][ir] = r
-                radial[(spe,l,n)][ir] = radial_GTO(r,alphas[(spe,l,n)],l)
-            radial[(spe,l,n)] /= np.sqrt(inner)
+                rvec[ir] = r
+                radial[ir] = r**l * np.exp(-alphas[(spe,l,n)]*r**2) 
+            radial /= np.sqrt(inner)
+            interp_radial[(spe,l,n)] = interp1d(rvec,radial)
 
 # define 3D grid
 nside = {}
-nside[0] = 50 
-nside[1] = 50
-nside[2] = 50
+nside[0] = 45
+nside[1] = 45
+nside[2] = 45
 npoints = 1
 for i in range(3):
     npoints *= nside[i]
 dx = cell[0,0] / nside[0]  # bohr 
 dy = cell[1,1] / nside[1]  # bohr 
 dz = cell[2,2] / nside[2]  # bohr 
-origin = np.array([0.0,0.0,0.0])#np.array([cell[0,0]/2.0,cell[1,1]/2.0,cell[2,2]/2.0]) # bohr
+#origin = np.array([cell[0,0]/2.0,cell[1,1]/2.0,cell[2,2]/2.0]) # bohr
+origin = np.zeros(3)
 grid_regular=np.transpose(np.asarray(np.meshgrid(dx*np.asarray(range(nside[0])),
                                                  dy*np.asarray(range(nside[1])),
                                                  dz*np.asarray(range(nside[2])) ) ),(2,1,3,0))
 grid_regular=grid_regular.reshape((npoints,3))
 
+spemax = max(rcuts,key=rcuts.get)
+dmax = rcuts[spemax]
+nreps = math.ceil(dmax/cell[0,0])
+if nreps < 1:
+    repmax = 1
+else:
+    repmax = math.ceil(dmax/cell[0,0])
+
 # compute 3D density
 rho_r = np.zeros(npoints)
-for ix in [-2,-1,0,1,2]:
-    for iy in [-2,-1,0,1,2]:
-        for iz in [-2,-1,0,1,2]:
-            itot=0 
+for ix in range(-repmax,repmax+1):
+    for iy in range(-repmax,repmax+1):
+        for iz in range(-repmax,repmax+1):
+            #print(ix,iy,iz,flush=True)
+            iaux=0 
             for iat in range(natoms):
+                spe = symbols[iat] 
                 coord = coords[iat] - origin
+                #coord[0] -= cell[0,0]*round(coord[0]/cell[0,0])
+                #coord[1] -= cell[1,1]*round(coord[1]/cell[1,1])
+                #coord[2] -= cell[2,2]*round(coord[2]/cell[2,2])
                 coord[0] += ix*cell[0,0] 
                 coord[1] += iy*cell[1,1] 
-                coord[2] += iz*cell[2,2] 
+                coord[2] += iz*cell[2,2]
                 dvec = grid_regular - coord
                 d2list = np.sum(dvec**2,axis=1)
-                spe = symbols[iat] 
+                indx = np.where(d2list<=rcuts[spe]**2)[0]
+                nidx = len(indx)
+                rr = dvec[indx] 
+                lr = np.sqrt(np.sum(rr**2,axis=1)) + 1e-10 
+                lth = np.arccos(rr[:,2]/lr)
+                lph = np.arctan2(rr[:,1],rr[:,0])
                 for l in range(lmax[spe]+1):
+                    # compute spherical harmonics on grid points
+                    ylm_real = np.zeros((2*l+1,nidx))
+                    lm = 0
+                    for m in range(-l,1):
+                        ylm = special.sph_harm(m,l,lph,lth)
+                        if m==0:
+                            ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
+                            lm += l+1
+                        else:
+                            ylm_real[lm,:] = -np.imag(ylm)
+                            ylm_real[lm-2*m,:] = np.real(ylm)
+                            lm += 1
+                    ylm_real *= np.sqrt(2.0)
                     for n in range(nmax[(spe,l)]):
-                        #grid per channel
-                        indx = np.where(d2list<=rcuts[(spe,l,n)]**2)[0]
-                        nidx = len(indx)
-                        rr = dvec[indx] 
                         #interpolate radial functions
-                        lr = np.sqrt(np.sum(rr**2,axis=1))
-                        interp_radial = interp1d(rvec[(spe,l,n)],radial[(spe,l,n)])
-                        radial_gto = interp_radial(lr)            
+                        radial_gto = interp_radial[(spe,l,n)](lr)            
                         #harmonics
-                        lth = np.arccos(rr[:,2]/lr)
-                        lph = np.arctan2(rr[:,1],rr[:,0])
-                        ylm_real = np.zeros((nidx,2*l+1))
-                        lm = 0
-                        for m in range(-l,1):
-                            ylm = special.sph_harm(m,l,lph,lth)
-                            if m==0:
-                                ylm_real[:,lm] = np.real(ylm)/np.sqrt(2.0)
-                                lm += l+1
-                            else:
-                                ylm_real[:,lm] = -np.imag(ylm)
-                                ylm_real[:,lm-2*m] = np.real(ylm)
-                                lm += 1
-                        ylm_real *= np.sqrt(2.0) 
-                        gto = np.einsum("a,ab->ab",radial_gto,ylm_real)
-                        rho_r[indx] += np.dot(gto,coefs[itot:itot+2*l+1])
-                        itot += 2*l+1 
+                        gto = np.einsum("ab,b->ab",ylm_real,radial_gto)
+                        rho_r[indx] += np.dot(coefs[iaux:iaux+2*l+1],gto)
+                        iaux += 2*l+1 
 
 print("number of electrons=",np.sum(rho_r)*dx*dy*dz)
 

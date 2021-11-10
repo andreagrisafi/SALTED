@@ -53,9 +53,7 @@ contra = {}
 for spe in species:
     with open("BASIS_MOLOPT") as f:
          for line in f:
-             if line.rstrip().split()[0] == spe and line.rstrip().split()[1] == "DZVP-MOLOPT-GTH":
-             #if line.rstrip().split()[0] == spe and line.rstrip().split()[1] == "SZV-MOLOPT-GTH":
-             #if line.rstrip().split()[0] == spe and line.rstrip().split()[1] == "MINIMAL":
+             if line.rstrip().split()[0] == spe and line.rstrip().split()[1] == inp.qmbasis:
                 line = list(islice(f, 2))[1]
                 laomax[spe] = int(line.split()[2])
                 nalphas[spe] = int(line.split()[3])
@@ -65,12 +63,11 @@ for spe in species:
                 lines = list(islice(f, nalphas[spe]))
                 alphas[spe] = np.zeros(nalphas[spe])
                 sigmas[spe] = np.zeros(nalphas[spe])
-                rcuts[spe] = np.zeros(nalphas[spe])
                 for ipgf in range(nalphas[spe]):
                     line = lines[ipgf].split()
                     alphas[spe][ipgf] = float(line[0])
                     sigmas[spe][ipgf] = np.sqrt(0.5/alphas[spe][ipgf]) # bohr
-                    rcuts[spe][ipgf] = sigmas[spe][ipgf]*10.0 # bohr
+                    rcuts[spe] = sigmas[spe][ipgf]*6.0 # bohr
                     icount = 0
                     for l in range(laomax[spe]+1):
                         for n in range(naomax[(spe,l)]):
@@ -97,8 +94,7 @@ for iao in range(naotot):
     blocks[math.floor(iao/4)].append(iao+1)
 
 dm = np.zeros((naotot,naotot))
-with open(inp.path2qm+"H2O-DM-1_0.Log") as f:
-#with open(inp.path2qm+"runs/conf_"+str(iconf+1)+"/water-DM-1_0_1.Log") as f:
+with open(inp.path2qm+inp.dmfile) as f:
      icount = 1
      for line in f:
          if icount > 3:
@@ -114,8 +110,9 @@ with open(inp.path2qm+"H2O-DM-1_0.Log") as f:
                                 iao += 1
          icount += 1
 
+print("Precomputing radial AOs on 1D mesh...")
 # compute interpolation function for contracted GTOs on a 1D radial mesh 
-ngrid = 50000
+ngrid = 10000
 interp_radial = {}
 for spe in species:
     for l in range(laomax[spe]+1):
@@ -133,7 +130,7 @@ for spe in species:
             # compute contracted radial functions
             rvec = np.zeros(ngrid)
             radial = np.zeros(ngrid)
-            dxx = rcuts[spe][-1]/float(ngrid-1)
+            dxx = rcuts[spe]/float(ngrid-1)
             for ir in range(ngrid):
                 r = ir*dxx
                 rvec[ir] = r
@@ -161,23 +158,20 @@ grid_regular=np.transpose(np.asarray(np.meshgrid(dx*np.asarray(range(nside[0])),
                                                  dz*np.asarray(range(nside[2])) ) ),(2,1,3,0))
 grid_regular=grid_regular.reshape((npoints,3))
 
+spemax = max(rcuts,key=rcuts.get)
+dmax = rcuts[spemax]
+nreps = math.ceil(dmax/cell[0,0])
+if nreps < 1:
+    repmax = 1
+else:
+    repmax = math.ceil(dmax/cell[0,0])
+
+print("Reconstructing electron density...")
 # precompute contracted atomic orbitals on grid 
 gtos = np.zeros((naotot,npoints))
-#for ix in [-5,-4,-3,-2,-1,0,1,2,3,4,5]:
-#    for iy in [-5,-4,-3,-2,-1,0,1,2,3,4,5]:
-#        for iz in [-5,-4,-3,-2,-1,0,1,2,3,4,5]:
-#for ix in [-4,-3,-2,-1,0,1,2,3,4]:
-#    for iy in [-4,-3,-2,-1,0,1,2,3,4]:
-#        for iz in [-4,-3,-2,-1,0,1,2,3,4]:
-#for ix in [-3,-2,-1,0,1,2,3]:
-#    for iy in [-3,-2,-1,0,1,2,3]:
-#        for iz in[-3,-2,-1,0,1,2,3]:
-for ix in [-1,0,1]:
-    for iy in [-1,0,1]:
-        for iz in[-1,0,1]:
-#for ix in [-1,0,1]:
-#    for iy in [-1,0,1]:
-#        for iz in [-1,0,1]:
+for ix in range(-repmax,repmax+1):
+    for iy in range(-repmax,repmax+1):
+        for iz in range(-repmax,repmax+1):
             iao = 0
             for iat in range(natoms):
                 spe = symbols[iat] 
@@ -188,13 +182,17 @@ for ix in [-1,0,1]:
                 coord[0] += ix*cell[0,0] 
                 coord[1] += iy*cell[1,1] 
                 coord[2] += iz*cell[2,2]
-                rr = grid_regular - coord
+                dvec = grid_regular - coord
+                d2list = np.sum(dvec**2,axis=1)
+                indx = np.where(d2list<rcuts[spe]**2)[0]
+                nidx = len(indx)
+                rr = dvec[indx]
                 lr = np.sqrt(np.sum(rr**2,axis=1)) + 1e-10 
                 lth = np.arccos(rr[:,2]/lr)
                 lph = np.arctan2(rr[:,1],rr[:,0])
                 for l in range(laomax[spe]+1):
                     # compute spherical harmonics on grid points
-                    ylm_real = np.zeros((2*l+1,npoints))
+                    ylm_real = np.zeros((2*l+1,nidx))
                     lm = 0
                     for m in range(-l,1):
                         ylm = special.sph_harm(m,l,lph,lth)
@@ -210,7 +208,7 @@ for ix in [-1,0,1]:
                         #interpolate radial functions on grid points
                         radial_gto = interp_radial[(spe,l,n)](lr)
                         #compute atomic orbitals
-                        gtos[iao:iao+2*l+1] += np.einsum("ab,b->ab",ylm_real,radial_gto)
+                        gtos[iao:iao+2*l+1,indx] += np.einsum("ab,b->ab",ylm_real,radial_gto)
                         iao += 2*l+1
 
 # compute density on grid
