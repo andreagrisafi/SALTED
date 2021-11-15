@@ -87,22 +87,50 @@ for spe in species:
 
 # compute GTOs on a 1D radial mesh 
 ngrid = 10000
-rvec = {}
-radial = {}
+ncut = {}
 interp_radial = {}
 for spe in species:
+    dxx = rcuts[spe]/float(ngrid-1)
+    rvec = np.zeros(ngrid)
     for l in range(lmax[spe]+1):
-        for n in range(nmax[(spe,l)]):
-            rvec = np.zeros(ngrid)
-            radial = np.zeros(ngrid)
-            dxx = rcuts[spe]/float(ngrid-1)
-            inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5)
-            for ir in range(ngrid):
-                r = ir*dxx
-                rvec[ir] = r
-                radial[ir] = r**l * np.exp(-alphas[(spe,l,n)]*r**2) 
-            radial /= np.sqrt(inner)
-            interp_radial[(spe,l,n)] = interp1d(rvec,radial)
+        overl = np.zeros((nmax[(spe,l)],nmax[(spe,l)]))
+        radial_start = np.zeros((nmax[(spe,l)],ngrid))
+        for n1 in range(nmax[(spe,l)]):
+            inner1 = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n1)]**2)**(l+1.5)
+            for irad in range(ngrid):
+                r = irad*dxx
+                rvec[irad] = r
+                radial_start[n1,irad] = r**l * np.exp(-alphas[(spe,l,n1)]*r**2)
+            radial_start[n1] /= np.sqrt(inner1)
+            for n2 in range(nmax[(spe,l)]):
+                inner2 = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n2)]**2)**(l+1.5)
+                overl[n1,n2] = 0.5 * special.gamma(l+1.5) / ( (alphas[(spe,l,n1)] + alphas[(spe,l,n2)])**(l+1.5) )
+                overl[n1,n2] /= np.sqrt(inner1*inner2)
+        # from the overlap metric, define a new space of radial functions as the most important eigenvectors
+        eigenvalues, unitary = np.linalg.eigh(overl)
+        eigenvalues = eigenvalues[eigenvalues>inp.cutradial]
+        ncut[(spe,l)] = len(eigenvalues)
+        projector = unitary[:,-ncut[(spe,l)]:]
+        radial = np.dot(projector.T,radial_start)
+        for n in range(ncut[(spe,l)]):
+            interp_radial[(spe,l,n)] = interp1d(rvec,radial[n])
+
+## compute GTOs on a 1D radial mesh 
+#ngrid = 10000
+#interp_radial = {}
+#for spe in species:
+#    for l in range(lmax[spe]+1):
+#        for n in range(nmax[(spe,l)]):
+#            rvec = np.zeros(ngrid)
+#            radial = np.zeros(ngrid)
+#            dxx = rcuts[spe]/float(ngrid-1)
+#            inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5)
+#            for ir in range(ngrid):
+#                r = ir*dxx
+#                rvec[ir] = r
+#                radial[ir] = r**l * np.exp(-alphas[(spe,l,n)]*r**2) 
+#            radial /= np.sqrt(inner)
+#            interp_radial[(spe,l,n)] = interp1d(rvec,radial)
 
 # define 3D grid
 nside = {}
@@ -135,7 +163,7 @@ rho_r = np.zeros(npoints)
 for ix in range(-repmax,repmax+1):
     for iy in range(-repmax,repmax+1):
         for iz in range(-repmax,repmax+1):
-            #print(ix,iy,iz,flush=True)
+            print(ix,iy,iz,flush=True)
             iaux=0 
             for iat in range(natoms):
                 spe = symbols[iat] 
@@ -168,7 +196,8 @@ for ix in range(-repmax,repmax+1):
                             ylm_real[lm-2*m,:] = np.real(ylm)
                             lm += 1
                     ylm_real *= np.sqrt(2.0)
-                    for n in range(nmax[(spe,l)]):
+                    for n in range(ncut[(spe,l)]):
+                    #for n in range(nmax[(spe,l)]):
                         #interpolate radial functions
                         radial_gto = interp_radial[(spe,l,n)](lr)            
                         #harmonics

@@ -6,7 +6,6 @@ from ase.io import read
 from scipy import special
 from itertools import islice
 from scipy.interpolate import interp1d
-from pyscf.pbc import gto
 import copy
 import argparse
 import ctypes
@@ -64,6 +63,17 @@ ndata = len(xyzfile)
 species = inp.species
 [lmax,nmax] = basis.basiset(inp.dfbasis)
 
+lebsize = {}
+for spe in species:
+    for l in range(lmax[spe]+1):
+        lebsize[(spe,l)] = 1202#LDNS[3+l**2]
+        print(spe,l,lebsize[(spe,l)])
+        #i = 0 
+        #for n in range(nmax[(spe,l)]):
+        #    lebsize[(spe,l,n)] = LDNS[3+i+l]
+        #    print(spe,l,n,lebsize[(spe,l,n)])
+        #    i+=1
+
 # init geometry
 geom = xyzfile[iconf]
 symbols = geom.get_chemical_symbols()
@@ -120,6 +130,7 @@ print("Reading auxiliary basis info...")
 alphas = {}
 sigmas = {}
 rcuts = {}
+grcuts = {}
 for spe in species:
     with open("BASIS_LRIGPW_AUXMOLOPT") as f:
          for line in f:
@@ -136,17 +147,23 @@ for spe in species:
                     for ibool in lbools:
                         alphas[(spe,l,nval[l])] = float(alpha)
                         sigmas[(spe,l,nval[l])] = np.sqrt(0.5/alphas[(spe,l,nval[l])]) # bohr
+                        grcuts[(spe,l,nval[l])] = sigmas[(spe,l,nval[l])]*(4.0+float(l))#6.0 # bohr
                         rcuts[spe] = sigmas[(spe,l,nval[l])]*6.0 # bohr
                         nval[l]+=1
                         l += 1
                 break
+
+
 # compute total number of auxiliary functions 
 ntot = 0
 for iat in range(natoms):
+    ntot_spe = 0
     spe = symbols[iat]
     for l in range(lmax[spe]+1):
         for n in range(nmax[(spe,l)]):
             ntot += 2*l+1
+            ntot_spe += 2*l+1
+    print(spe,ntot_spe)
 print("number of auxiliary functions =", ntot)
 
 print("Reading AOs density matrix...")
@@ -177,7 +194,7 @@ with open(inp.path2qm+inp.dmfile) as f:
 
 # compute interpolation function for contracted GTOs on a 1D radial mesh 
 print("Precomputing radial part of AOs on a 1D mesh...")
-ngrid = 10000
+ngrid = 100000
 interp_radial_aos = {}
 for spe in species:
     for l in range(laomax[spe]+1):
@@ -207,68 +224,149 @@ for spe in species:
             # return interpolation function on 1D mesh 
             interp_radial_aos[(spe,l,n)] = interp1d(rvec,radial)
 
+## define lowdin orthogonalization matrix for each angular momentum
+#lowdin = {}
+#for spe in species:
+#    for l in range(lmax[spe]+1):
+#        # compute inner product of contracted and normalized primitive GTOs
+#        overl = np.zeros((nmax[(spe,l)],nmax[(spe,l)])) 
+#        for n1 in range(nmax[(spe,l)]):
+#            inner1 = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n1)]**2)**(l+1.5) 
+#            for n2 in range(nmax[(spe,l)]):
+#                inner2 = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n2)]**2)**(l+1.5) 
+#                overl[n1,n2] = 0.5 * special.gamma(l+1.5) / ( (alphas[(spe,l,n1)] + alphas[(spe,l,n2)])**(l+1.5) )
+#                overl[n1,n2] /= np.sqrt(inner1*inner2)
+#        eigenvalues, unitary = np.linalg.eigh(overl)
+#        eigenvalues = eigenvalues[eigenvalues>1e-08]
+#        Mcut = len(eigenvalues)
+#        diagoverlap = np.diag(np.sqrt(1.0/eigenvalues))
+#        lowdin[(spe,l)] = np.real(np.dot(np.conj(unitary[:,-Mcut:]),np.dot(diagoverlap,unitary[:,-Mcut:].T)))
+
 print("Constructing atom-centered grids and precomputing auxiliary functions...")
+ncut = {}
 atomic_size = {}
 atomic_grid = {}
 atomic_weights = {}
 atomic_functions = {}
 for spe in species:
-    # lebedev grid and integration weights
-    lebsize = LDNS[lmax[spe]+5] 
-    lebedev_grid = ld(lebsize)
-    # init atomic grids
-    atomic_size[spe] = lebsize*inp.radsize
-    atomic_grid[spe] = np.zeros((atomic_size[spe],3),float)
-    atomic_weights[spe] = np.zeros(atomic_size[spe])
-    # Gauss-Legendre grid and integration weights
-    gauss_points,gauss_weights = gausslegendre.gauss_legendre.gaulegf(x1=0.0,x2=rcuts[spe],n=inp.radsize)
-    print(spe,"angular size =", lebsize, "radial size =", inp.radsize)   
-    # precompute auxiliary functions 
-    leb_grid = np.zeros((lebsize,3))
-    leb_weights = np.zeros(lebsize)
-    for ileb in range(lebsize):
-        leb_grid[ileb,:] = lebedev_grid[ileb][:3]
-        leb_weights[ileb] = lebedev_grid[ileb][3]
-    lth = np.arccos(leb_grid[:,2])
-    lph = np.arctan2(leb_grid[:,1],leb_grid[:,0])
-    ylm_real = {}
-    radial_aux = {}
     for l in range(lmax[spe]+1):
         # compute spherical harmonics on Lebedev
-        ylm_real[l] = np.zeros((2*l+1,lebsize))
+        lebedev_grid = ld(lebsize[(spe,l)])
+        leb_grid = np.zeros((lebsize[(spe,l)],3))
+        leb_weights = np.zeros(lebsize[(spe,l)])
+        for ileb in range(lebsize[(spe,l)]):
+            leb_grid[ileb,:] = lebedev_grid[ileb][:3]
+            leb_weights[ileb] = lebedev_grid[ileb][3]
+        lth = np.arccos(leb_grid[:,2])
+        lph = np.arctan2(leb_grid[:,1],leb_grid[:,0])
+        ylm_real = np.zeros((2*l+1,lebsize[(spe,l)]))
         lm = 0
         for m in range(-l,1):
             ylm = special.sph_harm(m,l,lph,lth)
             if m==0:
-                ylm_real[l][lm,:] = np.real(ylm)/np.sqrt(2.0)
+                ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
                 lm += l+1
             else:
-                ylm_real[l][lm,:] = -np.imag(ylm)
-                ylm_real[l][lm-2*m,:] = np.real(ylm)
+                ylm_real[lm,:] = -np.imag(ylm)
+                ylm_real[lm-2*m,:] = np.real(ylm)
                 lm += 1
-        ylm_real[l] *= np.sqrt(2.0)
-        for n in range(nmax[(spe,l)]):
-            # init atomic functions
-            atomic_functions[(spe,l,n)] = np.zeros((2*l+1,atomic_size[spe]))
-            # compute radial functions on Gauss-Legendre
-            radial_aux[(l,n)] = np.zeros(inp.radsize)
-            inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5) 
+        ylm_real *= np.sqrt(2.0)
+        # define Gauss-Legendre grid for radial integration
+        gauss_points,gauss_weights = gausslegendre.gauss_legendre.gaulegf(x1=0.0,x2=grcuts[(spe,l,nmax[(spe,l)]-1)],n=inp.radsize)
+        # compute inner product of contracted and normalized primitive GTOs
+        radial_start = np.zeros((nmax[(spe,l)],inp.radsize))
+        overl = np.zeros((nmax[(spe,l)],nmax[(spe,l)]))
+        for n1 in range(nmax[(spe,l)]):
+            inner1 = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n1)]**2)**(l+1.5)
             for irad in range(inp.radsize):
                 r = gauss_points[irad]
-                radial_aux[(l,n)][irad] = r**l * np.exp(-alphas[(spe,l,n)]*r**2) 
-            radial_aux[(l,n)] /= np.sqrt(inner)
-            np.savetxt("radials/aux_"+spe+"_l"+str(l)+"_n"+str(n)+".dat",np.vstack((gauss_points,radial_aux[(l,n)])))
-    # Construct atom centered grid
-    igrid = 0
-    for ileb in range(lebsize):
-        for irad in range(inp.radsize):
-            r = gauss_points[irad]
-            atomic_grid[spe][igrid] = r * leb_grid[ileb] 
-            atomic_weights[spe][igrid] = 4.0*np.pi * leb_weights[ileb] * r**2 * gauss_weights[irad]
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    atomic_functions[(spe,l,n)][:,igrid] = ylm_real[l][:,ileb] * radial_aux[(l,n)][irad]
-            igrid += 1
+                radial_start[n1][irad] = r**l * np.exp(-alphas[(spe,l,n1)]*r**2)
+            radial_start[n1] /= np.sqrt(inner1)
+            np.savetxt("radials/aux_"+spe+"_l"+str(l)+"_n"+str(n1)+".dat",np.vstack((gauss_points,radial_start[n1])))
+            for n2 in range(nmax[(spe,l)]):
+                inner2 = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n2)]**2)**(l+1.5)
+                overl[n1,n2] = 0.5 * special.gamma(l+1.5) / ( (alphas[(spe,l,n1)] + alphas[(spe,l,n2)])**(l+1.5) )
+                overl[n1,n2] /= np.sqrt(inner1*inner2)
+        # from the overlap metric, define a new space of radial functions as the most important eigenvectors
+        eigenvalues, unitary = np.linalg.eigh(overl)
+        eigenvalues = eigenvalues[eigenvalues>inp.cutradial]
+        ncut[(spe,l)] = len(eigenvalues)
+        projector = unitary[:,-ncut[(spe,l)]:] 
+        radial_aux = np.dot(projector.T,radial_start)       
+        for n in range(ncut[(spe,l)]):
+            np.savetxt("radials/projaux_"+spe+"_l"+str(l)+"_n"+str(n)+".dat",np.vstack((gauss_points,radial_aux[n])))
+            # precompute functions on atomic grid
+            atomic_size[(spe,l,n)] = lebsize[(spe,l)]*inp.radsize
+            atomic_functions[(spe,l,n)] = np.zeros((2*l+1,atomic_size[(spe,l,n)]))
+            atomic_grid[(spe,l,n)] = np.zeros((atomic_size[(spe,l,n)],3),float)
+            atomic_weights[(spe,l,n)] = np.zeros(atomic_size[(spe,l,n)])
+            igrid = 0
+            for ileb in range(lebsize[(spe,l)]):
+                for irad in range(inp.radsize):
+                    r = gauss_points[irad]
+                    atomic_grid[(spe,l,n)][igrid] = r * leb_grid[ileb]
+                    atomic_weights[(spe,l,n)][igrid] = 4.0*np.pi * leb_weights[ileb] * r**2 * gauss_weights[irad]
+                    atomic_functions[(spe,l,n)][:,igrid] = ylm_real[:,ileb] * radial_aux[n][irad]
+                    igrid += 1
+        #for n in range(nmax[(spe,l)]):
+        #    # lebedev grid and integration weights
+        #    lebedev_grid = ld(lebsize[(spe,l,n)])
+        #    leb_grid = np.zeros((lebsize[(spe,l,n)],3))
+        #    leb_weights = np.zeros(lebsize[(spe,l,n)])
+        #    for ileb in range(lebsize[(spe,l,n)]):
+        #        leb_grid[ileb,:] = lebedev_grid[ileb][:3]
+        #        leb_weights[ileb] = lebedev_grid[ileb][3]
+        #    # compute spherical harmonics on Lebedev
+        #    lth = np.arccos(leb_grid[:,2])
+        #    lph = np.arctan2(leb_grid[:,1],leb_grid[:,0])
+        #    ylm_real = np.zeros((2*l+1,lebsize[(spe,l,n)]))
+        #    lm = 0
+        #    for m in range(-l,1):
+        #        ylm = special.sph_harm(m,l,lph,lth)
+        #        if m==0:
+        #            ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
+        #            lm += l+1
+        #        else:
+        #            ylm_real[lm,:] = -np.imag(ylm)
+        #            ylm_real[lm-2*m,:] = np.real(ylm)
+        #            lm += 1
+        #    ylm_real *= np.sqrt(2.0)
+        #    # Gauss-Legendre grid and integration weights
+        #    gauss_points,gauss_weights = gausslegendre.gauss_legendre.gaulegf(x1=0.0,x2=grcuts[(spe,l,n)],n=inp.radsize)
+        #    # compute radial functions on Gauss-Legendre
+        #    radial_aux = np.zeros(inp.radsize)
+        #    inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5) 
+        #    for irad in range(inp.radsize):
+        #        r = gauss_points[irad]
+        #        radial_aux[irad] = r**l * np.exp(-alphas[(spe,l,n)]*r**2) 
+        #    radial_aux /= np.sqrt(inner)
+        #    np.savetxt("radials/aux_"+spe+"_l"+str(l)+"_n"+str(n)+".dat",np.vstack((gauss_points,radial_aux)))
+        #    # Construct atom centered grid
+        #    atomic_size[(spe,l,n)] = lebsize[(spe,l,n)]*inp.radsize
+        #    atomic_size[(spe,l,n)] = lebsize[(spe,l)]*inp.radsize
+        #    atomic_functions[(spe,l,n)] = np.zeros((2*l+1,atomic_size[(spe,l,n)]))
+        #    atomic_grid[(spe,l,n)] = np.zeros((atomic_size[(spe,l,n)],3),float)
+        #    atomic_weights[(spe,l,n)] = np.zeros(atomic_size[(spe,l,n)])
+        #    igrid = 0
+        #    for ileb in range(lebsize[(spe,l,n)]):
+        #        for irad in range(inp.radsize):
+        #            r = gauss_points[irad]
+        #            atomic_grid[(spe,l,n)][igrid] = r * leb_grid[ileb] 
+        #            atomic_weights[(spe,l,n)][igrid] = 4.0*np.pi * leb_weights[ileb] * r**2 * gauss_weights[irad]
+        #            atomic_functions[(spe,l,n)][:,igrid] = ylm_real[:,ileb] * radial_aux[irad]
+        #            igrid += 1
+
+# compute total number of contracted auxiliary functions 
+ntot = 0
+for iat in range(natoms):
+    ntot_spe = 0
+    spe = symbols[iat]
+    for l in range(lmax[spe]+1):
+        for n in range(ncut[(spe,l)]):
+            ntot += 2*l+1
+            ntot_spe += 2*l+1
+    print(spe,ntot_spe)
+print("contracted number of auxiliary functions =", ntot)
 
 # define number of cell repetitions to be considered
 spemax = max(aorcuts,key=aorcuts.get)
@@ -281,77 +379,92 @@ for spe in species:
     else:
         repmax[spe] = nreps 
 
+print("cell repetitions:", repmax)
+
 print("Computing auxiliary density projections...")
-iaux = 0
 aux_projs = np.zeros(ntot)  
 # for each atom used as center of the atomic grids
+iaux = 0
 for icen in range(natoms):
     specen = symbols[icen]
-    # move grid on the atomic center 
-    agrid = atomic_grid[specen] + coords[icen]
-    # initialize atomic orbitals on the atom-centered grid 
-    aos = np.zeros((naotot,atomic_size[specen]))
-    # loop over periodic images
-    for ix in range(-repmax[specen],repmax[specen]+1):
-        for iy in range(-repmax[specen],repmax[specen]+1):
-            for iz in range(-repmax[specen],repmax[specen]+1):
-                # collect contributions from each atom of the selected periodic image
-                iao = 0
-                for iat in range(natoms):
-                    spe = symbols[iat] 
-                    coord = coords[iat].copy() 
-                    #coord[0] -= cell[0,0]*round(coord[0]/cell[0,0])
-                    #coord[1] -= cell[1,1]*round(coord[1]/cell[1,1])
-                    #coord[2] -= cell[2,2]*round(coord[2]/cell[2,2])
-                    coord[0] += ix*cell[0,0] 
-                    coord[1] += iy*cell[1,1] 
-                    coord[2] += iz*cell[2,2]
-                    dvec = agrid - coord
-                    d2list = np.sum(dvec**2,axis=1) 
-                    indx = np.where(d2list<aorcuts[spe]**2)[0]
-                    nidx = len(indx)
-                    if nidx==0:
-                       for l in range(laomax[spe]+1):
-                           for n in range(naomax[(spe,l)]):
-                               iao += 2*l+1
-                       continue 
-                    rr = dvec[indx]
-                    lr = np.sqrt(np.sum(rr**2,axis=1))
-                    lth = np.arccos(rr[:,2]/lr)
-                    lph = np.arctan2(rr[:,1],rr[:,0]) 
-                    for l in range(laomax[spe]+1):
-                        # compute spherical harmonics on grid points
-                        ylm_real = np.zeros((2*l+1,nidx))
-                        lm = 0
-                        for m in range(-l,1):
-                            ylm = special.sph_harm(m,l,lph,lth)
-                            if m==0:
-                                ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
-                                lm += l+1
-                            else:
-                                ylm_real[lm,:] = -np.imag(ylm)
-                                ylm_real[lm-2*m,:] = np.real(ylm)
-                                lm += 1
-                        ylm_real *= np.sqrt(2.0) 
-                        for n in range(naomax[(spe,l)]):
-                            #interpolate radial functions on grid points
-                            radial_ao = interp_radial_aos[(spe,l,n)](lr)
-                            #compute atomic orbitals
-                            aos[iao:iao+2*l+1,indx] += np.einsum("ab,b->ab",ylm_real,radial_ao)
-                            iao += 2*l+1
-    # compute electron density on the given atomic grid
-    rho_r = np.zeros(atomic_size[specen])
-    for iao1 in range(naotot):
-        for iao2 in range(naotot):
-            rho_r += np.multiply(aos[iao1],aos[iao2]) * dm[iao1,iao2]
-    # multiply density by the integration weights
-    rho_r *= atomic_weights[specen]
-    # project electron density on the auxiliary functions
-    for l in range(lmax[specen]+1):
-        for n in range(nmax[(specen,l)]):
+    for laux in range(lmax[specen]+1):
+        for naux in range(ncut[(specen,laux)]):
+        #for naux in range(nmax[(specen,laux)]):
+            print(icen,laux,naux)
+            # move grid on the atomic center 
+            agrid = atomic_grid[(specen,laux,naux)] + coords[icen]
+            # initialize atomic orbitals on the atom-centered grid 
+            aos = np.zeros((naotot,atomic_size[(specen,laux,naux)]))
+            # loop over periodic images
+            for ix in range(-repmax[specen],repmax[specen]+1):
+                for iy in range(-repmax[specen],repmax[specen]+1):
+                    for iz in range(-repmax[specen],repmax[specen]+1):
+                        # collect contributions from each atom of the selected periodic image
+                        iao = 0
+                        for iat in range(natoms):
+                            spe = symbols[iat] 
+                            coord = coords[iat].copy() 
+                            #coord[0] -= cell[0,0]*round(coord[0]/cell[0,0])
+                            #coord[1] -= cell[1,1]*round(coord[1]/cell[1,1])
+                            #coord[2] -= cell[2,2]*round(coord[2]/cell[2,2])
+                            coord[0] += ix*cell[0,0] 
+                            coord[1] += iy*cell[1,1] 
+                            coord[2] += iz*cell[2,2]
+                            dvec = agrid - coord
+                            d2list = np.sum(dvec**2,axis=1) 
+                            indx = np.where(d2list<aorcuts[spe]**2)[0]
+                            nidx = len(indx)
+                            if nidx==0:
+                               for l in range(laomax[spe]+1):
+                                   for n in range(naomax[(spe,l)]):
+                                       iao += 2*l+1
+                               continue 
+                            rr = dvec[indx]
+                            lr = np.sqrt(np.sum(rr**2,axis=1))
+                            lth = np.arccos(rr[:,2]/lr)
+                            lph = np.arctan2(rr[:,1],rr[:,0]) 
+                            for l in range(laomax[spe]+1):
+                                # compute spherical harmonics on grid points
+                                ylm_real = np.zeros((2*l+1,nidx))
+                                lm = 0
+                                for m in range(-l,1):
+                                    ylm = special.sph_harm(m,l,lph,lth)
+                                    if m==0:
+                                        ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
+                                        lm += l+1
+                                    else:
+                                        ylm_real[lm,:] = -np.imag(ylm)
+                                        ylm_real[lm-2*m,:] = np.real(ylm)
+                                        lm += 1
+                                ylm_real *= np.sqrt(2.0) 
+                                for n in range(naomax[(spe,l)]):
+                                    #interpolate radial functions on grid points
+                                    radial_ao = interp_radial_aos[(spe,l,n)](lr)
+                                    #compute atomic orbitals
+                                    aos[iao:iao+2*l+1,indx] += np.einsum("ab,b->ab",ylm_real,radial_ao)
+                                    iao += 2*l+1
+            # compute electron density on the given atomic grid
+            rho_r = np.zeros(atomic_size[(specen,laux,naux)])
+            for iao1 in range(naotot):
+                for iao2 in range(naotot):
+                    rho_r += np.multiply(aos[iao1],aos[iao2]) * dm[iao1,iao2]
+            # multiply density by the integration weights
+            rho_r *= atomic_weights[(specen,laux,naux)]
             # perform integration and store auxiliary projection
-            aux_projs[iaux:iaux+2*l+1] = np.dot(atomic_functions[(specen,l,n)],rho_r) 
-            iaux += 2*l+1
+            aux_projs[iaux:iaux+2*laux+1] = np.dot(atomic_functions[(specen,laux,naux)],rho_r) 
+            iaux += 2*laux+1
+
+##orthogonalize radial projections for each atom and angular momentum
+#iaux = 0
+#for icen in range(natoms):
+#    specen = symbols[icen]
+#    for laux in range(lmax[specen]+1):
+#        blocksize = nmax[(specen,laux)]*(2*laux+1)
+#        # select relevant slice and reshape
+#        aux_slice = aux_projs[iaux:iaux+blocksize].reshape(nmax[(specen,laux)],2*laux+1)
+#        # orthogonalize and reshape back
+#        aux_projs[iaux:iaux+blocksize] = np.dot(lowdin[specen,laux],aux_slice).reshape(blocksize)    
+#        iaux += blocksize
 
 # save auxiliary projections
 dirpath = os.path.join(inp.path2qm, "projections")
@@ -359,148 +472,14 @@ if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 np.save(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy",aux_projs)
 
-print("Computing auxiliary overlap from PySCF functions...")
-# define atom object for pyscf
-atoms = []
-for iat in range(natoms):
-    coord = coords[iat] * bohr2angs
-    atoms.append([symbols[iat],(coord[0],coord[1],coord[2])])
+# load auxiliary overlap matrix
+over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
+# density-fitted coefficients
+coefs = np.linalg.solve(over,aux_projs)
 
-cp2kbasis = {'O': gto.basis.parse("""
-O  LRI-DZVP-MOLOPT-GTH-MEDIUM
-   15
- 2   0   0   1  1
-   24.031909411024   1.0
- 2   0   0   1  1
-   16.167926705922   1.0
- 2   0   1   1  1  1
-   10.877281929506   1.0   1.0
- 2   0   2   1  1  1  1
-    7.317899463920   1.0   1.0   1.0
- 2   0   3   1  1  1  1  1
-    4.923256831173   1.0   1.0   1.0   1.0
- 2   0   3   1  1  1  1  1
-    3.312215198528   1.0   1.0   1.0   1.0
- 2   0   4   1  1  1  1  1  1
-    2.228356126354   1.0   1.0   1.0   1.0   1.0
- 2   0   4   1  1  1  1  1  1
-    1.499169204968   1.0   1.0   1.0   1.0   1.0
- 2   0   4   1  1  1  1  1  1
-    1.008594756710   1.0   1.0   1.0   1.0   1.0
- 2   0   4   1  1  1  1  1  1
-    0.678551413605   1.0   1.0   1.0   1.0   1.0
- 2   0   4   1  1  1  1  1  1
-    0.456508441910   1.0   1.0   1.0   1.0   1.0
- 2   0   4   1  1  1  1  1  1
-    0.307124785767   1.0   1.0   1.0   1.0   1.0
- 2   0   4   1  1  1  1  1  1
-    0.206624073890   1.0   1.0   1.0   1.0   1.0
- 2   0   4   1  1  1  1  1  1
-    0.139010297734   1.0   1.0   1.0   1.0   1.0
- 2   0   4   1  1  1  1  1  1
-    0.093521836600   1.0   1.0   1.0   1.0   1.0
-"""), 'H': gto.basis.parse("""
-H  LRI-DZVP-MOLOPT-GTH-MEDIUM
-   10
- 2   0   0   1  1
-   22.956000679816   1.0
- 2   0   1   1  1  1
-   11.437045132575   1.0   1.0
- 2   0   2   1  1  1  1
-    5.698118029748   1.0   1.0   1.0
- 2   0   2   1  1  1  1
-    2.838893149810   1.0   1.0   1.0
- 2   0   3   1  1  1  1  1
-    1.414381779030   1.0   1.0   1.0  1.0
- 2   0   3   1  1  1  1  1
-    0.704667527549   1.0   1.0   1.0  1.0
- 2   0   3   1  1  1  1  1
-    0.351076584656   1.0   1.0   1.0  1.0
- 2   0   3   1  1  1  1  1
-    0.174911945670   1.0   1.0   1.0  1.0
- 2   0   3   1  1  1  1  1
-    0.087143916955   1.0   1.0   1.0  1.0
- 2   0   3   1  1  1  1  1
-    0.043416487268   1.0   1.0   1.0  1.0
-""")}
-
-mol = gto.M(atom=atoms,basis=cp2kbasis)
-
-# overlap of central cell 
-overlap = mol.intor('int1e_ovlp_sph')
-
-spemax = max(rcuts,key=rcuts.get)
-dmax = 2*rcuts[spemax]
-nreps = math.ceil(dmax/cell[0,0])
-if nreps < 1:
-    repmax = 1
-else:
-    repmax = math.ceil(dmax/cell[0,0])
-# append atom objects for periodic images
-for ix in range(-repmax,repmax+1):
-    for iy in range(-repmax,repmax+1):
-        for iz in range(-repmax,repmax+1):
-            if ix==0 and iy==0 and iz==0:
-                continue
-            else:
-                patoms = []
-                for iat in range(natoms):
-                    coord = coords[iat] * bohr2angs
-                    patoms.append([symbols[iat],(coord[0],coord[1],coord[2])])               
-                for iat in range(natoms):
-                    coord = coords[iat] * bohr2angs
-                    coord[0] += ix*cell[0,0] * bohr2angs 
-                    coord[1] += iy*cell[1,1] * bohr2angs
-                    coord[2] += iz*cell[2,2] * bohr2angs
-                    patoms.append([symbols[iat],(coord[0],coord[1],coord[2])])               
-                pmol = gto.M(atom=patoms,basis=cp2kbasis)
-                poverlap = pmol.intor('int1e_ovlp_sph')
-                overlap += poverlap[:ntot,ntot:]
-
-# reorder P-entries in overlap matrix
-over = np.zeros((ntot,ntot))
-i1 = 0
-for iat in range(natoms):
-    spe1 = symbols[iat]
-    for l1 in range(lmax[spe1]+1):
-        for n1 in range(nmax[(spe1,l1)]):
-            for im1 in range(2*l1+1):
-                i2 = 0
-                for jat in range(natoms):
-                    spe2 = symbols[jat]
-                    for l2 in range(lmax[spe2]+1):
-                        for n2 in range(nmax[(spe2,l2)]):
-                            for im2 in range(2*l2+1):
-                                if l1==1 and im1!=2 and l2!=1:
-                                    over[i1,i2] = overlap[i1+1,i2]
-                                elif l1==1 and im1==2 and l2!=1:
-                                    over[i1,i2] = overlap[i1-2,i2]
-                                elif l2==1 and im2!=2 and l1!=1:
-                                    over[i1,i2] = overlap[i1,i2+1]
-                                elif l2==1 and im2==2 and l1!=1:
-                                    over[i1,i2] = overlap[i1,i2-2]
-                                elif l1==1 and im1!=2 and l2==1 and im2!=2:
-                                    over[i1,i2] = overlap[i1+1,i2+1]
-                                elif l1==1 and im1!=2 and l2==1 and im2==2:
-                                    over[i1,i2] = overlap[i1+1,i2-2]
-                                elif l1==1 and im1==2 and l2==1 and im2!=2:
-                                    over[i1,i2] = overlap[i1-2,i2+1]
-                                elif l1==1 and im1==2 and l2==1 and im2==2:
-                                    over[i1,i2] = overlap[i1-2,i2-2]
-                                else:
-                                    over[i1,i2] = overlap[i1,i2]
-                                i2 += 1
-                i1 += 1
-
-# save overlap matrix
-dirpath = os.path.join(inp.path2qm, "overlaps")
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-np.save(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy",over)
-
-# compute density-fitted coefficients and save them to file
-coef = np.linalg.solve(over,aux_projs)
+#print(coefs)
+# save
 dirpath = os.path.join(inp.path2qm, "coefficients")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",coef)
+np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",coefs)
