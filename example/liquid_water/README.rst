@@ -5,7 +5,7 @@ Compute global feature vector and save as sparse object
 :code:`python ../../src/feature_vector.py`
 
 Minimize loss function and print out regression weights
-:code:`srun -n $ntasks python ../../minimize_loss-parallel.py` 
+:code:`srun -n $ntasks python ../../src/minimize_loss-parallel.py` 
 
 Validate model predicting on the remaining structures
-:code:`python ../../validation.py` 
+:code:`python ../../src/validation.py` 
