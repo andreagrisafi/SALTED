@@ -19,8 +19,7 @@ def set_variable_values(args):
 args = add_command_line_arguments("")
 iconf = set_variable_values(args)
 
-print ""
-print "conf", iconf
+print("conf", iconf)
 iconf -= 1 # 0-based indexing 
 
 import basis
@@ -34,11 +33,11 @@ ndata = len(xyzfile)
 # read basis
 [lmax,nmax] = basis.basiset(inp.dfbasis)
 
-print "PySCF orders all angular momentum components for L>1 as -L,...,0,...,+L," 
-print "and as +1,-1,0 for L=1, corresponding to X,Y,Z in Cartesian-SPH."
-print "Make sure to provide the density matrix following this convention!"
-print "---------------------------------------------------------------------------------"
-print "Reading geometry and basis sets..."
+print("PySCF orders all angular momentum components for L>1 as -L,...,0,...,+L,") 
+print("and as +1,-1,0 for L=1, corresponding to X,Y,Z in Cartesian-SPH.")
+print("Make sure to provide the density matrix following this convention!")
+print("---------------------------------------------------------------------------------")
+print("Reading geometry and basis sets...")
 
 
 # Initialize geometry
@@ -57,12 +56,12 @@ ribasis = inp.qmbasis+" jkfit"
 auxmol = gto.M(atom=atoms,basis=ribasis)
 pmol = mol + auxmol
 
-print "Computing overlap matrix..."
+print("Computing overlap matrix...")
 
 # Get and save overlap matrix
 overlap = auxmol.intor('int1e_ovlp_sph')
 
-print "Computing density-fitted coefficients..."
+print("Computing density-fitted coefficients...")
 
 # Number of atomic orbitals
 nao = mol.nao_nr()
@@ -79,17 +78,17 @@ dm=np.load(inp.path2qm+"density_matrices/dm_conf"+str(iconf+1)+".npy")
 rho = np.einsum('ijp,ij->p', eri3c, dm)
 rho = np.linalg.solve(eri2c, rho)
 
-print "Reordering..."
+print("Reordering...")
 
 # Reorder L=1 components following the -1,0,+1 convention
 Coef = np.zeros(len(rho),float)
 Over = np.zeros((len(rho),len(rho)),float)
 i1 = 0
-for iat in xrange(natoms):
+for iat in range(natoms):
     spe1 = symb[iat]
-    for l1 in xrange(lmax[spe1]+1):
-        for n1 in xrange(nmax[(spe1,l1)]):
-            for im1 in xrange(2*l1+1):
+    for l1 in range(lmax[spe1]+1):
+        for n1 in range(nmax[(spe1,l1)]):
+            for im1 in range(2*l1+1):
                 if l1==1 and im1!=2:
                     Coef[i1] = rho[i1+1]
                 elif l1==1 and im1==2:
@@ -97,11 +96,11 @@ for iat in xrange(natoms):
                 else:
                     Coef[i1] = rho[i1]
                 i2 = 0
-                for jat in xrange(natoms):
+                for jat in range(natoms):
                     spe2 = symb[jat]
-                    for l2 in xrange(lmax[spe2]+1):
-                        for n2 in xrange(nmax[(spe2,l2)]):
-                            for im2 in xrange(2*l2+1):
+                    for l2 in range(lmax[spe2]+1):
+                        for n2 in range(nmax[(spe2,l2)]):
+                            for im2 in range(2*l2+1):
                                 if l1==1 and im1!=2 and l2!=1:
                                     Over[i1,i2] = overlap[i1+1,i2]
                                 elif l1==1 and im1==2 and l2!=1:

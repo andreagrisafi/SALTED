@@ -21,7 +21,7 @@ def set_variable_values(args):
 args = add_command_line_arguments("")
 iconf = set_variable_values(args)
 
-print "conf", iconf
+print("conf", iconf)
 iconf -= 1 # 0-based indexing
 
 sys.path.insert(0, './')

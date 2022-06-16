@@ -24,7 +24,7 @@ llist = []
 nlist = []
 for spe in spelist:
     llist.append(lmax[spe])
-    for l in xrange(lmax[spe]+1):
+    for l in range(lmax[spe]+1):
         nlist.append(nmax[(spe,l)])
 llmax = max(llist)
 nnmax = max(nlist)
@@ -45,20 +45,20 @@ kdir = inp.kerndir
 pdir = inp.preddir
 
 natoms = np.zeros(ndata,int)
-for i in xrange(len(xyzfile)):
+for i in range(len(xyzfile)):
     atomic_symbols = xyzfile[i].get_chemical_symbols()
     natoms[i] = int(len(atomic_symbols))
 natmax = max(natoms)
 
 atom_idx = {}
-for iconf in xrange(ndata):
+for iconf in range(ndata):
     for spe in spelist:
         atom_idx[(iconf,spe)] = []
 
 # extract species-dependent power spectrum for lambda=0
-for iconf in xrange(ndata):
+for iconf in range(ndata):
     atomic_symbols = xyzfile[iconf].get_chemical_symbols()
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = atomic_symbols[iat]
         atom_idx[(iconf,spe)].append(iat)
 
@@ -70,7 +70,7 @@ if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
 # training set selection
-dataset = range(ndata)
+dataset = list(range(ndata))
 random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
@@ -78,15 +78,15 @@ np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 natoms_train = natoms[trainrange]
-print "Number of training configurations =", ntrain
-testrange = np.setdiff1d(range(ndata),trainrangetot)
+print("Number of training configurations =", ntrain)
+testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
 ortho_preds = np.zeros((ntest,natmax,llmax+1,nnmax,2*llmax+1))
 for spe in spelist:
 
-    for l in xrange(lmax[spe]+1):
+    for l in range(lmax[spe]+1):
       
         # get truncated size
         Mcut = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
@@ -97,7 +97,7 @@ for spe in spelist:
             B += np.dot(psi_nm.T,psi_nm)
         B /= ntrain
         
-        for n in xrange(nmax[(spe,l)]): 
+        for n in range(nmax[(spe,l)]): 
         
             # compute A vector
             A = np.zeros(Mcut)
@@ -108,9 +108,9 @@ for spe in spelist:
                 A += np.dot(psi_nm.T,ortho_projs)
             A /= ntrain
 
-            print ""
-            print "spe:",spe,"L:",l,"n:",n
-            print "------------------------"
+            print("")
+            print("spe:",spe,"L:",l,"n:",n)
+            print("------------------------")
             
             x = np.linalg.solve( B + reg*np.eye(Mcut) , A )
 
@@ -134,11 +134,11 @@ for spe in spelist:
 
                 i = 0
                 for iat in atom_idx[(iconf,spe)]:
-                    for im in xrange(2*l+1):
+                    for im in range(2*l+1):
                         ortho_preds[itest,iat,l,n,im] = ortho_projs.reshape(len(atom_idx[(iconf,spe)]),2*l+1)[i,im]
                     i+=1
                 itest += 1
 
-            print "% RMSE =", 100*np.sqrt(error_total/variance)
+            print("% RMSE =", 100*np.sqrt(error_total/variance))
 
 np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/ortho-predictions_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy",ortho_preds)

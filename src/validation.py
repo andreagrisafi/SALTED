@@ -6,6 +6,7 @@ import ase
 from ase import io
 from ase.io import read
 from random import shuffle
+from scipy import special
 import random
 
 import basis
@@ -35,8 +36,12 @@ M = inp.Menv
 eigcut = inp.eigcut
 reg = inp.regul
 
+projdir = inp.projdir
+coefdir = inp.coefdir
+
 kdir = inp.kerndir
 pdir = inp.preddir
+rdir = inp.regrdir
 
 # system parameters
 atomic_symbols = []
@@ -50,40 +55,40 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-dirpath = os.path.join(inp.path2qm, pdir)
+dirpath = os.path.join(inp.path2ml, pdir)
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+dirpath = os.path.join(inp.path2ml+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
-kdir = {}
-rcuts = [2.0,3.0,4.0,5.0,6.0]
-# get truncated size
-for rc in rcuts:
-    kdir[rc] = "kernels_rc"+str(rc)+"-sg"+str(rc/10)+"/"
+#kdir = {}
+#rcuts = [6.0]
+## get truncated size
+#for rc in rcuts:
+#    kdir[rc] = "kernels_rc"+str(rc)+"-sg"+str(rc/10)+"/"
 
-orcuts = np.loadtxt("optimal_rcuts.dat")
+#orcuts = np.loadtxt("optimal_rcuts.dat")
 
 trainrangetot = np.loadtxt("training_set.txt",int)
 ntrain = int(inp.trainfrac*len(trainrangetot))
 testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
-dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
+dirpath = os.path.join(inp.path2ml+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
-weights = np.load("weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
+# load regression weights
+weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
 
-itest = 0
+# compute error over test set
 error_density = 0
 variance = 0
-coeffs = np.zeros((len(testrange),natmax,llmax+1,nnmax,2*llmax+1))
 for iconf in testrange:
 
     # load reference
-    ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
-    ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
+    ref_projs = np.load(inp.path2qm+inp.projdir+"projections_conf"+str(iconf)+".npy")
+    ref_coefs = np.load(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
     overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
     Tsize = len(ref_coefs)
 
@@ -96,8 +101,9 @@ for iconf in testrange:
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
-                rc = orcuts[iii]
-                psi_nm = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+                #rc = 6.0#orcuts[iii]
+                #psi_nm = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+                psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
                 Mcut = psi_nm.shape[1]
                 C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
                 isize += Mcut
@@ -113,23 +119,19 @@ for iconf in testrange:
             for n in range(nmax[(spe,l)]):
                 pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1] 
                 if l==0:
-                   Av_coeffs[i] = av_coefs[spe][n]
+                    Av_coeffs[i] = av_coefs[spe][n]
                 i += 2*l+1
         ispe[spe] += 1
 
-    # rebuild predictions
+    # add the average spherical coefficients to the predictions 
     pred_coefs += Av_coeffs
-    np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
+
+    # save predicted coefficients
+    np.save(inp.path2ml+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
+
+    # compute predicted density projections <phi|rho>
     pred_projs = np.dot(overl,pred_coefs)
-    i = 0
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        for l in range(lmax[spe]+1):
-            for n in range(nmax[(spe,l)]):
-                for im in range(2*l+1):
-                    coeffs[itest,iat,l,n,im] = pred_coefs[i]
-                    i += 1
-    
+
     # compute error
     error = np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
     error_density += error
@@ -137,10 +139,21 @@ for iconf in testrange:
     ref_coefs -= Av_coeffs
     var = np.dot(ref_coefs,ref_projs)
     variance += var
-    print(iconf+1, ":", np.sqrt(error/var)*100, "% RMSE")#,flush=True)
-    itest+=1
+    print(iconf+1, ":", "rho integral =", rho_int, ", error =", np.sqrt(error/var)*100, "% RMSE", flush=True)
+
+    # UNCOMMENT TO CHECK PREDICTIONS OF <phi|rho-rho_0>
+    # ------------------------------------------------- 
+    #pred_projs = np.dot(overl,pred_coefs-Av_coeffs)
+    #av_projs = np.dot(overl,Av_coeffs)
+    #iaux = 0
+    #for iat in range(natoms[iconf]):
+    #    spe = atomic_symbols[iconf][iat]
+    #    for l in range(lmax[spe]+1):
+    #        for n in range(nmax[(spe,l)]):
+    #            for im in range(2*l+1):
+    #                if l==5 and im==0:
+    #                    print(pred_projs[iaux],ref_projs[iaux])
+    #                iaux += 1
 
 print("")
 print("% RMSE =", 100*np.sqrt(error_density/variance))
-
-#np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/pred_coeffs.npy",coeffs)

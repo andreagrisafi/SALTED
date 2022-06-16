@@ -19,7 +19,7 @@ import inp
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
-print('This is task',rank,'of',size)
+print('This is task',rank+1,'of',size)
 
 # system definition
 spelist = inp.species
@@ -42,6 +42,11 @@ nnmax = max(nlist)
 M = inp.Menv
 eigcut = inp.eigcut
 reg = inp.regul
+rdir = inp.regrdir
+fdir = inp.featdir
+
+projdir = inp.projdir
+coefdir = inp.coefdir
 
 # species dependent arrays
 atoms_per_spe = {}
@@ -70,11 +75,11 @@ for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
 # define training set at random
-#dataset = list(range(ndata))
-#random.Random(3).shuffle(dataset)
-#trainrangetot = dataset[:inp.Ntrain]
-#np.savetxt("training_set.txt",trainrangetot,fmt='%i')
-trainrangetot = np.loadtxt("training_set.txt",int)
+dataset = list(range(ndata))
+random.Random(3).shuffle(dataset)
+trainrangetot = dataset[:inp.Ntrain]
+np.savetxt("training_set.txt",trainrangetot,fmt='%i')
+#trainrangetot = np.loadtxt("training_set.txt",int)
 
 # Distribute structures to tasks
 ntraintot = int(inp.trainfrac*inp.Ntrain)
@@ -90,7 +95,7 @@ else:
     trainrange = None
 trainrange = comm.scatter(trainrange,root=0)
 ntrain = int(len(trainrange))
-print('Task',rank,'handles the following structures:',trainrange)
+print('Task',rank+1,'handles the following structures:',trainrange)
 
 
 def loss_func(weights,ovlp_list,psi_list):
@@ -101,17 +106,18 @@ def loss_func(weights,ovlp_list,psi_list):
     # init gradient
     gradient = np.zeros(totsize)
 
+    loss = 0.0
     # loop over training structures
     for iconf in range(ntrain):
    
         # load reference QM data
-        ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(trainrange[iconf])+".npy")
-        ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(trainrange[iconf])+".npy")
+        ref_projs = np.load(inp.path2qm+projdir+"projections_conf"+str(trainrange[iconf])+".npy")
+        ref_coefs = np.load(inp.path2qm+coefdir+"coefficients_conf"+str(trainrange[iconf])+".npy")
        
         Av_coeffs = np.zeros(ref_coefs.shape[0])
         i = 0
-        for iat in range(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
+        for iat in range(natoms[trainrange[iconf]]):
+            spe = atomic_symbols[trainrange[iconf]][iat]
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     if l==0:
@@ -149,13 +155,13 @@ def grad_func(weights,ovlp_list,psi_list):
     for iconf in range(ntrain):
    
         # load reference QM data
-        ref_projs = np.load(inp.path2qm+"projections/projections_conf"+str(trainrange[iconf])+".npy")
-        ref_coefs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(trainrange[iconf])+".npy")
+        ref_projs = np.load(inp.path2qm+projdir+"projections_conf"+str(trainrange[iconf])+".npy")
+        ref_coefs = np.load(inp.path2qm+coefdir+"coefficients_conf"+str(trainrange[iconf])+".npy")
        
         Av_coeffs = np.zeros(ref_coefs.shape[0])
         i = 0
-        for iat in range(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
+        for iat in range(natoms[trainrange[iconf]]):
+            spe = atomic_symbols[trainrange[iconf]][iat]
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     if l==0:
@@ -217,32 +223,35 @@ for iconf in trainrange:
     # load feature vector as a numpy array
 #    psi_list.append(np.load(inp.path2ml+psi-vectors/M+str(M)+_eigcut+str(int(np.log10(eigcut)))+/psi-nm_conf+str(iconf)+.npy))
     # load feature vector as a scipy sparse object
-    psi_list.append(sparse.load_npz(inp.path2ml+"psi-vectors/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz"))
+    psi_list.append(sparse.load_npz(inp.path2ml+fdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz"))
 
 totsize = psi_list[0].shape[1]
-if rank == 0: print("problem dimensionality:", totsize)
+if rank == 0: 
+    print("problem dimensionality:", totsize)
+    dirpath = os.path.join(inp.path2ml, rdir)
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+
 
 start = time.time()
 
 tol = inp.gradtol 
 
-if inp.restart == True:
-    w = np.load("weights_N"+str(ntraintot)+".npy")
-else:    
-    w = np.ones(totsize)*1e-04
-
-r = - grad_func(w,ovlp_list,psi_list)
-
-if rank == 0: print("computing preconditioning matrix...")
-#P = precond_func(ovlp_list,psi_list)
-#P = comm.allreduce(P)/float(ntraintot) + 2.0 * reg * np.ones(totsize)
-#P = 1.0/P
+# preconditioner
 P = np.ones(totsize)
 
-r = comm.allreduce(r)/float(ntraintot) + 2.0 * reg * w
-
-d = np.multiply(P,r)
-delnew = np.dot(r,d)
+if inp.restart == True:
+    w = np.load(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
+    d = np.load(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
+    r = np.load(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
+    s = np.multiply(P,r)
+    delnew = np.dot(r,s)
+else:
+    w = np.ones(totsize)*1e-04
+    r = - grad_func(w,ovlp_list,psi_list)
+    r = comm.allreduce(r)/float(ntraintot) + 2.0 * reg * w
+    d = np.multiply(P,r)
+    delnew = np.dot(r,d)
 
 if rank == 0: print("minimizing...")
 for i in range(100000):
@@ -251,8 +260,10 @@ for i in range(100000):
     curv = np.dot(d,Ad)
     alpha = delnew/curv
     w = w + alpha*d
-    if (i+1)%10==0:
-        np.save("weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w) 
+    if (i+1)%50==0:
+        np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+        np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
+        np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
     r -= alpha * Ad 
     if rank == 0: print(i+1, "gradient norm:", np.sqrt(np.sum((r**2))),flush=True)
     if np.sqrt(np.sum((r**2))) < tol:
@@ -265,6 +276,8 @@ for i in range(100000):
         d = s + beta*d
 
 if rank == 0:
-    np.save("weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+    np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+    np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
+    np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
     print("minimization compleated succesfully!")
     print("minimization time:", (time.time()-start)/60, "minutes")

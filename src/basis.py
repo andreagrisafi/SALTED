@@ -7,6 +7,49 @@ def basiset(basis):
    lmax = {}
    nmax = {}
 
+   if basis=="FHI-aims-clusters":
+   
+      lmax["H"] = 4
+      lmax["C"] = 5
+      lmax["N"] = 5
+      lmax["O"] = 5
+      lmax["F"] = 5
+
+      # hydrogen
+      nmax[("H",0)] = 9
+      nmax[("H",1)] = 7
+      nmax[("H",2)] = 6
+      nmax[("H",3)] = 3
+      nmax[("H",4)] = 1
+      # oxygen
+      nmax[("O",0)] = 9
+      nmax[("O",1)] = 10
+      nmax[("O",2)] = 9
+      nmax[("O",3)] = 8
+      nmax[("O",4)] = 6
+      nmax[("O",5)] = 4
+      # carbon
+      nmax[("C",0)] = 11
+      nmax[("C",1)] = 10
+      nmax[("C",2)] = 9
+      nmax[("C",3)] = 8
+      nmax[("C",4)] = 7
+      nmax[("C",5)] = 5
+      # nitrogen
+      nmax[("N",0)] = 9
+      nmax[("N",1)] = 10
+      nmax[("N",2)] = 9
+      nmax[("N",3)] = 8
+      nmax[("N",4)] = 6
+      nmax[("N",5)] = 4
+      # fluorine
+      nmax[("F",0)] = 11
+      nmax[("F",1)] = 10
+      nmax[("F",2)] = 10
+      nmax[("F",3)] = 7
+      nmax[("F",4)] = 7
+      nmax[("F",5)] = 5
+
    if basis=="FHI-aims-tight":
 
       lmax["H"] = 4
@@ -159,11 +202,65 @@ def basiset(basis):
       nmax[("Cu",5)] = 9
       nmax[("Cu",6)] = 8
 
-   if basis=="CP2K-LRI-SZV-MOLOPT-GTH-MEDIUM":
+   if basis=="LRI-DZVP-MOLOPT-GTH-MEDIUM-FULL-ANGULAR":
 
-      lmax["H"] = 0
+      lmax["H"] = 3
+      lmax["O"] = 4
+      lmax["Cu"] = 6
 
       # H
-      nmax[("H",0)] = 10  
+      nmax[("H",0)] = 10
+      nmax[("H",1)] = 10
+      nmax[("H",2)] = 10
+      nmax[("H",3)] = 10
+      # O
+      nmax[("O",0)] = 15
+      nmax[("O",1)] = 15
+      nmax[("O",2)] = 15
+      nmax[("O",3)] = 15
+      nmax[("O",4)] = 15
+      # Cu    
+      nmax[("Cu",0)] = 15
+      nmax[("Cu",1)] = 15
+      nmax[("Cu",2)] = 15
+      nmax[("Cu",3)] = 15
+      nmax[("Cu",4)] = 15
+      nmax[("Cu",5)] = 15
+      nmax[("Cu",6)] = 15
+
+   if basis=="LRI-DZVP-MOLOPT-GTH-MEDIUM-FULL-ANGULAR-SUPER-FAT-WIDER-18":
+
+      lmax["Cu"] = 6
+
+      # Cu    
+      nmax[("Cu",0)] = 18
+      nmax[("Cu",1)] = 18
+      nmax[("Cu",2)] = 18
+      nmax[("Cu",3)] = 18
+      nmax[("Cu",4)] = 18
+      nmax[("Cu",5)] = 18
+      nmax[("Cu",6)] = 18
+
+   if basis=="DF-DZVP-MOLOPT-GTH":
+
+      lmax["Ag"] = 6 
+
+      nmax[("Ag",0)] = 15
+      nmax[("Ag",1)] = 15
+      nmax[("Ag",2)] = 15
+      nmax[("Ag",3)] = 15
+      nmax[("Ag",4)] = 15
+      nmax[("Ag",5)] = 15
+      nmax[("Ag",6)] = 15
+
+      lmax["Au"] = 6 
+
+      nmax[("Au",0)] = 18
+      nmax[("Au",1)] = 18
+      nmax[("Au",2)] = 18
+      nmax[("Au",3)] = 18
+      nmax[("Au",4)] = 18
+      nmax[("Au",5)] = 18
+      nmax[("Au",6)] = 18
 
    return [lmax,nmax]

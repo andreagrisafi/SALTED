@@ -49,7 +49,7 @@ ndata = len(xyzfile)
 #======================= system parameters
 atomic_symbols = []
 natoms = np.zeros(ndata,int) 
-for i in xrange(len(xyzfile)):
+for i in range(len(xyzfile)):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     natoms[i] = int(len(atomic_symbols[i]))
 
@@ -57,30 +57,29 @@ for i in xrange(len(xyzfile)):
 nspecies = len(spelist)
 
 natoms_spe = {}
-for iconf in xrange(ndata):
+for iconf in range(ndata):
     for spe in spelist:
         natoms_spe[(iconf,spe)] = 0
 
-for iconf in xrange(ndata):
+for iconf in range(ndata):
     species = atomic_symbols[iconf]
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = species[iat]
         natoms_spe[(iconf,spe)] += 1
 
 nenv = {}
 for spe in spelist:
     nenv[spe] = 0
-    for iconf in xrange(ndata):
+    for iconf in range(ndata):
         nenv[spe] += natoms_spe[iconf,spe]
 
-print "computing averages..."
 # init averages
 av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.zeros(nmax[(spe,0)],float)
 
 # compute averages
-for iconf in xrange(ndata):
+for iconf in range(ndata):
     species = atomic_symbols[iconf]
     #==================================================
     Coef = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
@@ -90,11 +89,11 @@ for iconf in xrange(ndata):
 #    np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",Coef)
     #==================================================
     i = 0
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = species[iat] 
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
-                for im in xrange(2*l+1):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                for im in range(2*l+1):
                     if l==0:
                        av_coefs[spe][n] += Coef[i]
                     i += 1
@@ -104,16 +103,15 @@ for iconf in xrange(ndata):
 for spe in spelist:
     av_coefs[spe] /= nenv[spe]
     np.save("averages_"+str(spe)+".npy",av_coefs[spe])
-    for l in xrange(lmax[spe]+1):
-        for n in xrange(nmax[(spe,l)]):
+    for l in range(lmax[spe]+1):
+        for n in range(nmax[(spe,l)]):
             dirpath = os.path.join(inp.path2qm+"projections", "spe"+str(spe)+"_l"+str(l)+"_n"+str(n))
             if not os.path.exists(dirpath):
                 os.mkdir(dirpath)
 
-print "computing orthogonal projections..."
-#for iconf in xrange(istart,iend):
+#for iconf in range(istart,iend):
 #for iconf in [isel]:
-for iconf in xrange(ndata):
+for iconf in range(ndata):
     print iconf+1
     
     start = time.time()
@@ -121,8 +119,8 @@ for iconf in xrange(ndata):
     # init orthogonal projections
     projs = {}
     for spe in spelist:
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
                 projs[(spe,l,n)] = np.zeros((natoms_spe[iconf,spe],(2*l+1)))
     # compute coefficients
     Coef = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
@@ -131,11 +129,11 @@ for iconf in xrange(ndata):
     #Coef = np.linalg.solve(Over,Proj)
     # remove L=0 average
     i = 0
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = species[iat]
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
-                for im in xrange(2*l+1):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                for im in range(2*l+1):
                     if l==0:
                        Coef[i] -= av_coefs[spe][n]
                     i += 1
@@ -157,18 +155,18 @@ for iconf in xrange(ndata):
         specount[spe] = 0
     # fill array of orthogonal projections
     i = 0
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = species[iat]
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
-                for im in xrange(2*l+1):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                for im in range(2*l+1):
                     projs[(spe,l,n)][specount[spe],im] = OProj[i] 
                     i += 1
         specount[spe] += 1
     # save orthogonal projections
     for spe in spelist:
-        for l in xrange(lmax[spe]+1):
-            for n in xrange(nmax[(spe,l)]):
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
                 np.save(inp.path2qm+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy",projs[(spe,l,n)].reshape(natoms_spe[(iconf,spe)]*(2*l+1)))
 
-    print (time.time()-start)/60.0, "minutes"
+    print((time.time()-start)/60.0, "minutes")
