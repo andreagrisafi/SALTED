@@ -1,29 +1,13 @@
 import os
-import sys
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
 from random import shuffle
-
-import basis
-
-sys.path.insert(0, './')
 import inp
+from utils import read_system, get_atom_idx
 
-spelist = inp.species
-# read system
-xyzfile = read(inp.filename,":")
-ndata = len(xyzfile)
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
-# read basis
-[lmax,nmax] = basis.basiset(inp.dfbasis)
-
-llist = []
-for spe in spelist:
-    llist.append(lmax[spe])
-llmax = max(llist)
+atom_idx, natom_dict = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
 
 # number of sparse environments
 M = inp.Menv
@@ -49,14 +33,6 @@ def do_fps(x, d=0):
         nd = n2 + n2[iy[i]] - 2*np.real(np.dot(x,np.conj(x[iy[i]])))
         dl = np.minimum(dl,nd)
     return iy
-
-# system parameters
-atomic_symbols = []
-natoms = np.zeros(ndata,int)
-for i in range(ndata):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    natoms[i] = int(len(atomic_symbols[i]))
-natmax = max(natoms)
 
 # compute number of atomic environments for each species
 ispe = 0
@@ -96,21 +72,6 @@ for spe in spelist:
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
 
-# initialize useful arrays
-atom_idx = {}
-natom_dict = {}
-for iconf in range(ndata):
-    for spe in spelist:
-        atom_idx[(iconf,spe)] = [] 
-        natom_dict[(iconf,spe)] = 0 
-
-# extract species-dependent power spectrum for lambda=0
-for iconf in range(ndata):
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        atom_idx[(iconf,spe)].append(iat)
-        natom_dict[(iconf,spe)] += 1 
-
 # divide sparse set per species
 fps_indexes = {}
 for spe in spelist:
@@ -141,6 +102,7 @@ for spe in spelist:
     eva = eva[eva>eigcut]
     eve = eve[:,-len(eva):]
     V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+    np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
 
     # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
     for iconf in range(ndata):
@@ -177,6 +139,7 @@ for l in range(1,llmax+1):
         eva = eva[eva>eigcut]
         eve = eve[:,-len(eva):]
         V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+        np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
 
         # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
         for iconf in range(ndata):

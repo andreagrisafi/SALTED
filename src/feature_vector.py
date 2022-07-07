@@ -1,48 +1,27 @@
 import os
-import sys
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
 import random
 from random import shuffle
 from scipy import sparse
-import argparse
-
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-j1", "--istart", type=int, default=0, help="starting index")
-    parser.add_argument("-j2", "--iend",   type=int, default=0, help="ending index")
-    args = parser.parse_args()
-    return args
-
-args = add_command_line_arguments_contraction("dataset subselection")
-# dataset slice boundaries 
-istart = args.istart-1
-iend = args.iend
-
-import basis
-
-sys.path.insert(0, './')
+from utils import read_system,get_atom_idx
 import inp
 
-# system definition
-spelist = inp.species
-xyzfile = read(inp.filename,":")
-ndata = len(xyzfile)
+#import argparse
 
-# basis definition
-[lmax,nmax] = basis.basiset(inp.dfbasis)
+#def add_command_line_arguments_contraction(parsetext):
+#    parser = argparse.ArgumentParser(description=parsetext)
+#    parser.add_argument("-j1", "--istart", type=int, default=0, help="starting index")
+#    parser.add_argument("-j2", "--iend",   type=int, default=0, help="ending index")
+#    args = parser.parse_args()
+#    return args
 
-llist = []
-nlist = []
-for spe in spelist:
-    llist.append(lmax[spe])
-    for l in range(lmax[spe]+1):
-        nlist.append(nmax[(spe,l)])
-llmax = max(llist)
-nnmax = max(nlist)
+#args = add_command_line_arguments_contraction("dataset subselection")
+# dataset slice boundaries 
+#istart = args.istart-1
+#iend = args.iend
+
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
 # sparse-GPR parameters
 M = inp.Menv
@@ -51,26 +30,7 @@ eigcut = inp.eigcut
 kdir = inp.kerndir
 fdir = inp.featdir
 
-# species dependent arrays
-atoms_per_spe = {}
-natoms_per_spe = {}
-for iconf in range(ndata):
-    for spe in spelist:
-        atoms_per_spe[(iconf,spe)] = []
-        natoms_per_spe[(iconf,spe)] = 0
-
-atomic_symbols = []
-valences = []
-natoms = np.zeros(ndata,int)
-for iconf in range(ndata):
-    atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
-    valences.append(xyzfile[iconf].get_atomic_numbers())
-    natoms[iconf] = int(len(atomic_symbols[iconf]))
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        atoms_per_spe[(iconf,spe)].append(iat)
-        natoms_per_spe[(iconf,spe)] += 1
-natmax = max(natoms)
+atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
 
 #kdir = {}
 #rcuts = [6.0]
@@ -94,7 +54,6 @@ for spe in spelist:
             iii+=1
 
 print("problem dimensionality:", totsize)
-
 
 dirpath = os.path.join(inp.path2ml,fdir)
 if not os.path.exists(dirpath):
@@ -128,11 +87,11 @@ for iconf in range(ndata):
     for spe in spelist:
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
+            psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+            Mcut = psi_nm.shape[1]
             for n in range(nmax[(spe,l)]):
                 #orcuts[iii]
                 #psi_nm = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
-                psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
-                Mcut = psi_nm.shape[1]
                 Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
                 isize += Mcut
                 iii += 1

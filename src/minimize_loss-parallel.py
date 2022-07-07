@@ -13,6 +13,8 @@ from mpi4py import MPI
 
 import basis
 
+from utils import read_system, get_atom_idx
+
 sys.path.insert(0, './')
 import inp
 # MPI information
@@ -21,22 +23,7 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 print('This is task',rank+1,'of',size)
 
-# system definition
-spelist = inp.species
-xyzfile = read(inp.filename,":")
-ndata = len(xyzfile)
-
-# basis definition
-[lmax,nmax] = basis.basiset(inp.dfbasis)
-
-llist = []
-nlist = []
-for spe in spelist:
-    llist.append(lmax[spe])
-    for l in range(lmax[spe]+1):
-        nlist.append(nmax[(spe,l)])
-llmax = max(llist)
-nnmax = max(nlist)
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
 # sparse-GPR parameters
 M = inp.Menv
@@ -47,27 +34,9 @@ fdir = inp.featdir
 
 projdir = inp.projdir
 coefdir = inp.coefdir
+ovlpdir = inp.ovlpdir
 
-# species dependent arrays
-atoms_per_spe = {}
-natoms_per_spe = {}
-for iconf in range(ndata):
-    for spe in spelist:
-        atoms_per_spe[(iconf,spe)] = []
-        natoms_per_spe[(iconf,spe)] = 0
-
-atomic_symbols = []
-valences = []
-natoms = np.zeros(ndata,int)
-for iconf in range(ndata):
-    atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
-    valences.append(xyzfile[iconf].get_atomic_numbers())
-    natoms[iconf] = int(len(atomic_symbols[iconf]))
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        atoms_per_spe[(iconf,spe)].append(iat)
-        natoms_per_spe[(iconf,spe)] += 1
-natmax = max(natoms)
+atom_per_spe, natom_per_spe = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
 
 # load average density coefficients
 av_coefs = {}
@@ -93,6 +62,7 @@ if rank == 0:
             trainrange[i] = trainrangetot[i*blocksize:(i+1)*blocksize]
 else:
     trainrange = None
+
 trainrange = comm.scatter(trainrange,root=0)
 ntrain = int(len(trainrange))
 print('Task',rank+1,'handles the following structures:',trainrange)
@@ -219,9 +189,7 @@ if rank == 0: print("loading matrices...")
 ovlp_list = [] 
 psi_list = [] 
 for iconf in trainrange:
-    ovlp_list.append(np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy"))
-    # load feature vector as a numpy array
-#    psi_list.append(np.load(inp.path2ml+psi-vectors/M+str(M)+_eigcut+str(int(np.log10(eigcut)))+/psi-nm_conf+str(iconf)+.npy))
+    ovlp_list.append(np.load(inp.path2qm+ovlpdir+"overlap_conf"+str(iconf)+".npy"))
     # load feature vector as a scipy sparse object
     psi_list.append(sparse.load_npz(inp.path2ml+fdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz"))
 

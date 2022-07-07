@@ -1,5 +1,4 @@
 import os
-import sys
 import numpy as np
 import time
 import ase
@@ -10,26 +9,11 @@ from scipy import special
 import random
 
 import basis
-
-sys.path.insert(0, './')
 import inp
 
-spelist = inp.species
-# read system
-xyzfile = read(inp.filename,":")
-ndata = len(xyzfile)
+from utils import read_system
 
-# read basis
-[lmax,nmax] = basis.basiset(inp.dfbasis)
-
-llist = []
-nlist = []
-for spe in spelist:
-    llist.append(lmax[spe])
-    for l in range(lmax[spe]+1):
-        nlist.append(nmax[(spe,l)])
-llmax = max(llist)
-nnmax = max(nlist)
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
 # number of sparse environments
 M = inp.Menv
@@ -38,18 +22,11 @@ reg = inp.regul
 
 projdir = inp.projdir
 coefdir = inp.coefdir
+ovlpdir = inp.ovlpdir
 
 kdir = inp.kerndir
 pdir = inp.preddir
 rdir = inp.regrdir
-
-# system parameters
-atomic_symbols = []
-natoms = np.zeros(ndata,int)
-for i in range(ndata):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    natoms[i] = int(len(atomic_symbols[i]))
-natmax = max(natoms)
 
 av_coefs = {}
 for spe in spelist:
@@ -89,7 +66,7 @@ for iconf in testrange:
     # load reference
     ref_projs = np.load(inp.path2qm+inp.projdir+"projections_conf"+str(iconf)+".npy")
     ref_coefs = np.load(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
+    overl = np.load(inp.path2qm+inp.ovlpdir+"overlap_conf"+str(iconf)+".npy")
     Tsize = len(ref_coefs)
 
     # compute predictions per channel
@@ -139,7 +116,7 @@ for iconf in testrange:
     ref_coefs -= Av_coeffs
     var = np.dot(ref_coefs,ref_projs)
     variance += var
-    print(iconf+1, ":", "rho integral =", rho_int, ", error =", np.sqrt(error/var)*100, "% RMSE", flush=True)
+    print(iconf+1, ":", "error =", np.sqrt(error/var)*100, "% RMSE", flush=True)
 
     # UNCOMMENT TO CHECK PREDICTIONS OF <phi|rho-rho_0>
     # ------------------------------------------------- 
