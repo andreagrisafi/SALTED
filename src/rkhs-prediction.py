@@ -1,34 +1,15 @@
 import os
-import sys
 import numpy as np
 import time
-import ase
-from ase import io
 from ase.io import read
-from random import shuffle
-
-import basis
-
-sys.path.insert(0, './')
 import inp
+from utils import read_system, get_atom_idx
 
-spelist = inp.species
-
-# read system training set
-xyzfile_train = read(inp.path2ref+inp.filename,":")
-ndata_train = len(xyzfile_train)
+spelist, lmax, nmax, llmax, nnmax, ndata_train, atomic_symbols_train, natoms_train, natmax_train = read_system()
 
 # read system test set
-xyzfile = read(inp.filenametest,":")
+xyzfile = read(inp.predict_filename,":")
 ndata = len(xyzfile)
-
-# read basis
-[lmax,nmax] = basis.basiset(inp.dfbasis)
-
-llist = []
-for spe in spelist:
-    llist.append(lmax[spe])
-llmax = max(llist)
 
 # number of sparse environments
 M = inp.Menv
@@ -38,16 +19,9 @@ print("M =", M, "eigcut =", eigcut)
 print("zeta =", zeta)
 
 sdirtrain = inp.soapdir
-sdir = inp.soapdirtest
-kdir = inp.kerndirtest
-
-# system parameters training set
-atomic_symbols_train = []
-natoms_train = np.zeros(ndata_train,int)
-for i in range(ndata_train):
-    atomic_symbols_train.append(xyzfile_train[i].get_chemical_symbols())
-    natoms_train[i] = int(len(atomic_symbols_train[i]))
-natmax_train = max(natoms_train)
+kdirtrain = inp.kerndir
+sdir = inp.predict_soapdir
+kdir = inp.predict_kerndir
 
 # system parameters test set
 atomic_symbols = []
@@ -58,14 +32,14 @@ for i in range(ndata):
 natmax = max(natoms)
 
 # load lambda=0 power spectrum 
-power_train = np.load(inp.path2mlref+sdirtrain+"FEAT-0.npy")
+power_train = np.load(inp.path2ml+sdirtrain+"FEAT-0.npy")
 nfeat_train = power_train.shape[-1]
 power = np.load(inp.path2ml+sdir+"FEAT-0.npy")
 nfeat = power.shape[-1]
 
 # compute sparse set with FPS
-fps_idx = np.loadtxt(inp.path2ref+"sparse_set_"+str(M)+".txt",int)[:,0]
-fps_species = np.loadtxt(inp.path2ref+"sparse_set_"+str(M)+".txt",int)[:,1]
+fps_idx = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
+fps_species = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,1]
 
 # make directories if not exisiting
 dirpath = os.path.join(inp.path2ml, kdir)
@@ -80,20 +54,7 @@ for spe in spelist:
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
 
-# initialize useful arrays
-atom_idx = {}
-natom_dict = {}
-for iconf in range(ndata):
-    for spe in spelist:
-        atom_idx[(iconf,spe)] = [] 
-        natom_dict[(iconf,spe)] = 0 
-
-# extract species-dependent power spectrum for lambda=0
-for iconf in range(ndata):
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        atom_idx[(iconf,spe)].append(iat)
-        natom_dict[(iconf,spe)] += 1 
+atom_idx, natom_dict = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
 
 # divide sparse set per species
 fps_indexes = {}
@@ -121,10 +82,7 @@ for spe in spelist:
     kernel_mm = kernel0_mm[spe]**zeta
     
     # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
-    eva, eve = np.linalg.eigh(kernel_mm)
-    eva = eva[eva>eigcut]
-    eve = eve[:,-len(eva):]
-    V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+    V = np.load(inp.path2ml+kdirtrain+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy")
 
     # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
     for iconf in range(ndata):
@@ -139,7 +97,7 @@ for l in range(1,llmax+1):
 
     # load power spectrum
     print("loading lambda =", l)
-    power_train = np.load(inp.path2mlref+sdirtrain+"FEAT-"+str(l)+".npy")
+    power_train = np.load(inp.path2ml+sdirtrain+"FEAT-"+str(l)+".npy")
     nfeat_train = power_train.shape[-1]
     power = np.load(inp.path2ml+sdir+"FEAT-"+str(l)+".npy")
     nfeat = power.shape[-1]
@@ -159,10 +117,7 @@ for l in range(1,llmax+1):
                 kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_mm[spe][i1,i2]**(zeta-1)
     
         # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
-        eva, eve = np.linalg.eigh(kernel_mm)
-        eva = eva[eva>eigcut]
-        eve = eve[:,-len(eva):]
-        V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+        V = np.load(inp.path2ml+kdirtrain+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy")
 
         # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
         for iconf in range(ndata):

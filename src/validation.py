@@ -1,17 +1,14 @@
 import os
 import numpy as np
-import time
-import ase
-from ase import io
-from ase.io import read
-from random import shuffle
-from scipy import special
-import random
-
-import basis
 import inp
-
 from utils import read_system
+from mpi4py import MPI
+
+# MPI information
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
+print('This is task',rank+1,'of',size)
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -49,7 +46,7 @@ if not os.path.exists(dirpath):
 
 trainrangetot = np.loadtxt("training_set.txt",int)
 ntrain = int(inp.trainfrac*len(trainrangetot))
-testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
+testrangetot = np.setdiff1d(list(range(ndata)),trainrangetot)
 
 dirpath = os.path.join(inp.path2ml+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
 if not os.path.exists(dirpath):
@@ -61,6 +58,24 @@ weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_reg"+str(int(np.log
 # compute error over test set
 error_density = 0
 variance = 0
+
+# Distribute structures to tasks
+ntest = len(testrangetot)
+if rank == 0:
+    testrange = [[] for _ in range(size)]
+    blocksize = int(round(ntest/np.float(size)))
+    for i in range(size):
+        if i == (size-1):
+            testrange[i] = testrangetot[i*blocksize:ntest]
+        else:
+            testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
+else:
+    testrange = None
+
+testrange = comm.scatter(testrange,root=0)
+#ntrain = int(len(trainrange))
+print('Task',rank+1,'handles the following structures:',testrange,flush=True)
+
 for iconf in testrange:
 
     # load reference
@@ -132,5 +147,7 @@ for iconf in testrange:
     #                    print(pred_projs[iaux],ref_projs[iaux])
     #                iaux += 1
 
-print("")
-print("% RMSE =", 100*np.sqrt(error_density/variance))
+error_density = comm.allreduce(error_density)
+variance = comm.allreduce(variance)
+if (rank == 0) print("")
+if (rank == 0) print("% RMSE =", 100*np.sqrt(error_density/variance))

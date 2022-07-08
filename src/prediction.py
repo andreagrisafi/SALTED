@@ -1,67 +1,33 @@
 import os
-import sys
 import numpy as np
-import time
-import ase
-from ase import io
-from ase.io import read
-from random import shuffle
-from scipy import special
-import random
-
-import basis
-
-sys.path.insert(0, './')
 import inp
+from utils import read_system
 
-spelist = inp.species
-# read system
-xyzfile = read(inp.filenametest,":")
-ndata = len(xyzfile)
-
-# read basis
-[lmax,nmax] = basis.basiset(inp.dfbasis)
-
-llist = []
-nlist = []
-for spe in spelist:
-    llist.append(lmax[spe])
-    for l in range(lmax[spe]+1):
-        nlist.append(nmax[(spe,l)])
-llmax = max(llist)
-nnmax = max(nlist)
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(inp.predict_filename)
 
 # number of sparse environments
 M = inp.Menv
 eigcut = inp.eigcut
 reg = inp.regul
 
-kdir = inp.kerndirtest
-kdir = inp.kerndirtest
+kdir = inp.predict_kerndir
 rdir = inp.regrdir
-
-# system parameters
-atomic_symbols = []
-natoms = np.zeros(ndata,int)
-for i in range(ndata):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    natoms[i] = int(len(atomic_symbols[i]))
-natmax = max(natoms)
+pdir = inp.preddir
 
 av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-dirpath = os.path.join(inp.path2ml, pdir)
+dirpath = os.path.join(inp.path2qm, pdir)
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2ml+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
-ntrain = inp.Ntrain
+ntrain = int(inp.Ntrain*inp.trainfrac)
 
-dirpath = os.path.join(inp.path2ml+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
+dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -116,4 +82,4 @@ for itest in range(ndata):
     pred_coefs += Av_coeffs
 
     # save predicted coefficients
-    np.save(inp.path2ml+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(itest)+".npy",pred_coefs)
+    np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(itest)+".npy",pred_coefs)

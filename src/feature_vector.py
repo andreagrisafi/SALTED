@@ -6,6 +6,7 @@ from random import shuffle
 from scipy import sparse
 from utils import read_system,get_atom_idx
 import inp
+from mpi4py import MPI
 
 #import argparse
 
@@ -20,6 +21,12 @@ import inp
 # dataset slice boundaries 
 #istart = args.istart-1
 #iend = args.iend
+
+# MPI information
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
+print('This is task',rank+1,'of',size)
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -62,11 +69,27 @@ dirpath = os.path.join(inp.path2ml+fdir, "M"+str(M)+"_eigcut"+str(int(np.log10(e
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
-for iconf in range(ndata):
+# Distribute structures to tasks
+if rank == 0:
+    conf_range = [[] for _ in range(size)]
+    blocksize = int(round(ndata/np.float(size)))
+    for i in range(size):
+        if i == (size-1):
+            conf_range[i] = list(range(ndata))[i*blocksize:ndata]
+        else:
+            conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
+else:
+    conf_range = None
+
+conf_range = comm.scatter(conf_range,root=0)
+#nrange = int(len(conf_range))
+print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+
+for iconf in conf_range:
 #for iconf in range(istart,iend):
 
     start = time.time()
-    print(iconf+1)
+    print(iconf+1,flush=True)
 
     # load reference QM data
     coefs = np.load(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
@@ -120,4 +143,4 @@ for iconf in range(ndata):
     sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
     sparse.save_npz(inp.path2ml+fdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz", sparse_psi)
  
-    print(time.time()-start)
+#    print(time.time()-start)

@@ -3,7 +3,7 @@ import inp
 import numpy as np
 from ase.io import read
 
-def read_system():
+def read_system(filename=inp.filename):
     
     # read species
     spelist = inp.species
@@ -20,7 +20,7 @@ def read_system():
     llmax = max(llist)
     
     # read system
-    xyzfile = read(inp.filename,":")
+    xyzfile = read(filename,":")
     ndata = len(xyzfile)
     
     #======================= system parameters

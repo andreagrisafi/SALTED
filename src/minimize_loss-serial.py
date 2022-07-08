@@ -1,18 +1,9 @@
 import os
-import sys
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
 import random
-from random import shuffle
 from scipy import sparse
-
 from utils import read_system, get_atom_idx
-import basis
-
-sys.path.insert(0, './')
 import inp
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()

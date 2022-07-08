@@ -1,27 +1,17 @@
 import os
-import sys
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
 import random
-from random import shuffle
 from scipy import sparse
-from scipy.optimize import minimize
 from mpi4py import MPI
-
-import basis
-
 from utils import read_system, get_atom_idx
-
-sys.path.insert(0, './')
 import inp
+
 # MPI information
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
-print('This is task',rank+1,'of',size)
+print('This is task',rank+1,'of',size,flush=True)
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -65,7 +55,7 @@ else:
 
 trainrange = comm.scatter(trainrange,root=0)
 ntrain = int(len(trainrange))
-print('Task',rank+1,'handles the following structures:',trainrange)
+print('Task',rank+1,'handles the following structures:',trainrange,flush=True)
 
 
 def loss_func(weights,ovlp_list,psi_list):
