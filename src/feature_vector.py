@@ -63,11 +63,12 @@ for spe in spelist:
 print("problem dimensionality:", totsize)
 
 dirpath = os.path.join(inp.path2ml,fdir)
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2ml+fdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
+if (rank == 0):
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+    dirpath = os.path.join(inp.path2ml+fdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
 
 # Distribute structures to tasks
 if rank == 0:

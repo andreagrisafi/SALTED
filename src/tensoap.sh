@@ -1,5 +1,3 @@
-echo $TENSOAP_SPECIES
-
 for (( lam=0; lam<=$lmax; lam++ )); do
 
 #RUN TO SELECT nc SPARSE FEATURES FROM ns RANDOM STRUCTURES

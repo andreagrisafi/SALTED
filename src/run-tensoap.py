@@ -26,6 +26,8 @@ os.environ['TENSOAP_NS'] = str(ns)
 spath = os.environ.get('SALTEDPATH')
 
 # make directories if not exisiting
+if not os.path.exists(inp.path2ml):
+    os.mkdir(inp.path2ml)
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 

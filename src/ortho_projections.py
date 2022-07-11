@@ -1,77 +1,28 @@
 import os
-import sys
 import numpy as np
-import scipy
-from scipy import special
 import time
-import ase
-import argparse
-from ase import io
-from ase.io import read
-from scipy.sparse.linalg import eigsh
-
-
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-j1", "--istart", type=int, default=0, help="starting index")
-    parser.add_argument("-j2", "--iend",   type=int, default=0, help="ending index")
-    parser.add_argument("-iconf", "--iselection",   type=int, default=0, help="selected conf")
-    args = parser.parse_args()
-    return args
-
-args = add_command_line_arguments_contraction("dataset subselection")
-# dataset slice boundaries 
-istart = args.istart-1
-iend = args.iend
-isel = args.iselection # 0 based
-
-import basis
-sys.path.insert(0, './')
+#import argparse
 import inp
+from utils import read_system, get_atom_idx
+
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+atom_idx, natoms_spe = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
+
+#def add_command_line_arguments_contraction(parsetext):
+#    parser = argparse.ArgumentParser(description=parsetext)
+#    parser.add_argument("-j1", "--istart", type=int, default=0, help="starting index")
+#    parser.add_argument("-j2", "--iend",   type=int, default=0, help="ending index")
+#    parser.add_argument("-iconf", "--iselection",   type=int, default=0, help="selected conf")
+#    args = parser.parse_args()
+#    return args
+
+#args = add_command_line_arguments_contraction("dataset subselection")
+# dataset slice boundaries 
+#istart = args.istart-1
+#iend = args.iend
+#isel = args.iselection # 0 based
 
 ocut = inp.overcut
-
-# read species
-spelist = inp.species
-
-# read basis
-[lmax,nmax] = basis.basiset(inp.dfbasis)
-
-llist = []
-for spe in spelist:
-    llist.append(lmax[spe])
-llmax = max(llist)
-
-# read system
-xyzfile = read(inp.filename,":")
-ndata = len(xyzfile)
-
-#======================= system parameters
-atomic_symbols = []
-natoms = np.zeros(ndata,int) 
-for i in range(len(xyzfile)):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    natoms[i] = int(len(atomic_symbols[i]))
-
-#==================== species array
-nspecies = len(spelist)
-
-natoms_spe = {}
-for iconf in range(ndata):
-    for spe in spelist:
-        natoms_spe[(iconf,spe)] = 0
-
-for iconf in range(ndata):
-    species = atomic_symbols[iconf]
-    for iat in range(natoms[iconf]):
-        spe = species[iat]
-        natoms_spe[(iconf,spe)] += 1
-
-nenv = {}
-for spe in spelist:
-    nenv[spe] = 0
-    for iconf in range(ndata):
-        nenv[spe] += natoms_spe[iconf,spe]
 
 # init averages
 av_coefs = {}
@@ -82,11 +33,7 @@ for spe in spelist:
 for iconf in range(ndata):
     species = atomic_symbols[iconf]
     #==================================================
-    Coef = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
-#    Proj = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
-#    Over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
-#    Coef = np.linalg.solve(Over,Proj)
-#    np.save(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy",Coef)
+    Coef = np.load(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
     #==================================================
     i = 0
     for iat in range(natoms[iconf]):
@@ -98,6 +45,11 @@ for iconf in range(ndata):
                        av_coefs[spe][n] += Coef[i]
                     i += 1
 
+nenv = {}
+for spe in spelist:
+    nenv[spe] = 0
+    for iconf in range(ndata):
+        nenv[spe] += natoms_spe[iconf,spe]
 
 # save averages
 for spe in spelist:
@@ -105,14 +57,13 @@ for spe in spelist:
     np.save("averages_"+str(spe)+".npy",av_coefs[spe])
     for l in range(lmax[spe]+1):
         for n in range(nmax[(spe,l)]):
-            dirpath = os.path.join(inp.path2qm+"projections", "spe"+str(spe)+"_l"+str(l)+"_n"+str(n))
+            dirpath = os.path.join(inp.path2qm+inp.projdir, "spe"+str(spe)+"_l"+str(l)+"_n"+str(n))
             if not os.path.exists(dirpath):
                 os.mkdir(dirpath)
 
 #for iconf in range(istart,iend):
-#for iconf in [isel]:
 for iconf in range(ndata):
-    print iconf+1
+    print(iconf+1)
     
     start = time.time()
     species = atomic_symbols[iconf]
@@ -123,10 +74,8 @@ for iconf in range(ndata):
             for n in range(nmax[(spe,l)]):
                 projs[(spe,l,n)] = np.zeros((natoms_spe[iconf,spe],(2*l+1)))
     # compute coefficients
-    Coef = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
-    #Proj = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
-    Over = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
-    #Coef = np.linalg.solve(Over,Proj)
+    Coef = np.load(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
+    Over = np.load(inp.path2qm+inp.ovlpdir+"overlap_conf"+str(iconf)+".npy")
     # remove L=0 average
     i = 0
     for iat in range(natoms[iconf]):
@@ -146,7 +95,7 @@ for iconf in range(ndata):
     sqrteigen = np.sqrt(eigenvalues) 
     diagoverlap = np.diag(1.0/sqrteigen)
     orthomatrix = np.dot(np.conj(unitary[:,-Mcut:]),np.dot(diagoverlap,unitary[:,-Mcut:].T))
-    np.save(inp.path2qm+"overlaps/orthomatrix_"+str(iconf)+".npy",orthomatrix)
+    np.save(inp.path2qm+inp.ovlpdir+"orthomatrix_"+str(iconf)+".npy",orthomatrix)
     # orthogonalize projections
     OProj = np.dot(orthomatrix,DProj)
     # init species counting 
@@ -167,6 +116,6 @@ for iconf in range(ndata):
     for spe in spelist:
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
-                np.save(inp.path2qm+"projections/spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy",projs[(spe,l,n)].reshape(natoms_spe[(iconf,spe)]*(2*l+1)))
+                np.save(inp.path2qm+inp.projdir+"spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy",projs[(spe,l,n)].reshape(natoms_spe[(iconf,spe)]*(2*l+1)))
 
     print((time.time()-start)/60.0, "minutes")

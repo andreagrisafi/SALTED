@@ -149,5 +149,5 @@ for iconf in testrange:
 
 error_density = comm.allreduce(error_density)
 variance = comm.allreduce(variance)
-if (rank == 0) print("")
-if (rank == 0) print("% RMSE =", 100*np.sqrt(error_density/variance))
+if (rank == 0): print("")
+if (rank == 0): print("% RMSE =", 100*np.sqrt(error_density/variance))

@@ -6,18 +6,18 @@ propname = "electro"
 
 # paths to data
 # ------------
-path2ml = "mldata/" 
-path2qm = "qmdata/"
+path2ml = "mldata1/" 
+path2qm = "qmdata1/"
 
-featdir = "feat_vecs/"
-soapdir = "soaps/"
-regrdir = "regr/"
-kerndir = "kernels/"
+featdir = "feat_vecs1/"
+soapdir = "soaps1/"
+regrdir = "regr1/"
+kerndir = "kernels1/"
 
-coefdir = "coefficients/"
-projdir = "projections/"
-ovlpdir = "overlaps/"
-preddir = "predictions/"
+coefdir = "coefficients1/"
+projdir = "projections1/"
+ovlpdir = "overlaps1/"
+preddir = "predictions1/"
 
 # PySCF variables 
 # ------------
@@ -36,11 +36,11 @@ trainfrac = 1.0   # training set fraction
 
 regul = 1e-9      # regularization
 eigcut = 1e-10    # eigenvalues cutoff
-gradtol = 1e-4    # convergence parameter
+gradtol = 1e-5    # convergence parameter
 restart = False   # restart minimization
 
 # Prediction Paths
 # ------------
 predict_filename = "water_dimers_10.xyz"
-predict_soapdir = "predict_soaps/"
-predict_kerndir = "predict_kernels/"
+predict_soapdir = "predict_soaps1/"
+predict_kerndir = "predict_kernels1/"
