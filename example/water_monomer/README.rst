@@ -44,9 +44,7 @@ Compute global feature vector and save as sparse object
 :code:`mpirun -np $ntasks python $SALTEDPATH/feature_vector.py`
 
 Minimize loss function and print out regression weights
-:code:`mpirun -n $ntasks python $SALTEDPATH/minimize_loss-parallel.py`
-or if it is necessary to run serially
-:code:`python .$SALTEDPATH/minimize_loss-serial.py`
+:code:`mpirun -n $ntasks python $SALTEDPATH/minimize_loss.py`
 
 Validate model predicting on the remaining structures
 :code:`mpirun -np $ntasks python $SALTEDPATH/validation.py` 
