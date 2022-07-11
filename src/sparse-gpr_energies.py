@@ -5,14 +5,15 @@ import inp
 from ase.io import read
 from utils import read_system
 
-spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+spelist, lmax, nmax, llmax, nnmax, ndata, symbols, natoms, natmax = read_system()
 
 xyzfile = read(inp.filename,":")
 
 zeta = inp.z
 M = inp.Menv
 reg = inp.regul
-jit = inp.jitter
+jit = 1e-8
+#jit = inp.jitter
 
 nspecies = len(inp.species) 
 species = {}
@@ -26,7 +27,7 @@ stechio = np.zeros((ndata,nspecies),float)
 for iconf in range(ndata):
     energies[iconf] = xyzfile[iconf].info[inp.propname]
     for iat in range(natoms[iconf]):
-        ispe = species[symbols[iat]]
+        ispe = species[symbols[iconf][iat]]
         stechio[iconf,ispe] += 1.0 
 covariance = np.dot(stechio.T,stechio)
 
@@ -58,7 +59,7 @@ natoms_test = natoms[testrange]
 te_energ = energies[testrange]
 
 # load feature vector and define sparse feature vector
-power_per_conf = np.load(inp.path2data+"/soaps/FEAT-0.npy")
+power_per_conf = np.load(inp.path2ml+inp.soapdir+"FEAT-0.npy")
 nfeat = power_per_conf.shape[-1]
 power_ref_sparse = power_per_conf.reshape(ndata*3,nfeat)[fps_indexes]
 

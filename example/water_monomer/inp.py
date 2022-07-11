@@ -6,18 +6,18 @@ propname = "electro"
 
 # paths to data
 # ------------
-path2ml = "mldata1/" 
-path2qm = "qmdata1/"
+path2ml = "mldata/" 
+path2qm = "qmdata/"
 
-featdir = "feat_vecs1/"
-soapdir = "soaps1/"
-regrdir = "regr1/"
-kerndir = "kernels1/"
+featdir = "feat_vecs/"
+soapdir = "soaps/"
+regrdir = "regr/"
+kerndir = "kernels/"
 
-coefdir = "coefficients1/"
-projdir = "projections1/"
-ovlpdir = "overlaps1/"
-preddir = "predictions1/"
+coefdir = "coefficients/"
+projdir = "projections/"
+ovlpdir = "overlaps/"
+preddir = "predictions/"
 
 # PySCF variables 
 # ------------

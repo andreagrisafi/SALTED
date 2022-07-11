@@ -52,7 +52,7 @@ Validate model predicting on the remaining structures
 :code:`mpirun -np $ntasks python $SALTEDPATH/validation.py` 
 
 #-------------------------------------------------------------------------------
-# PERFORM SALTED MINIMISATION AND VALIDATION
+# PREDICT DENSITIES OF NEW STRUCTURES
 #-------------------------------------------------------------------------------
 
 Calculate the lambda-SOAP descriptors for the structures to predict, using
@@ -65,3 +65,25 @@ Calculate the predicted coefficients using
 :code:`python $SALTEDPATH/prediction.py`
 
 This produces the predicted coefficients for each configuration found in inp.predict_filename. These are output to inp.path2qm+inp.preddir.
+
+#-------------------------------------------------------------------------------
+# INDIRECT PREDICTION OF ELECTROSTATIC ENERGY
+#-------------------------------------------------------------------------------
+
+Calculate the reference energies of the water molecules used in validation, using
+:code:`python $SALTEDPATH/electro_energy-pyscf.py`
+
+Calculate the energies derived from the predicted densities and evaluate the error, using
+:code:`python $SALTEDPATH/electro_error-pyscf.py`
+
+To compare performance to an equivalent 'direct' prediction, run
+:code:`python $SALTEDPATH/sparse-gpr_energies.py`
+
+
+#-------------------------------------------------------------------------------
+# PERFORM ORTHOGONALISED MINIMISATION AND VALIDATION
+#-------------------------------------------------------------------------------
+
+:code:`python $SALTEDPATH/ortho_projections.py`
+:code:`python $SALTEDPATH/ortho_regression.py`
+:code:`python $SALTEDPATH/ortho_error.py`
