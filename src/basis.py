@@ -50,41 +50,6 @@ def basiset(basis):
       nmax[("F",4)] = 7
       nmax[("F",5)] = 5
 
-   if basis=="FHI-aims-tight":
-
-      lmax["H"] = 4
-      lmax["C"] = 8
-      lmax["O"] = 8
-      lmax["Al"] = 8
-      lmax["Si"] = 8
-
-      # hydrogen
-      nmax[("H",0)] = 8
-      nmax[("H",1)] = 6
-      nmax[("H",2)] = 6
-      nmax[("H",3)] = 3
-      nmax[("H",4)] = 1
-      # carbon
-      nmax[("C",0)] = 11
-      nmax[("C",1)] = 10
-      nmax[("C",2)] = 9
-      nmax[("C",3)] = 8
-      nmax[("C",4)] = 7
-      nmax[("C",5)] = 5
-      nmax[("C",6)] = 3
-      nmax[("C",7)] = 2
-      nmax[("C",8)] = 1
-      # oxygen
-      nmax[("O",0)] = 9
-      nmax[("O",1)] = 10
-      nmax[("O",2)] = 9
-      nmax[("O",3)] = 8
-      nmax[("O",4)] = 6
-      nmax[("O",5)] = 4
-      nmax[("O",6)] = 4
-      nmax[("O",7)] = 2
-      nmax[("O",8)] = 1
- 
    if basis=="RI-cc-pvqz":
 
       lmax["H"] = 4
@@ -262,5 +227,26 @@ def basiset(basis):
       nmax[("Au",4)] = 18
       nmax[("Au",5)] = 18
       nmax[("Au",6)] = 18
+
+   if basis=="FHI-aims-tight":
+
+      lmax["H"] = 4
+      lmax["O"] = 8
+
+      nmax[("H",0)] = 9
+      nmax[("H",1)] = 7
+      nmax[("H",2)] = 6
+      nmax[("H",3)] = 3
+      nmax[("H",4)] = 1
+
+      nmax[("O",0)] = 9
+      nmax[("O",1)] = 10
+      nmax[("O",2)] = 9
+      nmax[("O",3)] = 8
+      nmax[("O",4)] = 6
+      nmax[("O",5)] = 4
+      nmax[("O",6)] = 4
+      nmax[("O",7)] = 2
+      nmax[("O",8)] = 1
 
    return [lmax,nmax]

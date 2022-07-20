@@ -29,10 +29,10 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-dirpath = os.path.join(inp.path2ml, pdir)
+dirpath = os.path.join(inp.path2qm, pdir)
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2ml+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -48,7 +48,7 @@ trainrangetot = np.loadtxt("training_set.txt",int)
 ntrain = int(inp.trainfrac*len(trainrangetot))
 testrangetot = np.setdiff1d(list(range(ndata)),trainrangetot)
 
-dirpath = os.path.join(inp.path2ml+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
+dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -119,7 +119,7 @@ for iconf in testrange:
     pred_coefs += Av_coeffs
 
     # save predicted coefficients
-    np.save(inp.path2ml+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
+    np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
 
     # compute predicted density projections <phi|rho>
     pred_projs = np.dot(overl,pred_coefs)

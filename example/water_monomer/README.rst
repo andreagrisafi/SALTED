@@ -1,6 +1,6 @@
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 # SETUP
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 
 Before beginning, run
 :code:`source YOUR_SALTED_DIRECTORY/env.sh`
@@ -9,9 +9,9 @@ and
 
 Ensure that the file $SALTEDPATH/basis.py contains an entry corresponding to the dfbasis you wish to use
 
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 # GENERATE TRAINING DATA
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 
 Generate the density matrices for the configurations of water using PySCF using
 :code:`python $SALTEDPATH/run-pyscf.py`
@@ -24,18 +24,18 @@ Each of these commands can be run with the flag `-iconf n` to generate the train
 Calculate the spherically averaged baseline coefficients across the training set
 :code:`python $SALTEDPATH/get_averages.py`
 
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 # GENERATE DESCRIPTORS
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 
 Calculate the lambda-SOAP descriptors, using
 :code:`python $SALTEDPATH/run-tensoap.py`
 
 The number of sparse features and number of structures used for sparsification can be specified using the flags `-nc` and `-ns` respectively
 
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 # PERFORM SALTED MINIMISATION AND VALIDATION
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 
 Compute descriptors per basis function type for a given training set
 :code:`python $SALTEDPATH/rkhs.py`
@@ -49,9 +49,9 @@ Minimize loss function and print out regression weights
 Validate model predicting on the remaining structures
 :code:`mpirun -np $ntasks python $SALTEDPATH/validation.py` 
 
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 # PREDICT DENSITIES OF NEW STRUCTURES
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 
 Calculate the lambda-SOAP descriptors for the structures to predict, using
 :code:`python $SALTEDPATH/run-tensoap-predict.py`
@@ -64,9 +64,9 @@ Calculate the predicted coefficients using
 
 This produces the predicted coefficients for each configuration found in inp.predict_filename. These are output to inp.path2qm+inp.preddir.
 
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 # INDIRECT PREDICTION OF ELECTROSTATIC ENERGY
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 
 Calculate the reference energies of the water molecules used in validation, using
 :code:`python $SALTEDPATH/electro_energy-pyscf.py`
@@ -78,9 +78,9 @@ To compare performance to an equivalent 'direct' prediction, run
 :code:`python $SALTEDPATH/sparse-gpr_energies.py`
 
 
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 # PERFORM ORTHOGONALISED MINIMISATION AND VALIDATION
-#-------------------------------------------------------------------------------
+#---------------------------------------------------
 
 :code:`python $SALTEDPATH/ortho_projections.py`
 :code:`python $SALTEDPATH/ortho_regression.py`
