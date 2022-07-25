@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import sys
+import inp
 
 def main():
     
@@ -8,11 +9,11 @@ def main():
 
     dirname = inp.path2qm+'data/'
     av_err = 0
-    n = 1
+    n = 1000
     errs = np.zeros(n)
-    g = open('ri_errors','w+')
+    g = open('ri_maes','w+')
     for i in range(1,n+1):
-        dirn = sp+str(i)+'/'
+        dirn = dirname+str(i)+'/'
         f = open(dirn+'rho_input_ri.out')
         r_con = [float(line.split()[-1]) for line in f]
         f = open(dirn+'rho_df.out')
@@ -29,8 +30,7 @@ def main():
     av_err = np.average(errs)
     sem = np.std(errs)/np.sqrt(n)
 
-    print av_err,sem
-
-    print round(time.time() - start_time,1),'seconds'
+    print(av_err,sem)
+    print(round(time.time() - start_time,1),'seconds')
 
 main()

@@ -25,7 +25,7 @@ for (( i=1; i<=$n; i++ )); do
 	cp ${DATADIR}/geoms/$i.in ${DATADIR}/$i/geometry.in
 	cd ${DATADIR}/$i
 
-	srun -n 1 $AIMS < /dev/null > aims.out && mv  rho_rebuilt_ri.out rho_df.out && mv ri_restart_coeffs.out ri_restart_coeffs_df.out &
+	srun --exclusive -n 1 $AIMS < /dev/null > aims.out && mv  rho_rebuilt_ri.out rho_df.out && mv ri_restart_coeffs.out ri_restart_coeffs_df.out &
 
 	cd -
 done

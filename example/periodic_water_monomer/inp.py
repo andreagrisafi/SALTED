@@ -6,18 +6,18 @@ propname = "electro"
 
 # paths to data
 # ------------
-path2ml = "mldata1/" 
-path2qm = "qmdata1/"
+path2ml = "mldata/" 
+path2qm = "qmdata/"
 
-featdir = "feat_vecs1/"
-soapdir = "soaps1/"
-regrdir = "regr1/"
-kerndir = "kernels1/"
+featdir = "feat_vecs/"
+soapdir = "soaps/"
+regrdir = "regr/"
+kerndir = "kernels/"
 
-coefdir = "coefficients1/"
-projdir = "projections1/"
-ovlpdir = "overlaps1/"
-preddir = "predictions1/"
+coefdir = "coefficients/"
+projdir = "projections/"
+ovlpdir = "overlaps/"
+valcdir = "validation_coeffs/"
 
 # AIMS variables 
 # ------------
@@ -39,5 +39,7 @@ restart = False   # restart minimization
 # Prediction Paths
 # ------------
 predict_filename = "water_dimers_10.xyz"
-predict_soapdir = "predict_soaps1/"
-predict_kerndir = "predict_kernels1/"
+predict_soapdir = "predict_soaps/"
+predict_kerndir = "predict_kernels/"
+predict_coefdir = "predicted_coeffs/"
+predict_data = "predicted_data/"

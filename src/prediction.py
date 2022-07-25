@@ -12,7 +12,7 @@ reg = inp.regul
 
 kdir = inp.predict_kerndir
 rdir = inp.regrdir
-pdir = inp.preddir
+pdir = inp.predict_coefdir
 
 av_coefs = {}
 for spe in spelist:
@@ -83,3 +83,5 @@ for itest in range(ndata):
 
     # save predicted coefficients
     np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(itest)+".npy",pred_coefs)
+
+print('Prediction complete')

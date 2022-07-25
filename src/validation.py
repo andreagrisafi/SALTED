@@ -22,7 +22,7 @@ coefdir = inp.coefdir
 ovlpdir = inp.ovlpdir
 
 kdir = inp.kerndir
-pdir = inp.preddir
+pdir = inp.valcdir
 rdir = inp.regrdir
 
 av_coefs = {}

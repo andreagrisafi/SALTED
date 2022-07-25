@@ -44,7 +44,7 @@ testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
-pdir = inp.preddir
+pdir = inp.valcdir
 M = inp.Menv
 eigcut = inp.eigcut
 ntrain = int(inp.Ntrain*inp.trainfrac)

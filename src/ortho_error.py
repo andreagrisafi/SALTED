@@ -10,7 +10,7 @@ spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_
 M = inp.Menv
 eigcut = inp.eigcut
 
-pdir = inp.preddir
+pdir = inp.valcdir
 
 # load predicted coefficients for test structures
 trainrangetot = np.loadtxt("training_set.txt",int)

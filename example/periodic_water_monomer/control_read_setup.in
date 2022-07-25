@@ -10,13 +10,11 @@
   spin               none
   relativistic       none
   charge             0.
-  k_grid 	     1 1 1
-  ri_density_restart write
-  ri_full_output .True.
+#  k_grid 	     1 1 1
+  ri_density_restart read_init
 
   default_max_l_prodbas 5
   default_prodbas_acc 1d-4
-  wave_threshold 1e-8
 
 ################################################################################
 

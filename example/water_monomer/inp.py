@@ -17,7 +17,7 @@ kerndir = "kernels/"
 coefdir = "coefficients/"
 projdir = "projections/"
 ovlpdir = "overlaps/"
-preddir = "predictions/"
+valcdir = "validation_coeffs/"
 
 # PySCF variables 
 # ------------
@@ -44,3 +44,4 @@ restart = False   # restart minimization
 predict_filename = "water_dimers_10.xyz"
 predict_soapdir = "predict_soaps1/"
 predict_kerndir = "predict_kernels1/"
+predict_coefdir = "predict_coeffs1"

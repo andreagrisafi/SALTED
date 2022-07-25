@@ -17,7 +17,7 @@ frac = inp.trainfrac
 reg = inp.regul
 eigcut = inp.eigcut
 kdir = inp.kerndir
-pdir = inp.preddir
+pdir = inp.valcdir
 
 dirpath = os.path.join(inp.path2qm, pdir)
 if not os.path.exists(dirpath):
