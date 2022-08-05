@@ -4,7 +4,7 @@ import time
 import random
 from random import shuffle
 from scipy import sparse
-from utils import read_system,get_atom_idx
+from sys_utils import read_system,get_atom_idx
 import inp
 from mpi4py import MPI
 

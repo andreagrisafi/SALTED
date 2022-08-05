@@ -249,4 +249,35 @@ def basiset(basis):
       nmax[("O",7)] = 2
       nmax[("O",8)] = 1
 
+   if basis=="FHI-aims-ZrS":
+
+      lmax["S"] = 6
+      lmax["Zr"] = 6
+
+      nmax[("S",0)] = 10
+      nmax[("S",1)] = 10
+      nmax[("S",2)] = 10
+      nmax[("S",3)] = 10
+      nmax[("S",4)] = 8
+      nmax[("S",5)] = 5
+      nmax[("S",6)] = 4
+
+      nmax[("Zr",0)] = 14
+      nmax[("Zr",1)] = 13
+      nmax[("Zr",2)] = 13
+      nmax[("Zr",3)] = 12
+      nmax[("Zr",4)] = 12
+      nmax[("Zr",5)] = 8
+      nmax[("Zr",6)] = 4
+
+   if basis=="FHI-aims-graphene":
+
+      lmax["C"] = 4
+
+      nmax[("C",0)] = 7
+      nmax[("C",1)] = 7
+      nmax[("C",2)] = 6
+      nmax[("C",3)] = 5
+      nmax[("C",4)] = 3
+
    return [lmax,nmax]

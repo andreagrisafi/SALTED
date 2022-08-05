@@ -3,7 +3,7 @@
 import numpy as np
 import inp
 from ase.io import read
-from utils import read_system
+from sys_utils import read_system
 
 spelist, lmax, nmax, llmax, nnmax, ndata, symbols, natoms, natmax = read_system()
 

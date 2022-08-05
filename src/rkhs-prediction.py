@@ -3,7 +3,7 @@ import numpy as np
 import time
 from ase.io import read
 import inp
-from utils import read_system, get_atom_idx
+from sys_utils import read_system, get_atom_idx
 
 spelist, lmax, nmax, llmax, nnmax, ndata_train, atomic_symbols_train, natoms_train, natmax_train = read_system()
 

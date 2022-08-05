@@ -2,7 +2,7 @@ import os
 import time
 import numpy as np
 import inp
-from utils import read_system
+from sys_utils import read_system
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 

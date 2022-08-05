@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import inp
-from utils import read_system
+from sys_utils import read_system
 from mpi4py import MPI
 
 # MPI information

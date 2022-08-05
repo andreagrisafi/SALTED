@@ -1,5 +1,5 @@
 import os
-from utils import read_system
+from sys_utils import read_system
 import inp
 import subprocess
 import argparse

@@ -3,7 +3,7 @@ import numpy as np
 import time
 #import argparse
 import inp
-from utils import read_system, get_atom_idx
+from sys_utils import read_system, get_atom_idx
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 atom_idx, natoms_spe = get_atom_idx(ndata,natoms,spelist,atomic_symbols)

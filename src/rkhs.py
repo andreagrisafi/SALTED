@@ -3,7 +3,7 @@ import numpy as np
 import time
 from random import shuffle
 import inp
-from utils import read_system, get_atom_idx
+from sys_utils import read_system, get_atom_idx
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 

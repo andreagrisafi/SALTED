@@ -2,7 +2,7 @@ import os
 import numpy as np
 import random
 import inp
-from utils import read_system, get_atom_idx
+from sys_utils import read_system, get_atom_idx
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
