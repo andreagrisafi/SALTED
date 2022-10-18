@@ -12,7 +12,7 @@ export OMP_NUM_THREADS=1
 ulimit -s unlimited
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INTEL_HOME/compilers_and_libraries/linux/lib/intel64/:$MKL_HOME/lib/intel64/:$HOME/.local/lib
 
-QMDIR='qmdata1/'
+QMDIR='qmdata/'
 AIMS=~/aims.master.mkl.x
 
 DATADIR=${QMDIR}data

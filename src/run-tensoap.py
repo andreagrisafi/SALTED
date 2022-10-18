@@ -13,6 +13,7 @@ def add_command_line_arguments_contraction(parsetext):
     parser.add_argument("-vf", "--vol_frac",       type=float, default=1.0,                              help="Specify the occupied fraction of the cell")
     parser.add_argument("-rc", "--rcut",       type=float, default=4.0,                              help="Specify the SOAP cutoff radius")
     parser.add_argument("-sg", "--sigma",         type=float, default=0.3,                              help="Gaussian width")
+    parser.add_argument("-d", "--dummy", type=int,default=0, help="Include a dummy atom in the SOAP descriptor, at -x (1), -y (2), or -z (3)")
     args = parser.parse_args()
     return args
 
@@ -24,6 +25,7 @@ predict = args.predict
 vf = args.vol_frac
 rc = args.rcut
 sg = args.sigma
+dummy = args.dummy
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 if predict:
@@ -40,6 +42,7 @@ os.environ['TENSOAP_NC'] = str(nc)
 os.environ['TENSOAP_NS'] = str(ns)
 os.environ['TENSOAP_RC'] = str(rc)
 os.environ['TENSOAP_SG'] = str(sg)
+os.environ['TENSOAP_D'] = '-d '+str(dummy)
 if periodic:
     os.environ['TENSOAP_P'] = '-p'
 else:
