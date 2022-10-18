@@ -39,14 +39,14 @@ source activate mypy3
 source ~/SALTED/env.sh
 source ~/TENSOAP/env.sh
 
-srun -n 10 python move_data.py
+
+python $SALTEDPATH/get_averages.py
 
 python $SALTEDPATH/run-tensoap.py -p -nc 0
 
-python $SALTEDPATH/get_averages.py
 python $SALTEDPATH/rkhs.py
 srun -n 10 python $SALTEDPATH/feature_vector.py
 
-srun -n 1 python $SALTEDPATH/minimize_loss.py > reg_$i.out
-python $SALTEDPATH/validation.py >> reg_$i.out
+srun -n 1 python $SALTEDPATH/minimize_loss.py 
+python $SALTEDPATH/validation.py > validation.out
 

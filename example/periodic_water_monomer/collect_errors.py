@@ -90,7 +90,7 @@ if predict:
     np.savetxt('predict_reference_xc_energy.dat',xcs[:,0])
     np.savetxt('predict_reference_total_energy.dat',es[:,0])
     np.savetxt('prediction_electrostatic_energy.dat',eles[:,1])
-    np.savetxt('predict_xc_energy.dat',xcs[:,1])
+    np.savetxt('prediction_xc_energy.dat',xcs[:,1])
     np.savetxt('prediction_total_energy.dat',es[:,1])
 else:
     np.savetxt('val_reference_electrostatic_energy.dat',eles[:,0])

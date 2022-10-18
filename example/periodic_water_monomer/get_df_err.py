@@ -11,10 +11,10 @@ def main():
     av_err = 0
     n = 1000
     errs = np.zeros(n)
-    g = open('ri_maes','w+')
+    g = open('df_maes','w+')
     for i in range(1,n+1):
         dirn = dirname+str(i)+'/'
-        f = open(dirn+'rho_input_ri.out')
+        f = open(dirn+'rho_scf.out')
         r_con = [float(line.split()[-1]) for line in f]
         f = open(dirn+'rho_df.out')
         r_ri = [float(line.split()[-1]) for line in f]

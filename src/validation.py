@@ -25,16 +25,22 @@ kdir = inp.kerndir
 pdir = inp.valcdir
 rdir = inp.regrdir
 
+response = False
+if os.path.exists("regr_averages_"+str(spelist[0])+".npy"): response = True
+
 av_coefs = {}
+if response: regr_av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
+    if response: regr_av_coefs[spe] = np.load("regr_averages_"+str(spe)+".npy")
 
-dirpath = os.path.join(inp.path2qm, pdir)
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
+if rank == 0:
+    dirpath = os.path.join(inp.path2qm, pdir)
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+    dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
 
 #kdir = {}
 #rcuts = [6.0]
@@ -49,8 +55,9 @@ ntrain = int(inp.trainfrac*len(trainrangetot))
 testrangetot = np.setdiff1d(list(range(ndata)),trainrangetot)
 
 dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
+if rank == 0:
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
 
 # load regression weights
 weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
@@ -104,6 +111,7 @@ for iconf in testrange:
     # fill vector of predictions
     pred_coefs = np.zeros(Tsize)
     Av_coeffs = np.zeros(Tsize)
+    Regr_Av_coeffs = np.zeros(Tsize)
     i = 0
     for iat in range(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
@@ -112,11 +120,15 @@ for iconf in testrange:
                 pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1] 
                 if l==0:
                     Av_coeffs[i] = av_coefs[spe][n]
+                    if response: Regr_Av_coeffs[i] = regr_av_coefs[spe][n]
                 i += 2*l+1
         ispe[spe] += 1
 
     # add the average spherical coefficients to the predictions 
-    pred_coefs += Av_coeffs
+    if response:
+        pred_coefs += Regr_Av_coeffs
+    else:
+        pred_coefs += Av_coeffs
 
     # save predicted coefficients
     np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(iconf)+".npy",pred_coefs)

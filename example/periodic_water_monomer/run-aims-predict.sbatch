@@ -4,14 +4,14 @@
 #SBATCH -e ./predict.err.%j
 #SBATCH -J predict
 #SBATCH --partition=mpsd
-#SBATCH --nodes=4
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-node=16
 #SBATCH --mem-per-cpu=3800
 
 export OMP_NUM_THREADS=1
 ulimit -s unlimited
 
-DATADIR='qmdata1/predicted_data'
+DATADIR='qmdata/predicted_data'
 AIMS=~/aims.master.mkl.x
 
 python make_geoms.py --predict
@@ -24,12 +24,10 @@ for (( i=1; i<=$n; i++ )); do
 	cp ${DATADIR}/geoms/$i.in ${DATADIR}/$i/geometry.in
 	cd ${DATADIR}/$i
 
-	srun -n 1 $AIMS < /dev/null > aims.out && mv  rho_rebuilt_ri.out rho_df.out && mv ri_restart_coeffs.out ri_restart_coeffs_df.out &
+	srun -n 1 $AIMS < /dev/null > aims.out &
 
 	cd -
 done
-
-
 
 wait
 
@@ -40,13 +38,13 @@ for (( i=1; i<=$n; i++ )); do
 	srun --exclusive -n 1 $AIMS < /dev/null > temp.out 
 	cd -
 	
-	cp control_read.in ${DATADIR}/$i/control.in
+	cp control_read_predict.in ${DATADIR}/$i/control.in
 	python move_data_in.py --predict -i $i
 	
 	cd ${DATADIR}/$i
 	
-	cp ri_restart_coeffs_predicted.out ri_restart_coeffs.out
-	srun --exclusive -n 1 $AIMS < /dev/null > aims_predict.out &
+	mv ri_restart_coeffs_predicted.out ri_restart_coeffs.out
+	srun --exclusive -n 1 $AIMS < /dev/null > aims_predict.out && mv rho_rebuilt_ri.out rho_ml.out && mv ri_restart_coeffs.out ri_restart_coeffs_ml.out &
 
 	cd -
 done
