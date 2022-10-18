@@ -29,12 +29,20 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-dirpath = os.path.join(inp.path2qm, pdir)
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
+trainrangetot = np.loadtxt("training_set.txt",int)
+ntrain = int(inp.trainfrac*len(trainrangetot))
+testrangetot = np.setdiff1d(list(range(ndata)),trainrangetot)
+
+if rank == 0:
+    dirpath = os.path.join(inp.path2qm, pdir)
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+    dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+    dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
 
 #kdir = {}
 #rcuts = [6.0]
@@ -43,14 +51,6 @@ if not os.path.exists(dirpath):
 #    kdir[rc] = "kernels_rc"+str(rc)+"-sg"+str(rc/10)+"/"
 
 #orcuts = np.loadtxt("optimal_rcuts.dat")
-
-trainrangetot = np.loadtxt("training_set.txt",int)
-ntrain = int(inp.trainfrac*len(trainrangetot))
-testrangetot = np.setdiff1d(list(range(ndata)),trainrangetot)
-
-dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
 
 # load regression weights
 weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")

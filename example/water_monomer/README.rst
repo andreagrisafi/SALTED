@@ -54,7 +54,7 @@ Validate model predicting on the remaining structures
 #---------------------------------------------------
 
 Calculate the lambda-SOAP descriptors for the structures to predict, using
-:code:`python $SALTEDPATH/run-tensoap-predict.py`
+:code:`python $SALTEDPATH/run-tensoap.py --predict`
 
 Compute descriptors per basis function type for the prediction set
 :code:`python $SALTEDPATH/rkhs-prediction.py`

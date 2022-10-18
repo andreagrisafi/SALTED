@@ -75,7 +75,7 @@ Other properties can be collected with simple modifications to the script.
 #-------------------------------------------------------------------------------
 
 Calculate the lambda-SOAP descriptors for the structures to predict, using
-:code:`python $SALTEDPATH/run-tensoap-prediction.py`
+:code:`python $SALTEDPATH/run-tensoap.py --predict`
 
 Compute descriptors per basis function type for the prediction set
 :code:`python $SALTEDPATH/rkhs-prediction.py`

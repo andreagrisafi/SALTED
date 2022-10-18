@@ -280,4 +280,39 @@ def basiset(basis):
       nmax[("C",3)] = 5
       nmax[("C",4)] = 3
 
+   if basis=="FHI-aims-MoSe":
+
+      lmax["Se"] = 6
+      lmax["Mo"] = 6
+
+      nmax[("Se",0)] = 13
+      nmax[("Se",1)] = 13
+      nmax[("Se",2)] = 11
+      nmax[("Se",3)] = 11
+      nmax[("Se",4)] = 9
+      nmax[("Se",5)] = 7
+      nmax[("Se",6)] = 4
+
+      nmax[("Mo",0)] = 14
+      nmax[("Mo",1)] = 13
+      nmax[("Mo",2)] = 13
+      nmax[("Mo",3)] = 12
+      nmax[("Mo",4)] = 11
+      nmax[("Mo",5)] = 8
+      nmax[("Mo",6)] = 5
+
+   if basis=="FHI-aims-light":
+
+      lmax["H"] = 2
+      lmax["O"] = 4
+
+      nmax[("H",0)] = 4
+      nmax[("H",1)] = 3
+      nmax[("H",2)] = 1
+
+      nmax[("O",0)] = 9
+      nmax[("O",1)] = 9
+      nmax[("O",2)] = 8
+      nmax[("O",3)] = 3
+      nmax[("O",4)] = 1
    return [lmax,nmax]
