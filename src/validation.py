@@ -27,6 +27,8 @@ rdir = inp.regrdir
 
 response = False
 if os.path.exists("regr_averages_"+str(spelist[0])+".npy"): response = True
+if response:
+    kdir = inp.predict_kerndir
 
 av_coefs = {}
 if response: regr_av_coefs = {}
