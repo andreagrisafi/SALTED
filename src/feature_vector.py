@@ -5,7 +5,9 @@ import random
 from random import shuffle
 from scipy import sparse
 from sys_utils import read_system,get_atom_idx
+from sys import getsizeof
 import inp
+import gc
 from mpi4py import MPI
 
 #import argparse
@@ -121,7 +123,39 @@ for iconf in conf_range:
                 iii += 1
 
     # fill in a single array for RKHS feature vector and predictions
-    psi_vector = np.zeros((Tsize,totsize))
+#    psi_vector = np.zeros((Tsize,totsize))
+#    i = 0
+#    for iat in range(natoms[iconf]):
+#        spe = atomic_symbols[iconf][iat]
+#        for l in range(lmax[spe]+1):
+#            i1 = ispe[spe]*(2*l+1)
+#            i2 = ispe[spe]*(2*l+1)+2*l+1
+#            for n in range(nmax[(spe,l)]):
+#                psi_vector[i:i+2*l+1] = Psi[(spe,l,n)][i1:i2] 
+#                print(spe,l,n,i1,i2)
+#                print(Psi[(spe,l,n)][i1:i2])
+#                i += 2*l+1
+#        ispe[spe] += 1
+
+    # save sparse feature-vector 
+#    nrows = psi_vector.shape[0]
+#    ncols = psi_vector.shape[1]
+#    srows = np.nonzero(psi_vector)[0]
+#    scols = np.nonzero(psi_vector)[1]
+#    ssize = len(srows)
+
+#    psi_nonzero = psi_vector[srows,scols] 
+#    ij = np.vstack((srows,scols))
+    
+    # build sparse feature-vector memory efficiently
+    for spe in spelist:
+        ispe[spe] = 0
+
+    nrows = Tsize
+    ncols = totsize
+    srows = []
+    scols = []
+    psi_nonzero = []
     i = 0
     for iat in range(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
@@ -129,19 +163,23 @@ for iconf in conf_range:
             i1 = ispe[spe]*(2*l+1)
             i2 = ispe[spe]*(2*l+1)+2*l+1
             for n in range(nmax[(spe,l)]):
-                psi_vector[i:i+2*l+1] = Psi[(spe,l,n)][i1:i2] 
+                x = Psi[(spe,l,n)][i1:i2]
+                srows += list(np.nonzero(x)[0]+i) 
+                scols += list(np.nonzero(x)[1])
+                psi_nonzero += list(x[x!=0])
                 i += 2*l+1
         ispe[spe] += 1
-
-    # save sparse feature-vector 
-    nrows = psi_vector.shape[0]
-    ncols = psi_vector.shape[1]
-    srows = np.nonzero(psi_vector)[0]
-    scols = np.nonzero(psi_vector)[1]
-    ssize = len(srows)
-    psi_nonzero = psi_vector[srows,scols] 
     ij = np.vstack((srows,scols))
+
+    del srows
+    del scols
+
     sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
     sparse.save_npz(inp.path2ml+fdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz", sparse_psi)
- 
+
+    del sparse_psi
+    del psi_nonzero
+    del ij
+    gc.collect()
+
 #    print(time.time()-start)
