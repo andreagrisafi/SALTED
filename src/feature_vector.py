@@ -5,7 +5,6 @@ import random
 from random import shuffle
 from scipy import sparse
 from sys_utils import read_system,get_atom_idx
-from sys import getsizeof
 import inp
 import gc
 from mpi4py import MPI
@@ -92,7 +91,7 @@ for iconf in conf_range:
 #for iconf in range(istart,iend):
 
     start = time.time()
-    print(iconf+1,flush=True)
+    print(iconf,flush=True)
 
     # load reference QM data
     coefs = np.load(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
@@ -148,8 +147,6 @@ for iconf in conf_range:
 #    ij = np.vstack((srows,scols))
     
     # build sparse feature-vector memory efficiently
-    for spe in spelist:
-        ispe[spe] = 0
 
     nrows = Tsize
     ncols = totsize
