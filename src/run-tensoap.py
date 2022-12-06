@@ -40,9 +40,9 @@ else:
 
 #os.environ['TENSOAP_FILE_IN'] = fname
 os.environ['lmax'] = str(llmax)
-#os.environ['lmax'] = '1' #TEST
 os.environ['TENSOAP_OUTDIR'] = dirpath
 os.environ['TENSOAP_SPECIES'] = ' '.join(inp.species)
+spe = ' '.join(inp.species)
 os.environ['TENSOAP_NC'] = str(nc)
 os.environ['TENSOAP_NS'] = str(ns)
 os.environ['TENSOAP_RC'] = str(rc)
@@ -50,14 +50,21 @@ os.environ['TENSOAP_SG'] = str(sg)
 os.environ['TENSOAP_D'] = '-d '+str(dummy)
 if periodic:
     os.environ['TENSOAP_P'] = '-p'
+    per = '-p'
 else:
     os.environ['TENSOAP_P'] = ''
+    per = ''
 if vf < 1.0:
     os.environ['TENSOAP_VF'] = '-vf '+str(vf)
+    svf = '-vf '+str(vf)
 else:
     os.environ['TENSOAP_VF'] = ''
+    svf = ''
 
 spath = os.environ.get('SALTEDPATH')
+
+#os.environ['lmax'] = '0' #TEST
+#llmax = 0 #TEST
 
 # make directories if not exisiting
 if not os.path.exists(inp.path2ml):
@@ -71,13 +78,20 @@ if parallel > 0:
     coords = ase.io.read(fname,":")
     npoints = len(coords)
     block = ceil(npoints/parallel)
-    output = [None]*parallel
+    output = [None]*parallel*(llmax+1)
     if nc > 0:
         for l in range(llmax+1):
-            output[l] = subprocess.call(['bash',spath+'/tensoap_sparsify.sh',fname,str(l)])
+            if os.path.exists(dirpath+'FEAT-'+str(l)+'_Amat.npy'): continue
+#            output[l] = subprocess.call(['bash',spath+'/tensoap_sparsify.sh',fname,str(l)])
+            cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+#            cmd += inp.species
+#            cmd.append('-c')
+#            cmd += inp.species
+#            cmd += ['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+            subprocess.call(cmd)
+#            subprocess.call(['get_power_spectrum.py','-f',fname,'-lm',str(l),per,'-vf',str(vf),'-s',inp.species,'-s',inp.species,'-nc',str(nc),'-ns',str(ns),'-sm','random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)])
 #       for l in range(llmax+1):
 #           output[l].communicate()
-
 
     for i in range(parallel):
         fname1 = str(i)+'_'+fname
@@ -86,7 +100,15 @@ if parallel > 0:
         else:
            ase.io.write(fname1,coords[i*block:])
 #        os.environ['TENSOAP_FILE_IN'] = fname1
-        output[i] = subprocess.Popen(['bash',spath+'/tensoap.sh',fname1,str(i)])
+    for l in range(llmax+1):
+        for i in range(parallel):
+            fname1 = str(i)+'_'+fname
+            if nc > 0:
+                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+            else:
+                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+            output[i] = subprocess.Popen(cmd)
+#       output[i] = subprocess.Popen(['srun','--exclusive','-n','1','bash',spath+'/tensoap.sh',fname1,str(i),'&'])
 
     # Wait for all blocks to finish
     for i in range(parallel):
