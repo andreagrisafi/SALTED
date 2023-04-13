@@ -41,14 +41,14 @@ else:
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename=fname)
 
 spe = ' '.join(inp.species)
-if periodic:
-    per = '-p'
-else:
-    per = ''
-if vf < 1.0:
-    svf = '-vf '+str(vf)
-else:
-    svf = ''
+#if periodic:
+#    per = '-p'
+#else:
+#    per = ''
+#if vf < 1.0:
+#    svf = '-vf '+str(vf)
+#else:
+#    svf = ''
 
 # make directories if not exisiting
 if not os.path.exists(inp.path2ml):
@@ -65,7 +65,9 @@ if nc > 0:
         # build sparsification details if they don't already exist
 
         if os.path.exists(dirpath+'FEAT-'+str(l)+'_Amat.npy'): continue
-        cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+        cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+        if periodic:
+            cmd += '-p'
         subprocess.call(cmd)
 
 if parallel > 1:
@@ -89,9 +91,11 @@ if parallel > 1:
         for i in range(parallel):
             fname1 = str(i)+'_'+fname
             if nc > 0:
-                cmd = ['srun','--exclusive','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+                cmd = ['srun','--exclusive','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
             else:
-                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+            if periodic:
+                cmd += '-p'
             output[j] = subprocess.Popen(cmd)
             j += 1
 
@@ -120,8 +124,11 @@ if parallel > 1:
 
 
 else:
-    if nc > 0:
-        cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-    else:
-        cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-    subprocess.call(cmd)
+    for l in range(llmax+1):
+        if nc > 0:
+            cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+        else:
+            cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+        if periodic:
+            cmd += '-p'
+        subprocess.call(cmd)
