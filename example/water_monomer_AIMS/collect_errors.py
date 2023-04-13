@@ -76,10 +76,10 @@ for k,i in enumerate(testset):
     xcs[k].append(xc[-1])
     eles[k].append(ele[-1])
     
-es = np.array(es,dtype = np.float)
-xcs = np.array(xcs,dtype = np.float)
-eles = np.array(eles,dtype = np.float)
-n_atoms = np.array(n_atoms,dtype = np.float)
+es = np.array(es,dtype = float)
+xcs = np.array(xcs,dtype = float)
+eles = np.array(eles,dtype = float)
+n_atoms = np.array(n_atoms,dtype = float)
 
 for i in range(2):
     xcs[:,i] /= n_atoms

@@ -3,7 +3,7 @@
 #SBATCH -o ./gen_data.out.%j
 #SBATCH -e ./gen_data.err.%j
 #SBATCH -J gen_data
-#SBATCH --partition=mpsd
+#SBATCH --partition=XXXX
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=16
 #SBATCH --mem-per-cpu=3800
@@ -11,7 +11,6 @@
 
 export OMP_NUM_THREADS=1
 ulimit -s unlimited
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INTEL_HOME/compilers_and_libraries/linux/lib/intel64/:$MKL_HOME/lib/intel64/:$HOME/.local/lib
 
 QMDIR='qmdata/'
 AIMS=~/aims.master.mkl.x

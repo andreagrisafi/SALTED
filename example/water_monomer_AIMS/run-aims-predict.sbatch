@@ -3,7 +3,7 @@
 #SBATCH -o ./predict.out.%j
 #SBATCH -e ./predict.err.%j
 #SBATCH -J predict
-#SBATCH --partition=mpsd
+#SBATCH --partition=XXXX
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=16
 #SBATCH --mem-per-cpu=3800

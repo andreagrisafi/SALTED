@@ -1,7 +1,8 @@
 import os
 from sys_utils import read_system
 from math import ceil,floor
-from psutils import cpu_count()
+from psutil import cpu_count,Process
+from time import sleep
 import sys
 sys.path.insert(0, './')
 import inp
@@ -58,9 +59,9 @@ if nc > 0:
         # build sparsification details if they don't already exist
 
         if os.path.exists(dirpath+'FEAT-'+str(l)+'_Amat.npy'): continue
-        cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-        if periodic:
-            cmd += '-p'
+        cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
+        if periodic: cmd += ['-p']
+        if dummy > 0: cmd += ['-d',str(dummy)]
         subprocess.call(cmd)
 
 if parallel > 1:
@@ -69,8 +70,14 @@ if parallel > 1:
     coords = ase.io.read(fname,":")
     npoints = len(coords)
     block = ceil(npoints/parallel)
-    cpt = floor(cpu_count(logical=False)/parallel)
+    cpus = cpu_count(logical=False)
+    cpt = floor(cpus/parallel)
     output = [None]*parallel*(llmax+1)
+
+    def childcount():
+        cp = Process()
+        num = cp.children()
+        return(len(num))
 
     # Split coords file into parallel blocks and calculate the SOAP descriptors for each
     for i in range(parallel):
@@ -84,13 +91,19 @@ if parallel > 1:
         for i in range(parallel):
             fname1 = str(i)+'_'+fname
             if nc > 0:
-                cmd = ['srun','--exclusive','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+#                cmd = ['srun','--exclusive','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
             else:
-                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-            if periodic:
-                cmd += '-p'
+#                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+            if periodic: cmd += ['-p']
+            if dummy > 0: cmd += ['-d',str(dummy)]
             output[j] = subprocess.Popen(cmd)
             j += 1
+            while childcount() > parallel:
+                sleep(1)
+                for k in range(j):
+                    output[k].communicate()
 
     # Wait for all blocks to finish
     for i in range(parallel*(llmax+1)):
@@ -122,6 +135,6 @@ else:
             cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
         else:
             cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-        if periodic:
-            cmd += '-p'
+        if periodic: cmd += ['-p']
+        if dummy > 0: cmd += ['-d',str(dummy)]
         subprocess.call(cmd)

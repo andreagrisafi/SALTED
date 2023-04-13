@@ -3,7 +3,7 @@
 #SBATCH -o ./validate.out.%j
 #SBATCH -e ./validate.err.%j
 #SBATCH -J validate
-#SBATCH --partition=mpsd
+#SBATCH --partition=XXXX
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=16
 #SBATCH --mem-per-cpu=3800

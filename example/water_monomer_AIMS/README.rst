@@ -7,7 +7,7 @@ Before beginning, run
 and 
 :code:`source YOUR_TENSOAP_DIRECTORY/env.sh`
 
-Ensure that the file $SALTEDPATH/basis.py contains an entry corresponding to the dfbasis you wish to use
+Ensure that the file $SALTEDPATH/basis.py contains an entry corresponding to the dfbasis you wish to use. Python scripts which can be run in parallel are indicated in this README; however, by setting inp.parallel=False, every SALTED script can be run serially.
 
 #-------------------------------------------------------------------------------
 # GENERATE TRAINING DATA USING AIMS
@@ -41,7 +41,7 @@ Calculate the spherically averaged baseline coefficients across the training set
 (The submission script `run-ml.sbatch` is provided for convenience to run the following steps)
 
 Calculate the lambda-SOAP descriptors, using
-:code:`python $SALTEDPATH/run-tensoap.py -p -nc 0`
+:code:`python $SALTEDPATH/run-tensoap.py -p -nc 0 --parallel $ntasks`
 
 The number of sparse features and number of structures used for sparsification can be specified using the flags `-nc` and `-ns` respectively. These have respective default values of 1000 and 100. The flag `-p` should be added to handle periodic systems. Setting `-nc 0` will not use any sparsification, which is recommended for this example.
 
@@ -50,7 +50,7 @@ The number of sparse features and number of structures used for sparsification c
 #-------------------------------------------------------------------------------
 
 Compute descriptors per basis function type for a given training set
-:code:`python $SALTEDPATH/rkhs.py`
+:code:`mpirun -np $ntasks python $SALTEDPATH/rkhs.py`
 
 Compute global feature vector and save as sparse object 
 :code:`mpirun -np $ntasks python $SALTEDPATH/feature_vector.py`
@@ -77,14 +77,14 @@ The reference energies are output to files with the prefix `val_reference`, and 
 #-------------------------------------------------------------------------------
 
 Calculate the lambda-SOAP descriptors for the structures to predict, using
-:code:`python $SALTEDPATH/run-tensoap.py --predict`
+:code:`python $SALTEDPATH/run-tensoap.py -nc 0 --predict`
 Note that we are predicting the density a cluster, despite having trained on periodic systems. AIMS treats periodic and non-periodic calculations on the same footing, allowing this.
 
 Compute descriptors per basis function type for the prediction set
-:code:`python $SALTEDPATH/rkhs-prediction.py`
+:code:`mpirun $ntasks python $SALTEDPATH/rkhs-prediction.py`
 
 Calculate the predicted coefficients using
-:code:`python $SALTEDPATH/prediction.py`
+:code:`mpirun $ntasks python $SALTEDPATH/prediction.py`
 
 This produces the predicted coefficients for each configuration found in inp.predict_filename. These are output to inp.path2qm+inp.predict_coefdir.
 
@@ -96,7 +96,7 @@ To evaluate the accuracy of the predicted densities and their derived properties
 :code:`sbatch run-aims-predict.sbatch`.
 Once again, in the submission script $DATADIR must be set to the same directory as path2qm+predict_data in inp.py, and the path to the AIMS executable must be specified. Further changes to the submission script may be required depending on your HPC setup.
 
-The accuracy of the densities can be calculated by running :code:`python get_ml_err.py`. This will produce a file called ml_maes listing the percentage integrated mean absolute error in the density for every structure in the dataset. In this example it should be just over ???% for each structure.
+The accuracy of the densities can be calculated by running :code:`python get_ml_err.py`. This will produce a file called ml_maes listing the percentage integrated mean absolute error in the density for every structure in the dataset. In this example it should be just over 0.6% on average.
 
 The electrostatic, XC and total energies per atom can be collected from the raw output files into numpy arrays using the script
 :code:`python collect_energies.py --predict`

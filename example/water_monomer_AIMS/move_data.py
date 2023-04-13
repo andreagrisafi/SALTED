@@ -1,14 +1,17 @@
 import numpy as np
 import os
 import inp
-from mpi4py import MPI
 from ase.io import read
 
-# MPI information
-comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
-print('This is task',rank+1,'of',size,flush=True)
+if inp.parallel:
+    from mpi4py import MPI
+    # MPI information
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+    print('This is task',rank+1,'of',size,flush=True)
+else:
+    rank = 0
 
 if (rank == 0):
     if not os.path.exists(inp.path2qm+inp.ovlpdir):
@@ -22,17 +25,20 @@ xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
 # Distribute structures to tasks
-if rank == 0:
-    conf_range = [[] for _ in range(size)]
-    blocksize = int(round(ndata/float(size)))
-    for i in range(size):
-        if i == (size-1):
-            conf_range[i] = list(range(ndata))[i*blocksize:ndata]
-        else:
-            conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
+if inp.parallel:
+    if rank == 0:
+        conf_range = [[] for _ in range(size)]
+        blocksize = int(round(ndata/np.float(size)))
+        for i in range(size):
+            if i == (size-1):
+                conf_range[i] = list(range(ndata))[i*blocksize:ndata]
+            else:
+                conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
+    else:
+        conf_range = None
+    conf_range = comm.scatter(conf_range,root=0)
 else:
-    conf_range = None
-conf_range = comm.scatter(conf_range,root=0)
+    conf_range = list(range(ndata))
 
 for i in conf_range:
     dirpath = inp.path2qm+'data/'+str(i+1)+'/'

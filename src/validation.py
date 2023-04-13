@@ -4,6 +4,16 @@ import sys
 sys.path.insert(0, './')
 import inp
 from sys_utils import read_system
+import argparse
+
+def add_command_line_arguments_contraction(parsetext):
+    parser = argparse.ArgumentParser(description=parsetext)
+    parser.add_argument("-r", "--response", action='store_true', help="Specify if validating a field direction other than that used to train the model")
+    args = parser.parse_args()
+    return args
+
+args = add_command_line_arguments_contraction("")
+response = args.response
 
 if inp.parallel:
     from mpi4py import MPI
@@ -30,8 +40,8 @@ kdir = inp.kerndir
 pdir = inp.valcdir
 rdir = inp.regrdir
 
-response = False
-if os.path.exists("regr_averages_"+str(spelist[0])+".npy"): response = True
+if response and not os.path.exists("regr_averages_"+str(spelist[0])+".npy"):
+    print("The averages used when trining the regression model need to be present, with the prefix 'regr_'") 
 if response:
     kdir = inp.predict_kerndir
 
@@ -55,14 +65,6 @@ if rank == 0:
     dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
-
-#kdir = {}
-#rcuts = [6.0]
-## get truncated size
-#for rc in rcuts:
-#    kdir[rc] = "kernels_rc"+str(rc)+"-sg"+str(rc/10)+"/"
-
-#orcuts = np.loadtxt("optimal_rcuts.dat")
 
 # load regression weights
 weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy")

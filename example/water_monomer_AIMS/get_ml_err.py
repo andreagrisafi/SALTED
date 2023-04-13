@@ -30,7 +30,7 @@ def main():
     av_err = np.average(errs)
     sem = np.std(errs)/np.sqrt(n)
 
-    print(av_err,sem)
-    print(round(time.time() - start_time,1),'seconds')
+    print('% MAE =', av_err)
+#    print(round(time.time() - start_time,1),'seconds')
 
 main()
