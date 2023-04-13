@@ -3,6 +3,8 @@ from pyscf import gto
 from ase.io import read
 from scipy import special
 import basis
+import sys
+sys.path.insert(0, './')
 import inp
 
 # read species

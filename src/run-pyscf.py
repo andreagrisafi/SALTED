@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 from pyscf import gto
 from pyscf import scf,dft
@@ -6,6 +7,8 @@ from ase.io import read
 from scipy import special
 import argparse
 from pyscf import grad
+
+sys.path.insert(0, './')
 import inp
 
 def add_command_line_arguments(parsetext):

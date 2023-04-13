@@ -1,6 +1,8 @@
 import os
 from sys_utils import read_system
 from math import ceil
+import sys
+sys.path.insert(0, './')
 import inp
 import subprocess
 import argparse

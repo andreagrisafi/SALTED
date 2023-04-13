@@ -5,9 +5,15 @@ import random
 from random import shuffle
 from scipy import sparse
 from sys_utils import read_system,get_atom_idx
+import sys
+sys.path.insert(0, './')
 import inp
-import gc
-from mpi4py import MPI
+
+if inp.parallel:
+    import gc
+    from mpi4py import MPI
+else:
+    rank==0
 
 #import argparse
 

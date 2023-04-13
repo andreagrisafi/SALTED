@@ -5,13 +5,18 @@ import random
 from scipy import sparse
 from mpi4py import MPI
 from sys_utils import read_system, get_atom_idx
+import sys
+sys.path.insert(0, './')
 import inp
 
 # MPI information
-comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
-print('This is task',rank+1,'of',size,flush=True)
+if inp.parallel:
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+    print('This is task',rank+1,'of',size,flush=True)
+else:
+    rank==0
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 

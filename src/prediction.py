@@ -1,5 +1,7 @@
 import os
 import numpy as np
+import sys
+sys.path.insert(0, './')
 import inp
 from sys_utils import read_system
 

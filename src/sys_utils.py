@@ -1,4 +1,6 @@
 import basis
+import sys
+sys.path.insert(0, './')
 import inp
 import numpy as np
 from ase.io import read
@@ -41,8 +43,6 @@ def get_atom_idx(ndata,natoms,spelist,atomic_symbols):
         for spe in spelist:
             atom_idx[(iconf,spe)] = [] 
             natom_dict[(iconf,spe)] = 0
-
-#    for iconf in range(ndata):
         for iat in range(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
             atom_idx[(iconf,spe)].append(iat)

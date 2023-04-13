@@ -2,6 +2,8 @@ import os
 import numpy as np
 import time
 from random import shuffle
+import sys
+sys.path.insert(0, './')
 import inp
 from sys_utils import read_system, get_atom_idx
 
