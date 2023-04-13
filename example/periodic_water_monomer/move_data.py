@@ -24,7 +24,7 @@ ndata = len(xyzfile)
 # Distribute structures to tasks
 if rank == 0:
     conf_range = [[] for _ in range(size)]
-    blocksize = int(round(ndata/np.float(size)))
+    blocksize = int(round(ndata/float(size)))
     for i in range(size):
         if i == (size-1):
             conf_range[i] = list(range(ndata))[i*blocksize:ndata]

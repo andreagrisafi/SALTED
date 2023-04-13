@@ -4,6 +4,13 @@ import time
 from ase.io import read
 import inp
 from sys_utils import read_system, get_atom_idx
+from mpi4py import MPI
+
+# MPI information
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
+print('This is task',rank+1,'of',size)
 
 spelist, lmax, nmax, llmax, nnmax, ndata_train, atomic_symbols_train, natoms_train, natmax_train = read_system()
 
@@ -42,17 +49,18 @@ fps_idx = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
 fps_species = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,1]
 
 # make directories if not exisiting
-dirpath = os.path.join(inp.path2ml, kdir)
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-for spe in spelist:
-    for l in range(llmax+1):
-        dirpath = os.path.join(inp.path2ml+kdir, "spe"+str(spe)+"_l"+str(l))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-        dirpath = os.path.join(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
+if (rank == 0):
+    dirpath = os.path.join(inp.path2ml, kdir)
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+    for spe in spelist:
+        for l in range(llmax+1):
+            dirpath = os.path.join(inp.path2ml+kdir, "spe"+str(spe)+"_l"+str(l))
+            if not os.path.exists(dirpath):
+                os.mkdir(dirpath)
+            dirpath = os.path.join(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+            if not os.path.exists(dirpath):
+                os.mkdir(dirpath)
 
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
 
@@ -68,7 +76,21 @@ for spe in spelist:
 
 print("Computing RKHS of symmetry-adapted sparse kernel approximations...")
 
-# lambda = 0
+# Distribute structures to tasks
+if rank == 0:
+    conf_range = [[] for _ in range(size)]
+    blocksize = int(round(ndata/float(size)))
+    for i in range(size):
+        if i == (size-1):
+            conf_range[i] = list(range(ndata))[i*blocksize:ndata]
+        else:
+            conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
+else:
+    conf_range = None
+
+conf_range = comm.scatter(conf_range,root=0)
+print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+
 power_env_sparse = {}
 kernel0_mm = {}
 kernel0_nm = {}
