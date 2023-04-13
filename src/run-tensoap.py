@@ -1,6 +1,7 @@
 import os
 from sys_utils import read_system
-from math import ceil
+from math import ceil,floor
+from psutils import cpu_count()
 import sys
 sys.path.insert(0, './')
 import inp
@@ -41,14 +42,6 @@ else:
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename=fname)
 
 spe = ' '.join(inp.species)
-#if periodic:
-#    per = '-p'
-#else:
-#    per = ''
-#if vf < 1.0:
-#    svf = '-vf '+str(vf)
-#else:
-#    svf = ''
 
 # make directories if not exisiting
 if not os.path.exists(inp.path2ml):

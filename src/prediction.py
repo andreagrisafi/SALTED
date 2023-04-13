@@ -4,13 +4,17 @@ import sys
 sys.path.insert(0, './')
 import inp
 from sys_utils import read_system
-from mpi4py import MPI
 
-# MPI information
-comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
-print('This is task',rank+1,'of',size)
+if inp.parallel:
+    from mpi4py import MPI
+
+    # MPI information
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+    print('This is task',rank+1,'of',size)
+else:
+    rank = 0
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(inp.predict_filename)
 
@@ -47,19 +51,23 @@ weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_M"+str(M)+"_reg"+st
 
 ntest = ndata
 testrangetot = np.arange(ndata)
-if rank == 0:
-    testrange = [[] for _ in range(size)]
-    blocksize = int(round(ntest/float(size)))
-    for i in range(size):
-        if i == (size-1):
-            testrange[i] = testrangetot[i*blocksize:ntest]
-        else:
-            testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
-else:
-    testrange = None
 
-testrange = comm.scatter(testrange,root=0)
-print('Task',rank+1,'handles the following structures:',testrange,flush=True)
+if inp.parallel:
+    if rank == 0:
+        testrange = [[] for _ in range(size)]
+        blocksize = int(round(ntest/float(size)))
+        for i in range(size):
+            if i == (size-1):
+                testrange[i] = testrangetot[i*blocksize:ntest]
+            else:
+                testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
+    else:
+        testrange = None
+
+    testrange = comm.scatter(testrange,root=0)
+    print('Task',rank+1,'handles the following structures:',testrange,flush=True)
+else:
+    testrange = testrangetot[:ntest]
 
 # compute error over test set
 error_density = 0

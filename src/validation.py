@@ -13,7 +13,7 @@ if inp.parallel:
     rank = comm.Get_rank()
     print('This is task',rank+1,'of',size)
 else:
-    rank==0
+    rank=0
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -73,20 +73,22 @@ variance = 0
 
 # Distribute structures to tasks
 ntest = len(testrangetot)
-if rank == 0:
-    testrange = [[] for _ in range(size)]
-    blocksize = int(round(ntest/float(size)))
-    for i in range(size):
-        if i == (size-1):
-            testrange[i] = testrangetot[i*blocksize:ntest]
-        else:
-            testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
-else:
-    testrange = None
+if inp.parallel:
+    if rank == 0:
+        testrange = [[] for _ in range(size)]
+        blocksize = int(round(ntest/float(size)))
+        for i in range(size):
+            if i == (size-1):
+                testrange[i] = testrangetot[i*blocksize:ntest]
+            else:
+                testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
+    else:
+        testrange = None
 
-testrange = comm.scatter(testrange,root=0)
-#ntrain = int(len(trainrange))
-print('Task',rank+1,'handles the following structures:',testrange,flush=True)
+    testrange = comm.scatter(testrange,root=0)
+    print('Task',rank+1,'handles the following structures:',testrange,flush=True)
+else:
+    testrange = testrangetot[:ntest]
 
 for iconf in testrange:
 
@@ -164,7 +166,8 @@ for iconf in testrange:
     #                    print(pred_projs[iaux],ref_projs[iaux])
     #                iaux += 1
 
-error_density = comm.allreduce(error_density)
-variance = comm.allreduce(variance)
+if inp.parallel:
+    error_density = comm.allreduce(error_density)
+    variance = comm.allreduce(variance)
 if (rank == 0): print("")
 if (rank == 0): print("% RMSE =", 100*np.sqrt(error_density/variance))

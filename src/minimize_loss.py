@@ -3,7 +3,6 @@ import numpy as np
 import time
 import random
 from scipy import sparse
-from mpi4py import MPI
 from sys_utils import read_system, get_atom_idx
 import sys
 sys.path.insert(0, './')
@@ -11,12 +10,13 @@ import inp
 
 # MPI information
 if inp.parallel:
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
     rank = comm.Get_rank()
     print('This is task',rank+1,'of',size,flush=True)
 else:
-    rank==0
+    rank=0
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -47,23 +47,27 @@ np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 
 # Distribute structures to tasks
 ntraintot = int(inp.trainfrac*inp.Ntrain)
-if rank == 0 and ntraintot < size:
-    print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
-    comm.Abort()
-if rank == 0:
-    trainrange = [[] for _ in range(size)]
-    blocksize = int(round(ntraintot/float(size)))
-    for i in range(size):
-        if i == (size-1):
-            trainrange[i] = trainrangetot[i*blocksize:ntraintot]
-        else:
-            trainrange[i] = trainrangetot[i*blocksize:(i+1)*blocksize]
-else:
-    trainrange = None
 
-trainrange = comm.scatter(trainrange,root=0)
+if inp.parallel:
+    if rank == 0 and ntraintot < size:
+        print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
+        comm.Abort()
+    if rank == 0:
+        trainrange = [[] for _ in range(size)]
+        blocksize = int(round(ntraintot/float(size)))
+        for i in range(size):
+            if i == (size-1):
+                trainrange[i] = trainrangetot[i*blocksize:ntraintot]
+            else:
+                trainrange[i] = trainrangetot[i*blocksize:(i+1)*blocksize]
+    else:
+        trainrange = None
+
+    trainrange = comm.scatter(trainrange,root=0)
+    print('Task',rank+1,'handles the following structures:',trainrange,flush=True)
+else:
+    trainrange = trainrangetot[:ntraintot]
 ntrain = int(len(trainrange))
-print('Task',rank+1,'handles the following structures:',trainrange,flush=True)
 
 
 def loss_func(weights,ovlp_list,psi_list):
@@ -192,6 +196,7 @@ for iconf in trainrange:
     psi_list.append(sparse.load_npz(inp.path2ml+fdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz"))
 
 totsize = psi_list[0].shape[1]
+norm = 1.0/float(ntraintot)
 
 if rank == 0: 
     print("problem dimensionality:", totsize)
@@ -216,14 +221,22 @@ if inp.restart == True:
 else:
     w = np.ones(totsize)*1e-04
     r = - grad_func(w,ovlp_list,psi_list)
-    r = comm.allreduce(r)/float(ntraintot) + 2.0 * reg * w
+    if inp.parallel:
+        r = comm.allreduce(r)*norm  + 2.0 * reg * w
+    else:
+        r *= norm
+        r += 2.0*reg*w
     d = np.multiply(P,r)
     delnew = np.dot(r,d)
 
 if rank == 0: print("minimizing...")
 for i in range(100000):
     Ad = curv_func(d,ovlp_list,psi_list)
-    Ad = comm.allreduce(Ad)/float(ntraintot) + 2.0 * reg * d 
+    if inp.parallel:
+        Ad = comm.allreduce(Ad)*norm + 2.0 * reg * d 
+    else:
+        Ad *= norm
+        Ad += 2.0*reg*d
     curv = np.dot(d,Ad)
     alpha = delnew/curv
     w = w + alpha*d

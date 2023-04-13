@@ -6,13 +6,17 @@ import sys
 sys.path.insert(0, './')
 import inp
 from sys_utils import read_system, get_atom_idx
-from mpi4py import MPI
 
-# MPI information
-comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
-print('This is task',rank+1,'of',size)
+if inp.parallel:
+    from mpi4py import MPI
+
+    # MPI information
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+    print('This is task',rank+1,'of',size)
+else:
+    rank = 0
 
 spelist, lmax, nmax, llmax, nnmax, ndata_train, atomic_symbols_train, natoms_train, natmax_train = read_system()
 
@@ -79,19 +83,22 @@ for spe in spelist:
 print("Computing RKHS of symmetry-adapted sparse kernel approximations...")
 
 # Distribute structures to tasks
-if rank == 0:
-    conf_range = [[] for _ in range(size)]
-    blocksize = int(round(ndata/float(size)))
-    for i in range(size):
-        if i == (size-1):
-            conf_range[i] = list(range(ndata))[i*blocksize:ndata]
-        else:
-            conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
-else:
-    conf_range = None
+if inp.parallel:
+    if rank == 0:
+        conf_range = [[] for _ in range(size)]
+        blocksize = int(round(ndata/float(size)))
+        for i in range(size):
+            if i == (size-1):
+                conf_range[i] = list(range(ndata))[i*blocksize:ndata]
+            else:
+                conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
+    else:
+        conf_range = None
 
-conf_range = comm.scatter(conf_range,root=0)
-print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+    conf_range = comm.scatter(conf_range,root=0)
+    print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+else:
+    conf_range = list(range(ndata))
 
 power_env_sparse = {}
 kernel0_mm = {}
