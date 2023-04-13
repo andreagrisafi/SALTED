@@ -9,8 +9,8 @@ import argparse
 
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-ns", "--ns", type=int, default=100, help="Number of sparse features")
-    parser.add_argument("-nc", "--nc", type=int, default=1000, help="Number of structures the sparse features are selected from")
+    parser.add_argument("-ns", "--ns", type=int, default=100, help="Number of structures the sparse features are selected from")
+    parser.add_argument("-nc", "--nc", type=int, default=1000, help="Number of sparse features")
     parser.add_argument("-p", "--periodic", action='store_true', help="Number of structures the sparse features are selected from")
     parser.add_argument("--predict", action='store_true', help="Calculate the SOAP descript for the structure for which the density will be predicted.")
     parser.add_argument("-vf", "--vol_frac",       type=float, default=1.0,                              help="Specify the occupied fraction of the cell")
@@ -32,88 +32,71 @@ sg = args.sigma
 dummy = args.dummy
 parallel = args.parallel
 
-spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 if predict:
     dirpath = os.path.join(inp.path2ml, inp.predict_soapdir)
     fname = inp.predict_filename
 else:
     dirpath = os.path.join(inp.path2ml, inp.soapdir)
     fname = inp.filename
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename=fname)
 
-#os.environ['TENSOAP_FILE_IN'] = fname
-os.environ['lmax'] = str(llmax)
-os.environ['TENSOAP_OUTDIR'] = dirpath
-os.environ['TENSOAP_SPECIES'] = ' '.join(inp.species)
 spe = ' '.join(inp.species)
-os.environ['TENSOAP_NC'] = str(nc)
-os.environ['TENSOAP_NS'] = str(ns)
-os.environ['TENSOAP_RC'] = str(rc)
-os.environ['TENSOAP_SG'] = str(sg)
-os.environ['TENSOAP_D'] = '-d '+str(dummy)
 if periodic:
-    os.environ['TENSOAP_P'] = '-p'
     per = '-p'
 else:
-    os.environ['TENSOAP_P'] = ''
     per = ''
 if vf < 1.0:
-    os.environ['TENSOAP_VF'] = '-vf '+str(vf)
     svf = '-vf '+str(vf)
 else:
-    os.environ['TENSOAP_VF'] = ''
     svf = ''
-
-spath = os.environ.get('SALTEDPATH')
-
-#os.environ['lmax'] = '0' #TEST
-#llmax = 0 #TEST
 
 # make directories if not exisiting
 if not os.path.exists(inp.path2ml):
     os.mkdir(inp.path2ml)
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
+if predict and nc != 0:
+    os.system('cp '+inp.path2ml+inp.soapdir+'*Amat.npy '+dirpath)
+    os.system('cp '+inp.path2ml+inp.soapdir+'*fps.npy '+dirpath)
+    
+if nc > 0:
+    for l in range(llmax+1):
 
-if parallel > 0:
+        # build sparsification details if they don't already exist
+
+        if os.path.exists(dirpath+'FEAT-'+str(l)+'_Amat.npy'): continue
+        cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+        subprocess.call(cmd)
+
+if parallel > 1:
     import ase.io
     import numpy as np
     coords = ase.io.read(fname,":")
     npoints = len(coords)
     block = ceil(npoints/parallel)
+    cpt = floor(cpu_count(logical=False)/parallel)
     output = [None]*parallel*(llmax+1)
-    if nc > 0:
-        for l in range(llmax+1):
-            if os.path.exists(dirpath+'FEAT-'+str(l)+'_Amat.npy'): continue
-#            output[l] = subprocess.call(['bash',spath+'/tensoap_sparsify.sh',fname,str(l)])
-            cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-#            cmd += inp.species
-#            cmd.append('-c')
-#            cmd += inp.species
-#            cmd += ['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-            subprocess.call(cmd)
-#            subprocess.call(['get_power_spectrum.py','-f',fname,'-lm',str(l),per,'-vf',str(vf),'-s',inp.species,'-s',inp.species,'-nc',str(nc),'-ns',str(ns),'-sm','random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)])
-#       for l in range(llmax+1):
-#           output[l].communicate()
 
+    # Split coords file into parallel blocks and calculate the SOAP descriptors for each
     for i in range(parallel):
         fname1 = str(i)+'_'+fname
         if i < parallel-1:
            ase.io.write(fname1,coords[i*block:(i+1)*block])
         else:
            ase.io.write(fname1,coords[i*block:])
-#        os.environ['TENSOAP_FILE_IN'] = fname1
+    j = 0
     for l in range(llmax+1):
         for i in range(parallel):
             fname1 = str(i)+'_'+fname
             if nc > 0:
-                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+                cmd = ['srun','--exclusive','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
             else:
                 cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-            output[i] = subprocess.Popen(cmd)
-#       output[i] = subprocess.Popen(['srun','--exclusive','-n','1','bash',spath+'/tensoap.sh',fname1,str(i),'&'])
+            output[j] = subprocess.Popen(cmd)
+            j += 1
 
     # Wait for all blocks to finish
-    for i in range(parallel):
+    for i in range(parallel*(llmax+1)):
         output[i].wait()
 
     # Clean Up
@@ -137,4 +120,8 @@ if parallel > 0:
 
 
 else:
-    subprocess.call(['bash',spath+'/tensoap.sh',fname])
+    if nc > 0:
+        cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+    else:
+        cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),per,'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+    subprocess.call(cmd)

@@ -4,6 +4,13 @@ import sys
 sys.path.insert(0, './')
 import inp
 from sys_utils import read_system
+from mpi4py import MPI
+
+# MPI information
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
+print('This is task',rank+1,'of',size)
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(inp.predict_filename)
 
@@ -20,26 +27,44 @@ av_coefs = {}
 for spe in spelist:
     av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
-dirpath = os.path.join(inp.path2qm, pdir)
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
+if rank == 0:
+    dirpath = os.path.join(inp.path2qm, pdir)
+    if not os.path.exists(dirpath):
+        os.makedirs(dirpath)
+    dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+    if not os.path.exists(dirpath):
+        os.makedirs(dirpath)
 
 ntrain = int(inp.Ntrain*inp.trainfrac)
 
 dirpath = os.path.join(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N_"+str(ntrain))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
+if rank == 0:
+    if not os.path.exists(dirpath):
+        os.makedirs(dirpath)
 
 # load regression weights
-weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
+weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy")
+
+ntest = ndata
+testrangetot = np.arange(ndata)
+if rank == 0:
+    testrange = [[] for _ in range(size)]
+    blocksize = int(round(ntest/float(size)))
+    for i in range(size):
+        if i == (size-1):
+            testrange[i] = testrangetot[i*blocksize:ntest]
+        else:
+            testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
+else:
+    testrange = None
+
+testrange = comm.scatter(testrange,root=0)
+print('Task',rank+1,'handles the following structures:',testrange,flush=True)
 
 # compute error over test set
 error_density = 0
 variance = 0
-for itest in range(ndata):
+for itest in testrange:
 
     Tsize = 0
     for iat in range(natoms[itest]):
@@ -86,4 +111,4 @@ for itest in range(ndata):
     # save predicted coefficients
     np.save(inp.path2qm+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(itest)+".npy",pred_coefs)
 
-print('Prediction complete')
+if (rank == 0): print('Prediction complete')

@@ -47,9 +47,12 @@ np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 
 # Distribute structures to tasks
 ntraintot = int(inp.trainfrac*inp.Ntrain)
+if rank == 0 and ntraintot < size:
+    print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
+    comm.Abort()
 if rank == 0:
     trainrange = [[] for _ in range(size)]
-    blocksize = int(round(ntraintot/np.float(size)))
+    blocksize = int(round(ntraintot/float(size)))
     for i in range(size):
         if i == (size-1):
             trainrange[i] = trainrangetot[i*blocksize:ntraintot]
@@ -189,6 +192,7 @@ for iconf in trainrange:
     psi_list.append(sparse.load_npz(inp.path2ml+fdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz"))
 
 totsize = psi_list[0].shape[1]
+
 if rank == 0: 
     print("problem dimensionality:", totsize)
     dirpath = os.path.join(inp.path2ml, rdir)
@@ -223,10 +227,10 @@ for i in range(100000):
     curv = np.dot(d,Ad)
     alpha = delnew/curv
     w = w + alpha*d
-    if (i+1)%50==0:
-        np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
-        np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
-        np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
+    if (i+1)%50==0 and rank==0:
+        np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+        np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",d)
+        np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
     r -= alpha * Ad 
     if rank == 0: print(i+1, "gradient norm:", np.sqrt(np.sum((r**2))),flush=True)
     if np.sqrt(np.sum((r**2))) < tol:
@@ -239,8 +243,8 @@ for i in range(100000):
         d = s + beta*d
 
 if rank == 0:
-    np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
-    np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
-    np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
+    np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+    np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",d)
+    np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
     print("minimization compleated succesfully!")
     print("minimization time:", (time.time()-start)/60, "minutes")

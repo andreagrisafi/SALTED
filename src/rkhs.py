@@ -6,6 +6,13 @@ import sys
 sys.path.insert(0, './')
 import inp
 from sys_utils import read_system, get_atom_idx
+from mpi4py import MPI
+
+# MPI information
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
+print('This is task',rank+1,'of',size)
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -62,17 +69,18 @@ print("Computed sparse set made of ", M, "environments")
 np.savetxt("sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
 
 # make directories if not exisiting
-dirpath = os.path.join(inp.path2ml, kdir)
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-for spe in spelist:
-    for l in range(llmax+1):
-        dirpath = os.path.join(inp.path2ml+kdir, "spe"+str(spe)+"_l"+str(l))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-        dirpath = os.path.join(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
+if (rank == 0):
+    dirpath = os.path.join(inp.path2ml, kdir)
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+    for spe in spelist:
+        for l in range(llmax+1):
+            dirpath = os.path.join(inp.path2ml+kdir, "spe"+str(spe)+"_l"+str(l))
+            if not os.path.exists(dirpath):
+                os.mkdir(dirpath)
+            dirpath = os.path.join(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+            if not os.path.exists(dirpath):
+                os.mkdir(dirpath)
 
 # divide sparse set per species
 fps_indexes = {}
@@ -86,7 +94,21 @@ for spe in spelist:
 
 print("Computing RKHS of symmetry-adapted sparse kernel approximations...")
 
-# lambda = 0
+# Distribute structures to tasks
+if rank == 0:
+    conf_range = [[] for _ in range(size)]
+    blocksize = int(round(ndata/float(size)))
+    for i in range(size):
+        if i == (size-1):
+            conf_range[i] = list(range(ndata))[i*blocksize:ndata]
+        else:
+            conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
+else:
+    conf_range = None
+
+conf_range = comm.scatter(conf_range,root=0)
+print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+
 power_env_sparse = {}
 kernel0_mm = {}
 kernel0_nm = {}
@@ -107,7 +129,7 @@ for spe in spelist:
     np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
 
     # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
-    for iconf in range(ndata):
+    for iconf in conf_range:
         kernel0_nm[(iconf,spe)] = np.dot(power[iconf,atom_idx[(iconf,spe)]],power_env_sparse[spe].T)
         kernel_nm = kernel0_nm[(iconf,spe)]**zeta
         psi_nm = np.real(np.dot(kernel_nm,V))
@@ -144,7 +166,7 @@ for l in range(1,llmax+1):
         np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
 
         # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
-        for iconf in range(ndata):
+        for iconf in conf_range:
             kernel_nm = np.dot(power[iconf,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat),power_env_sparse[spe].T) 
             for i1 in range(natom_dict[(iconf,spe)]):
                 for i2 in range(Mspe[spe]):

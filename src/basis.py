@@ -305,6 +305,7 @@ def basiset(basis):
 
       lmax["H"] = 2
       lmax["O"] = 4
+      lmax["C"] = 4
 
       nmax[("H",0)] = 4
       nmax[("H",1)] = 3
@@ -315,4 +316,11 @@ def basiset(basis):
       nmax[("O",2)] = 8
       nmax[("O",3)] = 3
       nmax[("O",4)] = 1
+
+      nmax[("C",0)] = 9
+      nmax[("C",1)] = 8
+      nmax[("C",2)] = 7
+      nmax[("C",3)] = 3
+      nmax[("C",4)] = 1
+
    return [lmax,nmax]

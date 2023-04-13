@@ -65,7 +65,7 @@ if rank == 0:
 #orcuts = np.loadtxt("optimal_rcuts.dat")
 
 # load regression weights
-weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
+weights = np.load(inp.path2ml+rdir+"weights_N"+str(ntrain)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy")
 
 # compute error over test set
 error_density = 0
@@ -75,7 +75,7 @@ variance = 0
 ntest = len(testrangetot)
 if rank == 0:
     testrange = [[] for _ in range(size)]
-    blocksize = int(round(ntest/np.float(size)))
+    blocksize = int(round(ntest/float(size)))
     for i in range(size):
         if i == (size-1):
             testrange[i] = testrangetot[i*blocksize:ntest]
