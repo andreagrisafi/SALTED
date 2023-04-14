@@ -1,42 +1,24 @@
 import os
-import sys
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
 import random
-from random import shuffle
 from scipy import sparse
-from scipy.optimize import minimize
-from mpi4py import MPI
-
-import basis
-
+from sys_utils import read_system, get_atom_idx
+import sys
 sys.path.insert(0, './')
 import inp
+
 # MPI information
-comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
-print('This is task',rank+1,'of',size)
+if inp.parallel:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+    print('This is task',rank+1,'of',size,flush=True)
+else:
+    rank=0
 
-# system definition
-spelist = inp.species
-xyzfile = read(inp.filename,":")
-ndata = len(xyzfile)
-
-# basis definition
-[lmax,nmax] = basis.basiset(inp.dfbasis)
-
-llist = []
-nlist = []
-for spe in spelist:
-    llist.append(lmax[spe])
-    for l in range(lmax[spe]+1):
-        nlist.append(nmax[(spe,l)])
-llmax = max(llist)
-nnmax = max(nlist)
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
 # sparse-GPR parameters
 M = inp.Menv
@@ -47,27 +29,9 @@ fdir = inp.featdir
 
 projdir = inp.projdir
 coefdir = inp.coefdir
+ovlpdir = inp.ovlpdir
 
-# species dependent arrays
-atoms_per_spe = {}
-natoms_per_spe = {}
-for iconf in range(ndata):
-    for spe in spelist:
-        atoms_per_spe[(iconf,spe)] = []
-        natoms_per_spe[(iconf,spe)] = 0
-
-atomic_symbols = []
-valences = []
-natoms = np.zeros(ndata,int)
-for iconf in range(ndata):
-    atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
-    valences.append(xyzfile[iconf].get_atomic_numbers())
-    natoms[iconf] = int(len(atomic_symbols[iconf]))
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        atoms_per_spe[(iconf,spe)].append(iat)
-        natoms_per_spe[(iconf,spe)] += 1
-natmax = max(natoms)
+atom_per_spe, natom_per_spe = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
 
 # load average density coefficients
 av_coefs = {}
@@ -83,19 +47,27 @@ np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 
 # Distribute structures to tasks
 ntraintot = int(inp.trainfrac*inp.Ntrain)
-if rank == 0:
-    trainrange = [[] for _ in range(size)]
-    blocksize = int(round(ntraintot/np.float(size)))
-    for i in range(size):
-        if i == (size-1):
-            trainrange[i] = trainrangetot[i*blocksize:ntraintot]
-        else:
-            trainrange[i] = trainrangetot[i*blocksize:(i+1)*blocksize]
+
+if inp.parallel:
+    if rank == 0 and ntraintot < size:
+        print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
+        comm.Abort()
+    if rank == 0:
+        trainrange = [[] for _ in range(size)]
+        blocksize = int(round(ntraintot/float(size)))
+        for i in range(size):
+            if i == (size-1):
+                trainrange[i] = trainrangetot[i*blocksize:ntraintot]
+            else:
+                trainrange[i] = trainrangetot[i*blocksize:(i+1)*blocksize]
+    else:
+        trainrange = None
+
+    trainrange = comm.scatter(trainrange,root=0)
+    print('Task',rank+1,'handles the following structures:',trainrange,flush=True)
 else:
-    trainrange = None
-trainrange = comm.scatter(trainrange,root=0)
+    trainrange = trainrangetot[:ntraintot]
 ntrain = int(len(trainrange))
-print('Task',rank+1,'handles the following structures:',trainrange)
 
 
 def loss_func(weights,ovlp_list,psi_list):
@@ -219,13 +191,13 @@ if rank == 0: print("loading matrices...")
 ovlp_list = [] 
 psi_list = [] 
 for iconf in trainrange:
-    ovlp_list.append(np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy"))
-    # load feature vector as a numpy array
-#    psi_list.append(np.load(inp.path2ml+psi-vectors/M+str(M)+_eigcut+str(int(np.log10(eigcut)))+/psi-nm_conf+str(iconf)+.npy))
+    ovlp_list.append(np.load(inp.path2qm+ovlpdir+"overlap_conf"+str(iconf)+".npy"))
     # load feature vector as a scipy sparse object
     psi_list.append(sparse.load_npz(inp.path2ml+fdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz"))
 
 totsize = psi_list[0].shape[1]
+norm = 1.0/float(ntraintot)
+
 if rank == 0: 
     print("problem dimensionality:", totsize)
     dirpath = os.path.join(inp.path2ml, rdir)
@@ -249,21 +221,29 @@ if inp.restart == True:
 else:
     w = np.ones(totsize)*1e-04
     r = - grad_func(w,ovlp_list,psi_list)
-    r = comm.allreduce(r)/float(ntraintot) + 2.0 * reg * w
+    if inp.parallel:
+        r = comm.allreduce(r)*norm  + 2.0 * reg * w
+    else:
+        r *= norm
+        r += 2.0*reg*w
     d = np.multiply(P,r)
     delnew = np.dot(r,d)
 
 if rank == 0: print("minimizing...")
 for i in range(100000):
     Ad = curv_func(d,ovlp_list,psi_list)
-    Ad = comm.allreduce(Ad)/float(ntraintot) + 2.0 * reg * d 
+    if inp.parallel:
+        Ad = comm.allreduce(Ad)*norm + 2.0 * reg * d 
+    else:
+        Ad *= norm
+        Ad += 2.0*reg*d
     curv = np.dot(d,Ad)
     alpha = delnew/curv
     w = w + alpha*d
-    if (i+1)%50==0:
-        np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
-        np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
-        np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
+    if (i+1)%50==0 and rank==0:
+        np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+        np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",d)
+        np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
     r -= alpha * Ad 
     if rank == 0: print(i+1, "gradient norm:", np.sqrt(np.sum((r**2))),flush=True)
     if np.sqrt(np.sum((r**2))) < tol:
@@ -276,8 +256,8 @@ for i in range(100000):
         d = s + beta*d
 
 if rank == 0:
-    np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
-    np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
-    np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
+    np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+    np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",d)
+    np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
     print("minimization compleated succesfully!")
     print("minimization time:", (time.time()-start)/60, "minutes")

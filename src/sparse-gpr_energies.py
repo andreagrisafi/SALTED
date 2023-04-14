@@ -1,24 +1,21 @@
 #!/usr/bin/python
 
-import sys
 import numpy as np
-import time
-import ase
-from ase import io
-from ase.io import read
-import random
-import argparse
-
+import sys
 sys.path.insert(0, './')
 import inp
+from ase.io import read
+from sys_utils import read_system
+
+spelist, lmax, nmax, llmax, nnmax, ndata, symbols, natoms, natmax = read_system()
 
 xyzfile = read(inp.filename,":")
-ndata = len(xyzfile)
 
 zeta = inp.z
 M = inp.Menv
 reg = inp.regul
-jit = inp.jitter
+jit = 1e-8
+#jit = inp.jitter
 
 nspecies = len(inp.species) 
 species = {}
@@ -27,19 +24,13 @@ for spe in inp.species:
     species[spe] = i
     i+=1
 
-atomic_symbol = []
-natoms = np.zeros(ndata,int)
 energies = np.zeros(ndata)
 stechio = np.zeros((ndata,nspecies),float)
 for iconf in range(ndata):
     energies[iconf] = xyzfile[iconf].info[inp.propname]
-    symbols = xyzfile[iconf].get_chemical_symbols()
-    atomic_symbol.append(symbols)
-    natoms[iconf] = len(symbols)
     for iat in range(natoms[iconf]):
-        ispe = species[symbols[iat]]
+        ispe = species[symbols[iconf][iat]]
         stechio[iconf,ispe] += 1.0 
-natmax = max(natoms)
 covariance = np.dot(stechio.T,stechio)
 
 nostechio = False
@@ -70,7 +61,7 @@ natoms_test = natoms[testrange]
 te_energ = energies[testrange]
 
 # load feature vector and define sparse feature vector
-power_per_conf = np.load(inp.path2data+"/soaps/FEAT-0.npy")
+power_per_conf = np.load(inp.path2ml+inp.soapdir+"FEAT-0.npy")
 nfeat = power_per_conf.shape[-1]
 power_ref_sparse = power_per_conf.reshape(ndata*3,nfeat)[fps_indexes]
 

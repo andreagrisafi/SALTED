@@ -1,19 +1,17 @@
-import sys
 import time
 import numpy as np
 from pyscf import gto
 from ase.io import read
 from scipy import special
-
 import basis
-
+import sys
 sys.path.insert(0, './')
 import inp
 
 # read species
 spelist = inp.species
 spe_dict = {}
-for i in xrange(len(spelist)):
+for i in range(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
@@ -23,7 +21,7 @@ llist = []
 nlist = []
 for spe in spelist:
     llist.append(lmax[spe])
-    for l in xrange(lmax[spe]+1):
+    for l in range(lmax[spe]+1):
         nlist.append(nmax[(spe,l)])
 llmax = max(llist)
 nnmax = max(nlist)
@@ -34,11 +32,12 @@ ndata = len(xyzfile)
 
 hart2kcal = 627.5096080305927
 bohr2ang = 0.52917721067121
+
 #======================= system parameters
 atomic_symbols = []
 atomic_valence = []
 natoms = np.zeros(ndata,int) 
-for i in xrange(len(xyzfile)):
+for i in range(len(xyzfile)):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_symbols[i]))
@@ -47,17 +46,17 @@ natmax = max(natoms)
 def complex_to_real_transformation(sizes):
     """Transformation matrix from complex to real spherical harmonics"""
     matrices = []
-    for i in xrange(len(sizes)):
+    for i in range(len(sizes)):
         lval = (sizes[i]-1)/2
         st = (-1.0)**(lval+1)
         transformation_matrix = np.zeros((sizes[i],sizes[i]),dtype=complex)
-        for j in xrange( (sizes[i]-1)/2 ):
+        for j in range( int((sizes[i]-1)/2) ):
             transformation_matrix[j][j] = 1.0j
             transformation_matrix[j][sizes[i]-j-1] = st*1.0j
             transformation_matrix[sizes[i]-j-1][j] = 1.0
             transformation_matrix[sizes[i]-j-1][sizes[i]-j-1] = st*-1.0
             st = st * -1.0
-        transformation_matrix[(sizes[i]-1)/2][(sizes[i]-1)/2] = np.sqrt(2.0)
+        transformation_matrix[int((sizes[i]-1)/2)][int((sizes[i]-1)/2)] = np.sqrt(2.0)
         transformation_matrix /= np.sqrt(2.0)
         matrices.append(transformation_matrix)
     return matrices
@@ -65,7 +64,7 @@ def complex_to_real_transformation(sizes):
 def sph_zproj(theta,phi,lam):
     """Project on the spherical harmonics evaluated at d_ij direction"""
     sph_dij = np.zeros(2*lam+1,complex)
-    for mu in xrange(2*lam+1):
+    for mu in range(2*lam+1):
         sph_dij[mu] = special.sph_harm(mu-lam,lam,phi,theta)
     CR = complex_to_real_transformation([2*lam+1])[0]
     return np.real(np.dot(CR,sph_dij))
@@ -94,24 +93,23 @@ def radint2(lval,alp,d):
 
 f = open("hartree_energy.dat","w")
 g = open("external_energy.dat","w")
-print "Computing Hartree and external energy..."
+print("Computing Hartree and external energy...")
 itest=0
-for iconf in xrange(ndata):
-    print "conf. number:", iconf+1, "/", ndata
+for iconf in range(ndata):
+    print("conf. number:", iconf+1, "/", ndata)
     atoms = atomic_symbols[iconf]
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
     natoms = len(atoms)
     # Load projections and overlaps
-    rcoeffs = np.load(inp.path2qm+"coefficients/coefficients_conf"+str(iconf)+".npy")
-    overl = np.load(inp.path2qm+"overlaps/overlap_conf"+str(iconf)+".npy")
+    rcoeffs = np.load(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
     ref_coeffs = np.zeros((natoms,llmax+1,nnmax,2*llmax+1))
     ref_rho = np.zeros(len(rcoeffs))
     icoeff = 0
-    for iat in xrange(natoms):
-        for l in xrange(lmax[atoms[iat]]+1):
-            for n in xrange(nmax[(atoms[iat],l)]):
-                for im in xrange(2*l+1):
+    for iat in range(natoms):
+        for l in range(lmax[atoms[iat]]+1):
+            for n in range(nmax[(atoms[iat],l)]):
+                for im in range(2*l+1):
                     ref_coeffs[iat,l,n,im] = rcoeffs[icoeff]
                     if l==1:
                         if im != 2:
@@ -125,7 +123,7 @@ for iconf in xrange(ndata):
     geom = xyzfile[iconf]
     coords = geom.get_positions()
     catoms = []
-    for i in xrange(natoms):
+    for i in range(natoms):
         coord = coords[i]
         catoms.append([atoms[i],(coord[0],coord[1],coord[2])])
     coords /= bohr2ang
@@ -140,13 +138,13 @@ for iconf in xrange(ndata):
     E_H_ref = np.einsum('ij,ji',eri2c,matrix_of_coefficients)*0.5
     # Compute electron-nuclear energy
     E_eN_ref = 0.0
-    for iat in xrange(natoms):
+    for iat in range(natoms):
         ref_contr = 0.0
-        for jat in xrange(natoms):
+        for jat in range(natoms):
             spe = atoms[jat]
             if iat==jat:
                 idx=0
-                for n in xrange(nmax[(spe,0)]):
+                for n in range(nmax[(spe,0)]):
                     alpha=auxmol._basis[spe][idx][1][0]
                     r0 = radint0(alpha)
                     ref_contr += ref_coeffs[jat,0,n,0]*r0
@@ -157,9 +155,9 @@ for iconf in xrange(ndata):
                 theta = np.arccos(dist[2]/dij)
                 phi = np.arctan2(dist[1],dist[0])
                 idx=0
-                for l in xrange(lmax[spe]+1):
+                for l in range(lmax[spe]+1):
                     wigner_real = sph_zproj(theta,phi,l)*np.sqrt(4.0*np.pi)/float(2*l+1)
-                    for n in xrange(nmax[(spe,l)]):
+                    for n in range(nmax[(spe,l)]):
                         alpha=auxmol._basis[spe][idx][1][0]
                         r1 = radint1(l,alpha,dij)/(dij**(l+1))
                         r2 = radint2(l,alpha,dij)*(dij**l)
@@ -168,8 +166,8 @@ for iconf in xrange(ndata):
                         idx+=1
         E_eN_ref += ref_contr*valences[iat]
     E_eN_ref *= -np.sqrt(4.0*np.pi)
-    print >> f, E_H_ref
-    print >> g, E_eN_ref
+    print(E_H_ref,file=f)
+    print(E_eN_ref,file=g)
     itest+=1
 
 f.close()

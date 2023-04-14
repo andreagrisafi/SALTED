@@ -50,41 +50,6 @@ def basiset(basis):
       nmax[("F",4)] = 7
       nmax[("F",5)] = 5
 
-   if basis=="FHI-aims-tight":
-
-      lmax["H"] = 4
-      lmax["C"] = 8
-      lmax["O"] = 8
-      lmax["Al"] = 8
-      lmax["Si"] = 8
-
-      # hydrogen
-      nmax[("H",0)] = 8
-      nmax[("H",1)] = 6
-      nmax[("H",2)] = 6
-      nmax[("H",3)] = 3
-      nmax[("H",4)] = 1
-      # carbon
-      nmax[("C",0)] = 11
-      nmax[("C",1)] = 10
-      nmax[("C",2)] = 9
-      nmax[("C",3)] = 8
-      nmax[("C",4)] = 7
-      nmax[("C",5)] = 5
-      nmax[("C",6)] = 3
-      nmax[("C",7)] = 2
-      nmax[("C",8)] = 1
-      # oxygen
-      nmax[("O",0)] = 9
-      nmax[("O",1)] = 10
-      nmax[("O",2)] = 9
-      nmax[("O",3)] = 8
-      nmax[("O",4)] = 6
-      nmax[("O",5)] = 4
-      nmax[("O",6)] = 4
-      nmax[("O",7)] = 2
-      nmax[("O",8)] = 1
- 
    if basis=="RI-cc-pvqz":
 
       lmax["H"] = 4
@@ -262,5 +227,100 @@ def basiset(basis):
       nmax[("Au",4)] = 18
       nmax[("Au",5)] = 18
       nmax[("Au",6)] = 18
+
+   if basis=="FHI-aims-tight":
+
+      lmax["H"] = 4
+      lmax["O"] = 8
+
+      nmax[("H",0)] = 9
+      nmax[("H",1)] = 7
+      nmax[("H",2)] = 6
+      nmax[("H",3)] = 3
+      nmax[("H",4)] = 1
+
+      nmax[("O",0)] = 9
+      nmax[("O",1)] = 10
+      nmax[("O",2)] = 9
+      nmax[("O",3)] = 8
+      nmax[("O",4)] = 6
+      nmax[("O",5)] = 4
+      nmax[("O",6)] = 4
+      nmax[("O",7)] = 2
+      nmax[("O",8)] = 1
+
+   if basis=="FHI-aims-ZrS":
+
+      lmax["S"] = 6
+      lmax["Zr"] = 6
+
+      nmax[("S",0)] = 10
+      nmax[("S",1)] = 10
+      nmax[("S",2)] = 10
+      nmax[("S",3)] = 10
+      nmax[("S",4)] = 8
+      nmax[("S",5)] = 5
+      nmax[("S",6)] = 4
+
+      nmax[("Zr",0)] = 14
+      nmax[("Zr",1)] = 13
+      nmax[("Zr",2)] = 13
+      nmax[("Zr",3)] = 12
+      nmax[("Zr",4)] = 12
+      nmax[("Zr",5)] = 8
+      nmax[("Zr",6)] = 4
+
+   if basis=="FHI-aims-graphene":
+
+      lmax["C"] = 4
+
+      nmax[("C",0)] = 7
+      nmax[("C",1)] = 7
+      nmax[("C",2)] = 6
+      nmax[("C",3)] = 5
+      nmax[("C",4)] = 3
+
+   if basis=="FHI-aims-MoSe":
+
+      lmax["Se"] = 6
+      lmax["Mo"] = 6
+
+      nmax[("Se",0)] = 13
+      nmax[("Se",1)] = 13
+      nmax[("Se",2)] = 11
+      nmax[("Se",3)] = 11
+      nmax[("Se",4)] = 9
+      nmax[("Se",5)] = 7
+      nmax[("Se",6)] = 4
+
+      nmax[("Mo",0)] = 14
+      nmax[("Mo",1)] = 13
+      nmax[("Mo",2)] = 13
+      nmax[("Mo",3)] = 12
+      nmax[("Mo",4)] = 11
+      nmax[("Mo",5)] = 8
+      nmax[("Mo",6)] = 5
+
+   if basis=="FHI-aims-light":
+
+      lmax["H"] = 2
+      lmax["O"] = 4
+      lmax["C"] = 4
+
+      nmax[("H",0)] = 4
+      nmax[("H",1)] = 3
+      nmax[("H",2)] = 1
+
+      nmax[("O",0)] = 9
+      nmax[("O",1)] = 9
+      nmax[("O",2)] = 8
+      nmax[("O",3)] = 3
+      nmax[("O",4)] = 1
+
+      nmax[("C",0)] = 9
+      nmax[("C",1)] = 8
+      nmax[("C",2)] = 7
+      nmax[("C",3)] = 3
+      nmax[("C",4)] = 1
 
    return [lmax,nmax]
