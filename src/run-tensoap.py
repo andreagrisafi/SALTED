@@ -42,6 +42,8 @@ else:
     fname = inp.filename
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename=fname)
 
+llmax = 0
+
 spe = ' '.join(inp.species)
 
 # make directories if not exisiting
