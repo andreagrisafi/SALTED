@@ -6,6 +6,16 @@ import sys
 sys.path.insert(0, './')
 import inp
 from sys_utils import read_system, get_atom_idx
+import argparse
+
+def add_command_line_arguments_contraction(parsetext):
+    parser = argparse.ArgumentParser(description=parsetext)
+    parser.add_argument("-r", "--response", action='store_true', help="Build kernels using bare lambda=0 projectors introducing non-linearity")
+    args = parser.parse_args()
+    return args
+
+args = add_command_line_arguments_contraction("")
+response = args.response
 
 if inp.parallel:
     from mpi4py import MPI
@@ -49,6 +59,12 @@ power_train = np.load(inp.path2ml+sdirtrain+"FEAT-0.npy")
 nfeat_train = power_train.shape[-1]
 power = np.load(inp.path2ml+sdir+"FEAT-0.npy")
 nfeat = power.shape[-1]
+
+if response:
+    # load lambda=0 power spectrum without dummy atom
+    power_bare = np.load(inp.path2ml+sdir+"FEAT-0-bare.npy")
+    power_bare_train = np.load(inp.path2ml+sdirtrain+"FEAT-0-bare.npy")
+    nfeat_bare = power_bare_train.shape[-1]
 
 # compute sparse set with FPS
 fps_idx = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
@@ -103,14 +119,19 @@ else:
 power_env_sparse = {}
 kernel0_mm = {}
 kernel0_nm = {}
+
+if response:
+    power_env_sparse_bare = {}
+    kernel0_nm_temp = {}
+
 for spe in spelist:
     print("lambda = 0", "species:", spe)
     start = time.time()
 
     # compute sparse kernel K_MM for each atomic species 
     power_env_sparse[spe] = power_train.reshape(ndata_train*natmax_train,power_train.shape[-1])[np.array(fps_indexes[spe],int)]
-    kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
-    kernel_mm = kernel0_mm[spe]**zeta
+    if response:
+        power_env_sparse_bare[spe] = power_bare_train.reshape(ndata_train*natmax_train,nfeat_bare)[np.array(fps_indexes[spe],int)]
     
     # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
     V = np.load(inp.path2ml+kdirtrain+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy")
@@ -118,16 +139,27 @@ for spe in spelist:
     # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
     for iconf in range(ndata):
         kernel0_nm[(iconf,spe)] = np.dot(power[iconf,atom_idx[(iconf,spe)]],power_env_sparse[spe].T)
-        kernel_nm = kernel0_nm[(iconf,spe)]**zeta
+
+        if response:
+            kernel0_nm_temp[(iconf,spe)] = kernel0_nm[(iconf,spe)]
+            kernel0_nm[(iconf,spe)] = np.dot(power_bare[iconf,atom_idx[(iconf,spe)]],power_env_sparse_bare[spe].T)
+            kernel_nm = kernel0_nm_temp[(iconf,spe)] * kernel0_nm[(iconf,spe)]**(zeta-1)
+        else:
+            kernel_nm = kernel0_nm[(iconf,spe)]**zeta
+
         psi_nm = np.real(np.dot(kernel_nm,V))
         np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
     print((time.time()-start)/60.0)
+
+if response:
+    power_env_sparse_bare = {}
+    kernel0_nm_temp = {}
 
 # lambda>0
 for l in range(1,llmax+1):
 
     # load power spectrum
-    print("loading lambda =", l)
+    print("loading lambda =", l,flush=True)
     power_train = np.load(inp.path2ml+sdirtrain+"FEAT-"+str(l)+".npy")
     nfeat_train = power_train.shape[-1]
     power = np.load(inp.path2ml+sdir+"FEAT-"+str(l)+".npy")
@@ -141,12 +173,6 @@ for l in range(1,llmax+1):
         # get sparse feature vector for each atomic species
         power_env_sparse[spe] = power_train.reshape(ndata_train*natmax_train,2*l+1,nfeat_train)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat_train)
         
-        # compute K_MM 
-        kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T) 
-        for i1 in range(Mspe[spe]):
-            for i2 in range(Mspe[spe]):
-                kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_mm[spe][i1,i2]**(zeta-1)
-    
         # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
         V = np.load(inp.path2ml+kdirtrain+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy")
 

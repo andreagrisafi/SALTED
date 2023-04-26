@@ -72,7 +72,8 @@ if parallel > 1:
     block = ceil(npoints/parallel)
     cpus = cpu_count(logical=False)
     cpt = floor(cpus/parallel)
-    output = [None]*parallel*(llmax+1)
+    ntasks = parallel*(llmax+1+int(dummy>0))
+    output = [None]*ntasks
 
     def childcount():
         cp = Process()
@@ -92,12 +93,18 @@ if parallel > 1:
             fname1 = str(i)+'_'+fname
             if nc > 0:
 #                cmd = ['srun','--exclusive','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
             else:
 #                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
             if periodic: cmd += ['-p']
-            if dummy > 0: cmd += ['-d',str(dummy)]
+            if dummy > 0:
+                if l == 0:
+                    cmd2 = cmd.copy()
+                    cmd2[cmd2.index('-o')+1] += '-bare'
+                    output[j] = subprocess.Popen(cmd2)
+                    j+=1
+                cmd += ['-d',str(dummy)]
             output[j] = subprocess.Popen(cmd)
             j += 1
             while childcount() > parallel:
@@ -106,7 +113,7 @@ if parallel > 1:
                     output[k].communicate()
 
     # Wait for all blocks to finish
-    for i in range(parallel*(llmax+1)):
+    for i in range(ntasks):
         output[i].wait()
 
     # Clean Up
@@ -128,13 +135,28 @@ if parallel > 1:
         np.save(dirpath+'FEAT-'+str(l)+'.npy',full)
         np.save(dirpath+'FEAT-'+str(l)+'_natoms.npy',full_natoms)
 
+    if dummy > 0:
+        for i in range(parallel):
+            block = np.load(dirpath+str(i)+'FEAT-0-bare.npy')
+            if i == 0:
+                full = block
+            else:
+                full = np.concatenate([full,block])
+            os.remove(dirpath+str(i)+'FEAT-0-bare.npy')
+            os.remove(dirpath+str(i)+'FEAT-0-bare_natoms.npy')
+        np.save(dirpath+'FEAT-0-bare.npy',full)
 
 else:
     for l in range(llmax+1):
         if nc > 0:
-            cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+            cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
         else:
-            cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
+            cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
         if periodic: cmd += ['-p']
-        if dummy > 0: cmd += ['-d',str(dummy)]
+        if dummy > 0:
+            if l == 0:
+                cmd2 = cmd.copy()
+                cmd2[cmd2.index('-o')+1] += '-bare'
+                subprocess.call(cmd2)
+            cmd += ['-d',str(dummy)]
         subprocess.call(cmd)

@@ -6,6 +6,16 @@ import sys
 sys.path.insert(0, './')
 import inp
 from sys_utils import read_system, get_atom_idx
+import argparse
+
+def add_command_line_arguments_contraction(parsetext):
+    parser = argparse.ArgumentParser(description=parsetext)
+    parser.add_argument("-r", "--response", action='store_true', help="Build kernels using bare lambda=0 projectors introducing non-linearity")
+    args = parser.parse_args()
+    return args
+
+args = add_command_line_arguments_contraction("")
+response = args.response
 
 if inp.parallel:
     from mpi4py import MPI
@@ -65,6 +75,11 @@ species_array = species_array.reshape(ndata*natmax)
 power = np.load(inp.path2ml+sdir+"FEAT-0.npy")
 nfeat = power.shape[-1]
 
+if response:
+    # load lambda=0 power spectrum without dummy atom
+    power_bare = np.load(inp.path2ml+sdir+"FEAT-0-bare.npy")
+    nfeat_bare = power_bare.shape[-1]
+
 # compute sparse set with FPS
 fps_idx = np.array(do_fps(power.reshape(ndata*natmax,nfeat),M),int)
 fps_species = species_array[fps_idx]
@@ -119,14 +134,27 @@ else:
 power_env_sparse = {}
 kernel0_mm = {}
 kernel0_nm = {}
+
+if response:
+    power_env_sparse_bare = {}
+    kernel0_mm_temp = {}
+    kernel0_nm_temp = {}
+
 for spe in spelist:
-    print("lambda = 0", "species:", spe)
     start = time.time()
 
-    # compute sparse kernel K_MM for each atomic species 
-    power_env_sparse[spe] = power.reshape(ndata*natmax,power.shape[-1])[np.array(fps_indexes[spe],int)]
+    # compute sparse kernel K_MM for each atomic species
+
+    power_env_sparse[spe] = power.reshape(ndata*natmax,nfeat)[np.array(fps_indexes[spe],int)]
     kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
-    kernel_mm = kernel0_mm[spe]**zeta
+
+    if response:
+        power_env_sparse_bare[spe] = power_bare.reshape(ndata*natmax,nfeat_bare)[np.array(fps_indexes[spe],int)]
+        kernel0_mm_temp[spe] = kernel0_mm[spe]
+        kernel0_mm[spe] = np.dot(power_env_sparse_bare[spe],power_env_sparse_bare[spe].T)
+        kernel_mm = kernel0_mm_temp[spe] * kernel0_mm[spe]**(zeta-1)
+    else:
+        kernel_mm = kernel0_mm[spe]**zeta
     
     # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
     eva, eve = np.linalg.eigh(kernel_mm)
@@ -138,10 +166,22 @@ for spe in spelist:
     # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
     for iconf in conf_range:
         kernel0_nm[(iconf,spe)] = np.dot(power[iconf,atom_idx[(iconf,spe)]],power_env_sparse[spe].T)
-        kernel_nm = kernel0_nm[(iconf,spe)]**zeta
+
+        if response:
+            kernel0_nm_temp[(iconf,spe)] = kernel0_nm[(iconf,spe)]
+            kernel0_nm[(iconf,spe)] = np.dot(power_bare[iconf,atom_idx[(iconf,spe)]],power_env_sparse_bare[spe].T)
+            kernel_nm = kernel0_nm_temp[(iconf,spe)] * kernel0_nm[(iconf,spe)]**(zeta-1)
+        else:
+            kernel_nm = kernel0_nm[(iconf,spe)]**zeta
+
         psi_nm = np.real(np.dot(kernel_nm,V))
         np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
     print((time.time()-start)/60.0)
+
+if response:
+    power_env_sparse_bare = {}
+    kernel0_mm_temp = {}
+    kernel0_nm_temp = {}
 
 # lambda>0
 for l in range(1,llmax+1):

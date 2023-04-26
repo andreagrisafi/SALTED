@@ -32,21 +32,17 @@ export OMP_NUM_THREADS=32
 
 ### RUN YOUR CODE:
 
-module use /opt/easybuild/modules/all
-module load Anaconda3
-
-source activate mypy3
 source ~/SALTED/env.sh
 source ~/TENSOAP/env.sh
 
 
 python $SALTEDPATH/get_averages.py
 
-python $SALTEDPATH/run-tensoap.py -p -nc 0
+python $SALTEDPATH/run-tensoap.py -p -nc 0 --parallel 32
 
-python $SALTEDPATH/rkhs.py
-srun -n 10 python $SALTEDPATH/feature_vector.py
+srun -n 32 python $SALTEDPATH/rkhs.py
+srun -n 32 python $SALTEDPATH/feature_vector.py
 
-srun -n 1 python $SALTEDPATH/minimize_loss.py 
-python $SALTEDPATH/validation.py > validation.out
+srun -n 32 python $SALTEDPATH/minimize_loss.py 
+srun -n 32 python $SALTEDPATH/validation.py > validation.out
 
