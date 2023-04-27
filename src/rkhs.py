@@ -120,7 +120,7 @@ print("Computing RKHS of symmetry-adapted sparse kernel approximations...")
 if inp.parallel:
     if rank == 0:
         conf_range = [[] for _ in range(size)]
-        blocksize = int(round(ndata/float(size)))
+        blocksize = int(ndata/float(size))
         for i in range(size):
             if i == (size-1):
                 conf_range[i] = list(range(ndata))[i*blocksize:ndata]

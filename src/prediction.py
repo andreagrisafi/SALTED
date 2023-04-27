@@ -55,7 +55,7 @@ testrangetot = np.arange(ndata)
 if inp.parallel:
     if rank == 0:
         testrange = [[] for _ in range(size)]
-        blocksize = int(round(ntest/float(size)))
+        blocksize = int(ntest/float(size))
         for i in range(size):
             if i == (size-1):
                 testrange[i] = testrangetot[i*blocksize:ntest]

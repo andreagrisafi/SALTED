@@ -63,7 +63,12 @@ if nc > 0:
         if os.path.exists(dirpath+'FEAT-'+str(l)+'_Amat.npy'): continue
         cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
         if periodic: cmd += ['-p']
-        if dummy > 0: cmd += ['-d',str(dummy)]
+        if dummy > 0: 
+            if l == 0:
+                cmd2 = cmd.copy()
+                cmd2[cmd2.index('-o')+1] += '-bare'
+                subprocess.call(cmd2)
+            cmd += ['-d',str(dummy)]
         subprocess.call(cmd)
 
 if parallel > 1:
@@ -103,6 +108,7 @@ if parallel > 1:
             if dummy > 0:
                 if l == 0:
                     cmd2 = cmd.copy()
+                    if nc > 0: cmd2[cmd2.index('-sf')+1] += '-bare'
                     cmd2[cmd2.index('-o')+1] += '-bare'
                     output[j] = subprocess.Popen(cmd2)
                     j+=1
@@ -158,6 +164,7 @@ else:
         if dummy > 0:
             if l == 0:
                 cmd2 = cmd.copy()
+                if nc > 0: cmd2[cmd2.index('-sf')+1] += '-bare'
                 cmd2[cmd2.index('-o')+1] += '-bare'
                 subprocess.call(cmd2)
             cmd += ['-d',str(dummy)]

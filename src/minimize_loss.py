@@ -54,7 +54,7 @@ if inp.parallel:
         comm.Abort()
     if rank == 0:
         trainrange = [[] for _ in range(size)]
-        blocksize = int(round(ntraintot/float(size)))
+        blocksize = int(ntraintot/float(size))
         for i in range(size):
             if i == (size-1):
                 trainrange[i] = trainrangetot[i*blocksize:ntraintot]
