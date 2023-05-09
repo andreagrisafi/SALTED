@@ -1,13 +1,11 @@
 import os
 import numpy as np
 import time
-#from random import shuffle
 import sys
 sys.path.insert(0, './')
 import inp
 from sys_utils import read_system, get_atom_idx
 import argparse
-#import pickle
 import h5py
 
 def add_command_line_arguments_contraction(parsetext):
@@ -44,6 +42,7 @@ print("zeta =", zeta)
 sdir = inp.soapdir
 kdir = inp.kerndir
 
+# This procedure is done in parallel_rkhs_prep.py for parallel runs
 if not inp.parallel:
     def do_fps(x, d=0):
         # FPS code from Giulio Imbalzano
@@ -100,19 +99,19 @@ if not inp.parallel:
     for spe in spelist:
         Mspe[spe] = len(fps_indexes[spe])
 
-# make directories if not exisiting
-if (rank == 0):
-    dirpath = os.path.join(inp.path2ml, kdir)
-    if not os.path.exists(dirpath):
-        os.mkdir(dirpath)
-    for spe in spelist:
-        for l in range(llmax+1):
-            dirpath = os.path.join(inp.path2ml+kdir, "spe"+str(spe)+"_l"+str(l))
-            if not os.path.exists(dirpath):
-                os.mkdir(dirpath)
-            dirpath = os.path.join(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-            if not os.path.exists(dirpath):
-                os.mkdir(dirpath)
+   # make directories if not exisiting
+    if (rank == 0):
+        dirpath = os.path.join(inp.path2ml, kdir)
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+        for spe in spelist:
+            for l in range(llmax+1):
+                dirpath = os.path.join(inp.path2ml+kdir, "spe"+str(spe)+"_l"+str(l))
+                if not os.path.exists(dirpath):
+                    os.mkdir(dirpath)
+                dirpath = os.path.join(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+                if not os.path.exists(dirpath):
+                    os.mkdir(dirpath)
 
 print("Computing RKHS of symmetry-adapted sparse kernel approximations...")
 
@@ -133,7 +132,6 @@ if inp.parallel:
     print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
 else:
     conf_range = list(range(ndata))
-
 power_env_sparse = {}
 kernel0_mm = {}
 kernel0_nm = {}
@@ -169,16 +167,19 @@ for spe in spelist:
             power_env_sparse_bare[spe] = power_bare.reshape(ndata*natmax,nfeat_bare)[np.array(fps_indexes[spe],int)]
         kernel0_mm_temp[spe] = kernel0_mm[spe]
         kernel0_mm[spe] = np.dot(power_env_sparse_bare[spe],power_env_sparse_bare[spe].T)
-        kernel_mm = kernel0_mm_temp[spe] * kernel0_mm[spe]**(zeta-1)
+        if not inp.parallel: kernel_mm = kernel0_mm_temp[spe] * kernel0_mm[spe]**(zeta-1)
     else:
-        kernel_mm = kernel0_mm[spe]**zeta
+        if not inp.parallel: kernel_mm = kernel0_mm[spe]**zeta
     
+    if inp.parallel: 
+        V = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy")
+    else:
     # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
-    eva, eve = np.linalg.eigh(kernel_mm)
-    eva = eva[eva>eigcut]
-    eve = eve[:,-len(eva):]
-    V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-    np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
+        eva, eve = np.linalg.eigh(kernel_mm)
+        eva = eva[eva>eigcut]
+        eve = eve[:,-len(eva):]
+        V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+        np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
 
     # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
     for i,iconf in enumerate(conf_range):
@@ -230,17 +231,21 @@ for l in range(1,llmax+1):
             power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,nfeat)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
         
         # compute K_MM 
-        kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T) 
-        for i1 in range(Mspe[spe]):
-            for i2 in range(Mspe[spe]):
-                kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_mm[spe][i1,i2]**(zeta-1)
+        if inp.parallel:
+            V = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy")
+        else:
+            kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T) 
+            for i1 in range(Mspe[spe]):
+                for i2 in range(Mspe[spe]):
+                    kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_mm[spe][i1,i2]**(zeta-1)
     
         # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
-        eva, eve = np.linalg.eigh(kernel_mm)
-        eva = eva[eva>eigcut]
-        eve = eve[:,-len(eva):]
-        V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-        np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
+            eva, eve = np.linalg.eigh(kernel_mm)
+            kernel_mm = None
+            eva = eva[eva>eigcut]
+            eve = eve[:,-len(eva):]
+            V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+            np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
 
         # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
         for i,iconf in enumerate(conf_range):

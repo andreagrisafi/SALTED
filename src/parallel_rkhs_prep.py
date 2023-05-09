@@ -5,7 +5,7 @@ sys.path.insert(0, './')
 import inp
 import argparse
 import h5py
-from os import remove
+import os
 
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
@@ -26,10 +26,14 @@ atom_idx, natom_dict = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
 
 # number of sparse environments
 M = inp.Menv
+zeta = inp.z
+eigcut = inp.eigcut
 if predict:
     sdir = inp.predict_soapdir
+    kdir = inp.predict_kerndir
 else:
     sdir = inp.soapdir
+    kdir = inp.kerndir
 
 if not predict:
     def do_fps(x, d=0):
@@ -82,7 +86,21 @@ if not predict:
     for spe in spelist:
         Mspe[spe] = len(fps_indexes[spe])
     
+    # make directories if not exisiting
+    dirpath = os.path.join(inp.path2ml, kdir)
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+    for spe in spelist:
+        for l in range(llmax+1):
+            dirpath = os.path.join(inp.path2ml+kdir, "spe"+str(spe)+"_l"+str(l))
+            if not os.path.exists(dirpath):
+                os.mkdir(dirpath)
+            dirpath = os.path.join(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+            if not os.path.exists(dirpath):
+                os.mkdir(dirpath)
+    
     power_env_sparse = {}
+    kernel0_mm = {}
     h5f = h5py.File(inp.path2ml+sdir+'FEAT-0-M.h5','w')
     for spe in spelist:
         power_env_sparse[spe] = power.reshape(ndata*natmax,nfeat)[np.array(fps_indexes[spe],int)]
@@ -99,6 +117,23 @@ if not predict:
             power_env_sparse_bare[spe] = power_bare.reshape(ndata*natmax,nfeat_bare)[np.array(fps_indexes[spe],int)]
             h5f.create_dataset(spe,data=power_env_sparse_bare[spe])
         h5f.close()
+
+    if response: kernel0_mm_temp = {}
+
+    for spe in spelist:
+        kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
+        if response:
+            kernel0_mm_temp[spe] = kernel0_mm[spe]
+            kernel0_mm[spe] = np.dot(power_env_sparse_bare[spe],power_env_sparse_bare[spe].T)
+            kernel_mm = kernel0_mm_temp[spe] * kernel0_mm[spe]**(zeta-1)
+        else:
+            kernel_mm = kernel0_mm[spe]**zeta
+
+        eva, eve = np.linalg.eigh(kernel_mm)
+        eva = eva[eva>eigcut]
+        eve = eve[:,-len(eva):]
+        V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+        np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
     
     for l in range(1,llmax+1):
         power = np.load(inp.path2ml+sdir+"FEAT-"+str(l)+".npy")
@@ -110,16 +145,27 @@ if not predict:
             h5f.create_dataset(spe,data=power_env_sparse[spe])
         h5f.close()
 
+        for spe in spelist:
+            kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T) 
+            for i1 in range(Mspe[spe]):
+                for i2 in range(Mspe[spe]):
+                    kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_mm[spe][i1,i2]**(zeta-1)
+            eva, eve = np.linalg.eigh(kernel_mm)
+            eva = eva[eva>eigcut]
+            eve = eve[:,-len(eva):]
+            V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+            np.save(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
+
 for l in range(llmax+1):
     a = np.load(inp.path2ml+sdir+"FEAT-"+str(l)+".npy")
     f = h5py.File(inp.path2ml+sdir+"FEAT-"+str(l)+".h5",'w')
     f.create_dataset("descriptor",data=a)
     f.close
-    if clean: remove(inp.path2ml+sdir+"FEAT-"+str(l)+".npy")
+    if clean: os.remove(inp.path2ml+sdir+"FEAT-"+str(l)+".npy")
 
 if response:
     a = np.load(inp.path2ml+sdir+"FEAT-0-bare.npy")
     f = h5py.File(inp.path2ml+sdir+"FEAT-0-bare.h5",'w')
     f.create_dataset("descriptor",data=a)
     f.close
-    if clean: remove(inp.path2ml+sdir+"FEAT-0-bare.npy")
+    if clean: os.remove(inp.path2ml+sdir+"FEAT-0-bare.npy")
