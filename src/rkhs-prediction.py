@@ -106,26 +106,25 @@ else:
     conf_range = list(range(ndata))
 
 if inp.parallel:
-    power_train = h5py.File(inp.path2ml+sdirtrain+"FEAT-0.h5",'r')["descriptor"][conf_range,:]
+    # power_train = h5py.File(inp.path2ml+sdirtrain+"FEAT-0.h5",'r')["descriptor"][conf_range,:]
     power = h5py.File(inp.path2ml+sdir+"FEAT-0.h5",'r')["descriptor"][conf_range,:]
     if response:
-        power_bare_train = h5py.File(inp.path2ml+sdirtrain+"FEAT-0-bare.h5",'r')["descriptor"][conf_range,:]
+#        power_bare_train = h5py.File(inp.path2ml+sdirtrain+"FEAT-0-bare.h5",'r')["descriptor"][conf_range,:]
         power_bare = h5py.File(inp.path2ml+sdir+"FEAT-0-bare.h5",'r')["descriptor"][conf_range,:]
 
 else:
     # load lambda=0 power spectrum 
     power_train = np.load(inp.path2ml+sdirtrain+"FEAT-0.npy")
+    nfeat_train = power_train.shape[-1]
     power = np.load(inp.path2ml+sdir+"FEAT-0.npy")
     
     if response:
         # load lambda=0 power spectrum without dummy atom
         power_bare_train = np.load(inp.path2ml+sdirtrain+"FEAT-0-bare.npy")
+        nfeat_bare_train = power_bare_train.shape[-1]
         power_bare = np.load(inp.path2ml+sdir+"FEAT-0-bare.npy")
 
 nfeat = power.shape[-1]
-nfeat_train = power_train.shape[-1]
-if response:
-    nfeat_bare_train = power_bare_train.shape[-1]
 
 power_env_sparse = {}
 kernel0_mm = {}
@@ -143,7 +142,7 @@ for spe in spelist:
     if inp.parallel:
         power_env_sparse[spe] = h5py.File(inp.path2ml+sdirtrain+"FEAT-0-M.h5",'r')[spe][:]
     else:
-        power_env_sparse[spe] = power_train.reshape(ndata_train*natmax_train,power_train.shape[-1])[np.array(fps_indexes[spe],int)]
+        power_env_sparse[spe] = power_train.reshape(ndata_train*natmax_train,nfeat_train)[np.array(fps_indexes[spe],int)]
     if response:
         if inp.parallel:
             power_env_sparse_bare[spe] = h5py.File(inp.path2ml+sdirtrain+"FEAT-0-M-bare.h5",'r')[spe][:]
@@ -184,12 +183,12 @@ for l in range(1,llmax+1):
     # load power spectrum
     print("loading lambda =", l,flush=True)
     if inp.parallel:
-        power_train = h5py.File(inp.path2ml+sdirtrain+"FEAT-"+str(l)+".h5",'r')["descriptor"][conf_range,:]
+#        power_train = h5py.File(inp.path2ml+sdirtrain+"FEAT-"+str(l)+".h5",'r')["descriptor"][conf_range,:]
         power = h5py.File(inp.path2ml+sdir+"FEAT-"+str(l)+".h5",'r')["descriptor"][conf_range,:]
     else:
         power_train = np.load(inp.path2ml+sdirtrain+"FEAT-"+str(l)+".npy")
+        nfeat_train = power_train.shape[-1]
         power = np.load(inp.path2ml+sdir+"FEAT-"+str(l)+".npy")
-    nfeat_train = power_train.shape[-1]
     nfeat = power.shape[-1]
 
     power_env_sparse = {}

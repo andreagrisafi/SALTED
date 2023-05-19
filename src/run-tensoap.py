@@ -97,11 +97,11 @@ if parallel > 1:
         for i in range(parallel):
             fname1 = str(i)+'_'+fname
             if nc > 0:
-#                cmd = ['srun','--exclusive','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
+                cmd = ['srun','--exclusive','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
+#                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
             else:
-#                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg),'-d',str(dummy)]
-                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
+                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
+#                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
             if periodic: cmd += ['-p']
             if dummy > 0:
                 if l == 0:

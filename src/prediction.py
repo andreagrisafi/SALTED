@@ -86,6 +86,7 @@ for itest in testrange:
     ispe = {}
     isize = 0
     iii = 0
+    #print(weights.shape)
     for spe in spelist:
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
@@ -94,6 +95,7 @@ for itest in testrange:
                 #psi_nm = np.load(inp.path2ml+kdir[rc]+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(itest)+".npy") 
                 psi_nm = np.load(inp.path2ml+kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(itest)+".npy") 
                 Mcut = psi_nm.shape[1]
+                #print(spe,l,n,Mcut,isize)
                 C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
                 isize += Mcut
                 iii += 1

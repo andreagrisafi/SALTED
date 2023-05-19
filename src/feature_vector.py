@@ -91,8 +91,8 @@ for iconf in conf_range:
 #   define a numpy equivalent to an appendable list
     class arraylist:
         def __init__(self):
-            self.data = np.zeros((1000000,))
-            self.capacity = 1000000
+            self.data = np.zeros((100000,))
+            self.capacity = 100000
             self.size = 0
 
         def update(self, row):
@@ -101,7 +101,7 @@ for iconf in conf_range:
 
         def add(self, x, n):
             if self.size+n >= self.capacity:
-                self.capacity *= 4
+                self.capacity *= 2
                 newdata = np.zeros((self.capacity,))
                 newdata[:self.size] = self.data[:self.size]
                 self.data = newdata
@@ -112,7 +112,14 @@ for iconf in conf_range:
         def finalize(self):
             return self.data[:self.size]
 
+    srows = arraylist()
+    for l in range(lmax[spe]+1):
+        x = Psi[(spe,l)][i1:i2]
+        nz = np.nonzero(x)
+        srows.update(nz[0])
+    srows = srows.finalize()
     
+
     # build sparse feature-vector memory efficiently
     nrows = Tsize
     ncols = totsize
