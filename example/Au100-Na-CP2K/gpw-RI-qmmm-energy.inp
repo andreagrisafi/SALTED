@@ -1,0 +1,127 @@
+@set PROJECT Au 
+@set RUN ENERGY
+ 
+&FORCE_EVAL
+  METHOD QMMM 
+    &DFT
+    BASIS_SET_FILE_NAME BASIS_ccGRB_UZH
+    BASIS_SET_FILE_NAME RI_AUTO_OPT
+    POTENTIAL_FILE_NAME POTENTIAL_UZH
+    &PRINT
+      &RI_DENSITY
+         RI_COEFFS_FILE PREDICTED_COEFFS.dat
+         BASIS_TYPE RI_HFX
+         FFT .TRUE.
+      &END
+    &END
+    &MGRID
+      CUTOFF       800 
+      REL_CUTOFF    80
+      COMMENSURATE
+    &END MGRID
+    &POISSON
+      PERIODIC XY
+      POISSON_SOLVER MT 
+    &END POISSON
+    &SCF
+      MAX_SCF 0
+    &END SCF
+    &XC
+      &XC_FUNCTIONAL PBE
+      &END XC_FUNCTIONAL
+      &HF
+         FRACTION 0.0
+         &RI
+         &END
+      &END
+    &END XC
+    &EXTERNAL_POTENTIAL
+      STATIC .TRUE.
+      FUNCTION E*Z
+      PARAMETERS E 
+      VALUES 0.0
+    &END EXTERNAL_POTENTIAL
+  &END DFT
+  &MM
+    &FORCEFIELD
+     &CHARGE
+      ATOM Na
+      CHARGE 1.000000
+     &END CHARGE
+     &CHARGE
+      ATOM Au
+      CHARGE 0.0
+     &END CHARGE
+     &NONBONDED
+        &LENNARD-JONES
+          atoms Na Na
+          EPSILON 0.0 
+          SIGMA 3.166
+          RCUT 11.4
+        &END LENNARD-JONES
+        &LENNARD-JONES
+          atoms Na Au 
+          EPSILON 0.0
+          SIGMA 3.6705
+          RCUT 11.4
+        &END LENNARD-JONES
+        &LENNARD-JONES
+          atoms Au Au 
+          EPSILON 0.0
+          SIGMA 3.6705
+          RCUT 11.4
+        &END LENNARD-JONES
+      &END NONBONDED
+    &END FORCEFIELD
+    &POISSON
+      &EWALD
+        EWALD_TYPE ewald
+        ALPHA .44
+        GMAX 21
+      &END EWALD
+    &END POISSON
+  &END MM
+  &QMMM
+    MM_POTENTIAL_FILE_NAME MM_POTENTIAL
+    USE_GEEP_LIB 12 
+    @include cell.sys
+    ECOUPL GAUSS
+    NOCOMPATIBILITY
+    &PERIODIC
+      &POISSON
+        PERIODIC XY
+        POISSON_SOLVER MT
+      &END POISSON
+      &MULTIPOLE OFF
+      &END
+    &END PERIODIC
+    &MM_KIND Na
+     RADIUS 2.27 !ionic radius
+    &END MM_KIND
+    &QM_KIND Au
+      MM_INDEX 1..12    
+    &END QM_KIND
+  &END QMMM
+  &SUBSYS
+    @include cell.sys
+    @include coords.sys
+    &KIND Au
+      BASIS_SET ccGRB-D-q11
+      BASIS_SET RI_HFX RI_AUTO_OPT-ccGRB
+      POTENTIAL GTH-PBE-q11
+    &END KIND
+    &KIND Na
+      BASIS_SET ccGRB-D-q11
+      BASIS_SET RI_HFX RI_AUTO_OPT-ccGRB
+      POTENTIAL GTH-PBE-q11
+    &END KIND
+    &TOPOLOGY
+    &END TOPOLOGY
+  &END SUBSYS
+&END FORCE_EVAL
+&GLOBAL
+  PROJECT ${PROJECT}
+  RUN_TYPE ${RUN}
+  PRINT_LEVEL MEDIUM
+  EXTENDED_FFT_LENGTHS
+&END GLOBAL

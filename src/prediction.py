@@ -98,7 +98,6 @@ for itest in testrange:
                 isize += Mcut
                 iii += 1
     
-        
     # fill vector of predictions
     pred_coefs = np.zeros(Tsize)
     Av_coeffs = np.zeros(Tsize)

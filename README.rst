@@ -23,13 +23,13 @@ The training target consists in the projection of the scalar-field over atom-cen
 
 For each dataset configuration, both the scalar-field projection vector and the overlap matrix are needed. The dimensionality of these arrays has to correspond to the number of atoms, as sorted in the geometry file, times the non-redundant number of basis functions belonging to each atom. The ordering of the basis set follows a hierarchical structure: 
 
-1) For a given atomic species X, loop over the angular orders {L} 
+1) For a given atomic species X, cycle over the angular index {L} 
 
-2) For a given combination (X,L), loop over the radial functions {n} 
+2) For a given combination (X,L), cycle over the (contracted) radial functions {n} 
 
-3) Loop over the angular functions sorted as -L,...,0,...,+L
+3) Cycle over the angular functions sorted as -L, ..., 0 , ... , +L
 
-The possible basis set choices appear in :code:`src/basis.py`. If you want to use a basis that is not included in this file, it is easy enough to add a new one together with the proper dimensions.
+The possible basis set choices appear in :code:`src/basis.py`. If you want to use a basis that is not included in this file, add the proper dimensions there and generate the data accordingly.
 
 Contact
 -------

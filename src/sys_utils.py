@@ -45,7 +45,8 @@ def get_atom_idx(ndata,natoms,spelist,atomic_symbols):
             natom_dict[(iconf,spe)] = 0
         for iat in range(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
-            atom_idx[(iconf,spe)].append(iat)
-            natom_dict[(iconf,spe)] += 1 
+            if spe in spelist:
+               atom_idx[(iconf,spe)].append(iat)
+               natom_dict[(iconf,spe)] += 1 
 
     return atom_idx,natom_dict

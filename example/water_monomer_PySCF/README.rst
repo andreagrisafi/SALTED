@@ -14,10 +14,10 @@ Ensure that the file $SALTEDPATH/basis.py contains an entry corresponding to the
 #---------------------------------------------------
 
 Generate the density matrices for the configurations of water using PySCF using
-:code:`python $SALTEDPATH/run-pyscf.py`
+:code:`python run-pyscf.py`
 
 Calculate the projections of these density matrices onto auxiliary basis functions using
-:code:`python $SALTEDPATH/dm2df-pyscf.py`
+:code:`python dm2df-pyscf.py`
 
 Each of these commands can be run with the flag `-iconf n` to generate the training data for the nth structure only.
 
@@ -69,10 +69,10 @@ This produces the predicted coefficients for each configuration found in inp.pre
 #---------------------------------------------------
 
 Calculate the reference energies of the water molecules used in validation, using
-:code:`python $SALTEDPATH/electro_energy-pyscf.py`
+:code:`python electro_energy-pyscf.py`
 
 Calculate the energies derived from the predicted densities and evaluate the error, using
-:code:`python $SALTEDPATH/electro_error-pyscf.py`
+:code:`python electro_error-pyscf.py`
 
 To compare performance to an equivalent 'direct' prediction, run
 :code:`python $SALTEDPATH/sparse-gpr_energies.py`

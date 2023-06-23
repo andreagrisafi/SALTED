@@ -1,0 +1,36 @@
+#!/bin/bash
+##PBS -q beta
+##PBS -l select=1:ncpus=24:mpiprocs=24
+##PBS -N test
+##PBS -l walltime=03:00:00
+##PBS -j oe
+
+module load gcc/11.2 python/3.9 openMPI/4.1.2-gcc112
+
+export INTRISICS=1 # fix for xsmm vector instructions
+export MPI_HOME=/opt/dev/libs/OpenMPI-4.1.2-gcc112
+
+cd /home/grisafia/source/SALTED/example/Au100-CP2K
+mkdir lodes-nofield_rc8.0-sg0.5-l10-n10
+featpath=/home/grisafia/source/SALTED/example/Au100-CP2K/lodes-nofield_rc8.0-sg0.5-l6-n6
+
+python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 0 -ele -sew 1.1 -o $featpath/FEAT-0
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 1 -ele -sew 1.1  -o $featpath/FEAT-1
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 2 -ele -sew 1.1  -o $featpath/FEAT-2
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 3 -ele -sew 1.1  -o $featpath/FEAT-3
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 4 -ele -sew 1.1  -o $featpath/FEAT-4
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 5 -ele -sew 1.1  -o $featpath/FEAT-5
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 6 -ele -sew 1.1  -o $featpath/FEAT-6
+
+#cd /data/agrisafi/Au-fcc100-223/
+#mkdir lodes-efield_rc8.0-sg0.5-l10-n10
+#featpath=/home/grisafia/source/SALTED/example/Au100-CP2K/lodes-efield_rc8.0-sg0.5-l6-n6
+#
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 0 -ele -sew 1.1 -efield  -o $featpath/FEAT-0
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 1 -ele -sew 1.1 -efield  -o $featpath/FEAT-1
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 2 -ele -sew 1.1 -efield  -o $featpath/FEAT-2
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 3 -ele -sew 1.1 -efield  -o $featpath/FEAT-3
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 4 -ele -sew 1.1 -efield  -o $featpath/FEAT-4
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 5 -ele -sew 1.1 -efield  -o $featpath/FEAT-5
+#python3 ~/source/TENSOAP/soapfast/get_power_spectrum.py -p -f fcc100-223.xyz -rc 8.0 -sg 0.5 -l 6 -n 6 -lm 6 -ele -sew 1.1 -efield  -o $featpath/FEAT-6
+

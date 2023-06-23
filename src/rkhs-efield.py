@@ -1,22 +1,18 @@
 import os
+import sys
 import numpy as np
 import time
+import ase
+from ase import io
+from ase.io import read
 from random import shuffle
-import sys
+
+from sys_utils import read_system, get_atom_idx
+import basis
+
 sys.path.insert(0, './')
 import inp
-from sys_utils import read_system, get_atom_idx
 
-if inp.parallel:
-    from mpi4py import MPI
-
-    # MPI information
-    comm = MPI.COMM_WORLD
-    size = comm.Get_size()
-    rank = comm.Get_rank()
-    print('This is task',rank+1,'of',size)
-else:
-    rank = 0
 
 species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -49,7 +45,6 @@ natmax = max(natoms_list)
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 #############################################################################
-
 
 # number of sparse environments
 M = inp.Menv
@@ -87,30 +82,46 @@ for iconf in range(ndata):
         species_array[iconf,iat] = species_idx[spe] 
 species_array = species_array.reshape(ndata*natmax)
 
+# make directories if not exisiting
+dirpath = os.path.join(inp.saltedpath, "kernels_"+inp.saltedname)
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+for spe in species:
+    for l in range(llmax+1):
+        dirpath = os.path.join(inp.saltedpath+"kernels_"+inp.saltedname+"/", "spe"+str(spe)+"_l"+str(l))
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+        dirpath = os.path.join(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+
 # load lambda=0 power spectrum 
-power = np.load(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-0.npy")
-nfeat = power.shape[-1]
+power = np.load(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-0_field.npy")
+power2 = np.load(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-0.npy")
+nfeat1 = power.shape[-1]
+nfeat2 = power2.shape[-1]
 
 # compute sparse set with FPS
-fps_idx = np.array(do_fps(power.reshape(ndata*natmax,nfeat),M),int)
+fps_idx = np.array(do_fps(power2.reshape(ndata*natmax,nfeat2),M),int)
 fps_species = species_array[fps_idx]
 sparse_set = np.vstack((fps_idx,fps_species)).T
 print("Computed sparse set made of ", M, "environments")
 np.savetxt(inp.saltedpath+"equirepr_"+inp.saltedname+"/sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
 
-# make directories if not exisiting
-if (rank == 0):
-    dirpath = os.path.join(inp.saltedpath, "kernels_"+inp.saltedname)
-    if not os.path.exists(dirpath):
-        os.mkdir(dirpath)
+# initialize useful arrays
+atom_idx = {}
+natom_dict = {}
+for iconf in range(ndata):
     for spe in species:
-        for l in range(llmax+1):
-            dirpath = os.path.join(inp.saltedpath+"kernels_"+inp.saltedname+"/", "spe"+str(spe)+"_l"+str(l))
-            if not os.path.exists(dirpath):
-                os.mkdir(dirpath)
-            dirpath = os.path.join(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-            if not os.path.exists(dirpath):
-                os.mkdir(dirpath)
+        atom_idx[(iconf,spe)] = [] 
+        natom_dict[(iconf,spe)] = 0 
+
+# extract species-dependent power spectrum for lambda=0
+for iconf in range(ndata):
+    for iat in range(natoms[iconf]):
+        spe = atomic_symbols[iconf][iat]
+        atom_idx[(iconf,spe)].append(iat)
+        natom_dict[(iconf,spe)] += 1 
 
 # divide sparse set per species
 fps_indexes = {}
@@ -124,25 +135,9 @@ for spe in species:
 
 print("Computing RKHS of symmetry-adapted sparse kernel approximations...")
 
-# Distribute structures to tasks
-if inp.parallel:
-    if rank == 0:
-        conf_range = [[] for _ in range(size)]
-        blocksize = int(round(ndata/float(size)))
-        for i in range(size):
-            if i == (size-1):
-                conf_range[i] = list(range(ndata))[i*blocksize:ndata]
-            else:
-                conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
-    else:
-        conf_range = None
-
-    conf_range = comm.scatter(conf_range,root=0)
-    print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
-else:
-    conf_range = list(range(ndata))
-
+# lambda = 0
 power_env_sparse = {}
+power_env_sparse2 = {}
 kernel0_mm = {}
 kernel0_nm = {}
 for spe in species:
@@ -151,8 +146,11 @@ for spe in species:
 
     # compute sparse kernel K_MM for each atomic species 
     power_env_sparse[spe] = power.reshape(ndata*natmax,power.shape[-1])[np.array(fps_indexes[spe],int)]
-    kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
-    kernel_mm = kernel0_mm[spe]**zeta
+    power_env_sparse2[spe] = power2.reshape(ndata*natmax,power2.shape[-1])[np.array(fps_indexes[spe],int)]
+    kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
+    kernel0_mm[spe] = np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T)
+    kernel_mm += kernel0_mm[spe]
+    kernel_mm *= kernel0_mm[spe]**(zeta-1)
     
     # compute RKHS of K_MM^-1 cutting small/negative eigenvalues
     eva, eve = np.linalg.eigh(kernel_mm)
@@ -162,9 +160,11 @@ for spe in species:
     np.save(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
 
     # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
-    for iconf in conf_range:
-        kernel0_nm[(iconf,spe)] = np.dot(power[iconf,atom_idx[(iconf,spe)]],power_env_sparse[spe].T)
-        kernel_nm = kernel0_nm[(iconf,spe)]**zeta
+    for iconf in range(ndata):
+        kernel_nm = np.dot(power[iconf,atom_idx[(iconf,spe)]],power_env_sparse[spe].T)
+        kernel0_nm[(iconf,spe)] = np.dot(power2[iconf,atom_idx[(iconf,spe)]],power_env_sparse2[spe].T)
+        kernel_nm += kernel0_nm[(iconf,spe)]
+        kernel_nm *= kernel0_nm[(iconf,spe)]**(zeta-1)
         psi_nm = np.real(np.dot(kernel_nm,V))
         np.save(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
     print((time.time()-start)/60.0)
@@ -174,19 +174,24 @@ for l in range(1,llmax+1):
 
     # load power spectrum
     print("loading lambda =", l)
-    power = np.load(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(l)+".npy")
-    nfeat = power.shape[-1]
+    power = np.load(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(l)+"_field.npy")
+    power2 = np.load(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(l)+".npy")
+    nfeat1 = power.shape[-1]
+    nfeat2 = power2.shape[-1]
 
     power_env_sparse = {}
+    power_env_sparse2 = {}
     for spe in species:
         print("lambda = ", l, "species:", spe)
         start = time.time()
 
         # get sparse feature vector for each atomic species
-        power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,nfeat)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
+        power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,nfeat1)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat1)
+        power_env_sparse2[spe] = power2.reshape(ndata*natmax,2*l+1,nfeat2)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat2)
         
         # compute K_MM 
         kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T) 
+        kernel_mm += np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) 
         for i1 in range(Mspe[spe]):
             for i2 in range(Mspe[spe]):
                 kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_mm[spe][i1,i2]**(zeta-1)
@@ -199,8 +204,9 @@ for l in range(1,llmax+1):
         np.save(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
 
         # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
-        for iconf in conf_range:
-            kernel_nm = np.dot(power[iconf,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat),power_env_sparse[spe].T) 
+        for iconf in range(ndata):
+            kernel_nm = np.dot(power[iconf,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat1),power_env_sparse[spe].T) 
+            kernel_nm += np.dot(power2[iconf,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat2),power_env_sparse2[spe].T) 
             for i1 in range(natom_dict[(iconf,spe)]):
                 for i2 in range(Mspe[spe]):
                     kernel_nm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)

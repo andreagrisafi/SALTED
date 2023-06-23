@@ -50,6 +50,8 @@ def basiset(basis):
       nmax[("F",4)] = 7
       nmax[("F",5)] = 5
 
+      return [lmax,nmax]
+
    if basis=="RI-cc-pvqz":
 
       lmax["H"] = 4
@@ -84,6 +86,8 @@ def basiset(basis):
       nmax[("O",3)] = 3
       nmax[("O",4)] = 2
       nmax[("O",5)] = 1
+
+      return [lmax,nmax]
    
    if basis=="FHI-aims-first-tier":
 
@@ -100,6 +104,8 @@ def basiset(basis):
       nmax[("O",2)] = 4
       nmax[("O",3)] = 3
       nmax[("O",4)] = 1
+
+      return [lmax,nmax]
       
    if basis=="FHI-aims-third-tier":
 
@@ -123,6 +129,8 @@ def basiset(basis):
       nmax[("O",4)] = 8
       nmax[("O",5)] = 5
 
+      return [lmax,nmax]
+
    if basis=="FHI-aims-min":
 
       lmax["H"] = 0
@@ -140,6 +148,8 @@ def basiset(basis):
       nmax[("Si",0)] = 7
       nmax[("Si",1)] = 7
       nmax[("Si",2)] = 3
+
+      return [lmax,nmax]
 
    if basis=="LRI-DZVP-MOLOPT-GTH-MEDIUM":
       
@@ -167,6 +177,8 @@ def basiset(basis):
       nmax[("Cu",5)] = 9
       nmax[("Cu",6)] = 8
 
+      return [lmax,nmax]
+
    if basis=="LRI-DZVP-MOLOPT-GTH-MEDIUM-FULL-ANGULAR":
 
       lmax["H"] = 3
@@ -193,6 +205,8 @@ def basiset(basis):
       nmax[("Cu",5)] = 15
       nmax[("Cu",6)] = 15
 
+      return [lmax,nmax]
+
    if basis=="LRI-DZVP-MOLOPT-GTH-MEDIUM-FULL-ANGULAR-SUPER-FAT-WIDER-18":
 
       lmax["Cu"] = 6
@@ -205,6 +219,8 @@ def basiset(basis):
       nmax[("Cu",4)] = 18
       nmax[("Cu",5)] = 18
       nmax[("Cu",6)] = 18
+
+      return [lmax,nmax]
 
    if basis=="DF-DZVP-MOLOPT-GTH":
 
@@ -228,6 +244,8 @@ def basiset(basis):
       nmax[("Au",5)] = 18
       nmax[("Au",6)] = 18
 
+      return [lmax,nmax]
+
    if basis=="FHI-aims-tight":
 
       lmax["H"] = 4
@@ -248,6 +266,8 @@ def basiset(basis):
       nmax[("O",6)] = 4
       nmax[("O",7)] = 2
       nmax[("O",8)] = 1
+
+      return [lmax,nmax]
 
    if basis=="FHI-aims-ZrS":
 
@@ -270,6 +290,8 @@ def basiset(basis):
       nmax[("Zr",5)] = 8
       nmax[("Zr",6)] = 4
 
+      return [lmax,nmax]
+
    if basis=="FHI-aims-graphene":
 
       lmax["C"] = 4
@@ -279,6 +301,8 @@ def basiset(basis):
       nmax[("C",2)] = 6
       nmax[("C",3)] = 5
       nmax[("C",4)] = 3
+
+      return [lmax,nmax]
 
    if basis=="FHI-aims-MoSe":
 
@@ -300,6 +324,8 @@ def basiset(basis):
       nmax[("Mo",4)] = 11
       nmax[("Mo",5)] = 8
       nmax[("Mo",6)] = 5
+
+      return [lmax,nmax]
 
    if basis=="FHI-aims-light":
 
@@ -323,4 +349,19 @@ def basiset(basis):
       nmax[("C",3)] = 3
       nmax[("C",4)] = 1
 
-   return [lmax,nmax]
+      return [lmax,nmax]
+
+   if basis=="RI_AUTO_OPT-ccGRB":
+
+      lmax["Au"] = 6
+
+      nmax[("Au",0)] = 8
+      nmax[("Au",1)] = 8
+      nmax[("Au",2)] = 8
+      nmax[("Au",3)] = 8
+      nmax[("Au",4)] = 8
+      nmax[("Au",5)] = 1
+      nmax[("Au",6)] = 1
+
+      return [lmax,nmax]
+

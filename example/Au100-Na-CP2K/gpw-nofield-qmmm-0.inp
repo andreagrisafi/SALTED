@@ -1,0 +1,151 @@
+@set PROJECT Au 
+@set RUN ENERGY
+ 
+&FORCE_EVAL
+  METHOD QMMM 
+    &DFT
+    BASIS_SET_FILE_NAME BASIS_ccGRB_UZH
+    BASIS_SET_FILE_NAME RI_AUTO_OPT
+    POTENTIAL_FILE_NAME POTENTIAL_UZH
+    &MGRID
+      CUTOFF       800 
+      REL_CUTOFF    80
+      COMMENSURATE
+    &END MGRID
+    &POISSON
+      PERIODIC XY
+      POISSON_SOLVER MT 
+    &END POISSON
+    &SCF
+      SCF_GUESS ATOMIC
+      EPS_SCF 1.0E-8
+      MAX_SCF 5000
+      ADDED_MOS 2000 
+      CHOLESKY INVERSE
+      &SMEAR  ON
+         METHOD FERMI_DIRAC
+         ELECTRONIC_TEMPERATURE [K] 300 
+      &END SMEAR
+      &DIAGONALIZATION
+          ALGORITHM STANDARD
+      &END DIAGONALIZATION
+      &MIXING
+          METHOD BROYDEN_MIXING
+          ALPHA   0.1
+          BETA    1.5
+          NBROYDEN  8
+      &END MIXING 
+      &PRINT
+        &RESTART
+        &END
+      &END
+    &END SCF
+    &XC
+      &XC_FUNCTIONAL PBE
+      &END XC_FUNCTIONAL
+    &END XC
+    &EXTERNAL_POTENTIAL
+      STATIC .TRUE.
+      FUNCTION E*Z
+      PARAMETERS E 
+      VALUES 0.0
+    &END EXTERNAL_POTENTIAL
+    &PRINT
+      &E_DENSITY_CUBE
+        FILENAME ISOLATED 
+        LOG_PRINT_KEY .TRUE.
+        &EACH
+         JUST_ENERGY 1
+        &END EACH
+      &END E_DENSITY_CUBE
+#      &V_HARTREE_CUBE
+#        !LOG_PRINT_KEY .TRUE.
+#        &EACH
+#         JUST_ENERGY 1
+#        &END EACH
+#      &END V_HARTREE_CUBE
+    &END PRINT
+  &END DFT
+  &MM
+    &FORCEFIELD
+     &CHARGE
+      ATOM Na
+      CHARGE 0.000000
+     &END CHARGE
+     &CHARGE
+      ATOM Au
+      CHARGE 0.0
+     &END CHARGE
+     &NONBONDED
+        &LENNARD-JONES
+          atoms Na Na
+          EPSILON 0.0 
+          SIGMA 3.166
+          RCUT 11.4
+        &END LENNARD-JONES
+        &LENNARD-JONES
+          atoms Na Au 
+          EPSILON 0.0
+          SIGMA 3.6705
+          RCUT 11.4
+        &END LENNARD-JONES
+        &LENNARD-JONES
+          atoms Au Au 
+          EPSILON 0.0
+          SIGMA 3.6705
+          RCUT 11.4
+        &END LENNARD-JONES
+      &END NONBONDED
+    &END FORCEFIELD
+    &POISSON
+      &EWALD
+        EWALD_TYPE ewald
+        ALPHA .44
+        GMAX 21
+      &END EWALD
+    &END POISSON
+  &END MM
+  &QMMM
+    MM_POTENTIAL_FILE_NAME MM_POTENTIAL
+    USE_GEEP_LIB 12 
+    @include cell.sys
+    ECOUPL GAUSS
+    NOCOMPATIBILITY
+    &PERIODIC
+      &POISSON
+        PERIODIC XY
+        POISSON_SOLVER MT
+      &END POISSON
+      &MULTIPOLE OFF
+      &END
+    &END PERIODIC
+    &MM_KIND Na
+     RADIUS 2.27 !ionic radius
+    &END MM_KIND
+    &QM_KIND Au
+      MM_INDEX 1..12    
+    &END QM_KIND
+  &END QMMM
+  &SUBSYS
+    @include cell.sys
+    @include coords.sys
+    &KIND Au
+      BASIS_SET ccGRB-D-q11
+      BASIS_SET RI_HFX RI_AUTO_OPT-ccGRB
+      POTENTIAL GTH-PBE-q11
+    &END KIND
+    &KIND Na
+      BASIS_SET ccGRB-D-q11
+      BASIS_SET RI_HFX RI_AUTO_OPT-ccGRB
+      POTENTIAL GTH-PBE-q11
+    &END KIND
+    &TOPOLOGY
+    &END TOPOLOGY
+  &END SUBSYS
+&END FORCE_EVAL
+&GLOBAL
+  PROJECT ${PROJECT}
+  RUN_TYPE ${RUN}
+  PRINT_LEVEL MEDIUM
+  EXTENDED_FFT_LENGTHS
+&END GLOBAL

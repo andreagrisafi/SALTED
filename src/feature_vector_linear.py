@@ -21,59 +21,33 @@ if inp.parallel:
 else:
     rank=0
 
-species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
 # sparse-GPR parameters
 M = inp.Menv
 eigcut = inp.eigcut
 
-atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
+fdir = inp.featdir
 
-##########################################################################################
+atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
 
-natoms_total = 0
-natoms_list = []
-natoms = np.zeros(ndata,int)
-for iconf in range(ndata):
-    natoms[iconf] = 0
-    for spe in species:
-        natoms[iconf] += natoms_per_spe[(iconf,spe)]
-    natoms_total += natoms[iconf]
-    natoms_list.append(natoms[iconf])
-    # Define excluded species
-    excluded_species = []
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        if spe not in species:
-            excluded_species.append(spe)
-    excluded_species = set(excluded_species)
-    for spe in excluded_species:
-        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
-natmax = max(natoms_list)
-
-# recompute atomic indexes from new species selections
-atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
-
-##########################################################################################
+#orcuts = np.loadtxt("optimal_rcuts.dat")
 
 # compute the weight-vector size 
 Mcut = {}
 totsize = 0
 iii=0
-for spe in species:
+for spe in spelist:
     for l in range(lmax[spe]+1):
         for n in range(nmax[(spe,l)]):
-            Mcut[(spe,l,n)] = np.load(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
+            Mcut[(spe,l,n)] = np.load(inp.path2ml+inp.equidir+"spe"+str(spe)+"_l"+str(l)+"/pvec_conf"+str(0)+".npy").shape[1]
             totsize += Mcut[(spe,l,n)]
             iii+=1
 
 print("problem dimensionality:", totsize)
 
-dirpath = os.path.join(inp.saltedpath,"rkhs-vectors_"+inp.saltedname)
+dirpath = os.path.join(inp.path2ml,fdir)
 if (rank == 0):
-    if not os.path.exists(dirpath):
-        os.mkdir(dirpath)
-    dirpath = os.path.join(inp.saltedpath+"rkhs-vectors_"+inp.saltedname, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
 
@@ -101,12 +75,12 @@ for iconf in conf_range:
     print(iconf,flush=True)
 
     # load reference QM data
-    coefs = np.load(inp.saltedpath+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
+    coefs = np.load(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
     Tsize = len(coefs)
 
     # initialize RKHS feature vectors for each channel 
     Psi = {}
-    for spe in species:
+    for spe in spelist:
         for l in range(lmax[spe]+1):
             lsize = natoms_per_spe[(iconf,spe)]*(2*l+1) 
             for n in range(nmax[(spe,l)]):
@@ -116,10 +90,10 @@ for iconf in conf_range:
     ispe = {}
     isize = 0
     iii = 0
-    for spe in species:
+    for spe in spelist:
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
-            psi_nm = np.load(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+            psi_nm = np.load(inp.path2ml+inp.equidir+"spe"+str(spe)+"_l"+str(l)+"/pvec_conf"+str(iconf)+".npy") 
             Mcut = psi_nm.shape[1]
             for n in range(nmax[(spe,l)]):
                 Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
@@ -153,7 +127,7 @@ for iconf in conf_range:
         del scols
 
     sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
-    sparse.save_npz(inp.saltedpath+"rkhs-vectors_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz", sparse_psi)
+    sparse.save_npz(inp.path2ml+fdir+"psi-nm_conf"+str(iconf)+".npz", sparse_psi)
 
     if inp.parallel:
         del sparse_psi
