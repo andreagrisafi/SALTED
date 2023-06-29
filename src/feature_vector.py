@@ -27,6 +27,14 @@ species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_
 M = inp.Menv
 eigcut = inp.eigcut
 
+if inp.combo:
+    kdir = "kernels_"+inp.saltedname+"_"+inp.saltedname2 
+    fdir = "rkhs-vectors_"+inp.saltedname+"_"+inp.saltedname2 
+else:
+    kdir = "kernels_"+inp.saltedname
+    fdir = "rkhs-vectors_"+inp.saltedname
+
+
 atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 ##########################################################################################
@@ -63,17 +71,17 @@ iii=0
 for spe in species:
     for l in range(lmax[spe]+1):
         for n in range(nmax[(spe,l)]):
-            Mcut[(spe,l,n)] = np.load(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
+            Mcut[(spe,l,n)] = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
             totsize += Mcut[(spe,l,n)]
             iii+=1
 
 print("problem dimensionality:", totsize)
 
-dirpath = os.path.join(inp.saltedpath,"rkhs-vectors_"+inp.saltedname)
+dirpath = os.path.join(inp.saltedpath,fdir)
 if (rank == 0):
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
-    dirpath = os.path.join(inp.saltedpath+"rkhs-vectors_"+inp.saltedname, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+    dirpath = os.path.join(inp.saltedpath+fdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
 
@@ -119,7 +127,7 @@ for iconf in conf_range:
     for spe in species:
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
-            psi_nm = np.load(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+            psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
             Mcut = psi_nm.shape[1]
             for n in range(nmax[(spe,l)]):
                 Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
@@ -153,7 +161,7 @@ for iconf in conf_range:
         del scols
 
     sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
-    sparse.save_npz(inp.saltedpath+"rkhs-vectors_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz", sparse_psi)
+    sparse.save_npz(inp.saltedpath+fdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz", sparse_psi)
 
     if inp.parallel:
         del sparse_psi

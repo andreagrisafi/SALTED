@@ -8,10 +8,13 @@ field = False                # option for external field
 # SALTED set up 
 #--------------------------------------------------
 saltedpath = "/scratchbeta/grisafia/Au-fcc100-223-Na/"
-saltedname = "rc8.0_sg0.5"         
+saltedname = "rc8.0_rho-sg0.5_V-sg0.5"        
+saltedname2 = "rc8.0_rho-sg0.5"        
+predname = "N33" 
 coefdir = "coefficients-response/" # directory of density coefficients
 parallel = False                   # option for MPI parallelization
 average = False                    # option for spherical average baseline 
+combo = False 
 
 # QM variables for interface with CP2K
 # ---------------------------------------------
@@ -29,7 +32,7 @@ rcut1 = 8.0  # radial cutoff (angstrom)
 sig1 = 0.5   # Gaussian width (angstrom)
 nrad1 = 6    # number of radial functions 
 nang1 = 6    # number of angular functions
-nspe1 = 2    # number of chemical species
+neighspe1 = ["Au","Na"]    # number of chemical species
 
 # Representation of 2nd local environment 
 # ----------------------------------------
@@ -38,7 +41,7 @@ rcut2 = 8.0  # radial cutoff (angstrom)
 sig2 = 0.5   # Gaussian width (angstrom)
 nrad2 = 6    # number of radial functions 
 nang2 = 6    # number of angular functions
-nspe2 = 2    # number of chemical species
+neighspe2 = ["Au","Na"]    # number of chemical species
 
 # SALTED parameters
 #----------------------------------------------------------

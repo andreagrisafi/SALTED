@@ -6,6 +6,7 @@ import chemfiles
 import numpy as np
 from ase.io import read
 from scipy import special
+from ase.data import atomic_numbers
 
 from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
@@ -108,15 +109,7 @@ for iconf in range(ndata):
     natoms_list.append(natoms[iconf])
 natoms_max = max(natoms_list)
 
-centers_selection = np.zeros((natoms_total,2),int)
-i=0
 for iconf in range(ndata):
-    # Define selected centers 
-    for spe in species:
-        for iat in atom_idx[(iconf,spe)]:
-            centers_selection[i,0] = iconf
-            centers_selection[i,1] = iat 
-            i+=1
     # Define excluded species
     excluded_species = []
     for iat in range(natoms[iconf]):
@@ -167,19 +160,28 @@ elif inp.rep1=="V":
 else:
     print("Error: requested representation", inp.rep1, "not provided")
 
-selection = Labels(
-    names=["structure", "center"],
-    values=centers_selection,
-)
-
 descstart = time.time()
 
-spx = calculator.compute(frames, selected_samples=selection)
+nspe1 = len(inp.neighspe1)
+keys_array = np.zeros(((inp.nang1+1)*len(species)*nspe1,3),int)
+i = 0
+for l in range(inp.nang1+1):
+    for specen in species:
+        for speneigh in inp.neighspe1:
+            keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+            i += 1
+
+keys_selection = Labels(
+    names=["spherical_harmonics_l","species_center","species_neighbor"],
+    values=keys_array
+)
+
+spx = calculator.compute(frames, selected_keys=keys_selection)
 spx = spx.keys_to_properties("species_neighbor")
 spx = spx.keys_to_samples("species_center")
 
 # Get 1st set of coefficients as a complex numpy array
-omega1 = np.zeros((inp.nang1+1,natoms_total,2*inp.nang1+1,inp.nspe1*inp.nrad1),complex)
+omega1 = np.zeros((inp.nang1+1,natoms_total,2*inp.nang1+1,nspe1*inp.nrad1),complex)
 for l in range(inp.nang1+1):
     c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
     omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(spherical_harmonics_l=l).values)
@@ -195,12 +197,26 @@ elif inp.rep2=="V":
 else:
     print("Error: requested representation", inp.rep2, "not provided")
 
-spx_pot = calculator.compute(frames, selected_samples=selection)
+nspe2 = len(inp.neighspe2)
+keys_array = np.zeros(((inp.nang2+1)*len(species)*nspe2,3),int)
+i = 0
+for l in range(inp.nang2+1):
+    for specen in species:
+        for speneigh in inp.neighspe2:
+            keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+            i += 1
+
+keys_selection = Labels(
+    names=["spherical_harmonics_l","species_center","species_neighbor"],
+    values=keys_array
+)
+
+spx_pot = calculator.compute(frames, selected_keys=keys_selection)
 spx_pot = spx_pot.keys_to_properties("species_neighbor")
 spx_pot = spx_pot.keys_to_samples("species_center")
 
 # Get 2nd set of coefficients as a complex numpy array 
-omega2 = np.zeros((inp.nang2+1,natoms_total,2*inp.nang2+1,inp.nspe2*inp.nrad2),complex)
+omega2 = np.zeros((inp.nang2+1,natoms_total,2*inp.nang2+1,nspe2*inp.nrad2),complex)
 for l in range(inp.nang2+1):
     c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
     omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
@@ -254,10 +270,10 @@ for lam in range(lmax_max+1):
     c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
 
     # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
-    p = equicomb.equicomb(natoms_total,inp.nang1,inp.nang2,inp.nspe1*inp.nrad1,inp.nspe2*inp.nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
+    p = equicomb.equicomb(natoms_total,inp.nang1,inp.nang2,nspe1*inp.nrad1,nspe2*inp.nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
 
     # Define feature space and reshape equivariant descriptor
-    featspace = inp.nspe1*inp.nspe2*inp.nrad1*inp.nrad2*llmax
+    featspace = nspe1*nspe2*inp.nrad1*inp.nrad2*llmax
     p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featspace)
  
     print("equivariant time:", (time.time()-equistart))
@@ -302,7 +318,7 @@ for lam in range(lmax_max+1):
                 kernel0_nm[(iconf,spe)] = np.dot(pvec[iconf,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
                 kernel_nm = kernel0_nm[(iconf,spe)]**zeta
                 # Project on RKHS
-                psi_nm[(iconf,spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))    
+                psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
     else:
 
         # Compute covariant kernels
@@ -313,8 +329,8 @@ for lam in range(lmax_max+1):
                     for i2 in range(Mspe[spe]):
                         kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
                 # Project on RKHS
-                psi_nm[(iconf,spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))    
-    
+                psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
+   
     print("rkhs time:", time.time()-rkhsstart)
 
 predstart = time.time()
@@ -344,7 +360,6 @@ for iconf in range(ndata):
     C = {}
     ispe = {}
     isize = 0
-    iii = 0
     for spe in species:
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
@@ -352,13 +367,14 @@ for iconf in range(ndata):
                 Mcut = psi_nm[(iconf,spe,l)].shape[1]
                 C[(spe,l,n)] = np.dot(psi_nm[(iconf,spe,l)],weights[isize:isize+Mcut])
                 isize += Mcut
-                iii += 1
 
-    # fill vector of predictions
-    pred_coefs = np.zeros(Tsize)
+    # init averages array if asked
     if inp.average:
         Av_coeffs = np.zeros(Tsize)
+    
+    # fill vector of predictions
     i = 0
+    pred_coefs = np.zeros(Tsize)
     for iat in range(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
         for l in range(lmax[spe]+1):

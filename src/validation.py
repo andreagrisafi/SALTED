@@ -22,6 +22,15 @@ species = inp.species
 
 bohr2angs = 0.529177210670
 
+if inp.combo:
+    vdir = "validations_"+inp.saltedname+"_"+inp.saltedname2
+    rdir = "regrdir_"+inp.saltedname+"_"+inp.saltedname2
+    kdir = "kernels_"+inp.saltedname+"_"+inp.saltedname2
+else:
+    vdir = "validations_"+inp.saltedname
+    rdir = "regrdir_"+inp.saltedname
+    kdir = "kernels_"+inp.saltedname
+
 # read basis
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
@@ -51,24 +60,24 @@ for i in range(ndata):
     natoms[i] = int(len(atomic_symbols[i]))
 natmax = max(natoms)
 
-dirpath = os.path.join(inp.saltedpath, "validations_"+inp.saltedname)
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-dirpath = os.path.join(inp.saltedpath+"validations_"+inp.saltedname+"/", "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-
 # define test set
-trainrangetot = np.loadtxt(inp.saltedpath+"regrdir_"+inp.saltedname+"/training_set_N"+str(inp.Ntrain)+".txt",int)
+trainrangetot = np.loadtxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",int)
 ntrain = int(inp.trainfrac*len(trainrangetot))
 testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
-dirpath = os.path.join(inp.saltedpath+"validations_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
+# load regression weights
+weights = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
+
+dirpath = os.path.join(inp.saltedpath, vdir)
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+dirpath = os.path.join(inp.saltedpath+vdir+"/", "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+dirpath = os.path.join(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
-# load regression weights
-weights = np.load(inp.saltedpath+"regrdir_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
 
 if inp.qmcode=="cp2k":
     # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
@@ -118,16 +127,6 @@ if inp.qmcode=="cp2k":
 #    print("Integrated pseudo-charge =", pseudocharge)
 
 
-dirpath = os.path.join(inp.saltedpath,"validations_"+inp.saltedname)
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-dirpath = os.path.join(inp.saltedpath+"validations_"+inp.saltedname+"/","M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-dirpath = os.path.join(inp.saltedpath+"validations_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-
 # Load spherical averages if required
 if inp.average:
     av_coefs = {}
@@ -135,10 +134,10 @@ if inp.average:
         av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
 # compute error over test set
-efile = open(inp.saltedpath+"validations_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/errors.dat","w")
+efile = open(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/errors.dat","w")
 if inp.qmcode=="cp2k":
-    dfile = open(inp.saltedpath+"validations_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat","w")
-    qfile = open(inp.saltedpath+"validations_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat","w")
+    dfile = open(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat","w")
+    qfile = open(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat","w")
 
 error_density = 0
 variance = 0
@@ -159,7 +158,7 @@ for iconf in testrange:
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
-                psi_nm = np.load(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+                psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
                 Mcut = psi_nm.shape[1]
                 C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
                 isize += Mcut
@@ -242,10 +241,10 @@ for iconf in testrange:
             print(iconf+1,ref_charge,charge,file=qfile)
 
     # save predicted coefficients
-    np.save(inp.saltedpath+"validations_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
+    np.save(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
 
     # save predicted coefficients
-    np.savetxt(inp.saltedpath+"validations_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/COEFFS-"+str(iconf+1)+".dat",pred_coefs)
+    np.savetxt(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/COEFFS-"+str(iconf+1)+".dat",pred_coefs)
 
     # compute predicted density projections <phi|rho>
     pred_projs = np.dot(overl,pred_coefs)
