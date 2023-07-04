@@ -4,7 +4,7 @@ import time
 import sys
 sys.path.insert(0, './')
 import inp
-from sys_utils import read_system, get_atom_idx
+from sys_utils import read_system, get_atom_idx, get_conf_range
 import argparse
 import h5py
 
@@ -117,16 +117,17 @@ print("Computing RKHS of symmetry-adapted sparse kernel approximations...")
 
 # Distribute structures to tasks
 if inp.parallel:
-    if rank == 0:
-        conf_range = [[] for _ in range(size)]
-        blocksize = int(ndata/float(size))
-        for i in range(size):
-            if i == (size-1):
-                conf_range[i] = list(range(ndata))[i*blocksize:ndata]
-            else:
-                conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
-    else:
-        conf_range = None
+    conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
+#    if rank == 0:
+#        conf_range = [[] for _ in range(size)]
+#        blocksize = int(ndata/float(size))
+#        for i in range(size):
+#            if i == (size-1):
+#                conf_range[i] = list(range(ndata))[i*blocksize:ndata]
+#            else:
+#                conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
+#    else:
+#        conf_range = None
 
     conf_range = comm.scatter(conf_range,root=0)
     print('Task',rank+1,'handles the following structures:',conf_range,flush=True)

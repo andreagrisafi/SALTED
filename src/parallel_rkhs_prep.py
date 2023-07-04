@@ -68,13 +68,18 @@ if not predict:
     # load lambda=0 power spectrum 
     power = np.load(inp.path2ml+sdir+"FEAT-0.npy")
     nfeat = power.shape[-1]
-    
-    # compute sparse set with FPS
-    fps_idx = np.array(do_fps(power.reshape(ndata*natmax,nfeat),M),int)
-    fps_species = species_array[fps_idx]
-    sparse_set = np.vstack((fps_idx,fps_species)).T
-    print("Computed sparse set made of ", M, "environments")
-    np.savetxt("sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
+
+    if os.path.exists( "sparse_set_"+str(M)+".txt"):
+        sparse_set = np.loadtxt("sparse_set_"+str(M)+".txt",dtype=int).T
+        fps_idx = sparse_set[0]
+        fps_species = sparse_set[1]
+    else:
+        # compute sparse set with FPS
+        fps_idx = np.array(do_fps(power.reshape(ndata*natmax,nfeat),M),int)
+        fps_species = species_array[fps_idx]
+        sparse_set = np.vstack((fps_idx,fps_species)).T
+        print("Computed sparse set made of ", M, "environments")
+        np.savetxt("sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
     
     # divide sparse set per species
     fps_indexes = {}

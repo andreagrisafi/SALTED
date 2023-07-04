@@ -49,3 +49,28 @@ def get_atom_idx(ndata,natoms,spelist,atomic_symbols):
             natom_dict[(iconf,spe)] += 1 
 
     return atom_idx,natom_dict
+
+def get_conf_range(rank,size,ntest,testrangetot):
+    if rank == 0:
+        testrange = [[] for _ in range(size)]
+        blocksize = int(ntest/float(size))
+#       print(ntest,blocksize)
+        if type(testrangetot) is not list: testrangetot = testrangetot.tolist()
+        for i in range(size):
+            if i == (size-1):
+                rem = ntest - (i+1)*blocksize
+#               print(i,(i+1)*blocksize,rem)
+                if rem < 0:
+                    testrange[i] = testrangetot[i*blocksize:ntest]
+                else:
+                    testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
+                    for j in range(rem):
+                        testrange[j].append(testrangetot[(i+1)*blocksize+j])
+            else:
+                testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
+#           print(i,len(testrange[i]))
+    else:
+        testrange = None
+
+    return testrange
+

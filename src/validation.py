@@ -3,7 +3,7 @@ import numpy as np
 import sys
 sys.path.insert(0, './')
 import inp
-from sys_utils import read_system
+from sys_utils import read_system,get_conf_range
 import argparse
 
 def add_command_line_arguments_contraction(parsetext):
@@ -58,7 +58,7 @@ testrangetot = np.setdiff1d(list(range(ndata)),trainrangetot)
 if rank == 0:
     dirpath = os.path.join(inp.path2qm, pdir)
     if not os.path.exists(dirpath):
-        os.mkdir(dirpath)
+        os.makedirs(dirpath)
     dirpath = os.path.join(inp.path2qm+pdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
@@ -76,16 +76,17 @@ variance = 0
 # Distribute structures to tasks
 ntest = len(testrangetot)
 if inp.parallel:
-    if rank == 0:
-        testrange = [[] for _ in range(size)]
-        blocksize = int(ntest/float(size))
-        for i in range(size):
-            if i == (size-1):
-                testrange[i] = testrangetot[i*blocksize:ntest]
-            else:
-                testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
-    else:
-        testrange = None
+    testrange = get_conf_range(rank,size,ntest,testrangetot)
+#    if rank == 0:
+#        testrange = [[] for _ in range(size)]
+#        blocksize = int(ntest/float(size))
+#        for i in range(size):
+#            if i == (size-1):
+#                testrange[i] = testrangetot[i*blocksize:ntest]
+#            else:
+#                testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
+#    else:
+#        testrange = None
 
     testrange = comm.scatter(testrange,root=0)
     print('Task',rank+1,'handles the following structures:',testrange,flush=True)

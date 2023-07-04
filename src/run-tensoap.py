@@ -20,6 +20,7 @@ def add_command_line_arguments_contraction(parsetext):
     parser.add_argument("-sg", "--sigma",         type=float, default=0.3,                              help="Gaussian width")
     parser.add_argument("-d", "--dummy", type=int,default=0, help="Include a dummy atom in the SOAP descriptor, at -x (1), -y (2), or -z (3)")
     parser.add_argument("--parallel", type=int,default=0, help="Trivially parallelise the calculation of TENSOAP descriptors")
+    parser.add_argument("--bare", action='store_true', help="Additionally calculate bare lambda=0 descriptors")
     args = parser.parse_args()
     return args
 
@@ -33,6 +34,7 @@ rc = args.rcut
 sg = args.sigma
 dummy = args.dummy
 parallel = args.parallel
+bare = args.bare
 
 if predict:
     dirpath = os.path.join(inp.path2ml, inp.predict_soapdir)
@@ -62,7 +64,7 @@ if nc > 0:
         cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-nc',str(nc),'-ns',str(ns),'-sm', 'random', '-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
         if periodic: cmd += ['-p']
         if dummy > 0: 
-            if l == 0:
+            if l == 0 and bare:
                 cmd2 = cmd.copy()
                 cmd2[cmd2.index('-o')+1] += '-bare'
                 subprocess.call(cmd2)
@@ -74,10 +76,11 @@ if parallel > 1:
     import numpy as np
     coords = ase.io.read(fname,":")
     npoints = len(coords)
-    block = ceil(npoints/parallel)
-    cpus = cpu_count(logical=False)
+    block = floor(npoints/parallel)
+    nnodes = int(os.getenv('SLURM_JOB_NUM_NODES'))
+    cpus = cpu_count(logical=False)*nnodes
     cpt = floor(cpus/parallel)
-    ntasks = parallel*(llmax+1+int(dummy>0))
+    ntasks = parallel*(llmax+1+int(bare))
     output = [None]*ntasks
 
     def childcount():
@@ -86,25 +89,32 @@ if parallel > 1:
         return(len(num))
 
     # Split coords file into parallel blocks and calculate the SOAP descriptors for each
+    rem = npoints - parallel*block
+    start = 0
     for i in range(parallel):
         fname1 = str(i)+'_'+fname
-        if i < parallel-1:
-           ase.io.write(fname1,coords[i*block:(i+1)*block])
-        else:
-           ase.io.write(fname1,coords[i*block:])
+        end = start + block
+        if i < rem: end += 1
+#       if i < parallel-1:
+#          ase.io.write(fname1,coords[i*block:(i+1)*block])
+#       else:
+#          ase.io.write(fname1,coords[i*block:])
+        ase.io.write(fname1,coords[start:end])
+        start=end
+        print(i,end-start,end)
     j = 0
     for l in range(llmax+1):
         for i in range(parallel):
             fname1 = str(i)+'_'+fname
             if nc > 0:
-                cmd = ['srun','--exclusive','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
+                cmd = ['srun','--exclusive','-N','1','-n','1','-c',str(cpt),'get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
 #                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-sf',dirpath+'FEAT-'+str(l),'-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
             else:
-                cmd = ['srun','--exclusive','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
+                cmd = ['srun','--exclusive','-N','1','-n','1','get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
 #                cmd = ['get_power_spectrum.py','-f',fname1,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+str(i)+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
             if periodic: cmd += ['-p']
             if dummy > 0:
-                if l == 0:
+                if l == 0 and bare:
                     cmd2 = cmd.copy()
                     if nc > 0: cmd2[cmd2.index('-sf')+1] += '-bare'
                     cmd2[cmd2.index('-o')+1] += '-bare'
@@ -113,7 +123,7 @@ if parallel > 1:
                 cmd += ['-d',str(dummy)]
             output[j] = subprocess.Popen(cmd)
             j += 1
-            while childcount() > parallel:
+            while childcount() == parallel:
                 sleep(1)
                 for k in range(j):
                     output[k].communicate()
@@ -127,21 +137,34 @@ if parallel > 1:
         fname1 = str(i)+'_'+fname
         os.remove(fname1)
     for l in range(llmax+1):
+        start = 0
         for i in range(parallel):
             block = np.load(dirpath+str(i)+'FEAT-'+str(l)+'.npy')
             natoms = np.load(dirpath+str(i)+'FEAT-'+str(l)+'_natoms.npy')
+            size = block.shape[0]
             if i == 0:
-                full = block
-                full_natoms = natoms
-            else:
-                full = np.concatenate([full,block])
-                full_natoms = np.concatenate([full_natoms,natoms])
+#               full = block
+#               full_natoms = natoms
+                dim = list(block.shape)
+                dim[0] = npoints
+                full = np.zeros(dim)
+                dim = list(natoms.shape)
+                dim[0] = npoints
+                full_natoms = np.zeros(dim)
+#           else:
+#               full = np.concatenate([full,block])
+#               full_natoms = np.concatenate([full_natoms,natoms])
+
+            full[start:start+size] = block
+            full_natoms[start:start+size] = natoms
+            start += size
+
             os.remove(dirpath+str(i)+'FEAT-'+str(l)+'.npy')
             os.remove(dirpath+str(i)+'FEAT-'+str(l)+'_natoms.npy')
         np.save(dirpath+'FEAT-'+str(l)+'.npy',full)
         np.save(dirpath+'FEAT-'+str(l)+'_natoms.npy',full_natoms)
 
-    if dummy > 0:
+    if dummy > 0 and bare:
         for i in range(parallel):
             block = np.load(dirpath+str(i)+'FEAT-0-bare.npy')
             if i == 0:
@@ -160,7 +183,7 @@ else:
             cmd = ['get_power_spectrum.py','-f',fname,'-lm',str(l),'-vf',str(vf),'-s']+inp.species+['-c']+inp.species+['-o',dirpath+'FEAT-'+str(l),'-rc',str(rc),'-sg',str(sg)]
         if periodic: cmd += ['-p']
         if dummy > 0:
-            if l == 0:
+            if l == 0 and bare:
                 cmd2 = cmd.copy()
                 if nc > 0: cmd2[cmd2.index('-sf')+1] += '-bare'
                 cmd2[cmd2.index('-o')+1] += '-bare'

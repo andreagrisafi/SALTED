@@ -3,7 +3,7 @@ import numpy as np
 import time
 import random
 from scipy import sparse
-from sys_utils import read_system, get_atom_idx
+from sys_utils import read_system, get_atom_idx,get_conf_range
 import sys
 sys.path.insert(0, './')
 import inp
@@ -52,16 +52,17 @@ if inp.parallel:
     if rank == 0 and ntraintot < size:
         print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
         comm.Abort()
-    if rank == 0:
-        trainrange = [[] for _ in range(size)]
-        blocksize = int(ntraintot/float(size))
-        for i in range(size):
-            if i == (size-1):
-                trainrange[i] = trainrangetot[i*blocksize:ntraintot]
-            else:
-                trainrange[i] = trainrangetot[i*blocksize:(i+1)*blocksize]
-    else:
-        trainrange = None
+    trainrange = get_conf_range(rank,size,ntraintot,trainrangetot)
+#    if rank == 0:
+#        trainrange = [[] for _ in range(size)]
+#        blocksize = int(ntraintot/float(size))
+#        for i in range(size):
+#            if i == (size-1):
+#                trainrange[i] = trainrangetot[i*blocksize:ntraintot]
+#            else:
+#                trainrange[i] = trainrangetot[i*blocksize:(i+1)*blocksize]
+#    else:
+#        trainrange = None
 
     trainrange = comm.scatter(trainrange,root=0)
     print('Task',rank+1,'handles the following structures:',trainrange,flush=True)

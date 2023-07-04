@@ -3,7 +3,7 @@ import numpy as np
 import sys
 sys.path.insert(0, './')
 import inp
-from sys_utils import read_system
+from sys_utils import read_system,get_conf_range
 
 if inp.parallel:
     from mpi4py import MPI
@@ -53,16 +53,17 @@ ntest = ndata
 testrangetot = np.arange(ndata)
 
 if inp.parallel:
-    if rank == 0:
-        testrange = [[] for _ in range(size)]
-        blocksize = int(ntest/float(size))
-        for i in range(size):
-            if i == (size-1):
-                testrange[i] = testrangetot[i*blocksize:ntest]
-            else:
-                testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
-    else:
-        testrange = None
+    testrange = get_conf_range(rank,size,ntest,testrangetot)
+#    if rank == 0:
+#        testrange = [[] for _ in range(size)]
+#        blocksize = int(ntest/float(size))
+#        for i in range(size):
+#            if i == (size-1):
+#                testrange[i] = testrangetot[i*blocksize:ntest]
+#            else:
+#                testrange[i] = testrangetot[i*blocksize:(i+1)*blocksize]
+#    else:
+#        testrange = None
 
     testrange = comm.scatter(testrange,root=0)
     print('Task',rank+1,'handles the following structures:',testrange,flush=True)
