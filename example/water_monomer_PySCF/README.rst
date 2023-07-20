@@ -7,7 +7,7 @@ Before beginning, run
 and 
 :code:`source YOUR_TENSOAP_DIRECTORY/env.sh`
 
-Ensure that the file $SALTEDPATH/basis.py contains an entry corresponding to the dfbasis you wish to use
+Ensure that the file $SALTEDPATH/basis.py contains an entry corresponding to the dfbasis you wish to use. Helper programs to interface PySCF with SALTED are included in this example folder.
 
 #---------------------------------------------------
 # GENERATE TRAINING DATA

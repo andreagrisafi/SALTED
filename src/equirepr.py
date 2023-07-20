@@ -1,11 +1,11 @@
 import os
 import sys
-import ase
 import time
 import chemfiles
 import numpy as np
-from sympy.physics.wigner import wigner_3j
 from ase.data import atomic_numbers
+import wigner
+import h5py
 
 from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
@@ -280,6 +280,8 @@ for lam in range(lmax_max+1):
         llvec[il,1] = lvalues[il][1]
     
     # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
+    print(inp.saltedpath+'wigners',os.path.exists(inp.saltedpath+'wigners'))
+    if not os.path.exists(inp.saltedpath+'wigners'): wigner.build()
     if inp.field:
         wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field.dat")
         wigdim = wigner3j.size 
@@ -328,6 +330,7 @@ for lam in range(lmax_max+1):
 
     #TODO modify SALTED to directly deal with compact natoms_total dimension
     if lam==0:
+<<<<<<< HEAD
         p = p.reshape(natoms_total,featsize)
         pvec = np.zeros((ndata,natoms_max,featsize))
     else:
@@ -349,6 +352,11 @@ for lam in range(lmax_max+1):
         pvec = pvec.reshape(ndata*natoms_max*(2*lam+1),featsize)
         vfps = do_fps(pvec.T,ncut,0)
         np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy", vfps)
+    else:
+        if inp.field==True:    
+            h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+"_field.h5",'w')
+        else:
+            h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".h5",'w')
 
     # Apply sparsification with precomputed FPS selection 
     if not sparsify and ncut>-1:
@@ -362,17 +370,13 @@ for lam in range(lmax_max+1):
         else:
             psparse = psparse.reshape(ndata,natoms_max,(2*lam+1),psparse.shape[-1])
         # Save sparse feature vector
-        if inp.field==True:
-            np.save(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"_field.npy", psparse)
-        else:
-            np.save(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+".npy", psparse)
+        h5f.create_dataset("descriptor",data=psparse)
+        h5f.close
     
     # Save non-sparse descriptor  
     if not sparsify and ncut==-1:
-        if inp.field==True:    
-            np.save(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"_field.npy", pvec)
-        else:
-            np.save(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+".npy", pvec)
+        h5f.create_dataset("descriptor",data=pvec)
+        h5f.close
     
     print("save time:", (time.time()-savestart))
 

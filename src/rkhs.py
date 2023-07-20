@@ -2,16 +2,11 @@ import os
 import sys
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
-from random import shuffle
-
-from sys_utils import read_system, get_atom_idx
-import basis
-
+import sys
 sys.path.insert(0, './')
 import inp
+from sys_utils import read_system, get_atom_idx, get_conf_range
+import h5py
 
 saltedname = inp.saltedname
 
@@ -24,37 +19,6 @@ species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_
 
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-########################################################################################
-
-
-for iconf in range(ndata):
-    # Define relevant species
-    excluded_species = []
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        if spe not in species:
-            excluded_species.append(spe)
-    excluded_species = set(excluded_species)
-    for spe in excluded_species:
-        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
-
-# recompute number of atoms
-natoms_total = 0
-natoms_list = []
-natoms = np.zeros(ndata,int)
-for iconf in range(ndata):
-    natoms[iconf] = 0
-    for spe in species:
-        natoms[iconf] += natom_dict[(iconf,spe)]
-    natoms_total += natoms[iconf]
-    natoms_list.append(natoms[iconf])
-natmax = max(natoms_list)
-
-# recompute atomic indexes from new species selections
-atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
-
-#############################################################################
-
 # number of sparse environments
 M = inp.Menv
 zeta = inp.z
@@ -62,94 +26,28 @@ eigcut = inp.eigcut
 print("M =", M, "eigcut =", eigcut)
 print("zeta =", zeta)
 
-def do_fps(x, d=0):
-    # FPS code from Giulio Imbalzano
-    if d == 0 : d = len(x)
-    n = len(x)
-    iy = np.zeros(d,int)
-    iy[0] = 0
-    # Faster evaluation of Euclidean distance
-    n2 = np.sum((x*np.conj(x)),axis=1)
-    dl = n2 + n2[iy[0]] - 2*np.real(np.dot(x,np.conj(x[iy[0]])))
-    for i in range(1,d):
-        iy[i] = np.argmax(dl)
-        nd = n2 + n2[iy[i]] - 2*np.real(np.dot(x,np.conj(x[iy[i]])))
-        dl = np.minimum(dl,nd)
-    return iy
-
-# compute number of atomic environments for each species
-ispe = 0
-species_idx = {}
-for spe in species:
-    species_idx[spe] = ispe
-    ispe += 1
-
-species_array = np.zeros((ndata,natmax),int) 
-for iconf in range(ndata):
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        species_array[iconf,iat] = species_idx[spe] 
-species_array = species_array.reshape(ndata*natmax)
-
-# make directories if not exisiting
-dirpath = os.path.join(inp.saltedpath, kdir)
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
-for spe in species:
-    for l in range(llmax+1):
-        dirpath = os.path.join(inp.saltedpath+kdir+"/", "spe"+str(spe)+"_l"+str(l))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-        dirpath = os.path.join(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_zeta"+str(zeta))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-
-if inp.field==True:
-    # load lambda=0 power spectrum 
-    power = np.load(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-0_field.npy")
-    power2 = np.load(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-0.npy")
-    # compute sparse set with FPS
-    fps_idx = np.array(do_fps(power2.reshape(ndata*natmax,power2.shape[-1]),M),int)
-else:
-    # load lambda=0 power spectrum 
-    power = np.load(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-0.npy")
-    # compute sparse set with FPS
-    fps_idx = np.array(do_fps(power.reshape(ndata*natmax,power.shape[-1]),M),int)
-
-# compute sparse set with FPS
-fps_species = species_array[fps_idx]
-sparse_set = np.vstack((fps_idx,fps_species)).T
-print("Computed sparse set made of ", M, "environments")
-np.savetxt(inp.saltedpath+"equirepr_"+saltedname+"/sparse_set_"+str(M)+".txt",sparse_set,fmt='%i') 
-
-# initialize useful arrays
-atom_idx = {}
-natom_dict = {}
-for iconf in range(ndata):
-    for spe in species:
-        atom_idx[(iconf,spe)] = [] 
-        natom_dict[(iconf,spe)] = 0 
-
-# extract species-dependent power spectrum for lambda=0
-for iconf in range(ndata):
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        atom_idx[(iconf,spe)].append(iat)
-        natom_dict[(iconf,spe)] += 1 
-
-# divide sparse set per species
-fps_indexes = {}
-for spe in species:
-    fps_indexes[spe] = []
-for iref in range(M):
-    fps_indexes[species[fps_species[iref]]].append(fps_idx[iref])
-Mspe = {}
-for spe in species:
-    Mspe[spe] = len(fps_indexes[spe])
-
 print("Computing RKHS of symmetry-adapted sparse kernel approximations...")
 
-# lambda = 0
+# Distribute structures to tasks
+if inp.parallel:
+    if rank == 0:
+        conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
+#        conf_range = [[] for _ in range(size)]
+#        blocksize = int(round(ndata/float(size)))
+#        for i in range(size):
+#            if i == (size-1):
+#                conf_range[i] = list(range(ndata))[i*blocksize:ndata]
+#            else:
+#                conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
+#    else:
+#        conf_range = None
+
+    conf_range = comm.scatter(conf_range,root=0)
+    print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+else:
+    conf_range = list(range(ndata))
+
+power_env_sparse = {}
 kernel0_mm = {}
 kernel0_nm = {}
 for spe in species:
