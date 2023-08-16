@@ -21,6 +21,23 @@ import basis
 sys.path.insert(0, './')
 import inp
 
+filename = inp.filename
+saltedname = inp.saltedname
+predname = inp.predname
+rep1 = inp.rep1
+rcut1 = inp.rcut1
+sig1 = inp.sig1
+nrad1 = inp.nrad1
+nang1 = inp.nang1
+neighspe1 = inp.neighspe1
+rep2 = inp.rep2
+rcut2 = inp.rcut2
+sig2 = inp.sig2
+nrad2 = inp.nrad2
+nang2 = inp.nang2
+neighspe2 = inp.neighspe2
+ncut = inp.ncut
+
 from sys_utils import read_system, get_atom_idx
 species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
@@ -30,7 +47,6 @@ bohr2angs = 0.529177210670
 # Kernel parameters 
 M = inp.Menv
 zeta = inp.z
-eigcut = inp.eigcut
 reg = inp.regul
 
 if inp.qmcode=="cp2k":
@@ -67,8 +83,8 @@ if inp.qmcode=="cp2k":
 loadstart = time.time()
 
 # Load sparse set of atomic environments 
-fps_idx = np.loadtxt(inp.saltedpath+"equirepr_"+inp.saltedname+"/sparse_set_"+str(M)+".txt",int)[:,0]
-fps_species = np.loadtxt(inp.saltedpath+"equirepr_"+inp.saltedname+"/sparse_set_"+str(M)+".txt",int)[:,1]
+fps_idx = np.loadtxt(inp.saltedpath+"equirepr_"+saltedname+"/sparse_set_"+str(M)+".txt",int)[:,0]
+fps_species = np.loadtxt(inp.saltedpath+"equirepr_"+saltedname+"/sparse_set_"+str(M)+".txt",int)[:,1]
 # divide sparse set per species
 fps_indexes = {}
 for spe in species:
@@ -86,10 +102,10 @@ power_env_sparse = {}
 power_env_sparse_nofield = {}
 Vmat = {}
 for lam in range(lmax_max+1):
-    pvec_train[lam] = np.load(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+"_field.npy")
-    pvec_train_nofield[lam] = np.load(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".npy")
+    pvec_train[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"_field.npy")
+    pvec_train_nofield[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+".npy")
     for spe in species:
-        Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+inp.saltedname+"/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/projector.npy")
+        Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"_field/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
         if lam==0:
             power_env_sparse[(lam,spe)] = pvec_train[lam].reshape(pvec_train[lam].shape[0]*pvec_train[lam].shape[1],pvec_train[lam].shape[-1])[np.array(fps_indexes[spe],int)] 
             power_env_sparse_nofield[(lam,spe)] = pvec_train_nofield[lam].reshape(pvec_train_nofield[lam].shape[0]*pvec_train_nofield[lam].shape[1],pvec_train_nofield[lam].shape[-1])[np.array(fps_indexes[spe],int)] 
@@ -99,12 +115,24 @@ for lam in range(lmax_max+1):
 
 # load regression weights
 ntrain = int(inp.Ntrain*inp.trainfrac)
-weights = np.load(inp.saltedpath+"regrdir_"+inp.saltedname+"/M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+".npy")
+weights = np.load(inp.saltedpath+"regrdir_"+saltedname+"_field/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
 
 print("load time:", (time.time()-loadstart))
 
 start = time.time()
 
+for iconf in range(ndata):
+    # Define relevant species
+    excluded_species = []
+    for iat in range(natoms[iconf]):
+        spe = atomic_symbols[iconf][iat]
+        if spe not in species:
+            excluded_species.append(spe)
+    excluded_species = set(excluded_species)
+    for spe in excluded_species:
+        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
+
+# recompute number of atoms
 natoms_total = 0
 natoms_list = []
 natoms = np.zeros(ndata,int)
@@ -116,25 +144,14 @@ for iconf in range(ndata):
     natoms_list.append(natoms[iconf])
 natoms_max = max(natoms_list)
 
-for iconf in range(ndata):
-    # Define excluded species
-    excluded_species = []
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        if spe not in species:
-            excluded_species.append(spe)
-    excluded_species = set(excluded_species)
-    for spe in excluded_species:
-        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
-
 # recompute atomic indexes from new species selections
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 HYPER_PARAMETERS_DENSITY = {
-    "cutoff": inp.rcut1,
-    "max_radial": inp.nrad1,
-    "max_angular": inp.nang1,
-    "atomic_gaussian_width": inp.sig1,
+    "cutoff": rcut1,
+    "max_radial": nrad1,
+    "max_angular": nang1,
+    "atomic_gaussian_width": sig1,
     "center_atom_weight": 1.0,
     "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
     "cutoff_function": {"ShiftedCosine": {"width": 0.1}},
@@ -142,39 +159,39 @@ HYPER_PARAMETERS_DENSITY = {
 
 HYPER_PARAMETERS_POTENTIAL = {
     "potential_exponent": 1,
-    "cutoff": inp.rcut2,
-    "max_radial": inp.nrad2,
-    "max_angular": inp.nang2,
-    "atomic_gaussian_width": inp.sig2,
+    "cutoff": rcut2,
+    "max_radial": nrad2,
+    "max_angular": nang2,
+    "atomic_gaussian_width": sig2,
     "center_atom_weight": 1.0,
     "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
 }
 
 
-with chemfiles.Trajectory(inp.filename) as trajectory:
+with chemfiles.Trajectory(filename) as trajectory:
     frames = [f for f in trajectory]
 
 print(f"The dataset contains {len(frames)} frames.")
 
-if inp.rep1=="rho":
+if rep1=="rho":
     # get SPH expansion for atomic density    
     calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
 
-elif inp.rep1=="V":
+elif rep1=="V":
     # get SPH expansion for atomic potential 
     calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
 
 else:
-    print("Error: requested representation", inp.rep1, "not provided")
+    print("Error: requested representation", rep1, "not provided")
 
 descstart = time.time()
 
-nspe1 = len(inp.neighspe1)
-keys_array = np.zeros(((inp.nang1+1)*len(species)*nspe1,3),int)
+nspe1 = len(neighspe1)
+keys_array = np.zeros(((nang1+1)*len(species)*nspe1,3),int)
 i = 0
-for l in range(inp.nang1+1):
+for l in range(nang1+1):
     for specen in species:
-        for speneigh in inp.neighspe1:
+        for speneigh in neighspe1:
             keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
             i += 1
 
@@ -188,28 +205,28 @@ spx = spx.keys_to_properties("species_neighbor")
 spx = spx.keys_to_samples("species_center")
 
 # Get 1st set of coefficients as a complex numpy array
-omega1 = np.zeros((inp.nang1+1,natoms_total,2*inp.nang1+1,nspe1*inp.nrad1),complex)
-for l in range(inp.nang1+1):
+omega1 = np.zeros((nang1+1,natoms_total,2*nang1+1,nspe1*nrad1),complex)
+for l in range(nang1+1):
     c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
     omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(spherical_harmonics_l=l).values)
 
-if inp.rep2=="rho":
+if rep2=="rho":
     # get SPH expansion for atomic density    
     calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
 
-elif inp.rep2=="V":
+elif rep2=="V":
     # get SPH expansion for atomic potential 
     calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL) 
 
 else:
-    print("Error: requested representation", inp.rep2, "not provided")
+    print("Error: requested representation", rep2, "not provided")
 
-nspe2 = len(inp.neighspe2)
-keys_array = np.zeros(((inp.nang2+1)*len(species)*nspe2,3),int)
+nspe2 = len(neighspe2)
+keys_array = np.zeros(((nang2+1)*len(species)*nspe2,3),int)
 i = 0
-for l in range(inp.nang2+1):
+for l in range(nang2+1):
     for specen in species:
-        for speneigh in inp.neighspe2:
+        for speneigh in neighspe2:
             keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
             i += 1
 
@@ -223,26 +240,26 @@ spx_pot = spx_pot.keys_to_properties("species_neighbor")
 spx_pot = spx_pot.keys_to_samples("species_center")
 
 # Get 2nd set of coefficients as a complex numpy array 
-omega2 = np.zeros((inp.nang2+1,natoms_total,2*inp.nang2+1,nspe2*inp.nrad2),complex)
-for l in range(inp.nang2+1):
+omega2 = np.zeros((nang2+1,natoms_total,2*nang2+1,nspe2*nrad2),complex)
+for l in range(nang2+1):
     c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
     omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
 
 # get SPH expansion for a uniform and constant external field aligned along Z 
-omega_field = np.zeros((natoms_total,inp.nrad2),complex)
+omega_field = np.zeros((natoms_total,nrad2),complex)
 for iat in range(natoms_total):
-    omega_field[iat] = efield.get_efield_sph(inp.nrad2,inp.rcut2)
+    omega_field[iat] = efield.get_efield_sph(nrad2,rcut2)
 
 print("coefficients time:", (time.time()-descstart))
 print("")
 
-dirpath = os.path.join(inp.saltedpath,"predictions_"+inp.saltedname+"_"+inp.predname)
+dirpath = os.path.join(inp.saltedpath,"predictions_"+saltedname+"_field_"+predname)
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.saltedpath+"predictions_"+inp.saltedname+"_"+inp.predname+"/","M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+dirpath = os.path.join(inp.saltedpath+"predictions_"+saltedname+"_field_"+predname+"/","M"+str(M)+"_zeta"+str(zeta))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.saltedpath+"predictions_"+inp.saltedname+"_"+inp.predname+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
+dirpath = os.path.join(inp.saltedpath+"predictions_"+saltedname+"_field_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/","N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -257,8 +274,8 @@ for lam in range(lmax_max+1):
     # Select relevant angular components for equivariant descriptor calculation
     llmax = 0
     lvalues = {}
-    for l1 in range(inp.nang1+1):
-        for l2 in range(inp.nang2+1):
+    for l1 in range(nang1+1):
+        for l2 in range(nang2+1):
             # keep only even combination to enforce inversion symmetry
             if (lam+l1+l2)%2==0 :
                 if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
@@ -271,7 +288,7 @@ for lam in range(lmax_max+1):
         llvec[il,1] = lvalues[il][1]
     
     # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-    wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(inp.nang1)+"_lmax2-"+str(inp.nang2)+".dat")
+    wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_lmax2-"+str(nang2)+".dat")
     wigdim = wigner3j.size
   
     # Reshape arrays of expansion coefficients for optimal Fortran indexing 
@@ -282,10 +299,10 @@ for lam in range(lmax_max+1):
     c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
 
     # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
-    p = equicomb.equicomb(natoms_total,inp.nang1,inp.nang2,nspe1*inp.nrad1,nspe2*inp.nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
+    p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
 
     # Define feature space and reshape equivariant descriptor
-    featspace = nspe1*nspe2*inp.nrad1*inp.nrad2*llmax
+    featspace = nspe1*nspe2*nrad1*nrad2*llmax
     p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featspace)
  
     print("equivariant time:", (time.time()-equistart))
@@ -326,7 +343,7 @@ for lam in range(lmax_max+1):
     # Select relevant angular components for equivariant descriptor calculation
     llmax = 0
     lvalues = {}
-    for l1 in range(inp.nang1+1):
+    for l1 in range(nang1+1):
         # keep only even combination to enforce inversion symmetry
         if (lam+l1+1)%2==0 :
             if abs(1-lam) <= l1 and l1 <= (1+lam) :
@@ -339,15 +356,15 @@ for lam in range(lmax_max+1):
         llvec[il,1] = lvalues[il][1]
 
     # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-    wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(inp.nang1)+"_field.dat")
+    wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field.dat")
     wigdim = wigner3j.size
  
     # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
     v2 = omega_field.T
-    p = equicombfield.equicombfield(natoms_total,inp.nang1,nspe1*inp.nrad1,inp.nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
+    p = equicombfield.equicombfield(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
 
     # Define feature space and reshape equivariant descriptor
-    featspacefield = nspe1*inp.nrad1*inp.nrad2*llmax
+    featspacefield = nspe1*nrad1*nrad2*llmax
     p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featspacefield)
   
     print("equivariant time:", (time.time()-equistart))
@@ -413,9 +430,9 @@ for lam in range(lmax_max+1):
 predstart = time.time()
 
 if inp.qmcode=="cp2k":
-    xyzfile = read(inp.filename,":")
-    qfile = open(inp.saltedpath+"predictions_"+inp.saltedname+"_"+inp.predname+"/M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+"/charges.dat","w")
-    dfile = open(inp.saltedpath+"predictions_"+inp.saltedname+"_"+inp.predname+"/M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+"/dipoles.dat","w")
+    xyzfile = read(filename,":")
+    qfile = open(inp.saltedpath+"predictions_"+saltedname+"_field_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat","w")
+    dfile = open(inp.saltedpath+"predictions_"+saltedname+"_field_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat","w")
 
 # Load spherical averages if required
 if inp.average:
@@ -475,20 +492,19 @@ for iconf in range(ndata):
         all_symbols = xyzfile[iconf].get_chemical_symbols()
         all_natoms = int(len(all_symbols))
 
-        if inp.average:
-            # compute integral of predicted density
-            iaux = 0
-            rho_int = 0.0
-            nele = 0.0
-            for iat in range(all_natoms):
-                spe = all_symbols[iat]
-                if spe in species:
-                    nele += inp.pseudocharge
-                    for l in range(lmax[spe]+1):
-                        for n in range(nmax[(spe,l)]):
-                            if l==0:
-                                rho_int += charge_integrals[(spe,l,n)] * pred_coefs[iaux]
-                            iaux += 2*l+1
+        # compute integral of predicted density
+        iaux = 0
+        rho_int = 0.0
+        nele = 0.0
+        for iat in range(all_natoms):
+            spe = all_symbols[iat]
+            if spe in species:
+                nele += inp.pseudocharge
+                for l in range(lmax[spe]+1):
+                    for n in range(nmax[(spe,l)]):
+                        if l==0:
+                            rho_int += charge_integrals[(spe,l,n)] * pred_coefs[iaux]
+                        iaux += 2*l+1
 
         # compute charge and dipole 
         iaux = 0
@@ -505,22 +521,22 @@ for iconf in range(ndata):
                             if l==0 and im==0:
                                 if inp.average:
                                     pred_coefs[iaux] *= nele/rho_int
+                                else:
+                                    if n==nmax[(spe,l)]-1:
+                                        pred_coefs[iaux] -= rho_int/(charge_integrals[(spe,l,n)]*natoms[iconf])
                                 charge += pred_coefs[iaux] * charge_integrals[(spe,l,n)]
                                 dipole -= pred_coefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,2]
                             if l==1 and im==1:
                                 dipole -= pred_coefs[iaux] * dipole_integrals[(spe,l,n)]
                             iaux += 1
         print(iconf+1,dipole,file=dfile)
-        if inp.average:
-            print(iconf+1,rho_int,file=qfile)
-        else:
-            print(iconf+1,charge,file=qfile)
+        print(iconf+1,rho_int,charge,file=qfile)
 
         # save predicted coefficients in CP2K format
-        np.savetxt(inp.saltedpath+"predictions_"+inp.saltedname+"_"+inp.predname+"/M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+"/COEFFS-"+str(iconf+1)+".dat",pred_coefs)
+        np.savetxt(inp.saltedpath+"predictions_"+saltedname+"_field_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/COEFFS-"+str(iconf+1)+".dat",pred_coefs)
 
     # save predicted coefficients
-    np.save(inp.saltedpath+"predictions_"+inp.saltedname+"_"+inp.predname+"/M"+str(M)+"_eigcut"+str(int(np.log10(inp.eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
+    np.save(inp.saltedpath+"predictions_"+saltedname+"_field_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
 
 
 if inp.qmcode=="cp2k":

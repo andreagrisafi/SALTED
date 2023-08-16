@@ -17,15 +17,17 @@ import basis
 
 sys.path.insert(0, './')
 import inp
+from sys_utils import read_system, get_atom_idx
 
-species = inp.species
+species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 bohr2angs = 0.529177210670
 
-if inp.combo:
-    vdir = "validations_"+inp.saltedname+"_"+inp.saltedname2
-    rdir = "regrdir_"+inp.saltedname+"_"+inp.saltedname2
-    kdir = "kernels_"+inp.saltedname+"_"+inp.saltedname2
+if inp.field:
+    vdir = "validations_"+inp.saltedname+"_field"
+    rdir = "regrdir_"+inp.saltedname+"_field"
+    kdir = "kernels_"+inp.saltedname+"_field"
 else:
     vdir = "validations_"+inp.saltedname
     rdir = "regrdir_"+inp.saltedname
@@ -34,31 +36,37 @@ else:
 # read basis
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
-[lmax,nmax] = basis.basiset(inp.dfbasis)
-
-llist = []
-nlist = []
-for spe in species:
-    llist.append(lmax[spe])
-    for l in range(lmax[spe]+1):
-        nlist.append(nmax[(spe,l)])
-llmax = max(llist)
-nnmax = max(nlist)
 
 # number of sparse environments
 M = inp.Menv
 eigcut = inp.eigcut
 reg = inp.regul
+zeta = inp.z
 
 coefdir = inp.coefdir
 
-# system parameters
-atomic_symbols = []
+for iconf in range(ndata):
+    # Define relevant species
+    excluded_species = []
+    for iat in range(natoms[iconf]):
+        spe = atomic_symbols[iconf][iat]
+        if spe not in species:
+            excluded_species.append(spe)
+    excluded_species = set(excluded_species)
+    for spe in excluded_species:
+        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
+
+# recompute number of atoms
+natoms_total = 0
+natoms_list = []
 natoms = np.zeros(ndata,int)
-for i in range(ndata):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    natoms[i] = int(len(atomic_symbols[i]))
-natmax = max(natoms)
+for iconf in range(ndata):
+    natoms[iconf] = 0
+    for spe in species:
+        natoms[iconf] += natom_dict[(iconf,spe)]
+    natoms_total += natoms[iconf]
+    natoms_list.append(natoms[iconf])
+natmax = max(natoms_list)
 
 # define test set
 trainrangetot = np.loadtxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",int)
@@ -66,15 +74,15 @@ ntrain = int(inp.trainfrac*len(trainrangetot))
 testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
 # load regression weights
-weights = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
+weights = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
 
 dirpath = os.path.join(inp.saltedpath, vdir)
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.saltedpath+vdir+"/", "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+dirpath = os.path.join(inp.saltedpath+vdir+"/", "M"+str(M)+"_zeta"+str(zeta))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/","N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
+dirpath = os.path.join(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/","N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -126,7 +134,6 @@ if inp.qmcode=="cp2k":
 #    pseudocharge *= 4*np.pi*dr
 #    print("Integrated pseudo-charge =", pseudocharge)
 
-
 # Load spherical averages if required
 if inp.average:
     av_coefs = {}
@@ -134,10 +141,10 @@ if inp.average:
         av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
 # compute error over test set
-efile = open(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/errors.dat","w")
+efile = open(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/errors.dat","w")
 if inp.qmcode=="cp2k":
-    dfile = open(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat","w")
-    qfile = open(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat","w")
+    dfile = open(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat","w")
+    qfile = open(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat","w")
 
 error_density = 0
 variance = 0
@@ -158,7 +165,7 @@ for iconf in testrange:
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
-                psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+                psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npy") 
                 Mcut = psi_nm.shape[1]
                 C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
                 isize += Mcut
@@ -171,14 +178,13 @@ for iconf in testrange:
     i = 0
     for iat in range(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
-        if spe in species:
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
-                    if inp.average and l==0:
-                        Av_coeffs[i] = av_coefs[spe][n]
-                    i += 2*l+1
-            ispe[spe] += 1
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
+                if inp.average and l==0:
+                    Av_coeffs[i] = av_coefs[spe][n]
+                i += 2*l+1
+        ispe[spe] += 1
 
     # add back spherical averages if required
     if inp.average:
@@ -189,23 +195,23 @@ for iconf in testrange:
         geom = xyzfile[iconf]
         geom.wrap()
         coords = geom.get_positions()/bohr2angs
+        all_symbols = xyzfile[iconf].get_chemical_symbols()
+        all_natoms = int(len(all_symbols))
    
-        if inp.average: 
-            # compute integral of predicted density
-            iaux = 0
-            nele = 0.0
-            rho_int = 0.0
-            ref_rho_int = 0.0
-            for iat in range(natoms[iconf]):
-                spe = atomic_symbols[iconf][iat]
-                if spe in species:
-                    nele += inp.pseudocharge
-                    for l in range(lmax[spe]+1):
-                        for n in range(nmax[(spe,l)]):
-                            if l==0:
-                                rho_int += charge_integrals[(spe,l,n)] * pred_coefs[iaux]
-                                ref_rho_int += charge_integrals[(spe,l,n)] * ref_coefs[iaux]
-                            iaux += 2*l+1
+        # compute integral of predicted density
+        iaux = 0
+        nele = 0.0
+        rho_int = 0.0
+        ref_rho_int = 0.0
+        for iat in range(natoms[iconf]):
+            spe = atomic_symbols[iconf][iat]
+            nele += inp.pseudocharge
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    if l==0:
+                        rho_int += charge_integrals[(spe,l,n)] * pred_coefs[iaux]
+                        ref_rho_int += charge_integrals[(spe,l,n)] * ref_coefs[iaux]
+                    iaux += 2*l+1
   
         # compute charge and dipole
         iaux = 0
@@ -213,8 +219,8 @@ for iconf in testrange:
         dipole = 0.0
         ref_dipole = 0.0
         ref_charge = 0.0
-        for iat in range(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
+        for iat in range(all_natoms):
+            spe = all_symbols[iat]
             if spe in species:
                 if inp.average:
                     dipole += inp.pseudocharge * coords[iat,2]
@@ -226,6 +232,9 @@ for iconf in testrange:
                                 # rescale spherical coefficients to conserve the electronic charge
                                 if inp.average:
                                     pred_coefs[iaux] *= nele/rho_int
+                                else:
+                                   if n==nmax[(spe,l)]-1:
+                                       pred_coefs[iaux] -= rho_int/(charge_integrals[(spe,l,n)]*natoms[iconf])
                                 charge += pred_coefs[iaux] * charge_integrals[(spe,l,n)]
                                 dipole -= pred_coefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,2]
                                 ref_charge += ref_coefs[iaux] * charge_integrals[(spe,l,n)]
@@ -235,16 +244,13 @@ for iconf in testrange:
                                 ref_dipole -= ref_coefs[iaux] * dipole_integrals[(spe,l,n)]
                             iaux += 1
         print(iconf+1,ref_dipole,dipole,file=dfile)
-        if inp.average:
-            print(iconf+1,ref_charge,rho_int,file=qfile)
-        else:
-            print(iconf+1,ref_charge,charge,file=qfile)
+        print(iconf+1,ref_charge,rho_int,file=qfile)
 
     # save predicted coefficients
-    np.save(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
+    np.save(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
 
     # save predicted coefficients
-    np.savetxt(inp.saltedpath+vdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/COEFFS-"+str(iconf+1)+".dat",pred_coefs)
+    np.savetxt(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/COEFFS-"+str(iconf+1)+".dat",pred_coefs)
 
     # compute predicted density projections <phi|rho>
     pred_projs = np.dot(overl,pred_coefs)

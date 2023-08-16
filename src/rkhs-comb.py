@@ -20,16 +20,7 @@ atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 ########################################################################################
 
-natoms_total = 0
-natoms_list = []
-natoms = np.zeros(ndata,int)
 for iconf in range(ndata):
-    # define relevant atoms
-    natoms[iconf] = 0
-    for spe in species:
-        natoms[iconf] += natom_dict[(iconf,spe)]
-    natoms_total += natoms[iconf]
-    natoms_list.append(natoms[iconf])
     # Define relevant species
     excluded_species = []
     for iat in range(natoms[iconf]):
@@ -39,6 +30,17 @@ for iconf in range(ndata):
     excluded_species = set(excluded_species)
     for spe in excluded_species:
         atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
+
+# recompute number of atoms
+natoms_total = 0
+natoms_list = []
+natoms = np.zeros(ndata,int)
+for iconf in range(ndata):
+    natoms[iconf] = 0
+    for spe in species:
+        natoms[iconf] += natom_dict[(iconf,spe)]
+    natoms_total += natoms[iconf]
+    natoms_list.append(natoms[iconf])
 natmax = max(natoms_list)
 
 # recompute atomic indexes from new species selections
@@ -53,10 +55,7 @@ eigcut = inp.eigcut
 print("M =", M, "eigcut =", eigcut)
 print("zeta =", zeta)
 
-if inp.combo:
-    kdir = "kernels_"+inp.saltedname+"_"+inp.saltedname2
-else:
-    kdir = "kernels_"+inp.saltedname
+kdir = "kernels_"+inp.saltedname+"_"+inp.saltedname2
 
 def do_fps(x, d=0):
     # FPS code from Giulio Imbalzano
@@ -96,7 +95,7 @@ for spe in species:
         dirpath = os.path.join(inp.saltedpath+kdir+"/", "spe"+str(spe)+"_l"+str(l))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
-        dirpath = os.path.join(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+        dirpath = os.path.join(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_zeta"+str(zeta))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
 
@@ -161,7 +160,7 @@ for spe in species:
     eva = eva[eva>eigcut]
     eve = eve[:,-len(eva):]
     V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-    np.save(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
+    np.save(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy",V)
 
     # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
     for iconf in range(ndata):
@@ -169,7 +168,7 @@ for spe in species:
         kernel0_nm[(iconf,spe)] += np.dot(power2[iconf,atom_idx[(iconf,spe)]],power_env_sparse2[spe].T)
         kernel_nm = kernel0_nm[(iconf,spe)]**zeta
         psi_nm = np.real(np.dot(kernel_nm,V))
-        np.save(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
+        np.save(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
     print((time.time()-start)/60.0)
 
 # lambda>0
@@ -204,7 +203,7 @@ for l in range(1,llmax+1):
         eva = eva[eva>eigcut]
         eve = eve[:,-len(eva):]
         V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-        np.save(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
+        np.save(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy",V)
 
         # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
         for iconf in range(ndata):
@@ -214,5 +213,5 @@ for l in range(1,llmax+1):
                 for i2 in range(Mspe[spe]):
                     kernel_nm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
             psi_nm = np.real(np.dot(kernel_nm,V))
-            np.save(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
+            np.save(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
         print((time.time()-start)/60.0)

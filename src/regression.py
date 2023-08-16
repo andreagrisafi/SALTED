@@ -11,18 +11,40 @@ import inp
 
 # sparse-GPR parameters
 M = inp.Menv
-eigcut = inp.eigcut
 reg = inp.regul
+zeta = inp.z
 
-if inp.combo:
-    fdir = "rkhs-vectors_"+inp.saltedname+"_"+inp.saltedname2
-    rdir = "regrdir_"+inp.saltedname+"_"+inp.saltedname2
+if inp.field:
+    kdir = "kernels_"+inp.saltedname+"_field"
+    fdir = "rkhs-vectors_"+inp.saltedname+"_field"
+    rdir = "regrdir_"+inp.saltedname+"_field"
 else:
+    kdir = "kernels_"+inp.saltedname
     fdir = "rkhs-vectors_"+inp.saltedname
     rdir = "regrdir_"+inp.saltedname
 
-p = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf0.npz")
-totsize = p.shape[-1]
+# basis definition
+[lmax,nmax] = basis.basiset(inp.dfbasis)
+
+llist = []
+nlist = []
+for spe in inp.species:
+    llist.append(lmax[spe])
+    for l in range(lmax[spe]+1):
+        nlist.append(nmax[(spe,l)])
+llmax = max(llist)
+nnmax = max(nlist)
+
+# compute the weight-vector size 
+totsize = 0
+iii=0
+for spe in inp.species:
+    for l in range(lmax[spe]+1):
+        for n in range(nmax[(spe,l)]):
+            Mcut = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(0)+".npy").shape[1]
+            totsize += Mcut
+            iii+=1
+
 print("problem dimensionality:", totsize,flush=True)
 if totsize>70000:
     print("ERROR: problem dimension too large, minimize directly loss-function instead!")
@@ -32,8 +54,8 @@ if totsize>70000:
 ntrain = int(inp.trainfrac*inp.Ntrain)
 
 # load regression matrices
-Avec = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/Avec_N"+str(ntrain)+".npy")
-Bmat = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/Bmat_N"+str(ntrain)+".npy")
+Avec = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(ntrain)+".npy")
+Bmat = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(ntrain)+".npy")
 
 start = time.time()
 
@@ -41,4 +63,4 @@ w = np.linalg.solve(Bmat+np.eye(totsize)*reg,Avec)
 
 print("regression time:", (time.time()-start)/60, "minutes")
 
-np.save(inp.saltedpath+rdir+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy",w)

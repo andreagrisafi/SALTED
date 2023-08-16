@@ -8,8 +8,10 @@ import sys
 sys.path.insert(0, './')
 import inp
 
+paral = inp.parallel
+
 # MPI information
-if inp.parallel:
+if paral:
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
@@ -18,37 +20,80 @@ if inp.parallel:
 else:
     rank=0
 
-spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+if inp.field:
+    fdir = "rkhs-vectors_"+inp.saltedname+"_field"
+    rdir = "regrdir_"+inp.saltedname+"_field"
+else:
+    fdir = "rkhs-vectors_"+inp.saltedname
+    rdir = "regrdir_"+inp.saltedname
+
+species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
 # sparse-GPR parameters
 M = inp.Menv
-eigcut = inp.eigcut
+zeta = inp.z
 reg = inp.regul
-rdir = inp.regrdir
-fdir = inp.featdir
-
 projdir = inp.projdir
 coefdir = inp.coefdir
-ovlpdir = inp.ovlpdir
 
-atom_per_spe, natom_per_spe = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
+atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-# load average density coefficients
-av_coefs = {}
-for spe in spelist:
-    av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
+###############################################################################################
+
+for iconf in range(ndata):
+    # Define relevant species
+    excluded_species = []
+    for iat in range(natoms[iconf]):
+        spe = atomic_symbols[iconf][iat]
+        if spe not in species:
+            excluded_species.append(spe)
+    excluded_species = set(excluded_species)
+    for spe in excluded_species:
+        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
+
+# recompute number of atoms
+natoms_total = 0
+natoms_list = []
+natoms = np.zeros(ndata,int)
+for iconf in range(ndata):
+    natoms[iconf] = 0
+    for spe in species:
+        natoms[iconf] += natoms_per_spe[(iconf,spe)]
+    natoms_total += natoms[iconf]
+    natoms_list.append(natoms[iconf])
+natmax = max(natoms_list)
+
+# recompute atomic indexes from new species selections
+atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
+
+###############################################################################################
+
+
+# load average density coefficients if needed
+if inp.average:
+    av_coefs = {}
+    for spe in species:
+        av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
+
+if rank==0:
+    dirpath = os.path.join(inp.saltedpath, rdir)
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+    dirpath = os.path.join(inp.saltedpath+rdir+"/", "M"+str(M)+"_zeta"+str(zeta))
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
 
 # define training set at random
 dataset = list(range(ndata))
 random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:inp.Ntrain]
-np.savetxt("training_set.txt",trainrangetot,fmt='%i')
+np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
 #trainrangetot = np.loadtxt("training_set.txt",int)
 
 # Distribute structures to tasks
 ntraintot = int(inp.trainfrac*inp.Ntrain)
 
-if inp.parallel:
+if paral:
     if rank == 0 and ntraintot < size:
         print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
         comm.Abort()
@@ -83,22 +128,24 @@ def loss_func(weights,ovlp_list,psi_list):
     for iconf in range(ntrain):
    
         # load reference QM data
-        ref_projs = np.load(inp.path2qm+projdir+"projections_conf"+str(trainrange[iconf])+".npy")
-        ref_coefs = np.load(inp.path2qm+coefdir+"coefficients_conf"+str(trainrange[iconf])+".npy")
+        ref_projs = np.load(inp.saltedpath+projdir+"projections_conf"+str(trainrange[iconf])+".npy")
+        ref_coefs = np.load(inp.saltedpath+coefdir+"coefficients_conf"+str(trainrange[iconf])+".npy")
        
-        Av_coeffs = np.zeros(ref_coefs.shape[0])
+        if inp.average:
+            Av_coeffs = np.zeros(ref_coefs.shape[0])
         i = 0
         for iat in range(natoms[trainrange[iconf]]):
             spe = atomic_symbols[trainrange[iconf]][iat]
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
-                    if l==0:
-                       Av_coeffs[i] = av_coefs[spe][n]
+                    if inp.average and l==0:
+                        Av_coeffs[i] = av_coefs[spe][n]
                     i += 2*l+1
 
         # rebuild predicted coefficients
         pred_coefs = sparse.csr_matrix.dot(psi_list[iconf],weights)
-        pred_coefs += Av_coeffs
+        if inp.average:
+            pred_coefs += Av_coeffs
 
         # compute predicted density projections
         ovlp = ovlp_list[iconf]
@@ -127,22 +174,24 @@ def grad_func(weights,ovlp_list,psi_list):
     for iconf in range(ntrain):
    
         # load reference QM data
-        ref_projs = np.load(inp.path2qm+projdir+"projections_conf"+str(trainrange[iconf])+".npy")
-        ref_coefs = np.load(inp.path2qm+coefdir+"coefficients_conf"+str(trainrange[iconf])+".npy")
-       
-        Av_coeffs = np.zeros(ref_coefs.shape[0])
+        ref_projs = np.load(inp.saltedpath+projdir+"projections_conf"+str(trainrange[iconf])+".npy")
+        ref_coefs = np.load(inp.saltedpath+coefdir+"coefficients_conf"+str(trainrange[iconf])+".npy")
+      
+        if inp.average:
+            Av_coeffs = np.zeros(ref_coefs.shape[0])
         i = 0
         for iat in range(natoms[trainrange[iconf]]):
             spe = atomic_symbols[trainrange[iconf]][iat]
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
-                    if l==0:
-                       Av_coeffs[i] = av_coefs[spe][n]
+                    if inp.average and l==0:
+                        Av_coeffs[i] = av_coefs[spe][n]
                     i += 2*l+1
 
         # rebuild predicted coefficients
         pred_coefs = sparse.csr_matrix.dot(psi_list[iconf],weights)
-        pred_coefs += Av_coeffs
+        if inp.average:
+            pred_coefs += Av_coeffs
 
         # compute predicted density projections
         ovlp = ovlp_list[iconf]
@@ -191,16 +240,16 @@ if rank == 0: print("loading matrices...")
 ovlp_list = [] 
 psi_list = [] 
 for iconf in trainrange:
-    ovlp_list.append(np.load(inp.path2qm+ovlpdir+"overlap_conf"+str(iconf)+".npy"))
+    ovlp_list.append(np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy"))
     # load feature vector as a scipy sparse object
-    psi_list.append(sparse.load_npz(inp.path2ml+fdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npz"))
+    psi_list.append(sparse.load_npz(inp.saltedpath+fdir+"M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz"))
 
 totsize = psi_list[0].shape[1]
 norm = 1.0/float(ntraintot)
 
 if rank == 0: 
     print("problem dimensionality:", totsize)
-    dirpath = os.path.join(inp.path2ml, rdir)
+    dirpath = os.path.join(inp.saltedpath, rdir)
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
 
@@ -213,15 +262,15 @@ tol = inp.gradtol
 P = np.ones(totsize)
 
 if inp.restart == True:
-    w = np.load(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
-    d = np.load(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
-    r = np.load(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
+    w = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
+    d = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
+    r = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
     s = np.multiply(P,r)
     delnew = np.dot(r,s)
 else:
     w = np.ones(totsize)*1e-04
     r = - grad_func(w,ovlp_list,psi_list)
-    if inp.parallel:
+    if paral:
         r = comm.allreduce(r)*norm  + 2.0 * reg * w
     else:
         r *= norm
@@ -232,7 +281,7 @@ else:
 if rank == 0: print("minimizing...")
 for i in range(100000):
     Ad = curv_func(d,ovlp_list,psi_list)
-    if inp.parallel:
+    if paral:
         Ad = comm.allreduce(Ad)*norm + 2.0 * reg * d 
     else:
         Ad *= norm
@@ -241,9 +290,9 @@ for i in range(100000):
     alpha = delnew/curv
     w = w + alpha*d
     if (i+1)%50==0 and rank==0:
-        np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",w)
-        np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",d)
-        np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
+        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
+        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r)
     r -= alpha * Ad 
     if rank == 0: print(i+1, "gradient norm:", np.sqrt(np.sum((r**2))),flush=True)
     if np.sqrt(np.sum((r**2))) < tol:
@@ -256,8 +305,8 @@ for i in range(100000):
         d = s + beta*d
 
 if rank == 0:
-    np.save(inp.path2ml+rdir+"weights_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",w)
-    np.save(inp.path2ml+rdir+"dvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",d)
-    np.save(inp.path2ml+rdir+"rvector_N"+str(ntraintot)+"_M"+str(M)+"_reg"+str(int(np.log10(reg)))+".npy",r) 
+    np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+    np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
+    np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r)
     print("minimization compleated succesfully!")
     print("minimization time:", (time.time()-start)/60, "minutes")
