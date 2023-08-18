@@ -2,8 +2,8 @@ import os
 import sys
 import time
 import chemfiles
-import numpy as np
 from ase.data import atomic_numbers
+import numpy as np
 import wigner
 import h5py
 
@@ -22,7 +22,6 @@ import inp
 
 filename = inp.filename
 saltedname = inp.saltedname
-predname = inp.predname
 rep1 = inp.rep1
 rcut1 = inp.rcut1
 sig1 = inp.sig1
@@ -36,13 +35,38 @@ nrad2 = inp.nrad2
 nang2 = inp.nang2
 neighspe2 = inp.neighspe2
 ncut = inp.ncut
-sparsify = inp.sparsify
+#sparsify = inp.sparsify
+parallel = inp.parallel
 
-from sys_utils import read_system, get_atom_idx
+sparsify = False
+if '-s' in sys.argv:
+    sparsify = True
+    parallel = False
+
+if inp.parallel:
+    from mpi4py import MPI
+    # MPI information
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+#    print('This is task',rank+1,'of',size)
+
+from sys_utils import read_system, get_atom_idx,get_conf_range
 species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 start = time.time()
+
+ndata_true = ndata
+if inp.parallel:
+    conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
+    conf_range = comm.scatter(conf_range,root=0)
+    print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+    ndata = len(conf_range)
+else:
+    conf_range = list(range(ndata))
+
+natoms_total = sum(natoms[conf_range])
 
 def do_fps(x, d=0,initial=-1):
     # Code from Giulio Imbalzano
@@ -91,38 +115,6 @@ def FPS_sparsify(PS,featsize,ncut,initial):
 
     return [psparse,sparse_details]
 
-
-########################################################################################
-
-
-for iconf in range(ndata):
-    # Define relevant species
-    excluded_species = []
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        if spe not in species:
-            excluded_species.append(spe)
-    excluded_species = set(excluded_species)
-    for spe in excluded_species:
-        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
-
-# recompute number of atoms
-natoms_total = 0
-natoms_list = []
-natoms = np.zeros(ndata,int)
-for iconf in range(ndata):
-    natoms[iconf] = 0
-    for spe in species:
-        natoms[iconf] += natom_dict[(iconf,spe)]
-    natoms_total += natoms[iconf]
-    natoms_list.append(natoms[iconf])
-natoms_max = max(natoms_list)
-
-# recompute atomic indexes from new species selections
-atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
-
-#############################################################################
-
 HYPER_PARAMETERS_DENSITY = {
     "cutoff": rcut1,
     "max_radial": nrad1,
@@ -146,8 +138,9 @@ HYPER_PARAMETERS_POTENTIAL = {
 
 with chemfiles.Trajectory(filename) as trajectory:
     frames = [f for f in trajectory]
+    frames = [frames[i] for i in conf_range]
 
-print(f"The dataset contains {len(frames)} frames.")
+if rank == 0: print(f"The dataset contains {ndata_true} frames.")
 
 if rep1=="rho":
     # get SPH expansion for atomic density    
@@ -186,7 +179,7 @@ for l in range(nang1+1):
     c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
     omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(spherical_harmonics_l=l).values)
 
-print("rho time:", (time.time()-rhostart))
+if rank == 0: print("rho time:", (time.time()-rhostart))
 
 potstart = time.time()
 
@@ -236,7 +229,7 @@ else:
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
         omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
 
-print("pot time:", (time.time()-potstart))
+if rank == 0: print("pot time:", (time.time()-potstart))
 
 # Generate directories for saving descriptors 
 dirpath = os.path.join(inp.saltedpath, "equirepr_"+saltedname)
@@ -246,7 +239,7 @@ if not os.path.exists(dirpath):
 # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
 for lam in range(lmax_max+1):
 
-    print("lambda =", lam)
+    if rank == 0: print("lambda =", lam)
 
     equistart = time.time()
 
@@ -313,7 +306,7 @@ for lam in range(lmax_max+1):
     # Reshape equivariant descriptor
     p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsize)
  
-    print("equivariant time:", (time.time()-equistart))
+    if rank == 0: print("equivariant time:", (time.time()-equistart))
     
     normstart = time.time()
     
@@ -321,20 +314,19 @@ for lam in range(lmax_max+1):
     inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featsize),p.reshape(natoms_total,(2*lam+1)*featsize))
     p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
     
-    print("norm time:", (time.time()-normstart))
+    if rank == 0: print("norm time:", (time.time()-normstart))
 
     savestart = time.time()
    
-    print("feature space size =", featsize)
+    if rank == 0: print("feature space size =", featsize)
 
     #TODO modify SALTED to directly deal with compact natoms_total dimension
     if lam==0:
-<<<<<<< HEAD
         p = p.reshape(natoms_total,featsize)
-        pvec = np.zeros((ndata,natoms_max,featsize))
+        pvec = np.zeros((ndata,natmax,featsize))
     else:
         p = p.reshape(natoms_total,2*lam+1,featsize)
-        pvec = np.zeros((ndata,natoms_max,2*lam+1,featsize))
+        pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
     i = 0
     for iconf in range(ndata):
         for iat in range(natoms[iconf]):
@@ -344,39 +336,50 @@ for lam in range(lmax_max+1):
     # Do feature selection with FPS sparsification
     if sparsify:
         if ncut==-1:
-            print("ERROR: please select a finite number of features!")
+            if rank == 0: print("ERROR: please select a finite number of features!")
         if ncut >= featsize:
             ncut = featsize + 1 - 1 
-        print("fps...")
-        pvec = pvec.reshape(ndata*natoms_max*(2*lam+1),featsize)
+        if rank == 0: print("fps...")
+        pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
         vfps = do_fps(pvec.T,ncut,0)
         np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy", vfps)
+
     else:
         if inp.field==True:    
-            h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+"_field.h5",'w')
+            h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+"_field.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
         else:
-            h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".h5",'w')
+            h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
 
-    # Apply sparsification with precomputed FPS selection 
-    if not sparsify and ncut>-1:
-        # Load sparsification details
-        vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
-        print("sparsifying...")
-        pvec = pvec.reshape(ndata*natoms_max*(2*lam+1),featsize)
-        psparse = pvec.T[vfps].T
+        if ncut < 0 or ncut >= featsize: ncut_l = featsize
         if lam==0:
-            psparse = psparse.reshape(ndata,natoms_max,psparse.shape[-1])
+            dset = h5f.create_dataset("descriptor",(ndata_true,natmax,ncut_l))
         else:
-            psparse = psparse.reshape(ndata,natoms_max,(2*lam+1),psparse.shape[-1])
-        # Save sparse feature vector
-        h5f.create_dataset("descriptor",data=psparse)
-        h5f.close
-    
-    # Save non-sparse descriptor  
-    if not sparsify and ncut==-1:
-        h5f.create_dataset("descriptor",data=pvec)
-        h5f.close
-    
-    print("save time:", (time.time()-savestart))
+            dset = h5f.create_dataset("descriptor",(ndata_true,natmax,(2*lam+1),ncut_l))
 
-print("time:", (time.time()-start))
+        # Apply sparsification with precomputed FPS selection 
+        if ncut_l < featsize:
+            # Load sparsification details
+            try:
+                vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
+            except:
+                if rank == 0: print("Sparsification must be performed prior to calculating the descritors if ncut > -1. First run this script with the flag -s, then rerun with no flag.")
+                exit()
+            if rank == 0: print("sparsifying...")
+            pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
+            psparse = pvec.T[vfps].T
+            if lam==0:
+                psparse = psparse.reshape(ndata,natmax,psparse.shape[-1])
+            else:
+                psparse = psparse.reshape(ndata,natmax,(2*lam+1),psparse.shape[-1])
+            # Save sparse feature vector
+            dset[conf_range] = psparse
+
+        # Save non-sparse descriptor  
+        elif ncut == -1:
+            dset[conf_range] = pvec
+
+        h5f.close()
+
+    if rank == 0: print("save time:", (time.time()-savestart))
+
+if rank == 0: print("time:", (time.time()-start))

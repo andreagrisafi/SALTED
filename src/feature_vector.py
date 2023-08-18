@@ -13,7 +13,7 @@ if inp.parallel:
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
     rank = comm.Get_rank()
-    print('This is task',rank+1,'of',size)
+#    print('This is task',rank+1,'of',size)
 
 else:
     rank=0
@@ -64,11 +64,11 @@ totsize = 0
 for spe in species:
     for l in range(lmax[spe]+1):
         for n in range(nmax[(spe,l)]):
-            Mcut = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(0)+".npy").shape[1]
+            Mcut = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(0)+".npy").shape[1]
             cuml_Mcut[(spe,l,n)] = totsize
             totsize += Mcut
 
-print("problem dimensionality:", totsize)
+if rank == 0: print("problem dimensionality:", totsize)
 
 dirpath = os.path.join(inp.saltedpath,fdir)
 if (rank == 0):
@@ -103,7 +103,7 @@ for iconf in conf_range:
     for spe in species:
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
-            psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/psi-nm_conf"+str(iconf)+".npy") 
+            psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npy") 
             Psi[(spe,l)] = psi_nm
 
     # build sparse feature-vector memory efficiently

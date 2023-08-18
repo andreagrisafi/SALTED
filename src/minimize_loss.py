@@ -3,7 +3,7 @@ import numpy as np
 import time
 import random
 from scipy import sparse
-from sys_utils import read_system, get_atom_idx
+from sys_utils import read_system, get_atom_idx, get_conf_range
 import sys
 sys.path.insert(0, './')
 import inp
@@ -38,37 +38,6 @@ coefdir = inp.coefdir
 
 atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-###############################################################################################
-
-for iconf in range(ndata):
-    # Define relevant species
-    excluded_species = []
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        if spe not in species:
-            excluded_species.append(spe)
-    excluded_species = set(excluded_species)
-    for spe in excluded_species:
-        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
-
-# recompute number of atoms
-natoms_total = 0
-natoms_list = []
-natoms = np.zeros(ndata,int)
-for iconf in range(ndata):
-    natoms[iconf] = 0
-    for spe in species:
-        natoms[iconf] += natoms_per_spe[(iconf,spe)]
-    natoms_total += natoms[iconf]
-    natoms_list.append(natoms[iconf])
-natmax = max(natoms_list)
-
-# recompute atomic indexes from new species selections
-atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
-
-###############################################################################################
-
-
 # load average density coefficients if needed
 if inp.average:
     av_coefs = {}
@@ -97,17 +66,8 @@ if paral:
     if rank == 0 and ntraintot < size:
         print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
         comm.Abort()
-    if rank == 0:
-        trainrange = [[] for _ in range(size)]
-        blocksize = int(round(ntraintot/float(size)))
-        for i in range(size):
-            if i == (size-1):
-                trainrange[i] = trainrangetot[i*blocksize:ntraintot]
-            else:
-                trainrange[i] = trainrangetot[i*blocksize:(i+1)*blocksize]
-    else:
-        trainrange = None
 
+    trainrange = get_conf_range(rank,size,ntraintot,trainrangetot)
     trainrange = comm.scatter(trainrange,root=0)
     print('Task',rank+1,'handles the following structures:',trainrange,flush=True)
 else:
@@ -242,7 +202,7 @@ psi_list = []
 for iconf in trainrange:
     ovlp_list.append(np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy"))
     # load feature vector as a scipy sparse object
-    psi_list.append(sparse.load_npz(inp.saltedpath+fdir+"M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz"))
+    psi_list.append(sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz"))
 
 totsize = psi_list[0].shape[1]
 norm = 1.0/float(ntraintot)

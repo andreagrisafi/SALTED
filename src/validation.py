@@ -2,22 +2,25 @@ import os
 import sys
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
-from random import shuffle
 from scipy import special
-import random
 
-from sympy.parsing import mathematica
-from sympy import symbols
-from sympy import lambdify
+#from sympy.parsing import mathematica
+#from sympy import symbols
+#from sympy import lambdify
 
 import basis
 
 sys.path.insert(0, './')
 import inp
-from sys_utils import read_system, get_atom_idx
+from sys_utils import read_system, get_atom_idx, get_conf_range
+
+if inp.parallel:
+    from mpi4py import MPI
+    # MPI information
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+#    print('This is task',rank+1,'of',size)
 
 species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
@@ -34,8 +37,6 @@ else:
     kdir = "kernels_"+inp.saltedname
 
 # read basis
-xyzfile = read(inp.filename,":")
-ndata = len(xyzfile)
 
 # number of sparse environments
 M = inp.Menv
@@ -73,6 +74,13 @@ trainrangetot = np.loadtxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)
 ntrain = int(inp.trainfrac*len(trainrangetot))
 testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
+# Distribute structures to tasks
+ntest = len(testrange)
+if inp.parallel:
+    testrange = get_conf_range(rank,size,ntest,testrange)
+    testrange = comm.scatter(testrange,root=0)
+    print('Task',rank+1,'handles the following structures:',testrange,flush=True)
+
 # load regression weights
 weights = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
 
@@ -89,7 +97,7 @@ if not os.path.exists(dirpath):
 
 if inp.qmcode=="cp2k":
     # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
-    print("Reading auxiliary basis info...")
+    if rank == 0: print("Reading auxiliary basis info...")
     alphas = {}
     sigmas = {}
     for spe in species:
@@ -192,6 +200,8 @@ for iconf in testrange:
 
     if inp.qmcode=="cp2k":
         
+        from ase.io import read
+        xyzfile = read(inp.filename,":")
         geom = xyzfile[iconf]
         geom.wrap()
         coords = geom.get_positions()/bohr2angs
@@ -281,6 +291,12 @@ for iconf in testrange:
 #                        print(pred_projs[iaux],ref_projs[iaux])
 #                    iaux += 1
 
-dfile.close()
-print("")
-print("% RMSE =", 100*np.sqrt(error_density/variance))
+if inp.qmcode == 'cp2k':
+    dfile.close()
+    qfile.close()
+
+if inp.parallel:
+    error_density = comm.allreduce(error_density)
+    variance = comm.allreduce(variance)
+if rank == 0: print("")
+if rank == 0: print("% RMSE =", 100*np.sqrt(error_density/variance))

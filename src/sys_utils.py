@@ -28,12 +28,11 @@ def read_system(filename=inp.filename):
     #======================= system parameters
     atomic_symbols = []
     natoms = np.zeros(ndata,int) 
+#    natoms_total = 0 
     for iconf in range(len(xyzfile)):
         atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
-        natoms[iconf] = int(len(atomic_symbols[iconf]))
 
     #############################################################################
-
         # Define relevant species
         excluded_species = []
         for iat in range(natoms[iconf]):
@@ -45,9 +44,12 @@ def read_system(filename=inp.filename):
             atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
     #############################################################################
 
+        natoms[iconf] = int(len(atomic_symbols[iconf]))
+#        natoms_total += natoms[iconf]
+
     natmax = max(natoms)
 
-    return spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols,natoms, natmax
+    return spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax#, natoms_total
 
 def get_atom_idx(ndata,natoms,spelist,atomic_symbols):
     # initialize useful arrays

@@ -1,13 +1,10 @@
 import os
 import sys
-import ase
 import time
 import chemfiles
 import numpy as np
-from ase.io import read
 from scipy import special
 from ase.data import atomic_numbers
-from copy import copy
 
 from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
@@ -19,8 +16,17 @@ import basis
 
 sys.path.insert(0, './')
 import inp
+import h5py
 
-filename = inp.filename
+if inp.parallel:
+    from mpi4py import MPI
+    # MPI information
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+#    print('This is task',rank+1,'of',size)
+
+filename = inp.predict_filename
 saltedname = inp.saltedname
 predname = inp.predname
 rep1 = inp.rep1 
@@ -37,8 +43,8 @@ nang2 = inp.nang2
 neighspe2 = inp.neighspe2
 ncut = inp.ncut
 
-from sys_utils import read_system, get_atom_idx
-species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+from sys_utils import read_system, get_atom_idx,get_conf_range
+species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename)
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 bohr2angs = 0.529177210670
@@ -48,10 +54,20 @@ M = inp.Menv
 zeta = inp.z
 reg = inp.regul
 
+# Distribute structures to tasks
+if inp.parallel:
+    conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
+    conf_range = comm.scatter(conf_range,root=0)
+    ndata = len(conf_range)
+    print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+else:
+    conf_range = list(range(ndata))
+natoms_total = sum(natoms[conf_range])
+
 if inp.qmcode=="cp2k":
 
     # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
-    print("Reading auxiliary basis info...")
+    if rank == 0: print("Reading auxiliary basis info...")
     alphas = {}
     sigmas = {}
     for spe in species:
@@ -81,68 +97,26 @@ if inp.qmcode=="cp2k":
 
 loadstart = time.time()
 
-# Load sparse set of atomic environments 
-fps_idx = np.loadtxt(inp.saltedpath+"equirepr_"+saltedname+"/sparse_set_"+str(M)+".txt",int)[:,0]
-fps_species = np.loadtxt(inp.saltedpath+"equirepr_"+saltedname+"/sparse_set_"+str(M)+".txt",int)[:,1]
-# divide sparse set per species
-fps_indexes = {}
-for spe in species:
-    fps_indexes[spe] = []
-for iref in range(M):
-    fps_indexes[species[fps_species[iref]]].append(fps_idx[iref])
-Mspe = {}
-for spe in species:
-    Mspe[spe] = len(fps_indexes[spe])
-
 # Load training feature vectors and RKHS projection matrix 
-pvec_train = {}
+Mspe = {}
 power_env_sparse = {}
 Vmat = {}
 vfps = {}
 for lam in range(lmax_max+1):
-    pvec_train[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+".npy")
     # Load sparsification details
-    vfps[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
+    if ncut > -1: vfps[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
     for spe in species:
+        power_env_sparse[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M.h5",'r')[spe][:]
+        if lam == 0: Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
         Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
-        if lam==0:
-            power_env_sparse[(lam,spe)] = pvec_train[lam].reshape(pvec_train[lam].shape[0]*pvec_train[lam].shape[1],pvec_train[lam].shape[-1])[np.array(fps_indexes[spe],int)] 
-        else:
-            power_env_sparse[(lam,spe)] = pvec_train[lam].reshape(pvec_train[lam].shape[0]*pvec_train[lam].shape[1],2*lam+1,pvec_train[lam].shape[-1])[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*lam+1),pvec_train[lam].shape[-1])
 
 # load regression weights
 ntrain = int(inp.Ntrain*inp.trainfrac)
 weights = np.load(inp.saltedpath+"regrdir_"+saltedname+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
 
-print("load time:", (time.time()-loadstart))
+if rank == 0: print("load time:", (time.time()-loadstart))
 
 start = time.time()
-
-for iconf in range(ndata):
-    # Define relevant species
-    excluded_species = []
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        if spe not in species:
-            excluded_species.append(spe)
-    excluded_species = set(excluded_species)
-    for spe in excluded_species:
-        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
-
-# recompute number of atoms
-natoms_total = 0
-natoms_list = []
-natoms = np.zeros(ndata,int)
-for iconf in range(ndata):
-    natoms[iconf] = 0
-    for spe in species:
-        natoms[iconf] += natom_dict[(iconf,spe)]
-    natoms_total += natoms[iconf]
-    natoms_list.append(natoms[iconf])
-natoms_max = max(natoms_list)
-
-# recompute atomic indexes from new species selections
-atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 HYPER_PARAMETERS_DENSITY = {
     "cutoff": rcut1,
@@ -167,8 +141,9 @@ HYPER_PARAMETERS_POTENTIAL = {
 
 with chemfiles.Trajectory(filename) as trajectory:
     frames = [f for f in trajectory]
+    frames = [frames[i] for i in conf_range]
 
-print(f"The dataset contains {len(frames)} frames.")
+if rank == 0: print(f"The dataset contains {ndata_true} frames.")
 
 if rep1=="rho":
     # get SPH expansion for atomic density    
@@ -179,7 +154,7 @@ elif rep1=="V":
     calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
 
 else:
-    print("Error: requested representation", rep1, "not provided")
+    if rank == 0: print("Error: requested representation", rep1, "not provided")
 
 descstart = time.time()
 
@@ -216,7 +191,7 @@ elif rep2=="V":
     calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL) 
 
 else:
-    print("Error: requested representation", rep2, "not provided")
+    if rank == 0: print("Error: requested representation", rep2, "not provided")
 
 nspe2 = len(neighspe2)
 keys_array = np.zeros(((nang2+1)*len(species)*nspe2,3),int)
@@ -242,8 +217,8 @@ for l in range(nang2+1):
     c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
     omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
 
-print("coefficients time:", (time.time()-descstart))
-print("")
+if rank == 0: print("coefficients time:", (time.time()-descstart))
+if rank == 0: print("")
 
 dirpath = os.path.join(inp.saltedpath,"predictions_"+saltedname+"_"+predname)
 if not os.path.exists(dirpath):
@@ -259,7 +234,7 @@ if not os.path.exists(dirpath):
 psi_nm = {}
 for lam in range(lmax_max+1):
 
-    print("lambda =", lam)
+    if rank == 0: print("lambda =", lam)
 
     equistart = time.time()
 
@@ -297,7 +272,7 @@ for lam in range(lmax_max+1):
     featsize = nspe1*nspe2*nrad1*nrad2*llmax
     p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsize)
  
-    print("equivariant time:", (time.time()-equistart))
+    if rank == 0: print("equivariant time:", (time.time()-equistart))
     
     normstart = time.time()
     
@@ -305,7 +280,7 @@ for lam in range(lmax_max+1):
     inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featsize),p.reshape(natoms_total,(2*lam+1)*featsize))
     p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
     
-    print("norm time:", (time.time()-normstart))
+    if rank == 0: print("norm time:", (time.time()-normstart))
 
     sparsestart = time.time()
     
@@ -314,29 +289,29 @@ for lam in range(lmax_max+1):
         p = p.T[vfps[lam]].T
         featsize = inp.ncut
     
-    print("sparse time:", (time.time()-sparsestart))
+    if rank == 0: print("sparse time:", (time.time()-sparsestart))
     
     fillstart = time.time()
 
     # Fill vector of equivariant descriptor 
     if lam==0:
         p = p.reshape(natoms_total,featsize)
-        pvec = np.zeros((ndata,natoms_max,featsize))
-        i = 0
-        for iconf in range(ndata):
+        pvec = np.zeros((ndata,natmax,featsize))
+        j = 0
+        for i,iconf in enumerate(conf_range):
             for iat in range(natoms[iconf]):
-                pvec[iconf,iat] = p[i]
-                i += 1
+                pvec[i,iat] = p[j]
+                j += 1
     else:
         p = p.reshape(natoms_total,2*lam+1,featsize)
-        pvec = np.zeros((ndata,natoms_max,2*lam+1,featsize))
-        i = 0
-        for iconf in range(ndata):
+        pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
+        j = 0
+        for i,iconf in enumerate(conf_range):
             for iat in range(natoms[iconf]):
-                pvec[iconf,iat] = p[i]
-                i += 1
+                pvec[i,iat] = p[j]
+                j += 1
     
-    print("fill vector time:", (time.time()-fillstart))
+    if rank == 0: print("fill vector time:", (time.time()-fillstart))
 
     rkhsstart = time.time()
 
@@ -344,29 +319,30 @@ for lam in range(lmax_max+1):
 
         # Compute scalar kernels
         kernel0_nm = {}
-        for iconf in range(ndata):
+        for i,iconf in enumerate(conf_range):
             for spe in species:
-                kernel0_nm[(iconf,spe)] = np.dot(pvec[iconf,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
+                kernel0_nm[(iconf,spe)] = np.dot(pvec[i,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
                 kernel_nm = kernel0_nm[(iconf,spe)]**zeta
                 # Project on RKHS
                 psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
     else:
 
         # Compute covariant kernels
-        for iconf in range(ndata):
+        for i,iconf in enumerate(conf_range):
             for spe in species:
-                kernel_nm = np.dot(pvec[iconf,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                kernel_nm = np.dot(pvec[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
                 for i1 in range(natom_dict[(iconf,spe)]):
                     for i2 in range(Mspe[spe]):
                         kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
                 # Project on RKHS
                 psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
    
-    print("rkhs time:", time.time()-rkhsstart,flush=True)
+    if rank == 0: print("rkhs time:", time.time()-rkhsstart,flush=True)
 
 predstart = time.time()
 
 if inp.qmcode=="cp2k":
+    from ase.io import read
     xyzfile = read(filename,":")
     qfile = open(inp.saltedpath+"predictions_"+saltedname+"_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat","w")
     dfile = open(inp.saltedpath+"predictions_"+saltedname+"_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat","w")
@@ -378,7 +354,7 @@ if inp.average:
         av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
 # Perform equivariant predictions
-for iconf in range(ndata):
+for iconf in conf_range:
 
     Tsize = 0
     for iat in range(natoms[iconf]):
@@ -482,8 +458,8 @@ if inp.qmcode=="cp2k":
     qfile.close()
     dfile.close()
 
-print("")
-print("prediction time:", time.time()-predstart)
+if rank == 0: print("")
+if rank == 0: print("prediction time:", time.time()-predstart)
 
-print("")
-print("total time:", (time.time()-start))
+if rank == 0: print("")
+if rank == 0: print("total time:", (time.time()-start))

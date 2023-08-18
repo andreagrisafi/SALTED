@@ -105,7 +105,7 @@ for spe in spelist:
         dirpath = os.path.join(kdir, "spe"+str(spe)+"_l"+str(l))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
-        dirpath = os.path.join(kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
+        dirpath = os.path.join(kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_zeta"+str(zeta))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
 
@@ -139,7 +139,7 @@ for spe in spelist:
     eva = eva[eva>eigcut]
     eve = eve[:,-len(eva):]
     V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-    np.save(kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
+    np.save(kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy",V)
 
 #    if inp.field:
 #        kernel_mm = (np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) + kernel0_mm) * kernel0_mm[spe]**(zeta -1)
@@ -178,4 +178,4 @@ for l in range(1,llmax+1):
         eva = eva[eva>eigcut]
         eve = eve[:,-len(eva):]
         V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-        np.save(kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
+        np.save(kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy",V)
