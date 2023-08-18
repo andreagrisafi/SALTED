@@ -109,16 +109,30 @@ for spe in spelist:
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
 
-power_env_sparse = {}
 kernel0_mm = {}
+power_env_sparse = {}
 h5f = h5py.File(sdir+'FEAT-0-M.h5','w')
+if inp.field:
+    power2 = h5py.File(sdir+"FEAT-0_field.h5",'r')['descriptor'][:]
+    power_env_sparse2 = {}
+    h5f2 = h5py.File(sdir+'FEAT-0-M_field.h5','w')
 for spe in spelist:
     power_env_sparse[spe] = power.reshape(ndata*natmax,nfeat)[np.array(fps_indexes[spe],int)]
     h5f.create_dataset(spe,data=power_env_sparse[spe])
+    if inp.field:
+        power_env_sparse2[spe] = power2.reshape(ndata*natmax,nfeat)[np.array(fps_indexes[spe],int)]
+        h5f.create_dataset(spe,data=power_env_sparse2[spe])
 h5f.close()
+if inp.field: h5f2.close()
 
 for spe in spelist:
     kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
+    # Only one of this and the next if inp.field statements are needed. Need to decide which
+    if inp.field:
+        kernel_mm = (np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) + kernel0_mm) * kernel0_mm[spe]**(zeta -1)
+    else:
+        kernel_mm = kernel0_mm[spe]**zeta
+    
     kernel_mm = kernel0_mm[spe]**zeta
 
     eva, eve = np.linalg.eigh(kernel_mm)
@@ -127,18 +141,36 @@ for spe in spelist:
     V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
     np.save(kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector.npy",V)
 
+#    if inp.field:
+#        kernel_mm = (np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) + kernel0_mm) * kernel0_mm[spe]**(zeta -1)
+
+#        eva, eve = np.linalg.eigh(kernel_mm)
+#        eva = eva[eva>eigcut]
+#        eve = eve[:,-len(eva):]
+#        V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+#        np.save(kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector_field.npy",V)
+
 for l in range(1,llmax+1):
     power = h5py.File(sdir+"FEAT-"+str(l)+".h5",'r')['descriptor'][:]
     nfeat = power.shape[-1]
     power_env_sparse = {}
     h5f = h5py.File(sdir+'FEAT-'+str(l)+'-M.h5','w')
+    if inp.field: 
+        power2 = h5py.File(sdir+"FEAT-"+str(l)+"_field.h5",'r')['descriptor'][:]
+        power_env_sparse2 = {}
+        h5f2 = h5py.File(sdir+'FEAT-'+str(l)+'-M_field.h5','w')
     for spe in spelist:
         power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,nfeat)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
         h5f.create_dataset(spe,data=power_env_sparse[spe])
+        if inp.field:
+            power_env_sparse2[spe] = power2.reshape(ndata*natmax,2*l+1,nfeat)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
+            h5f2.create_dataset(spe,data=power_env_sparse2[spe])
     h5f.close()
+    if inp.field: h5f2.close()
 
     for spe in spelist:
-        kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T) 
+        kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
+        if inp.field: kernel_mm += np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T)
         for i1 in range(Mspe[spe]):
             for i2 in range(Mspe[spe]):
                 kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_mm[spe][i1,i2]**(zeta-1)

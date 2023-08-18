@@ -280,7 +280,6 @@ for lam in range(lmax_max+1):
         llvec[il,1] = lvalues[il][1]
     
     # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-    print(inp.saltedpath+'wigners',os.path.exists(inp.saltedpath+'wigners'))
     if not os.path.exists(inp.saltedpath+'wigners'): wigner.build()
     if inp.field:
         wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field.dat")

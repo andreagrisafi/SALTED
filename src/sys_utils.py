@@ -28,9 +28,23 @@ def read_system(filename=inp.filename):
     #======================= system parameters
     atomic_symbols = []
     natoms = np.zeros(ndata,int) 
-    for i in range(len(xyzfile)):
-        atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-        natoms[i] = int(len(atomic_symbols[i]))
+    for iconf in range(len(xyzfile)):
+        atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
+        natoms[iconf] = int(len(atomic_symbols[iconf]))
+
+    #############################################################################
+
+        # Define relevant species
+        excluded_species = []
+        for iat in range(natoms[iconf]):
+            spe = atomic_symbols[iconf][iat]
+            if spe not in spelist:
+                excluded_species.append(spe)
+        excluded_species = set(excluded_species)
+        for spe in excluded_species:
+            atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
+    #############################################################################
+
     natmax = max(natoms)
 
     return spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols,natoms, natmax
@@ -48,34 +62,6 @@ def get_atom_idx(ndata,natoms,spelist,atomic_symbols):
             if spe in spelist:
                atom_idx[(iconf,spe)].append(iat)
                natom_dict[(iconf,spe)] += 1
-
-    ########################################################################################
-
-    natoms_total = 0
-    natoms_list = []
-    natoms = np.zeros(ndata,int)
-    for iconf in range(ndata):
-        # define relevant atoms
-        natoms[iconf] = 0
-        for spe in species:
-            natoms[iconf] += natom_dict[(iconf,spe)]
-        natoms_total += natoms[iconf]
-        natoms_list.append(natoms[iconf])
-        # Define relevant species
-        excluded_species = []
-        for iat in range(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
-            if spe not in species:
-                excluded_species.append(spe)
-        excluded_species = set(excluded_species)
-        for spe in excluded_species:
-            atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
-    natmax = max(natoms_list)
-
-    # recompute atomic indexes from new species selections
-    atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
-
-    #############################################################################
 
     return atom_idx,natom_dict
 
