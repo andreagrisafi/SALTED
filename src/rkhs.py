@@ -16,6 +16,8 @@ if inp.parallel:
     size = comm.Get_size()
     rank = comm.Get_rank()
 #    print('This is task',rank+1,'of',size)
+else:
+    rank = 0
 
 saltedname = inp.saltedname
 
@@ -48,6 +50,7 @@ else:
     conf_range = list(range(ndata))
 
 power_env_sparse = {}
+if inp.field: power_env_sparse2 = {}
 kernel0_nm = {}
 
 power = h5py.File(sdir+"FEAT-0.h5",'r')["descriptor"][conf_range,:]
@@ -63,6 +66,7 @@ for spe in species:
 
     # compute sparse kernel K_MM for each atomic species 
     power_env_sparse[spe] = h5py.File(sdir+"FEAT-0-M.h5",'r')[spe][:]
+    if inp.field: power_env_sparse2[spe] = h5py.File(sdir+"FEAT-0-M_field.h5",'r')[spe][:]
     Mspe[spe] = power_env_sparse[spe].shape[0]
 
     V = np.load(kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
@@ -89,7 +93,7 @@ for l in range(1,llmax+1):
     nfeat = power.shape[-1]
     if inp.field:
         power2 = h5py.File(sdir+"FEAT-"+str(l)+"_field.h5",'r')["descriptor"][conf_range,:]
-        nfeat2 = power.shape[-1]
+        nfeat2 = power2.shape[-1]
 
 #    if inp.field:
 #        power = h5py.File(sdir+"FEAT-"+str(l)+"_field.h5",'r')["descriptor"][conf_range,:]
@@ -111,7 +115,7 @@ for l in range(1,llmax+1):
         # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
         for i,iconf in enumerate(conf_range):
             kernel_nm = np.dot(power[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat),power_env_sparse[spe].T) 
-            if inp.field: kernel_nm += np.dot(power2[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat2),power_env_sparse2.T) 
+            if inp.field: kernel_nm += np.dot(power2[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat2),power_env_sparse2[spe].T) 
             for i1 in range(natom_dict[(iconf,spe)]):
                 for i2 in range(Mspe[spe]):
                     kernel_nm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)

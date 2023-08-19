@@ -50,6 +50,8 @@ if inp.parallel:
     size = comm.Get_size()
     rank = comm.Get_rank()
 #    print('This is task',rank+1,'of',size)
+else:
+    rank = 0
 
 from sys_utils import read_system, get_atom_idx,get_conf_range
 species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
@@ -345,10 +347,16 @@ for lam in range(lmax_max+1):
         np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy", vfps)
 
     else:
-        if inp.field==True:    
-            h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+"_field.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
+        if inp.field==True:
+            if inp.parallel:
+                h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+"_field.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
+            else:
+                h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+"_field.h5",'w')
         else:
-            h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
+            if inp.parallel:
+                h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
+            else:
+                h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".h5",'w')
 
         if ncut < 0 or ncut >= featsize: ncut_l = featsize
         if lam==0:
