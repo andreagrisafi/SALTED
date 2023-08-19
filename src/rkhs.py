@@ -25,6 +25,7 @@ if inp.field==True:
     kdir = "kernels_"+saltedname+"_field"
 else:
     kdir = "kernels_"+saltedname
+kdir += '/'
 
 species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -39,7 +40,6 @@ if rank == 0:
     print("zeta =", zeta)
     print("Computing RKHS of symmetry-adapted sparse kernel approximations...")
 sdir = inp.saltedpath+'equirepr_'+inp.saltedname+'/'
-kdir = inp.saltedpath+"kernels_"+inp.saltedname+'/'
 
 # Distribute structures to tasks
 if inp.parallel:

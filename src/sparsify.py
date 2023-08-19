@@ -15,7 +15,9 @@ M = inp.Menv
 zeta = inp.z
 eigcut = inp.eigcut
 sdir = inp.saltedpath+'equirepr_'+inp.saltedname+'/'
-kdir = inp.saltedpath+'kernels_'+inp.saltedname+'/'
+kdir = inp.saltedpath+'kernels_'+inp.saltedname
+if inp.field: kdir += '_field'
+kdir += '/'
 
 def do_fps(x, d=0):
     # FPS code from Giulio Imbalzano
