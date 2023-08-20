@@ -110,9 +110,11 @@ power_env_sparse = {}
 if inp.field: power_env_sparse_field = {}
 Vmat = {}
 vfps = {}
+if inp.field: vfps_field = {}
 for lam in range(lmax_max+1):
     # Load sparsification details
     if ncut > -1: vfps[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
+    if ncut > -1 and inp.field: vfps_field[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy")
     for spe in species:
         power_env_sparse[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M.h5",'r')[spe][:]
         if inp.field: power_env_sparse_field[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M_field.h5",'r')[spe][:]
@@ -377,6 +379,11 @@ for lam in range(lmax_max+1):
          p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
  
          if rank == 0: print("field norm time:", (time.time()-normstart))
+    
+         if ncut > -1:
+             p = p.reshape(natoms_total*(2*lam+1),featspacefield)
+             p = p.T[vfps_field[lam]].T
+             featspacefield = inp.ncut
  
          fillstart = time.time()
  

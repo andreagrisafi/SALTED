@@ -151,6 +151,7 @@ if inp.average:
         av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
 # compute error over test set
+if inp.parallel: comm.Barrier()
 efile = open(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/errors.dat","w")
 if inp.qmcode=="cp2k":
     dfile = open(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat","w")

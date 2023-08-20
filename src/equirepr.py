@@ -35,13 +35,13 @@ nrad2 = inp.nrad2
 nang2 = inp.nang2
 neighspe2 = inp.neighspe2
 ncut = inp.ncut
-#sparsify = inp.sparsify
+sparsify = inp.sparsify
 parallel = inp.parallel
 
-sparsify = False
-if '-s' in sys.argv:
-    sparsify = True
-    parallel = False
+#sparsify = False
+#if '-s' in sys.argv:
+#    sparsify = True
+#    parallel = False
 
 if inp.parallel:
     from mpi4py import MPI
@@ -344,7 +344,10 @@ for lam in range(lmax_max+1):
         if rank == 0: print("fps...")
         pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
         vfps = do_fps(pvec.T,ncut,0)
-        np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy", vfps)
+        if inp.field:
+            np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy", vfps)
+        else:
+            np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy", vfps)
 
     else:
         if inp.field==True:
@@ -358,7 +361,10 @@ for lam in range(lmax_max+1):
             else:
                 h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".h5",'w')
 
-        if ncut < 0 or ncut >= featsize: ncut_l = featsize
+        if ncut < 0 or ncut >= featsize:
+            ncut_l = featsize
+        else:
+            ncut_l = ncut
         if lam==0:
             dset = h5f.create_dataset("descriptor",(ndata_true,natmax,ncut_l))
         else:
@@ -368,7 +374,10 @@ for lam in range(lmax_max+1):
         if ncut_l < featsize:
             # Load sparsification details
             try:
-                vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
+                if inp.field:
+                    vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy")
+                else:
+                    vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
             except:
                 if rank == 0: print("Sparsification must be performed prior to calculating the descritors if ncut > -1. First run this script with the flag -s, then rerun with no flag.")
                 exit()

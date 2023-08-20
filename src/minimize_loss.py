@@ -59,7 +59,7 @@ if (inp.Ntrain > ndata):
 dataset = list(range(ndata))
 random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:inp.Ntrain]
-np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
+if rank == 0: np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
 #trainrangetot = np.loadtxt("training_set.txt",int)
 
 # Distribute structures to tasks
@@ -69,7 +69,6 @@ if paral:
     if rank == 0 and ntraintot < size:
         print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
         comm.Abort()
-    print(rank,size,ntraintot,trainrangetot)
     trainrange = get_conf_range(rank,size,ntraintot,trainrangetot)
     trainrange = comm.scatter(trainrange,root=0)
     print('Task',rank+1,'handles the following structures:',trainrange,flush=True)
