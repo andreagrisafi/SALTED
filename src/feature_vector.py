@@ -82,10 +82,9 @@ if (rank == 0):
 if inp.parallel:
     conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
     conf_range = comm.scatter(conf_range,root=0)
+    print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
 else:
     conf_range = range(ndata)
-
-print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
 
 for iconf in conf_range:
 

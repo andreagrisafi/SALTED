@@ -18,6 +18,10 @@ sys.path.insert(0, './')
 import inp
 import h5py
 
+if inp.field:
+    from lib import equicombfield 
+    import efield
+
 if inp.parallel:
     from mpi4py import MPI
     # MPI information
@@ -25,6 +29,8 @@ if inp.parallel:
     size = comm.Get_size()
     rank = comm.Get_rank()
 #    print('This is task',rank+1,'of',size)
+else:
+    rank = 0
 
 filename = inp.predict_filename
 saltedname = inp.saltedname
@@ -55,6 +61,7 @@ zeta = inp.z
 reg = inp.regul
 
 # Distribute structures to tasks
+ndata_true = ndata
 if inp.parallel:
     conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
     conf_range = comm.scatter(conf_range,root=0)
@@ -100,6 +107,7 @@ loadstart = time.time()
 # Load training feature vectors and RKHS projection matrix 
 Mspe = {}
 power_env_sparse = {}
+if inp.field: power_env_sparse_field = {}
 Vmat = {}
 vfps = {}
 for lam in range(lmax_max+1):
@@ -107,12 +115,19 @@ for lam in range(lmax_max+1):
     if ncut > -1: vfps[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
     for spe in species:
         power_env_sparse[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M.h5",'r')[spe][:]
+        if inp.field: power_env_sparse_field[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M_field.h5",'r')[spe][:]
         if lam == 0: Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
-        Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
+        if inp.field:
+            Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"_field/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
+        else:
+            Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
 
 # load regression weights
 ntrain = int(inp.Ntrain*inp.trainfrac)
-weights = np.load(inp.saltedpath+"regrdir_"+saltedname+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
+if inp.field:
+    weights = np.load(inp.saltedpath+"regrdir_"+saltedname+"_field/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
+else:
+    weights = np.load(inp.saltedpath+"regrdir_"+saltedname+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
 
 if rank == 0: print("load time:", (time.time()-loadstart))
 
@@ -217,17 +232,25 @@ for l in range(nang2+1):
     c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
     omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
 
+if inp.field:
+# get SPH expansion for a uniform and constant external field aligned along Z 
+    omega_field = np.zeros((natoms_total,nrad2),complex)
+    for iat in range(natoms_total):
+        omega_field[iat] = efield.get_efield_sph(nrad2,rcut2)
+
 if rank == 0: print("coefficients time:", (time.time()-descstart))
 if rank == 0: print("")
 
-dirpath = os.path.join(inp.saltedpath,"predictions_"+saltedname+"_"+predname)
-if not os.path.exists(dirpath):
+dirpath = os.path.join(inp.saltedpath,"predictions_"+saltedname)
+if inp.field: dirpath += '_field'
+dirpath += '_'+predname
+if rank == 0 and not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.saltedpath+"predictions_"+saltedname+"_"+predname+"/","M"+str(M)+"_zeta"+str(zeta))
-if not os.path.exists(dirpath):
+dirpath = os.path.join(dirpath,"M"+str(M)+"_zeta"+str(zeta))
+if rank == 0 and not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.saltedpath+"predictions_"+saltedname+"_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/","N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
-if not os.path.exists(dirpath):
+dirpath = os.path.join(dirpath,"N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
+if rank == 0 and not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
 # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
@@ -313,6 +336,67 @@ for lam in range(lmax_max+1):
     
     if rank == 0: print("fill vector time:", (time.time()-fillstart))
 
+    if inp.field:
+         #########################################################
+         #                 START E-FIELD HERE
+         #########################################################
+      
+         # Select relevant angular components for equivariant descriptor calculation
+         llmax = 0
+         lvalues = {}
+         for l1 in range(nang1+1):
+             # keep only even combination to enforce inversion symmetry
+             if (lam+l1+1)%2==0 :
+                 if abs(1-lam) <= l1 and l1 <= (1+lam) :
+                     lvalues[llmax] = [l1,1]
+                     llmax+=1
+         # Fill dense array from dictionary
+         llvec = np.zeros((llmax,2),int)
+         for il in range(llmax):
+             llvec[il,0] = lvalues[il][0]
+             llvec[il,1] = lvalues[il][1]
+
+         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
+         wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field.dat")
+         wigdim = wigner3j.size
+      
+         # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
+         v2 = omega_field.T
+         p = equicombfield.equicombfield(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
+ 
+         # Define feature space and reshape equivariant descriptor
+         featspacefield = nspe1*nrad1*nrad2*llmax
+         p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featspacefield)
+       
+         if rank == 0: print("field equivariant time:", (time.time()-equistart))
+          
+         normstart = time.time()
+ 
+         # Normalize equivariant descriptor  
+         inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featspacefield),p.reshape(natoms_total,(2*lam+1)*featspacefield))
+         p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
+ 
+         if rank == 0: print("field norm time:", (time.time()-normstart))
+ 
+         fillstart = time.time()
+ 
+         # Fill vector of equivariant descriptor 
+         if lam==0:
+             p = p.reshape(natoms_total,featspacefield)
+             pvec_field = np.zeros((ndata,natmax,featspacefield))
+             i = 0
+             for iconf in range(ndata):
+                 for iat in range(natoms[iconf]):
+                     pvec_field[iconf,iat] = p[i]
+                     i += 1
+         else:
+             pvec_field = np.zeros((ndata,natmax,2*lam+1,featspacefield))
+             i = 0
+             for iconf in range(ndata):
+                 for iat in range(natoms[iconf]):
+                     pvec_field[iconf,iat] = p[i]
+                     i += 1
+
     rkhsstart = time.time()
 
     if lam==0:
@@ -322,7 +406,11 @@ for lam in range(lmax_max+1):
         for i,iconf in enumerate(conf_range):
             for spe in species:
                 kernel0_nm[(iconf,spe)] = np.dot(pvec[i,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
-                kernel_nm = kernel0_nm[(iconf,spe)]**zeta
+                if inp.field:
+                    kernel_nm = np.dot(pvec_field[i,atom_idx[(iconf,spe)]],power_env_sparse_field[(lam,spe)].T) + kernel0_nm[(iconf,spe)]
+                    kernel_nm *= kernel0_nm[(iconf,spe)]**(zeta-1)
+                else:
+                    kernel_nm = kernel0_nm[(iconf,spe)]**zeta
                 # Project on RKHS
                 psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
     else:
@@ -331,12 +419,13 @@ for lam in range(lmax_max+1):
         for i,iconf in enumerate(conf_range):
             for spe in species:
                 kernel_nm = np.dot(pvec[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                if inp.field: kernel_nm += np.dot(pvec_field[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
                 for i1 in range(natom_dict[(iconf,spe)]):
                     for i2 in range(Mspe[spe]):
                         kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
                 # Project on RKHS
-                psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
-   
+                psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
+
     if rank == 0: print("rkhs time:", time.time()-rkhsstart,flush=True)
 
 predstart = time.time()
@@ -344,8 +433,8 @@ predstart = time.time()
 if inp.qmcode=="cp2k":
     from ase.io import read
     xyzfile = read(filename,":")
-    qfile = open(inp.saltedpath+"predictions_"+saltedname+"_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat","w")
-    dfile = open(inp.saltedpath+"predictions_"+saltedname+"_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat","w")
+    qfile = open(dirpath+"/charges.dat","w")
+    dfile = open(dirpath+"/dipoles.dat","w")
 
 # Load spherical averages if required
 if inp.average:
@@ -448,10 +537,10 @@ for iconf in conf_range:
         print(iconf+1,rho_int,charge,file=qfile)
 
         # save predicted coefficients in CP2K format
-        np.savetxt(inp.saltedpath+"predictions_"+saltedname+"_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/COEFFS-"+str(iconf+1)+".dat",pred_coefs)
+        np.savetxt(dirpath+"/COEFFS-"+str(iconf+1)+".dat",pred_coefs)
 
     # save predicted coefficients
-    np.save(inp.saltedpath+"predictions_"+saltedname+"_"+predname+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
+    np.save(dirpath+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
 
 
 if inp.qmcode=="cp2k":

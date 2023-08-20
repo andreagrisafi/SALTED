@@ -53,6 +53,9 @@ if rank==0:
         os.mkdir(dirpath)
 
 # define training set at random
+if (inp.Ntrain > ndata):
+    print("More training structures have been requested than are present in the input data.")
+    exit()
 dataset = list(range(ndata))
 random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:inp.Ntrain]
@@ -66,7 +69,7 @@ if paral:
     if rank == 0 and ntraintot < size:
         print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
         comm.Abort()
-
+    print(rank,size,ntraintot,trainrangetot)
     trainrange = get_conf_range(rank,size,ntraintot,trainrangetot)
     trainrange = comm.scatter(trainrange,root=0)
     print('Task',rank+1,'handles the following structures:',trainrange,flush=True)
