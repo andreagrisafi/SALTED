@@ -325,6 +325,7 @@ for lam in range(lmax_max+1):
     else:
         p = p.reshape(natoms_total,2*lam+1,featsize)
         pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
+
     j = 0
     for i,iconf in enumerate(conf_range):
         for iat in range(natoms[iconf]):
@@ -375,10 +376,10 @@ for lam in range(lmax_max+1):
     
          if rank == 0: print("field norm time:", (time.time()-normstart))
 
-#         if ncut > -1:
-#             p = p.reshape(natoms_total*(2*lam+1),featspacefield)
-#             p = p.T[vfps_field[lam]].T
-#             featspacefield = inp.ncut 
+         if ncut > -1:
+             p = p.reshape(natoms_total*(2*lam+1),featspacefield)
+             p = p.T[vfps_field[lam]].T
+             featspacefield = inp.ncut 
 
          fillstart = time.time()
  
@@ -387,6 +388,7 @@ for lam in range(lmax_max+1):
              p = p.reshape(natoms_total,featspacefield)
              pvec_field = np.zeros((ndata,natmax,featspacefield))
          else:
+             p = p.reshape(natoms_total,2*lam+1,featsize)
              pvec_field = np.zeros((ndata,natmax,2*lam+1,featspacefield))
 
          j = 0
@@ -395,8 +397,8 @@ for lam in range(lmax_max+1):
                  pvec_field[i,iat] = p[j]
                  j += 1
          
-         if ncut > -1:
-             pvec_field = pvec_field.T[vfps_field[lam]].T
+#         if ncut > -1:
+#             pvec_field = pvec_field.T[vfps_field[lam]].T
 
     rkhsstart = time.time()
 
