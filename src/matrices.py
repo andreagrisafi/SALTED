@@ -19,8 +19,12 @@ def add_command_line_arguments_contraction(parsetext):
 
 args = add_command_line_arguments_contraction("dataset subselection")
 # dataset slice boundaries 
-istart = args.istart-1
 iend = args.iend
+
+if iend==0:
+    istart = 0
+else:
+    istart = args.istart-1
 
 from sys_utils import read_system,get_atom_idx
 import basis
@@ -65,36 +69,6 @@ species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_
 atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 
-###############################################################################################
-
-for iconf in range(ndata):
-    # Define relevant species
-    excluded_species = []
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
-        if spe not in species:
-            excluded_species.append(spe)
-    excluded_species = set(excluded_species)
-    for spe in excluded_species:
-        atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
-
-# recompute number of atoms
-natoms_total = 0
-natoms_list = []
-natoms = np.zeros(ndata,int)
-for iconf in range(ndata):
-    natoms[iconf] = 0
-    for spe in species:
-        natoms[iconf] += natoms_per_spe[(iconf,spe)]
-    natoms_total += natoms[iconf]
-    natoms_list.append(natoms[iconf])
-natmax = max(natoms_list)
-
-# recompute atomic indexes from new species selections
-atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
-
-###############################################################################################
-
 p = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf0.npz")
 totsize = p.shape[-1]
 print("problem dimensionality:", totsize,flush=True)
@@ -117,7 +91,7 @@ if not os.path.exists(dirpath):
 
 # define training set at random
 dataset = list(range(ndata))
-random.Random(3).shuffle(dataset)
+#random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:inp.Ntrain]
 np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
 ntraintot = int(inp.trainfrac*inp.Ntrain)

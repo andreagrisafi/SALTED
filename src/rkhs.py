@@ -22,9 +22,9 @@ else:
 saltedname = inp.saltedname
 
 if inp.field==True:
-    kdir = "kernels_"+saltedname+"_field"
+    kdir = inp.saltedpath+"kernels_"+saltedname+"_field"
 else:
-    kdir = "kernels_"+saltedname
+    kdir = inp.saltedpath+"kernels_"+saltedname
 kdir += '/'
 
 species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()

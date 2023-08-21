@@ -6,18 +6,34 @@ import inp
 import h5py
 import os
 
-spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
-atom_idx, natom_dict = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
+atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 # number of sparse environments
 M = inp.Menv
 zeta = inp.z
 eigcut = inp.eigcut
 sdir = inp.saltedpath+'equirepr_'+inp.saltedname+'/'
-kdir = inp.saltedpath+'kernels_'+inp.saltedname
+
+kdir = 'kernels_'+inp.saltedname
 if inp.field: kdir += '_field'
 kdir += '/'
+
+# make directories if not exisiting
+dirpath = os.path.join(inp.saltedpath, kdir)
+if not os.path.exists(dirpath):
+    os.mkdir(dirpath)
+for spe in species:
+    for l in range(llmax+1):
+        dirpath = os.path.join(inp.saltedpath+kdir, "spe"+str(spe)+"_l"+str(l))
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+        dirpath = os.path.join(inp.saltedpath+kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_zeta"+str(zeta))
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+
+kdir = inp.saltedpath+kdir
 
 def do_fps(x, d=0):
     # FPS code from Giulio Imbalzano
@@ -37,7 +53,7 @@ def do_fps(x, d=0):
 # compute number of atomic environments for each species
 ispe = 0
 species_idx = {}
-for spe in spelist:
+for spe in species:
     species_idx[spe] = ispe
     ispe += 1
 
@@ -66,25 +82,13 @@ else:
 
 # divide sparse set per species
 fps_indexes = {}
-for spe in spelist:
+for spe in species:
     fps_indexes[spe] = []
 for iref in range(M):
-    fps_indexes[spelist[fps_species[iref]]].append(fps_idx[iref])
+    fps_indexes[species[fps_species[iref]]].append(fps_idx[iref])
 Mspe = {}
-for spe in spelist:
+for spe in species:
     Mspe[spe] = len(fps_indexes[spe])
-
-# make directories if not exisiting
-if not os.path.exists(kdir):
-    os.mkdir(kdir)
-for spe in spelist:
-    for l in range(llmax+1):
-        dirpath = os.path.join(kdir, "spe"+str(spe)+"_l"+str(l))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-        dirpath = os.path.join(kdir+"spe"+str(spe)+"_l"+str(l), "M"+str(M)+"_zeta"+str(zeta))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
 
 kernel0_mm = {}
 power_env_sparse = {}
@@ -94,7 +98,7 @@ if inp.field:
     nfeat2 = power2.shape[-1]
     power_env_sparse2 = {}
     h5f2 = h5py.File(sdir+'FEAT-0-M-'+str(M)+'_field.h5','w')
-for spe in spelist:
+for spe in species:
     power_env_sparse[spe] = power.reshape(ndata*natmax,nfeat)[np.array(fps_indexes[spe],int)]
     h5f.create_dataset(spe,data=power_env_sparse[spe])
     if inp.field:
@@ -103,7 +107,7 @@ for spe in spelist:
 h5f.close()
 if inp.field: h5f2.close()
 
-for spe in spelist:
+for spe in species:
     kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
     # Only one of this and the next if inp.field statements are needed. Need to decide which
     if inp.field:
@@ -138,7 +142,7 @@ for l in range(1,llmax+1):
         nfeat2 = power2.shape[-1]
         power_env_sparse2 = {}
         h5f2 = h5py.File(sdir+'FEAT-'+str(l)+'-M-'+str(M)+'_field.h5','w')
-    for spe in spelist:
+    for spe in species:
         power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,nfeat)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
         h5f.create_dataset(spe,data=power_env_sparse[spe])
         if inp.field:
@@ -147,7 +151,7 @@ for l in range(1,llmax+1):
     h5f.close()
     if inp.field: h5f2.close()
 
-    for spe in spelist:
+    for spe in species:
         kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
         if inp.field: kernel_mm += np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T)
         for i1 in range(Mspe[spe]):

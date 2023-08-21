@@ -20,6 +20,7 @@ import basis
 
 sys.path.insert(0, './')
 import inp
+import h5py
 
 filename = inp.filename
 saltedname = inp.saltedname
@@ -96,22 +97,14 @@ for spe in species:
     Mspe[spe] = len(fps_indexes[spe])
 
 # Load training feature vectors and RKHS projection matrix 
-pvec_train = {}
-pvec_train_nofield = {}
 power_env_sparse = {}
 power_env_sparse_nofield = {}
 Vmat = {}
 for lam in range(lmax_max+1):
-    pvec_train[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"_field.npy")
-    pvec_train_nofield[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+".npy")
     for spe in species:
         Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"_field/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
-        if lam==0:
-            power_env_sparse[(lam,spe)] = pvec_train[lam].reshape(pvec_train[lam].shape[0]*pvec_train[lam].shape[1],pvec_train[lam].shape[-1])[np.array(fps_indexes[spe],int)] 
-            power_env_sparse_nofield[(lam,spe)] = pvec_train_nofield[lam].reshape(pvec_train_nofield[lam].shape[0]*pvec_train_nofield[lam].shape[1],pvec_train_nofield[lam].shape[-1])[np.array(fps_indexes[spe],int)] 
-        else:
-            power_env_sparse[(lam,spe)] = pvec_train[lam].reshape(pvec_train[lam].shape[0]*pvec_train[lam].shape[1],2*lam+1,pvec_train[lam].shape[-1])[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*lam+1),pvec_train[lam].shape[-1])
-            power_env_sparse_nofield[(lam,spe)] = pvec_train_nofield[lam].reshape(pvec_train_nofield[lam].shape[0]*pvec_train_nofield[lam].shape[1],2*lam+1,pvec_train_nofield[lam].shape[-1])[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*lam+1),pvec_train_nofield[lam].shape[-1])
+        power_env_sparse_nofield[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M-"+str(M)+".h5",'r')[spe][:]
+        power_env_sparse[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M-"+str(M)+"_field.h5",'r')[spe][:]
 
 # load regression weights
 ntrain = int(inp.Ntrain*inp.trainfrac)
