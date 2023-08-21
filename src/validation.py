@@ -151,11 +151,19 @@ if inp.average:
         av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
 
 # compute error over test set
+
+efname = inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/errors.dat"
+if rank == 0 and os.path.exists(efname): os.remove(efname)
+if inp.qmcode = cp2k:
+    dfname = inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat"
+    qfname = inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat"
+    if rank == 0 and os.path.exists(dfname): os.remove(dfname)
+    if rank == 0 and os.path.exists(qfname): os.remove(qfname)
 if inp.parallel: comm.Barrier()
-efile = open(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/errors.dat","w")
+efile = open(efname,"a")
 if inp.qmcode=="cp2k":
-    dfile = open(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat","w")
-    qfile = open(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat","w")
+    dfile = open(dfname,"a")
+    qfile = open(qfname,"a")
 
 error_density = 0
 variance = 0
@@ -294,6 +302,7 @@ for iconf in testrange:
 #                        print(pred_projs[iaux],ref_projs[iaux])
 #                    iaux += 1
 
+efile.close()
 if inp.qmcode == 'cp2k':
     dfile.close()
     qfile.close()
@@ -301,5 +310,13 @@ if inp.qmcode == 'cp2k':
 if inp.parallel:
     error_density = comm.allreduce(error_density)
     variance = comm.allreduce(variance)
+    if rank == 0:
+        errs = np.loadtxt(efname)
+        np.savetxt(efname,errs[errs[:,0].argsort()],fmt='%i %f')
+        if inp.qmcode = 'cp2k'
+            dips = np.loadtxt(dfname)
+            np.savetxt(dfname,dips[dips[:,0].argsort()],fmt='%i %f')
+            qs = np.loadtxt(qfname)
+            np.savetxt(qfname,qs[qs[:,0].argsort()],fmt='%i %f')
 if rank == 0: print("")
 if rank == 0: print("% RMSE =", 100*np.sqrt(error_density/variance))

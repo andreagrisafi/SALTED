@@ -436,8 +436,11 @@ predstart = time.time()
 if inp.qmcode=="cp2k":
     from ase.io import read
     xyzfile = read(filename,":")
-    qfile = open(dirpath+"/charges.dat","w")
-    dfile = open(dirpath+"/dipoles.dat","w")
+    if rank == 0 and os.path.exists(dfname): os.remove(dirpath+"/charges.dat")
+    if rank == 0 and os.path.exists(qfname): os.remove(dirpath+"/dipoles.dat")
+    if inp.parallel: comm.Barrier()
+    qfile = open(dirpath+"/charges.dat","a")
+    dfile = open(dirpath+"/dipoles.dat","a")
 
 # Load spherical averages if required
 if inp.average:
@@ -549,6 +552,11 @@ for iconf in conf_range:
 if inp.qmcode=="cp2k":
     qfile.close()
     dfile.close()
+    if inp.parallel and rank == 0:
+        dips = np.loadtxt(dirpath+'/dipoles.dat')
+        np.savetxt(dirpath+'/dipoles.dat',dips[dips[:,0].argsort()],fmt='%i %f')
+        qs = np.loadtxt(dirpath+'/charges.dat')
+        np.savetxt(dirpath+'/charges.dat',qs[qs[:,0].argsort()],fmt='%i %f')
 
 if rank == 0: print("")
 if rank == 0: print("prediction time:", time.time()-predstart)

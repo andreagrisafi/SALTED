@@ -367,9 +367,9 @@ for lam in range(lmax_max+1):
         else:
             ncut_l = ncut
         if lam==0:
-            dset = h5f.create_dataset("descriptor",(ndata_true,natmax,ncut_l))
+            dset = h5f.create_dataset("descriptor",(ndata_true,natmax,ncut_l),dtype='float64')
         else:
-            dset = h5f.create_dataset("descriptor",(ndata_true,natmax,(2*lam+1),ncut_l))
+            dset = h5f.create_dataset("descriptor",(ndata_true,natmax,(2*lam+1),ncut_l),dtype='float64')
 
         # Apply sparsification with precomputed FPS selection 
         if ncut_l < featsize:
