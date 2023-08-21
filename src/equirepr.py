@@ -340,7 +340,7 @@ for lam in range(lmax_max+1):
         if ncut==-1:
             if rank == 0: print("ERROR: please select a finite number of features!")
         if ncut >= featsize:
-            ncut = featsize + 1 - 1 
+            ncut = featsize  
         if rank == 0: print("fps...")
         pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
         vfps = do_fps(pvec.T,ncut,0)
@@ -352,14 +352,14 @@ for lam in range(lmax_max+1):
     else:
         if inp.field==True:
             if inp.parallel:
-                h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+"_field.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
+                h5f = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"_field.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
             else:
-                h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+"_field.h5",'w')
+                h5f = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"_field.h5",'w')
         else:
             if inp.parallel:
-                h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
+                h5f = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+".h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
             else:
-                h5f = h5py.File(inp.saltedpath+"equirepr_"+inp.saltedname+"/FEAT-"+str(lam)+".h5",'w')
+                h5f = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+".h5",'w')
 
         if ncut < 0 or ncut >= featsize:
             ncut_l = featsize
@@ -392,7 +392,7 @@ for lam in range(lmax_max+1):
             dset[conf_range] = psparse
 
         # Save non-sparse descriptor  
-        elif ncut == -1:
+        else:
             dset[conf_range] = pvec
 
         h5f.close()

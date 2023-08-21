@@ -88,12 +88,12 @@ for spe in spelist:
 
 kernel0_mm = {}
 power_env_sparse = {}
-h5f = h5py.File(sdir+'FEAT-0-M.h5','w')
+h5f = h5py.File(sdir+'FEAT-0-M-'+str(M)+'.h5','w')
 if inp.field:
     power2 = h5py.File(sdir+"FEAT-0_field.h5",'r')['descriptor'][:]
     nfeat2 = power2.shape[-1]
     power_env_sparse2 = {}
-    h5f2 = h5py.File(sdir+'FEAT-0-M_field.h5','w')
+    h5f2 = h5py.File(sdir+'FEAT-0-M-'+str(M)+'_field.h5','w')
 for spe in spelist:
     power_env_sparse[spe] = power.reshape(ndata*natmax,nfeat)[np.array(fps_indexes[spe],int)]
     h5f.create_dataset(spe,data=power_env_sparse[spe])
@@ -132,12 +132,12 @@ for l in range(1,llmax+1):
     power = h5py.File(sdir+"FEAT-"+str(l)+".h5",'r')['descriptor'][:]
     nfeat = power.shape[-1]
     power_env_sparse = {}
-    h5f = h5py.File(sdir+'FEAT-'+str(l)+'-M.h5','w')
+    h5f = h5py.File(sdir+'FEAT-'+str(l)+'-M-'+str(M)+'.h5','w')
     if inp.field: 
         power2 = h5py.File(sdir+"FEAT-"+str(l)+"_field.h5",'r')['descriptor'][:]
         nfeat2 = power2.shape[-1]
         power_env_sparse2 = {}
-        h5f2 = h5py.File(sdir+'FEAT-'+str(l)+'-M_field.h5','w')
+        h5f2 = h5py.File(sdir+'FEAT-'+str(l)+'-M-'+str(M)+'_field.h5','w')
     for spe in spelist:
         power_env_sparse[spe] = power.reshape(ndata*natmax,2*l+1,nfeat)[np.array(fps_indexes[spe],int)].reshape(Mspe[spe]*(2*l+1),nfeat)
         h5f.create_dataset(spe,data=power_env_sparse[spe])

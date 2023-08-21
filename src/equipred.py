@@ -32,7 +32,7 @@ if inp.parallel:
 else:
     rank = 0
 
-filename = inp.predict_filename
+filename = inp.filename
 saltedname = inp.saltedname
 predname = inp.predname
 rep1 = inp.rep1 
@@ -116,8 +116,8 @@ for lam in range(lmax_max+1):
     if ncut > -1: vfps[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
     if ncut > -1 and inp.field: vfps_field[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy")
     for spe in species:
-        power_env_sparse[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M.h5",'r')[spe][:]
-        if inp.field: power_env_sparse_field[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M_field.h5",'r')[spe][:]
+        power_env_sparse[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M-"+str(M)+".h5",'r')[spe][:]
+        if inp.field: power_env_sparse_field[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M-"+str(M)+"_field.h5",'r')[spe][:]
         if lam == 0: Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
         if inp.field:
             Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"_field/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
@@ -322,19 +322,14 @@ for lam in range(lmax_max+1):
     if lam==0:
         p = p.reshape(natoms_total,featsize)
         pvec = np.zeros((ndata,natmax,featsize))
-        j = 0
-        for i,iconf in enumerate(conf_range):
-            for iat in range(natoms[iconf]):
-                pvec[i,iat] = p[j]
-                j += 1
     else:
         p = p.reshape(natoms_total,2*lam+1,featsize)
         pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
-        j = 0
-        for i,iconf in enumerate(conf_range):
-            for iat in range(natoms[iconf]):
-                pvec[i,iat] = p[j]
-                j += 1
+    j = 0
+    for i,iconf in enumerate(conf_range):
+        for iat in range(natoms[iconf]):
+            pvec[i,iat] = p[j]
+            j += 1
     
     if rank == 0: print("fill vector time:", (time.time()-fillstart))
 
@@ -391,18 +386,14 @@ for lam in range(lmax_max+1):
          if lam==0:
              p = p.reshape(natoms_total,featspacefield)
              pvec_field = np.zeros((ndata,natmax,featspacefield))
-             i = 0
-             for iconf in range(ndata):
-                 for iat in range(natoms[iconf]):
-                     pvec_field[iconf,iat] = p[i]
-                     i += 1
          else:
              pvec_field = np.zeros((ndata,natmax,2*lam+1,featspacefield))
-             i = 0
-             for iconf in range(ndata):
-                 for iat in range(natoms[iconf]):
-                     pvec_field[iconf,iat] = p[i]
-                     i += 1
+
+         j = 0
+         for i,iconf in enumerate(conf_range):
+             for iat in range(natoms[iconf]):
+                 pvec_field[i,iat] = p[j]
+                 j += 1
 
     rkhsstart = time.time()
 

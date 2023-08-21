@@ -105,6 +105,13 @@ for iconf in conf_range:
             psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npy") 
             Psi[(spe,l)] = psi_nm
 
+# This would be needed if psi_nm depended on n
+#            Mcut = psi_nm.shape[1]
+#            for n in range(nmax[(spe,l)]):
+#                Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
+#                isize += Mcut
+
+
     # build sparse feature-vector memory efficiently
 
     nrows = Tsize
@@ -122,6 +129,10 @@ for iconf in conf_range:
             nz = np.nonzero(x)
             vals = x[x!=0]
             for n in range(nmax[(spe,l)]):
+# If psi_nm depended on n, would need the follwing lines
+#                x = Psi[(spe,l,n)][i1:i2]
+#                nz = np.nonzero(x)
+#                vals = x[x!=0]
                 psi_nonzero.update(vals)
                 srows.update(nz[0]+i)
                 scols.update(nz[1]+cuml_Mcut[(spe,l,n)])

@@ -65,8 +65,8 @@ for spe in species:
     start = time.time()
 
     # compute sparse kernel K_MM for each atomic species 
-    power_env_sparse[spe] = h5py.File(sdir+"FEAT-0-M.h5",'r')[spe][:]
-    if inp.field: power_env_sparse2[spe] = h5py.File(sdir+"FEAT-0-M_field.h5",'r')[spe][:]
+    power_env_sparse[spe] = h5py.File(sdir+"FEAT-0-M-"+str(M)+".h5",'r')[spe][:]
+    if inp.field: power_env_sparse2[spe] = h5py.File(sdir+"FEAT-0-M-"+str(M)+"_field.h5",'r')[spe][:]
     Mspe[spe] = power_env_sparse[spe].shape[0]
 
     V = np.load(kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
@@ -108,8 +108,8 @@ for l in range(1,llmax+1):
         start = time.time()
 
         # get sparse feature vector for each atomic species
-        power_env_sparse[spe] = h5py.File(sdir+"FEAT-"+str(l)+"-M.h5",'r')[spe][:]
-        if inp.field: power_env_sparse2[spe] = h5py.File(sdir+"FEAT-"+str(l)+"-M_field.h5",'r')[spe][:]
+        power_env_sparse[spe] = h5py.File(sdir+"FEAT-"+str(l)+"-M-"+str(M)+".h5",'r')[spe][:]
+        if inp.field: power_env_sparse2[spe] = h5py.File(sdir+"FEAT-"+str(l)+"-M-"+str(M)+"_field.h5",'r')[spe][:]
         V = np.load(kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy") 
 
         # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
