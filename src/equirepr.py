@@ -315,7 +315,7 @@ for lam in range(lmax_max+1):
     # Normalize equivariant descriptor 
     inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featsize),p.reshape(natoms_total,(2*lam+1)*featsize))
     p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
-    
+
     if rank == 0: print("norm time:", (time.time()-normstart))
 
     savestart = time.time()
@@ -329,11 +329,12 @@ for lam in range(lmax_max+1):
     else:
         p = p.reshape(natoms_total,2*lam+1,featsize)
         pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
-    i = 0
-    for iconf in range(ndata):
+
+    j = 0
+    for i,iconf in enumerate(conf_range):
         for iat in range(natoms[iconf]):
-            pvec[iconf,iat] = p[i]
-            i += 1
+            pvec[i,iat] = p[j]
+            j += 1
 
     # Do feature selection with FPS sparsification
     if sparsify:

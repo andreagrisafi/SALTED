@@ -372,14 +372,14 @@ for lam in range(lmax_max+1):
          # Normalize equivariant descriptor  
          inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featspacefield),p.reshape(natoms_total,(2*lam+1)*featspacefield))
          p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
- 
-         if rank == 0: print("field norm time:", (time.time()-normstart))
     
-         if ncut > -1:
-             p = p.reshape(natoms_total*(2*lam+1),featspacefield)
-             p = p.T[vfps_field[lam]].T
-             featspacefield = inp.ncut
- 
+         if rank == 0: print("field norm time:", (time.time()-normstart))
+
+#         if ncut > -1:
+#             p = p.reshape(natoms_total*(2*lam+1),featspacefield)
+#             p = p.T[vfps_field[lam]].T
+#             featspacefield = inp.ncut 
+
          fillstart = time.time()
  
          # Fill vector of equivariant descriptor 
@@ -394,6 +394,9 @@ for lam in range(lmax_max+1):
              for iat in range(natoms[iconf]):
                  pvec_field[i,iat] = p[j]
                  j += 1
+         
+         if ncut > -1:
+             pvec_field = pvec_field.T[vfps_field[lam]].T
 
     rkhsstart = time.time()
 
