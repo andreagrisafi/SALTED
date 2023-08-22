@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import h5py
 import chemfiles
 import numpy as np
 from scipy import special
@@ -10,17 +11,17 @@ from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
 from equistore import Labels
 
+import pathlib
+SALTEDPATHLIB = str(pathlib.Path(__file__).parent.resolve())+"/../"
+sys.path.append(SALTEDPATHLIB)
 from lib import equicomb 
+from lib import equicombfield 
+
 import sph_utils
 import basis
 
 sys.path.insert(0, './')
 import inp
-import h5py
-
-if inp.field:
-    from lib import equicombfield 
-    import efield
 
 if inp.parallel:
     from mpi4py import MPI

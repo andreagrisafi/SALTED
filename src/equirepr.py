@@ -11,7 +11,9 @@ from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
 from equistore import Labels
 
-sys.path.append(os.environ['SALTEDLIBS'])
+import pathlib
+SALTEDPATHLIB = str(pathlib.Path(__file__).parent.resolve())+"/../"
+sys.path.append(SALTEDPATHLIB)
 from lib import equicomb 
 from lib import equicombfield 
 
