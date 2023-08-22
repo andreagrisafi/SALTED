@@ -11,8 +11,10 @@ from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
 from equistore import Labels
 
+sys.path.append(os.environ['SALTEDLIBS'])
 from lib import equicomb 
 from lib import equicombfield 
+
 import sph_utils
 import efield
 import basis
