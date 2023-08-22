@@ -10,6 +10,8 @@ import copy
 import argparse
 import time
 
+SALTEDPATHLIB = str(pathlib.Path(__file__).parent.resolve())+"/../"
+sys.path.append(SALTEDPATHLIB)
 import basis
 
 

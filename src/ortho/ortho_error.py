@@ -2,9 +2,11 @@ import os
 import time
 import numpy as np
 import sys
+
+from sys_utils import read_system
+
 sys.path.insert(0, './')
 import inp
-from sys_utils import read_system
 
 spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 

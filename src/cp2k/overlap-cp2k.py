@@ -10,10 +10,15 @@ import argparse
 import ctypes
 import time
 
+import pathlib
+SALTEDPATHLIB = str(pathlib.Path(__file__).parent.resolve())+"/../../"
+sys.path.append(SALTEDPATHLIB)
 from lib import ovlp2c
 from lib import ovlp2cXYperiodic
 from lib import ovlp2cnonperiodic
 
+SALTEDPATHLIB = str(pathlib.Path(__file__).parent.resolve())+"/../"
+sys.path.append(SALTEDPATHLIB)
 import basis
 import sph_utils
 

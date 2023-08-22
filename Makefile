@@ -26,23 +26,23 @@ CC=gcc
 f2py: lib/ovlp2c.so lib/ovlp3c.so lib/ovlp2cXYperiodic.so lib/ovlp3cXYperiodic.so lib/ovlp2cnonperiodic.so lib/ovlp3cnonperiodic.so lib/equicomb.so lib/equicombfield.so 
 #lib/gausslegendre.so lib/neighlist_ewald.so lib/nearfield_ewald.so lib/lebedev.so
 
-lib/ovlp2c.so: src/ovlp2c.f90
-	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/ovlp2c.f90 -m ovlp2c --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp2c.*.so ovlp2c.so
+lib/ovlp2c.so: src/cp2k/ovlp2c.f90
+	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/cp2k/ovlp2c.f90 -m ovlp2c --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp2c.*.so ovlp2c.so
 
-lib/ovlp3c.so: src/ovlp3c.f90
-	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/ovlp3c.f90 -m ovlp3c --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp3c.*.so ovlp3c.so
+lib/ovlp3c.so: src/cp2k/ovlp3c.f90
+	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/cp2k/ovlp3c.f90 -m ovlp3c --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp3c.*.so ovlp3c.so
 
-lib/ovlp2cXYperiodic.so: src/ovlp2cXYperiodic.f90
-	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/ovlp2cXYperiodic.f90 -m ovlp2cXYperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp2cXYperiodic.*.so ovlp2cXYperiodic.so
+lib/ovlp2cXYperiodic.so: src/cp2k/ovlp2cXYperiodic.f90
+	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/cp2k/ovlp2cXYperiodic.f90 -m ovlp2cXYperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp2cXYperiodic.*.so ovlp2cXYperiodic.so
 
-lib/ovlp3cXYperiodic.so: src/ovlp3cXYperiodic.f90
-	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/ovlp3cXYperiodic.f90 -m ovlp3cXYperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp3cXYperiodic.*.so ovlp3cXYperiodic.so
+lib/ovlp3cXYperiodic.so: src/cp2k/ovlp3cXYperiodic.f90
+	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/cp2k/ovlp3cXYperiodic.f90 -m ovlp3cXYperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp3cXYperiodic.*.so ovlp3cXYperiodic.so
 
-lib/ovlp2cnonperiodic.so: src/ovlp2cnonperiodic.f90
-	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/ovlp2cnonperiodic.f90 -m ovlp2cnonperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp2cnonperiodic.*.so ovlp2cnonperiodic.so
+lib/ovlp2cnonperiodic.so: src/cp2k/ovlp2cnonperiodic.f90
+	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/cp2k/ovlp2cnonperiodic.f90 -m ovlp2cnonperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp2cnonperiodic.*.so ovlp2cnonperiodic.so
 
-lib/ovlp3cnonperiodic.so: src/ovlp3cnonperiodic.f90
-	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/ovlp3cnonperiodic.f90 -m ovlp3cnonperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp3cnonperiodic.*.so ovlp3cnonperiodic.so
+lib/ovlp3cnonperiodic.so: src/cp2k/ovlp3cnonperiodic.f90
+	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/cp2k/ovlp3cnonperiodic.f90 -m ovlp3cnonperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp3cnonperiodic.*.so ovlp3cnonperiodic.so
 
 lib/equicomb.so: src/equicomb.f90
 	cd lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../src/equicomb.f90 -m equicomb --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicomb.*.so equicomb.so

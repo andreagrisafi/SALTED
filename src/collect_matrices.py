@@ -57,11 +57,8 @@ M = inp.Menv
 reg = inp.regul
 zeta = inp.z
 
-# define training set at random
-dataset = list(range(ndata))
-random.Random(3).shuffle(dataset)
-trainrangetot = dataset[:inp.Ntrain]
-np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
+# load training set 
+trainrangetot = np.loadtxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",int)
 ntrain = int(inp.trainfrac*inp.Ntrain)
 
 nblocks = int(ntrain/blocksize)
