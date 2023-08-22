@@ -5,10 +5,13 @@ species = ["Au"]             # list of species to use as centers
 periodic = "2D"              # system periodicity
 field = True                  # option for external field
 
+ncut = -1
+sparsify = False
+
 # SALTED set up 
 #--------------------------------------------------
 saltedpath = "/scratchbeta/grisafia/Au-fcc100-223/"
-saltedname = "rc8.0_rho-sg0.5_V-sg0.5"  
+saltedname = "rc8.0_rho-sg0.5_V-sg0.5_alan_branch"  
 predname = "N_33-40"       
 coefdir = "coefficients-response/" # directory of density coefficients
 parallel = False                   # option for MPI parallelization
