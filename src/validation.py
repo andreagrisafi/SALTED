@@ -154,7 +154,7 @@ if inp.average:
 
 efname = inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/errors.dat"
 if rank == 0 and os.path.exists(efname): os.remove(efname)
-if inp.qmcode = cp2k:
+if inp.qmcode == "cp2k":
     dfname = inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/dipoles.dat"
     qfname = inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/charges.dat"
     if rank == 0 and os.path.exists(dfname): os.remove(dfname)
@@ -303,7 +303,7 @@ for iconf in testrange:
 #                    iaux += 1
 
 efile.close()
-if inp.qmcode == 'cp2k':
+if inp.qmcode == "cp2k":
     dfile.close()
     qfile.close()
 
@@ -313,7 +313,7 @@ if inp.parallel:
     if rank == 0:
         errs = np.loadtxt(efname)
         np.savetxt(efname,errs[errs[:,0].argsort()],fmt='%i %f')
-        if inp.qmcode = 'cp2k'
+        if inp.qmcode == "cp2k":
             dips = np.loadtxt(dfname)
             np.savetxt(dfname,dips[dips[:,0].argsort()],fmt='%i %f')
             qs = np.loadtxt(qfname)

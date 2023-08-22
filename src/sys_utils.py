@@ -24,32 +24,27 @@ def read_system(filename=inp.filename):
     # read system
     xyzfile = read(filename,":")
     ndata = len(xyzfile)
-    
-    #======================= system parameters
+   
+    # Define system excluding atoms that belong to species not listed in SALTED input 
     atomic_symbols = []
     natoms = np.zeros(ndata,int) 
-#    natoms_total = 0 
     for iconf in range(len(xyzfile)):
         atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
-
-    #############################################################################
-        # Define relevant species
+        natoms_total = len(atomic_symbols[iconf])
         excluded_species = []
-        for iat in range(natoms[iconf]):
+        for iat in range(natoms_total):
             spe = atomic_symbols[iconf][iat]
             if spe not in spelist:
                 excluded_species.append(spe)
         excluded_species = set(excluded_species)
         for spe in excluded_species:
             atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
-    #############################################################################
-
         natoms[iconf] = int(len(atomic_symbols[iconf]))
-#        natoms_total += natoms[iconf]
 
+    # Define maximum number of atoms
     natmax = max(natoms)
 
-    return spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax#, natoms_total
+    return spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax
 
 def get_atom_idx(ndata,natoms,spelist,atomic_symbols):
     # initialize useful arrays

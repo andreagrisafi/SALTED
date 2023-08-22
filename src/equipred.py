@@ -363,33 +363,33 @@ for lam in range(lmax_max+1):
          p = equicombfield.equicombfield(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
  
          # Define feature space and reshape equivariant descriptor
-         featspacefield = nspe1*nrad1*nrad2*llmax
-         p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featspacefield)
+         featsizefield = nspe1*nrad1*nrad2*llmax
+         p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsizefield)
        
          if rank == 0: print("field equivariant time:", (time.time()-equistart))
           
          normstart = time.time()
  
          # Normalize equivariant descriptor  
-         inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featspacefield),p.reshape(natoms_total,(2*lam+1)*featspacefield))
+         inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featsizefield),p.reshape(natoms_total,(2*lam+1)*featsizefield))
          p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
     
          if rank == 0: print("field norm time:", (time.time()-normstart))
 
          if ncut > -1:
-             p = p.reshape(natoms_total*(2*lam+1),featspacefield)
+             p = p.reshape(natoms_total*(2*lam+1),featsizefield)
              p = p.T[vfps_field[lam]].T
-             featspacefield = inp.ncut 
+             featsizefield = inp.ncut 
 
          fillstart = time.time()
  
          # Fill vector of equivariant descriptor 
          if lam==0:
-             p = p.reshape(natoms_total,featspacefield)
-             pvec_field = np.zeros((ndata,natmax,featspacefield))
+             p = p.reshape(natoms_total,featsizefield)
+             pvec_field = np.zeros((ndata,natmax,featsizefield))
          else:
-             p = p.reshape(natoms_total,2*lam+1,featsize)
-             pvec_field = np.zeros((ndata,natmax,2*lam+1,featspacefield))
+             p = p.reshape(natoms_total,2*lam+1,featsizefield)
+             pvec_field = np.zeros((ndata,natmax,2*lam+1,featsizefield))
 
          j = 0
          for i,iconf in enumerate(conf_range):
@@ -436,8 +436,8 @@ predstart = time.time()
 if inp.qmcode=="cp2k":
     from ase.io import read
     xyzfile = read(filename,":")
-    if rank == 0 and os.path.exists(dfname): os.remove(dirpath+"/charges.dat")
-    if rank == 0 and os.path.exists(qfname): os.remove(dirpath+"/dipoles.dat")
+    if rank == 0 and os.path.exists(dirpath+"/charges.dat"): os.remove(dirpath+"/charges.dat")
+    if rank == 0 and os.path.exists(dirpath+"/dipoles.dat"): os.remove(dirpath+"/dipoles.dat")
     if inp.parallel: comm.Barrier()
     qfile = open(dirpath+"/charges.dat","a")
     dfile = open(dirpath+"/dipoles.dat","a")
