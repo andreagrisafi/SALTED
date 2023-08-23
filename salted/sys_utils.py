@@ -1,9 +1,12 @@
-import basis
 import sys
-sys.path.insert(0, './')
-import inp
 import numpy as np
 from ase.io import read
+
+from salted import basis
+
+sys.path.insert(0, './')
+import inp
+
 
 def read_system(filename=inp.filename):
     

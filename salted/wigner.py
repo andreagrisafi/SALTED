@@ -6,8 +6,8 @@ import chemfiles
 import numpy as np
 from sympy.physics.wigner import wigner_3j
 
-import sph_utils
-import basis
+from salted import sph_utils
+from salted import basis
 
 
 def build():

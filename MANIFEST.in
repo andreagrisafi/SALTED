@@ -1,0 +1,8 @@
+include salted/lib/equicomb.so 
+include salted/lib/equicombfield.so 
+include salted/lib/ovlp2cnonperiodic.so 
+include salted/lib/ovlp2c.so 
+include salted/lib/ovlp2cXYperiodic.so  
+include salted/lib/ovlp3cnonperiodic.so  
+include salted/lib/ovlp3c.so  
+include salted/lib/ovlp3cXYperiodic.so
