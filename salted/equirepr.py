@@ -1,10 +1,11 @@
 import os
 import sys
 import time
-import chemfiles
 from ase.data import atomic_numbers
+from ase.io import read
 import numpy as np
 import h5py
+import random
 
 from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
@@ -19,6 +20,21 @@ from salted.lib import equicomb
 from salted.lib import equicombfield
 
 def build():
+
+    sys.path.insert(0, './')
+    import inp
+
+    if inp.field:
+        if inp.ncut > -1: equirepr(sparsify=True,field=True)
+        equirepr(sparsify=False,field=True)
+
+    if inp.ncut > -1: equirepr(sparsify=True,field=False)
+    equirepr(sparsify=False,field=False)
+
+    return
+
+
+def equirepr(sparsify,field):
     sys.path.insert(0, './')
     import inp
     
@@ -37,13 +53,8 @@ def build():
     nang2 = inp.nang2
     neighspe2 = inp.neighspe2
     ncut = inp.ncut
-    sparsify = inp.sparsify
     parallel = inp.parallel
-    
-    #sparsify = False
-    #if '-s' in sys.argv:
-    #    sparsify = True
-    #    parallel = False
+    nsamples = inp.nsamples
     
     if inp.parallel:
         from mpi4py import MPI
@@ -60,7 +71,8 @@ def build():
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
     
     start = time.time()
-    
+   
+    if nsamples < ndata and sparsify: ndata = inp.nsamples
     ndata_true = ndata
     if inp.parallel:
         conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
@@ -139,10 +151,9 @@ def build():
         "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
     }
     
-    
-    with chemfiles.Trajectory(filename) as trajectory:
-        frames = [f for f in trajectory]
-        frames = [frames[i] for i in conf_range]
+    frames = read(filename,":")
+    if sparsify: random.Random(3).shuffle(frames)
+    frames = [frames[i] for i in conf_range]
     
     if rank == 0: print(f"The dataset contains {ndata_true} frames.")
     
@@ -188,7 +199,7 @@ def build():
     potstart = time.time()
     
     # External field?
-    if inp.field:
+    if field:
     
         # get SPH expansion for a uniform and constant external field aligned along Z 
         omega2 = np.zeros((natoms_total,nrad2),complex)
@@ -248,7 +259,7 @@ def build():
         equistart = time.time()
     
         # External field?
-        if inp.field:
+        if field:
             # Select relevant angular components for equivariant descriptor calculation
             llmax = 0
             lvalues = {}
@@ -278,7 +289,7 @@ def build():
         
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         if not os.path.exists(inp.saltedpath+'wigners'): wigner.build()
-        if inp.field:
+        if field:
             wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field.dat")
             wigdim = wigner3j.size 
         else:
@@ -287,7 +298,7 @@ def build():
       
         # Reshape arrays of expansion coefficients for optimal Fortran indexing 
         v1 = np.transpose(omega1,(2,0,3,1))
-        if inp.field:
+        if field:
             v2 = omega2.T
         else:
             v2 = np.transpose(omega2,(2,0,3,1))
@@ -296,7 +307,7 @@ def build():
         # Compute complex to real transformation matrix for the given lambda value
         c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
     
-        if inp.field:
+        if field:
            # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018) by having the field components as second entry
            p = equicombfield.equicombfield(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
            # Define feature space size
@@ -347,13 +358,13 @@ def build():
             if rank == 0: print("fps...")
             pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
             vfps = do_fps(pvec.T,ncut,0)
-            if inp.field:
+            if field:
                 np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy", vfps)
             else:
                 np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy", vfps)
     
         else:
-            if inp.field==True:
+            if field==True:
                 if inp.parallel:
                     h5f = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"_field.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
                 else:
@@ -377,7 +388,7 @@ def build():
             if ncut_l < featsize:
                 # Load sparsification details
                 try:
-                    if inp.field:
+                    if field:
                         vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy")
                     else:
                         vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")

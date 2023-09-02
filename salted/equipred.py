@@ -2,11 +2,10 @@ import os
 import sys
 import time
 import h5py
-import chemfiles
 import numpy as np
-from mpi4py import MPI
 from scipy import special
 from ase.data import atomic_numbers
+from ase.io import read
 
 from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
@@ -26,6 +25,7 @@ def build():
     import inp
 
     if inp.parallel:
+        from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
         size = comm.Get_size()
@@ -156,10 +156,8 @@ def build():
         "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
     }
     
-    
-    with chemfiles.Trajectory(filename) as trajectory:
-        frames = [f for f in trajectory]
-        frames = [frames[i] for i in conf_range]
+    frames = read(filename,":")
+    frames = [frames[i] for i in conf_range]
     
     if rank == 0: print(f"The dataset contains {ndata_true} frames.")
     
@@ -435,7 +433,6 @@ def build():
     predstart = time.time()
     
     if inp.qmcode=="cp2k":
-        from ase.io import read
         xyzfile = read(filename,":")
         if rank == 0 and os.path.exists(dirpath+"/charges.dat"): os.remove(dirpath+"/charges.dat")
         if rank == 0 and os.path.exists(dirpath+"/dipoles.dat"): os.remove(dirpath+"/dipoles.dat")

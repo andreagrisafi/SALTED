@@ -2,7 +2,6 @@ import os
 import sys
 import numpy as np
 import time
-from mpi4py import MPI
 from scipy import special
 
 #from sympy.parsing import mathematica
@@ -18,6 +17,7 @@ def build():
     import inp
     
     if inp.parallel:
+        from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
         size = comm.Get_size()

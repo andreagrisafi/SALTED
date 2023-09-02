@@ -11,9 +11,23 @@ References
 
 3. Alan M. Lewis, Andrea Grisafi, Michele Ceriotti, Mariana Rossi, "Learning electron densities in the condensed-phase", Journal of chemical theory and computation 17 (11), 7203-7214 (2021) 
 
+4. Andrea Grisafi, Alan M. Lewis, Mariana Rossi, Michele Ceriotti,, "Electronic-Structure Properties from Atom-Centered Predictions of the Electron Density", Journal of chemical theory and computation 19 (14), 4451-4460 (2023) 
+
+Installation
+------------
+In the SALTED directory, simply run :code: `make`, followed by :code: `pip install .`
+   
 Dependencies
 ------------
-TENSOAP: https://github.com/dilkins/TENSOAP
+numpy, scipy, h5py, rascaline, ase, sympy, equistore, math
+These should be automatically installed on installation.
+
+mpi4py is also required to use MPI parallelisation
+A h5py installation with mpi is required to use MPI parellelisation of equirepr.py only.
+
+Usage
+-----
+For detailed examples of how to use SALTED, refer to the example corresponding to the electronic structure code you wish to use. In general, functions may be called either directly from a terminal script, or using a python script via :code: `import salted`.
 
 Input Dataset
 -------------
@@ -34,6 +48,7 @@ The possible basis set choices appear in :code:`src/basis.py`. If you want to us
 Contact
 -------
 andrea.grisafi@ens.psl.eu
+alan.m.lewis@york.ac.uk
 
 Contributors
 ------------
