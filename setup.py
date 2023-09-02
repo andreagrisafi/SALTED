@@ -8,7 +8,7 @@ setup(
     author='Andrea Grisafi, Alan Lewis',
     author_email='andrea.grisafi@ens.psl.eu, alan.m.lewis@york.ac.uk',
     license='GNU GENERAL PUBLIC LICENSE',
-    packages=['salted','salted.cp2k','salted.pyscf','salted.lib'],
+    packages=['salted','salted.cp2k','salted.pyscf','salted.aims','salted.lib'],
     install_requires=['mpi4py','rascaline','ase','numpy','scipy','h5py','sympy'],
     include_package_data=True,
     package_data={"salted": ["salted/lib/*.so"]},

@@ -1,15 +1,4 @@
 #-------------------------------------------------------------------------------
-# SETUP
-#-------------------------------------------------------------------------------
-
-Before beginning, run
-:code:`source YOUR_SALTED_DIRECTORY/env.sh`
-and 
-:code:`source YOUR_TENSOAP_DIRECTORY/env.sh`
-
-Ensure that the file $SALTEDPATH/basis.py contains an entry corresponding to the dfbasis you wish to use. Python scripts which can be run in parallel are indicated in this README; however, by setting inp.parallel=False, every SALTED script can be run serially.
-
-#-------------------------------------------------------------------------------
 # GENERATE TRAINING DATA USING AIMS
 #-------------------------------------------------------------------------------
 
