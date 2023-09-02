@@ -19,11 +19,18 @@ In the SALTED directory, simply run :code: `make`, followed by :code: `pip insta
    
 Dependencies
 ------------
-numpy, scipy, h5py, rascaline, ase, sympy, equistore, math
-These should be automatically installed on installation.
+numpy, scipy, h5py, rascaline, ase, sympy
+These should be automatically installed on installation, with the exception of rascaline.
 
-mpi4py is also required to use MPI parallelisation
-A h5py installation with mpi is required to use MPI parellelisation of equirepr.py only.
+Rascaline installation requires a RUST compiler. To install a RUST compiler, run:
+:code: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
+Rascaline can then be installed using
+:code: `pip install git+https://github.com/Luthaf/rascaline.git`
+
+mpi4py is required to use MPI parallelisation; SALTED can be run without this.
+A parallel h5py installation is required to use MPI parellelisation of equirepr.py only. This can be installed by running:
+:code: `HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
+provided HDF5 has been compiled with MPI support.
 
 Usage
 -----
