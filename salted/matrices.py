@@ -67,7 +67,7 @@ def build():
 
     if blocks:
         if ntrain%blocksize != 0:
-            print("Please choose a blocksize which is an exact divisor of ntrain")
+            print("Please choose a blocksize which is an exact divisor of inp.Ntrain*inp.fractrain")
             return
         nblocks = int(ntrain/blocksize)
         j = 0

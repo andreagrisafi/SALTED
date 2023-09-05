@@ -9,7 +9,7 @@ import random
 
 from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
-from equistore import Labels
+from metatensor.core import Labels
 
 from salted import wigner
 from salted import sph_utils
@@ -65,6 +65,7 @@ def equirepr(sparsify,field):
     #    print('This is task',rank+1,'of',size)
     else:
         rank = 0
+        size = 1
     
     from salted.sys_utils import read_system, get_atom_idx,get_conf_range
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
@@ -289,7 +290,7 @@ def equirepr(sparsify,field):
         
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         if rank == 0 and not os.path.exists(inp.saltedpath+'wigners'): wigner.build()
-        comm.Barrier()
+        if size > 1: comm.Barrier()
         if field:
             wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field.dat")
             wigdim = wigner3j.size 

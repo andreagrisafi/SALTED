@@ -14,12 +14,12 @@ else:
     rank = 0
 
 if (rank == 0):
-    if not os.path.exists(inp.saltedpath+"overlaps_"+inp.saltedname):
-        os.mkdir(inp.saltedpath+"overlaps_"+inp.saltedname)
-    if not os.path.exists(inp.saltedpath+"coefficients_"+inp.saltedname):
-        os.mkdir(inp.saltedpath+"coefficients_"+inp.saltedname)
-    if not os.path.exists(inp.saltedpath+"projections_"+inp.saltedname):
-        os.mkdir(inp.saltedpath+"projections_"+inp.saltedname)
+    if not os.path.exists(inp.saltedpath+"overlaps"):
+        os.mkdir(inp.saltedpath+"overlaps")
+    if not os.path.exists(inp.saltedpath+"coefficients"):
+        os.mkdir(inp.saltedpath+"coefficients")
+    if not os.path.exists(inp.saltedpath+"projections"):
+        os.mkdir(inp.saltedpath+"projections")
 
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
@@ -65,8 +65,8 @@ for i in conf_range:
     t = t[idx]
     ovlp = ovlp[idx,:]
     ovlp = ovlp[:,idx]
-    np.save(inp.saltedpath+"overlaps_"+inp.saltedname+'/overlap_conf'+str(i)+'.npy',ovlp)
-    np.save(inp.saltedpath+"projections_"+inp.saltedname+'/projections_conf'+str(i)+'.npy',o)
-    np.save(inp.saltedpath+"coefficients_"+inp.saltedname+'/coefficients_conf'+str(i)+'.npy',t)
+    np.save(inp.saltedpath+'overlaps/overlap_conf'+str(i)+'.npy',ovlp)
+    np.save(inp.saltedpath+'projections/projections_conf'+str(i)+'.npy',o)
+    np.save(inp.saltedpath+'coefficients/coefficients_conf'+str(i)+'.npy',t)
     os.remove(dirpath+'ri_ovlp.out')
     os.remove(dirpath+'ri_projections.out')
