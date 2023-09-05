@@ -21,7 +21,7 @@ ndata = len(xyzfile)
 species = inp.species
 [lmax,nmax] = basis.basiset(inp.dfbasis)
 
-dirpath = os.path.join(inp.saltedpath, inp.coefdir)
+dirpath = os.path.join(inp.saltedpath, "coefficients")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -48,7 +48,7 @@ for iconf in range(ndata):
         print("conf", iconf+1, "size =", nRI)
     
     # save coefficients vector in SALTED format
-    np.save(inp.saltedpath+inp.coefdir+"coefficients_conf"+str(iconf)+".npy",coefficients)
+    np.save(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy",coefficients)
 
     # save overlap matrix in SALTED format
     overlap = np.zeros((nRI, nRI)).astype(np.double)
@@ -56,14 +56,14 @@ for iconf in range(ndata):
         offset = 4 + i*((nRI+1)*8)
         overlap[:, i] = np.fromfile(inp.path2qm+"conf_"+str(iconf+1)+"/"+inp.ovlpfile, dtype=np.float64, offset = offset, count=nRI)
     
-    #dirpath = os.path.join(inp.saltedpath, "overlaps")
+    dirpath = os.path.join(inp.saltedpath, "overlaps")
     if not os.path.exists(dirpath):
        os.mkdir(dirpath)
     np.save(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy",overlap)
     
     # save projections vector in SALTED format
     projections = np.dot(overlap,coefficients)
-    dirpath = os.path.join(inp.saltedpath, inp.projdir)
+    dirpath = os.path.join(inp.saltedpath, "projections")
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
-    np.save(inp.saltedpath+inp.projdir+"projections_conf"+str(iconf)+".npy",projections)
+    np.save(inp.saltedpath+"projections/projections_conf"+str(iconf)+".npy",projections)

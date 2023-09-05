@@ -19,7 +19,7 @@ def build():
     print("computing averages...")
     for iconf in range(ndata):
         atoms = atomic_symbols[iconf]
-        coefs = np.load(inp.saltedpath+"coefficients_"+inp.saltedname+"/coefficients_conf"+str(iconf)+".npy")
+        coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
         i = 0
         for iat in range(natoms[iconf]):
             spe = atoms[iat] 

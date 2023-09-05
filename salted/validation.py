@@ -170,8 +170,8 @@ def build():
     for iconf in testrange:
     
         # load reference
-        ref_coefs = np.load(inp.saltedpath+"coefficients_"+inp.saltedname+"/coefficients_conf"+str(iconf)+".npy")
-        overl = np.load(inp.saltedpath+"overlaps_"+inp.saltedname+"/overlap_conf"+str(iconf)+".npy")
+        ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
+        overl = np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy")
         ref_projs = np.dot(overl,ref_coefs)
         Tsize = len(ref_coefs)
     

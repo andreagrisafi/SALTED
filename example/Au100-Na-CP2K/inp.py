@@ -1,6 +1,6 @@
 # System definition
 # ---------------------------
-filename = "coords-qmmm-test.xyz" # XYZ coordinate file
+filename = "coords-qmmm.xyz" # XYZ coordinate file
 species = ["Au"]             # list of species to use as centers
 periodic = "2D"              # system periodicity
 field = False                # option for external field
@@ -13,7 +13,6 @@ sparsify = False
 saltedpath = "/scratchbeta/grisafia/Au-fcc100-223-Na/"
 saltedname = "rc8.0_rho-sg0.5_V-sg0.5_alan_branch"        
 predname = "N_33-40" 
-coefdir = "coefficients-response/" # directory of density coefficients
 parallel = False                   # option for MPI parallelization
 average = False                    # option for spherical average baseline 
 combo = False 
@@ -47,7 +46,8 @@ neighspe2 = ["Au","Na"]    # number of chemical species
 
 # SALTED parameters
 #----------------------------------------------------------
-Menv = 50         # number of sparse atomic environments 
+nsamples = 40
+Menv = 100        # number of sparse atomic environments 
 z = 2             # kernels exponent
 Ntrain = 32       # number of training structures
 trainfrac = 1.0   # training set fraction

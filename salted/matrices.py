@@ -121,8 +121,8 @@ def matrices(block_idx,trainrange,rank):
        
         start = time.time()
         # load reference QM data
-        ref_coefs = np.load(inp.saltedpath+"coefficients_"+inp.saltedname+"/coefficients_conf"+str(iconf)+".npy")
-        over = np.load(inp.saltedpath+"overlaps_"+inp.saltedname+"/overlap_conf"+str(iconf)+".npy")
+        ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
+        over = np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy")
         psivec = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz")
         psi = psivec.toarray()
     

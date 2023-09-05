@@ -91,8 +91,8 @@ def build():
         for iconf in range(ntrain):
        
             # load reference QM data
-            ref_projs = np.load(inp.saltedpath+"projections_"+inp.saltedname+"/projections_conf"+str(trainrange[iconf])+".npy")
-            ref_coefs = np.load(inp.saltedpath+"coefficients_"+inp.saltedname+"/coefficients_conf"+str(trainrange[iconf])+".npy")
+            ref_projs = np.load(inp.saltedpath+"projections/projections_conf"+str(trainrange[iconf])+".npy")
+            ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(trainrange[iconf])+".npy")
            
             if inp.average:
                 Av_coeffs = np.zeros(ref_coefs.shape[0])
@@ -138,8 +138,8 @@ def build():
         for iconf in range(ntrain):
        
             # load reference QM data
-            ref_projs = np.load(inp.saltedpath+"projections_"+inp.saltedname+"/projections_conf"+str(trainrange[iconf])+".npy")
-            ref_coefs = np.load(inp.saltedpath+"coefficients_"+inp.saltedname+"/coefficients_conf"+str(trainrange[iconf])+".npy")
+            ref_projs = np.load(inp.saltedpath+"projections/projections_conf"+str(trainrange[iconf])+".npy")
+            ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(trainrange[iconf])+".npy")
           
             if inp.average:
                 Av_coeffs = np.zeros(ref_coefs.shape[0])
@@ -206,7 +206,7 @@ def build():
     ovlp_list = [] 
     psi_list = [] 
     for iconf in trainrange:
-        ovlp_list.append(np.load(inp.saltedpath+"overlaps_"+inp.saltedname+"/overlap_conf"+str(iconf)+".npy"))
+        ovlp_list.append(np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy"))
         # load feature vector as a scipy sparse object
         psi_list.append(sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz"))
 
