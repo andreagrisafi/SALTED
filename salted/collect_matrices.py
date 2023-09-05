@@ -27,6 +27,7 @@ def build():
         return
 
     nblocks = int(ntrain/blocksize)
+    print("blocksize =",blocksize)
     print("number of blocks = ",nblocks)
     
     Avec = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(blocksize)+"_chunk0.npy")

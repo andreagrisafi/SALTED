@@ -12,11 +12,10 @@ def add_command_line_arguments_contraction(parsetext):
 args = add_command_line_arguments_contraction("")
 predict = args.predict
 
+fname = inp.filename
 if predict:
-    fname = inp.predict_filename
     datadir = inp.predict_data
 else:
-    fname = inp.filename
     datadir = "data/"
 
 if not os.path.exists(inp.path2qm):

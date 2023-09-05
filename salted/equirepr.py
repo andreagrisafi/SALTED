@@ -288,7 +288,8 @@ def equirepr(sparsify,field):
             llvec[il,1] = lvalues[il][1]
         
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-        if not os.path.exists(inp.saltedpath+'wigners'): wigner.build()
+        if rank == 0 and not os.path.exists(inp.saltedpath+'wigners'): wigner.build()
+        comm.Barrier()
         if field:
             wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field.dat")
             wigdim = wigner3j.size 

@@ -53,10 +53,17 @@ def build():
 
     try:
         blocksize = inp.blocksize
-        blocks = True
+        if blocksize > 0:
+            blocks = True
+        else:
+            blocks = False
     except:
         blocksize = ntrain
         blocks = False
+
+    if not blocks and size > 1:
+        print("Please run serially if computing a single matrix, or add inp.blocksize>0 to the input file to compute the matrix blockwise and in parallel.")
+        return
 
     if blocks:
         if ntrain%blocksize != 0:
@@ -66,18 +73,17 @@ def build():
         j = 0
         for i in range(nblocks):
             if rank==(i-j*size): matrices(i,trainrange[i*blocksize:(i+1)*blocksize],rank)
-            print(rank,i,i+1,(j+1)*size,j)
+#            print(rank,i,i+1,(j+1)*size,j)
             if i+1 == (j+1)*size: j += 1
 
     else:
         matrices(-1,trainrange,rank)
 
-    return
-
 def matrices(block_idx,trainrange,rank):
     
     sys.path.insert(0, './')
     import inp
+    print("Task",rank,"handling structures:",trainrange)
 
     if inp.field:
         fdir = "rkhs-vectors_"+inp.saltedname+"_field"
@@ -89,8 +95,6 @@ def matrices(block_idx,trainrange,rank):
     # sparse-GPR parameters
     M = inp.Menv
     zeta = inp.z
-    
-    coefdir = inp.coefdir
     
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
@@ -117,8 +121,8 @@ def matrices(block_idx,trainrange,rank):
        
         start = time.time()
         # load reference QM data
-        ref_coefs = np.load(inp.saltedpath+coefdir+"coefficients_conf"+str(iconf)+".npy")
-        over = np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy")
+        ref_coefs = np.load(inp.saltedpath+"coefficients_"+inp.saltedname+"/coefficients_conf"+str(iconf)+".npy")
+        over = np.load(inp.saltedpath+"overlaps_"+inp.saltedname+"/overlap_conf"+str(iconf)+".npy")
         psivec = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz")
         psi = psivec.toarray()
     
