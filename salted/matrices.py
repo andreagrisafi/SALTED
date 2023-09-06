@@ -44,8 +44,14 @@ def build():
 
     # define training set at random
     dataset = list(range(ndata))
-    random.Random(3).shuffle(dataset)
-    trainrangetot = dataset[:inp.Ntrain]
+    if inp.trainsel=="sequential":
+        trainrangetot = dataset[:inp.Ntrain]
+    elif inp.trainsel=="random":
+        random.Random(3).shuffle(dataset)
+        trainrangetot = dataset[:inp.Ntrain]
+    else:
+        print("ERROR: training set selection not available!")
+        sys.exit(0)
     np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
     ntraintot = int(inp.trainfrac*inp.Ntrain)
     trainrange = trainrangetot[:ntraintot]
@@ -83,7 +89,7 @@ def matrices(block_idx,trainrange,rank):
     
     sys.path.insert(0, './')
     import inp
-    print("Task",rank,"handling structures:",trainrange)
+    if inp.parallel: print("Task",rank,"handling structures:",trainrange)
 
     if inp.field:
         fdir = "rkhs-vectors_"+inp.saltedname+"_field"

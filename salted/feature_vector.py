@@ -95,7 +95,7 @@ def build():
         print(iconf,flush=True)
     
         # load reference QM data
-        coefs = np.load(inp.saltedpath+"coefficients_"+inp.saltedname+"/coefficients_conf"+str(iconf)+".npy")
+        coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
         Tsize = len(coefs)
     
         # initialize RKHS feature vectors for each channel 

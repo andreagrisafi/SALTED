@@ -1,11 +1,12 @@
 # System definition
 # ---------------------------
-filename = "coords-qmmm.xyz" # XYZ coordinate file
+filename = "coords-qmmm-test.xyz" # XYZ coordinate file
 species = ["Au"]             # list of species to use as centers
 periodic = "2D"              # system periodicity
 field = False                # option for external field
 
 ncut = -1
+nsamples = 40
 sparsify = False
 
 # SALTED set up 
@@ -46,9 +47,9 @@ neighspe2 = ["Au","Na"]    # number of chemical species
 
 # SALTED parameters
 #----------------------------------------------------------
-nsamples = 40
-Menv = 100        # number of sparse atomic environments 
+Menv = 50        # number of sparse atomic environments 
 z = 2             # kernels exponent
+trainsel = "sequential"
 Ntrain = 32       # number of training structures
 trainfrac = 1.0   # training set fraction
 regul = 1e-08     # regularization parameter
