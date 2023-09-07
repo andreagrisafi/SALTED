@@ -1,6 +1,6 @@
 Symmetry-Adapted Learning of Three-dimensional Electron Densities
 =================================================================
-This repository contains an implementation of sparse Gaussian Process Regression that is suitable to do machine learning of any three-dimensional scalar field, e.g., the electron density of a system, that is expanded on an atom-centered basis made of radial functions and spherical harmonics. 
+This repository contains an implementation of symmetry-adapted Gaussian Process Regression that is suitable to do machine learning of any three-dimensional scalar field, e.g., the electron density of a system, decomposed on an atom-centered basis made of radial functions and spherical harmonics. 
 
 
 References
@@ -19,15 +19,12 @@ In the SALTED directory, simply run :code: `make`, followed by :code: `pip insta
    
 Dependencies
 ------------
-numpy, scipy, h5py, rascaline, ase, sympy
-These should be automatically installed on installation, with the exception of rascaline.
-
-Rascaline installation requires a RUST compiler. To install a RUST compiler, run:
+**rascaline**: rascaline installation requires a RUST compiler. To install a RUST compiler, run:
 :code: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
-Rascaline can then be installed using
+rascaline can then be installed using
 :code: `pip install git+https://github.com/Luthaf/rascaline.git`
 
-mpi4py is required to use MPI parallelisation; SALTED can be run without this.
+**mpi4py**: mpi4py is required to use MPI parallelisation; SALTED can be run without this.
 A parallel h5py installation is required to use MPI parellelisation of equirepr.py only. This can be installed by running:
 :code: `HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
 provided HDF5 has been compiled with MPI support.
@@ -48,7 +45,7 @@ Training data consists in the projection of the scalar field over atom-centered 
 
 3) Cycle over the angular functions sorted as -L, ..., 0 , ... , +L
 
-The possible basis set choices appear in :code:`src/basis.py`. If you want to use a basis that is not included in this file, add the proper dimensions there and generate the data accordingly.
+The possible basis set choices appear in :code:`src/basis.py` and are consistent with the electronic structure codes that are to date interfaced with SALTED, i.e., PySCF, FHI-aims, CP2K. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper dimensions.
 
 Contact
 -------
