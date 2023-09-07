@@ -2,7 +2,6 @@ Symmetry-Adapted Learning of Three-dimensional Electron Densities
 =================================================================
 This repository contains an implementation of symmetry-adapted Gaussian Process Regression that is suitable to do machine learning of any three-dimensional scalar field, e.g., the electron density of a system, decomposed on an atom-centered basis made of radial functions and spherical harmonics. 
 
-
 References
 ----------
 1. Andrea Grisafi, Alberto Fabrizio, David M. Wilkins, Benjamin A. R. Meyer, Clemence Corminboeuf, Michele Ceriotti, "A Transferable Machine-Learning Model of the Electron Density", ACS Central Science 5, 57 (2019)
@@ -29,10 +28,6 @@ A parallel h5py installation is required to use MPI parellelisation of equirepr.
 :code:`HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
 provided HDF5 has been compiled with MPI support.
 
-Usage
------
-For detailed examples of how to use SALTED, refer to the example corresponding to the electronic structure code you wish to use. In general, functions may be called either directly from a terminal script, or using a python script via :code:`import salted`.
-
 Input Dataset
 -------------
 Geometries of the input structures are required in :code:`xyz` format.
@@ -46,6 +41,52 @@ Training data consists in the projection of the scalar field over atom-centered 
 3) Cycle over the angular functions sorted as -L, ..., 0 , ... , +L
 
 The possible basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic structure codes that are to date interfaced with SALTED, i.e., PySCF, FHI-aims, CP2K. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper dimensions to the file.
+
+Usage
+-----
+For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
+
+- Import SALTED modules
+
+:code:`from salted import equirepr, sparsify, rkhs, feature_vector, matrices, regression, validation`
+
+- Build equivariant structural representations up to the maximum L used to expand the scalar field.
+
+:code:`equirepr.build()`
+
+- Sparsify equivariant representations over a subset :code:`M` of atomic environment and compute RKHS projector as described in Ref.(4).
+
+:code:`sparsify.build()`
+
+- Build equivariant kernels and project them over the RKHS as described in Ref.(4).
+
+:code:`rkhs.build()`
+
+- Build SALTED feature vector.
+
+:code:`feature_vector.build()`
+
+- Build regression matrices over :code:`Ntrain` training structure.
+
+:code:`matrices.build()`
+
+- Perform regression with a given regularization parameter :code:`reg`.
+
+:code:`regression.build()`
+
+- Validate predictions over the structures that have not been retained for training.
+
+:code:`validation.build()`
+
+Once the SALTED model has been trained and validated, a SALTED prediction on an additional dataset can be performed as follows:
+
+- Import prediction module
+
+:code:`from salted import equipred`
+
+- Perform equivariant prediction
+
+:code:`equipred.build()`
 
 Contact
 -------
