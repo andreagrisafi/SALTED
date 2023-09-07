@@ -15,14 +15,14 @@ References
 
 Installation
 ------------
-In the SALTED directory, simply run :code:`make`, followed by :code:`pip install`.
+In the SALTED directory, simply run :code:`make`, followed by :code:`pip install .`
    
 Dependencies
 ------------
 **rascaline**: rascaline installation requires a RUST compiler. To install a RUST compiler, run:
-:code: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
+:code:`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
 rascaline can then be installed using
-:code: `pip install git+https://github.com/Luthaf/rascaline.git`
+:code:`pip install git+https://github.com/Luthaf/rascaline.git`
 
 **mpi4py**: mpi4py is required to use MPI parallelisation; SALTED can be run without this.
 A parallel h5py installation is required to use MPI parellelisation of equirepr.py only. This can be installed by running:
