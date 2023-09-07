@@ -1,30 +1,13 @@
 import numpy as np
 import sys
 import inp
-import argparse
 from os import listdir
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-pr", "--predict", action='store_true', help="Prepare geometries for a true prediction")
-    args = parser.parse_args()
-    return args
-
-args = add_command_line_arguments_contraction("")
-predict = args.predict
-
-if predict:
-    dn = inp.path2qm+inp.predict_data
-    l = listdir(dn+'geoms/')
-    nfiles = len(l)
-    testset = list(range(nfiles))
-    testset = [x+1 for x in testset]
-else:
-    dn = inp.path2qm+'data/'
-    trainset = np.loadtxt('training_set.txt')
-    l = listdir(dn+'geoms/')
-    nfiles = len(l)
-    testset = np.setdiff1d(range(nfiles),trainset)+1
+dn = inp.path2qm+inp.predict_data
+l = listdir(dn+'geoms/')
+nfiles = len(l)
+testset = list(range(nfiles))
+testset = [x+1 for x in testset]
 
 es = []
 xcs = []
@@ -52,10 +35,7 @@ for k,i in enumerate(testset):
         else:
             continue
 
-    if predict:
-        f1 = open(dirn+'aims_predict.out')
-    else:
-        f1 = open(dirn+'aims_validate.out')
+    f1 = open(dirn+'aims_predict.out')
     for line in f1:
         if line.find('| Electrostatic energy') != -1:
             ele.append(line.split()[6])
@@ -85,20 +65,12 @@ for i in range(2):
     xcs[:,i] /= n_atoms
     eles[:,i] /= n_atoms
 
-if predict:
-    np.savetxt('predict_reference_electrostatic_energy.dat',eles[:,0])
-    np.savetxt('predict_reference_xc_energy.dat',xcs[:,0])
-    np.savetxt('predict_reference_total_energy.dat',es[:,0])
-    np.savetxt('prediction_electrostatic_energy.dat',eles[:,1])
-    np.savetxt('prediction_xc_energy.dat',xcs[:,1])
-    np.savetxt('prediction_total_energy.dat',es[:,1])
-else:
-    np.savetxt('val_reference_electrostatic_energy.dat',eles[:,0])
-    np.savetxt('val_reference_xc_energy.dat',xcs[:,0])
-    np.savetxt('val_reference_total_energy.dat',es[:,0])
-    np.savetxt('validation_electrostatic_energy.dat',eles[:,1])
-    np.savetxt('validation_xc_energy.dat',xcs[:,1])
-    np.savetxt('validation_total_energy.dat',es[:,1])
+np.savetxt('predict_reference_electrostatic_energy.dat',eles[:,0])
+np.savetxt('predict_reference_xc_energy.dat',xcs[:,0])
+np.savetxt('predict_reference_total_energy.dat',es[:,0])
+np.savetxt('prediction_electrostatic_energy.dat',eles[:,1])
+np.savetxt('prediction_xc_energy.dat',xcs[:,1])
+np.savetxt('prediction_total_energy.dat',es[:,1])
 
 print('Mean absolute errors (eV/atom):')
 print('Electrostatic energy:',np.average(np.abs(eles[:,1]-eles[:,0])))

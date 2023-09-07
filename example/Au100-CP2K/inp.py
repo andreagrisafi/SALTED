@@ -7,13 +7,13 @@ field = True                  # option for external field
 
 ncut = -1
 sparsify = False
+nsamples = 40
 
 # SALTED set up 
 #--------------------------------------------------
 saltedpath = "/scratchbeta/grisafia/Au-fcc100-223/"
 saltedname = "rc8.0_rho-sg0.5_V-sg0.5_alan_branch"  
 predname = "N_33-40"       
-coefdir = "coefficients-response/" # directory of density coefficients
 parallel = False                   # option for MPI parallelization
 average = False                    # option for spherical average baseline 
 combo = False
@@ -51,6 +51,8 @@ Menv = 50         # number of sparse atomic environments
 z = 2             # kernels exponent
 Ntrain = 32       # number of training structures
 trainfrac = 1.0   # training set fraction
+trainsel = "sequential"
+
 regul = 1e-08     # regularization parameter
 eigcut = 1e-10    # eigenvalues cutoff for RKHS projection
 gradtol = 1e-05   # tolerance for CG minimization 

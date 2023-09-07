@@ -1,10 +1,7 @@
-import os
 import sys
 import numpy as np
 import time
-import sys
 import h5py
-from mpi4py import MPI
 
 from salted.sys_utils import read_system, get_atom_idx, get_conf_range
 
@@ -14,6 +11,7 @@ def build():
     import inp
     
     if inp.parallel:
+        from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
         size = comm.Get_size()

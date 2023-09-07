@@ -2,7 +2,6 @@ import os
 import sys
 import numpy as np
 import time
-from mpi4py import MPI
 from scipy import special
 
 #from sympy.parsing import mathematica
@@ -18,6 +17,7 @@ def build():
     import inp
     
     if inp.parallel:
+        from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
         size = comm.Get_size()
@@ -46,8 +46,6 @@ def build():
     eigcut = inp.eigcut
     reg = inp.regul
     zeta = inp.z
-    
-    coefdir = inp.coefdir
     
     for iconf in range(ndata):
         # Define relevant species
@@ -172,7 +170,7 @@ def build():
     for iconf in testrange:
     
         # load reference
-        ref_coefs = np.load(inp.saltedpath+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
+        ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
         overl = np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy")
         ref_projs = np.dot(overl,ref_coefs)
         Tsize = len(ref_coefs)

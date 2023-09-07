@@ -1,38 +1,27 @@
 #-------------------------------------------------------------------------------
-# SETUP
-#-------------------------------------------------------------------------------
-
-Before beginning, run
-:code:`source YOUR_SALTED_DIRECTORY/env.sh`
-and 
-:code:`source YOUR_TENSOAP_DIRECTORY/env.sh`
-
-Ensure that the file $SALTEDPATH/basis.py contains an entry corresponding to the dfbasis you wish to use. Python scripts which can be run in parallel are indicated in this README; however, by setting inp.parallel=False, every SALTED script can be run serially.
-
-#-------------------------------------------------------------------------------
 # GENERATE TRAINING DATA USING AIMS
 #-------------------------------------------------------------------------------
 
 Generate the overlap matrices and projections for the configurations of water using FHI-AIMS.
 
 First, generate AIMS geometry input files from the xyz file, running
-:code:`python make_geoms.py`
+:code:`python -m salted.aims.make_geoms`
 
 To run AIMS and generate the training data for each configuration, run
 :code:`sbatch run-aims.sbatch`.
 In the submission script, $QMDIR must be set to the same directory as path2qm in inp.py, and the path to the AIMS executable must be specified. Further changes to the submission script may be required depending on your HPC setup.
 
 The AIMS output must be re-ordered and the Condon-Shottley convention applied before being input to SALTED. To do this, run
-:code:`mpirun -np $ntasks python move_data.py`
-This also removes the overlap matrix and projections vector from the AIMS output folder to save space.
+:code:`mpirun -np $ntasks python -m salted.aims.move_data`
+This removes the overlap matrix and projections vector from the AIMS output folder to save space, and creates re-ordered numpy files in the folders "projections", "overlaps" and "coefficients".
 
 IMPORTANT NOTE: The auxiliary basis used by AIMS depends sensitively on a number of choices made in control.in. Please check that the information about the auxiliary basis in `$SALTEDPATH/basis.py` matches that output by FHI-aims in `basis_info.out`. To facilitate integration between AIMS and SALTED, the following script generates a dictionary entry called `new_basis_entry` which can be appended to `$SALTEDPATH/basis.py` containing the necessary information about the auxiliary basis used to generate the training data:
-:code:`python get_basis_info.py`
+:code:`python -m salted.aims.get_basis_info`
 
-To check the accuracy of the auxilliary basis, run :code:`python get_df_err.py`. This will produce a file called df_maes listing the percentage integrated mean absolute error in the density for every structure in the dataset. In this example it should be just over 0.1% for each structure.
+To check the accuracy of the auxilliary basis, run :code:`python -m salted.aims.get_df_err`. This will produce a file called df_maes listing the percentage integrated mean absolute error in the density for every structure in the dataset. In this example it should be just over 0.1% for each structure.
 
 Calculate the spherically averaged baseline coefficients across the training set
-:code:`python $SALTEDPATH/get_averages.py`
+:code:`python -m salted.get_averages`
 
 #-------------------------------------------------------------------------------
 # GENERATE DESCRIPTORS
@@ -41,52 +30,57 @@ Calculate the spherically averaged baseline coefficients across the training set
 (The submission script `run-ml.sbatch` is provided for convenience to run the following steps)
 
 Calculate the lambda-SOAP descriptors, using
-:code:`python $SALTEDPATH/run-tensoap.py -p -nc 0 --parallel $ntasks`
+:code:`mpirun -np $ntasks python -m salted.equirepr`
 
-The number of sparse features and number of structures used for sparsification can be specified using the flags `-nc` and `-ns` respectively. These have respective default values of 1000 and 100. The flag `-p` should be added to handle periodic systems. Setting `-nc 0` will not use any sparsification, which is recommended for this example.
+The number of sparse features and number of structures used for sparsification can be specified using the flags `inp.ncut` and `inp.nsamples` respectively. Setting `inp.ncut=-1` will not use any sparsification, which is recommended for this example.
+
+These descriptors are then be further sparsified by selecting a representative number of reference environments, defined by `inp.Menv`, using
+:code:`python -m salted.sparsify`
+Note that this code should NOT be run using MPI parallelisation, even when it is being used for other functions.
 
 #-------------------------------------------------------------------------------
 # PERFORM SALTED MINIMISATION AND VALIDATION
 #-------------------------------------------------------------------------------
 
 Compute descriptors per basis function type for a given training set
-:code:`mpirun -np $ntasks python $SALTEDPATH/rkhs.py`
+:code:`mpirun -np $ntasks python -m salted.rkhs`
 
 Compute global feature vector and save as sparse object 
-:code:`mpirun -np $ntasks python $SALTEDPATH/feature_vector.py`
+:code:`mpirun -np $ntasks python -m salted.feature_vector`
 
-Minimize loss function and print out regression weights
-:code:`mpirun -n $ntasks python $SALTEDPATH/minimize_loss.py`
+There are two methods to calculate the regression weights. 
 
-Validate model predicting on the remaining structures
-:code:`mpirun -np $ntasks python $SALTEDPATH/validation.py`
-This produces the predicted coefficients for each configuration in the validation set. These are output to inp.path2qm+inp.valcdir. The average error for this example should be 0.75%.
+EITHER:
 
-#-------------------------------------------------------------------------------
-# CALCULATING DERIVED PROPERTIES
-#-------------------------------------------------------------------------------
+For smaller problems, they can be found via a matrix inversion (see Ref 3. in the main README). This is carried out via a two- or three- step process. For very small problems, the matrix can be built in a single calculation by running:
+:code: `python -m salted.matrices`.
+This will be the case if `inp.blocksize` is not present, or is not a positive integer. For this usage the code should be run serially.
 
-To evaluate the properties derived from these validation predicted densities, run
-:code:`sbatch run-aims-validate.sbatch`.
-The electrostatic, XC and total energies per atom can be collected from the raw output files into numpy arrays using the script
-:code:`python collect_energies.py`
-The reference energies are output to files with the prefix `val_reference`, and the energied derived from the densities produced by SALTED to files with the prefix `validation`. Other properties can be collected with simple modifications to the script.
+Alternatively, the matrix can be constructed in several blocks, each constructed from an equally sized subset of the training set. This will be the case if `inp.blocksize` is a positive integer. Note that `inp.blocksize` must be an exact divisor of the training set size determined by `inp.Ntrain*inp.trainfrac`. If calculating the matrix blockwise, the code can be run in parallel:
+:code: `mpirun -np $ntasks python -m salted.matrices`.
+The blocks then need to be combined to form a single matrix; this is done by running (serially):
+:code: `mpirun -np $ntasks python -m salted.collect_matrices`.
+
+Finally, the matrix is inverted:
+:code: `mpirun -np $ntasks python -m salted.regression`.
+
+OR:
+
+For large problems, the regrssion weights should be found by minimizing the loss function directly. This requires just a single step:
+:code:`mpirun -n $ntasks python -m salted.minimize_loss`
+
+After finding the regression weights by either method, validate the model by predicting the density of the remaining structures
+:code:`mpirun -np $ntasks python -m salted.validation`
+This produces the predicted coefficients for each configuration in the validation set. These are output to validations_+inp.saltedname. The average error for this example should be 0.75%.
 
 #-------------------------------------------------------------------------------
 # PREDICT DENSITIES OF NEW STRUCTURES
 #-------------------------------------------------------------------------------
 
-Calculate the lambda-SOAP descriptors for the structures to predict, using
-:code:`python $SALTEDPATH/run-tensoap.py -nc 0 --predict`
-Note that we are predicting the density a cluster, despite having trained on periodic systems. AIMS treats periodic and non-periodic calculations on the same footing, allowing this.
+The resulting model can be used to predict the expansion coefficients of further structures not used in training the model. These structures will be read from `inp.filename`; this must be changed from the file used to train the model. Calculate the predicted coefficients using
+:code:`mpirun $ntasks python -m salted.equipred`
 
-Compute descriptors per basis function type for the prediction set
-:code:`mpirun $ntasks python $SALTEDPATH/rkhs-prediction.py`
-
-Calculate the predicted coefficients using
-:code:`mpirun $ntasks python $SALTEDPATH/prediction.py`
-
-This produces the predicted coefficients for each configuration found in inp.predict_filename. These are output to inp.path2qm+inp.predict_coefdir.
+The predicted coefficients are output to "predictions_"+inp.saltedname+inp.predname.
 
 #-------------------------------------------------------------------------------
 # CALCULATING DERIVED PROPERTIES OF NEW STRUCTURES
@@ -96,9 +90,13 @@ To evaluate the accuracy of the predicted densities and their derived properties
 :code:`sbatch run-aims-predict.sbatch`.
 Once again, in the submission script $DATADIR must be set to the same directory as path2qm+predict_data in inp.py, and the path to the AIMS executable must be specified. Further changes to the submission script may be required depending on your HPC setup.
 
-The accuracy of the densities can be calculated by running :code:`python get_ml_err.py`. This will produce a file called ml_maes listing the percentage integrated mean absolute error in the density for every structure in the dataset. In this example it should be just over 0.6% on average.
+To calculate the reference result, run
+:code:`sbatch run-aims.sbatch`
+after modifying $DATADIR to be set to the inp.path2qm+inp.predict_data. In this case, the keywords prefixed by "ri_" may be commented from control.in, apart from ri_output_density_only.
+
+The accuracy of the densities can be calculated by running :code:`python -m salted.aims.get_ml_err`. This will produce a file called ml_maes listing the percentage integrated mean absolute error in the density for every structure in the dataset.
 
 The electrostatic, XC and total energies per atom can be collected from the raw output files into numpy arrays using the script
-:code:`python collect_energies.py --predict`
-The reference energies are output to files with the prefix `predict_reference`, and the energied derived from the densities produced by SALTED to files with the prefix `predict`. Other properties can be collected with simple modifications to the script.
+:code:`python -m salted.aims.collect_energies`
+The reference energies are output to files with the prefix `predict_reference`, and the energied derived from the densities produced by SALTED to files with the prefix `predict`. Other properties can be collected with simple modifications to the script, if desired.
 

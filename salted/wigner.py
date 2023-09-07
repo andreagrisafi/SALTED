@@ -2,7 +2,6 @@ import os
 import sys
 import ase
 import time
-import chemfiles
 import numpy as np
 from sympy.physics.wigner import wigner_3j
 
@@ -14,13 +13,7 @@ def build():
     sys.path.insert(0, './')
     import inp
     
-    #[lmax,nmax] = basis.basiset(inp.dfbasis)
-    #lmax_max = []
-    #for spe in species:
-    #    lmax_max.append(lmax[spe])
-    #lmax_max = max(lmax_max)
-    
-    from sys_utils import read_system, get_atom_idx
+    from salted.sys_utils import read_system, get_atom_idx
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
     
@@ -28,7 +21,6 @@ def build():
     dirpath = os.path.join(inp.saltedpath, "wigners")
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
-    
     
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     for lam in range(lmax_max+1):

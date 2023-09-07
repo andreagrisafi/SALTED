@@ -7,7 +7,7 @@
 # Job Name:
 #SBATCH -J ML-water
 # Queue (Partition):
-#SBATCH --partition=mpsd
+#SBATCH --partition=XXXX
 #SBATCH --nodes=1
 ##SBATCH --ntasks-per-node=4
 ##SBATCH --ntasks=32
@@ -20,33 +20,22 @@
 #SBATCH --mail-type=none
 #
 # Wall clock limit:
-##SBATCH --time=3:30:00
 #SBATCH --time=8:00:00
 
 ### SET UP ENVIRONMENT VARIABLES: (uncomment and edit as needed)
 
-ulimit -s unlimited
-ulimit -c 0
-
-export OMP_NUM_THREADS=32
 
 ### RUN YOUR CODE:
 
-module use /opt/easybuild/modules/all
-module load Anaconda3
-
-source activate mypy3
-source ~/SALTED/env.sh
-source ~/TENSOAP/env.sh
-
-
 python $SALTEDPATH/get_averages.py
 
-python $SALTEDPATH/run-tensoap.py -p -nc 0
+srun -n 16 python -m salted.equirepr
+python -m salted.sparsify
 
-python $SALTEDPATH/rkhs.py
-srun -n 10 python $SALTEDPATH/feature_vector.py
+srun -n 16 python -m salted.rkhs
+srun -n 16 python -m salted.feature_vector
 
-srun -n 1 python $SALTEDPATH/minimize_loss.py 
-python $SALTEDPATH/validation.py > validation.out
+srun -n 16 python -m salted.matrices
+python -m salted.collect_matrices
+srun -n 16 python -m salted.validation > validation.out
 

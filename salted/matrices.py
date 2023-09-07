@@ -2,38 +2,95 @@ import os
 import sys
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
 import random
-from random import shuffle
 from scipy import sparse
-import argparse
 
-from salted import basis
-from salted.sys_utils import read_system,get_atom_idx
+from salted.sys_utils import read_system,get_atom_idx,get_conf_range
 
 def build():
-
-    def add_command_line_arguments_contraction(parsetext):
-        parser = argparse.ArgumentParser(description=parsetext)
-        parser.add_argument("-j1", "--istart", type=int, default=0, help="starting index")
-        parser.add_argument("-j2", "--iend",   type=int, default=0, help="ending index")
-        args = parser.parse_args()
-        return args
-    
-    args = add_command_line_arguments_contraction("dataset subselection")
-    # dataset slice boundaries 
-    iend = args.iend
-    
-    if iend==0:
-        istart = 0
-    else:
-        istart = args.istart-1
     
     sys.path.insert(0, './')
     import inp
     
+    if inp.parallel:
+        from mpi4py import MPI
+        # MPI information
+        comm = MPI.COMM_WORLD
+        size = comm.Get_size()
+        rank = comm.Get_rank()
+    #    print('This is task',rank+1,'of',size)
+    else:
+        rank = 0
+        size = 1
+    
+    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    
+    if inp.field:
+        rdir = "regrdir_"+inp.saltedname+"_field"
+    else:
+        rdir = "regrdir_"+inp.saltedname
+    
+    # sparse-GPR parameters
+    M = inp.Menv
+    zeta = inp.z
+    
+    if rank == 0:    
+        dirpath = os.path.join(inp.saltedpath, rdir)
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+        dirpath = os.path.join(inp.saltedpath+rdir+"/", "M"+str(M)+"_zeta"+str(zeta))
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+
+    # define training set at random
+    dataset = list(range(ndata))
+    if inp.trainsel=="sequential":
+        trainrangetot = dataset[:inp.Ntrain]
+    elif inp.trainsel=="random":
+        random.Random(3).shuffle(dataset)
+        trainrangetot = dataset[:inp.Ntrain]
+    else:
+        print("ERROR: training set selection not available!")
+        sys.exit(0)
+    np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
+    ntraintot = int(inp.trainfrac*inp.Ntrain)
+    trainrange = trainrangetot[:ntraintot]
+    ntrain = len(trainrange)
+
+    try:
+        blocksize = inp.blocksize
+        if blocksize > 0:
+            blocks = True
+        else:
+            blocks = False
+    except:
+        blocksize = ntrain
+        blocks = False
+
+    if not blocks and size > 1:
+        print("Please run serially if computing a single matrix, or add inp.blocksize>0 to the input file to compute the matrix blockwise and in parallel.")
+        return
+
+    if blocks:
+        if ntrain%blocksize != 0:
+            print("Please choose a blocksize which is an exact divisor of inp.Ntrain*inp.fractrain")
+            return
+        nblocks = int(ntrain/blocksize)
+        j = 0
+        for i in range(nblocks):
+            if rank==(i-j*size): matrices(i,trainrange[i*blocksize:(i+1)*blocksize],rank)
+#            print(rank,i,i+1,(j+1)*size,j)
+            if i+1 == (j+1)*size: j += 1
+
+    else:
+        matrices(-1,trainrange,rank)
+
+def matrices(block_idx,trainrange,rank):
+    
+    sys.path.insert(0, './')
+    import inp
+    if inp.parallel: print("Task",rank,"handling structures:",trainrange)
+
     if inp.field:
         fdir = "rkhs-vectors_"+inp.saltedname+"_field"
         rdir = "regrdir_"+inp.saltedname+"_field"
@@ -41,39 +98,16 @@ def build():
         fdir = "rkhs-vectors_"+inp.saltedname
         rdir = "regrdir_"+inp.saltedname
     
-    # system definition
-    spelist = inp.species
-    xyzfile = read(inp.filename,":")
-    ndata = len(xyzfile)
-    
-    # basis definition
-    [lmax,nmax] = basis.basiset(inp.dfbasis)
-    
-    llist = []
-    nlist = []
-    for spe in spelist:
-        llist.append(lmax[spe])
-        for l in range(lmax[spe]+1):
-            nlist.append(nmax[(spe,l)])
-    llmax = max(llist)
-    nnmax = max(nlist)
-    
     # sparse-GPR parameters
     M = inp.Menv
-    eigcut = inp.eigcut
-    reg = inp.regul
     zeta = inp.z
     
-    coefdir = inp.coefdir
-    
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
-    
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
-    
     
     p = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf0.npz")
     totsize = p.shape[-1]
-    print("problem dimensionality:", totsize,flush=True)
+    if rank == 0: print("problem dimensionality:", totsize,flush=True)
     if totsize>70000:
         print("ERROR: problem dimension too large, minimize directly loss-function instead!")
         sys.exit(0)
@@ -81,40 +115,19 @@ def build():
     if inp.average:
         # load average density coefficients
         av_coefs = {}
-        for spe in spelist:
+        for spe in species:
             av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
-    
-    dirpath = os.path.join(inp.saltedpath, rdir)
-    if not os.path.exists(dirpath):
-        os.mkdir(dirpath)
-    dirpath = os.path.join(inp.saltedpath+rdir+"/", "M"+str(M)+"_zeta"+str(zeta))
-    if not os.path.exists(dirpath):
-        os.mkdir(dirpath)
-    
-    # define training set at random
-    dataset = list(range(ndata))
-    #random.Random(3).shuffle(dataset)
-    trainrangetot = dataset[:inp.Ntrain]
-    np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
-    ntraintot = int(inp.trainfrac*inp.Ntrain)
-    trainrange = trainrangetot[:ntraintot]
-    ntrain = len(trainrange)
-    
-    print("computing regression matrices...")
-    
-    if iend==0:
-        ilast = ndata
-    else:
-        ilast = iend
+   
+    if rank == 0: print("computing regression matrices...")
     
     Avec = np.zeros(totsize)
     Bmat = np.zeros((totsize,totsize))
-    for iconf in trainrange[istart:ilast]:
+    for iconf in trainrange:
         print("conf:", iconf+1,flush=True)
        
         start = time.time()
         # load reference QM data
-        ref_coefs = np.load(inp.saltedpath+coefdir+"coefficients_conf"+str(iconf)+".npy")
+        ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
         over = np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy")
         psivec = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz")
         psi = psivec.toarray()
@@ -142,19 +155,17 @@ def build():
         Bmat += np.dot(psi.T,np.dot(over,psi))
     
         print("conf time =", time.time()-start)
-    #    if iconf+1==50 or iconf+1==100 or iconf+1==200 or iconf+1==400: 
-    #        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(iconf+1)+".npy",Avec/float(iconf+1))
-    #        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(iconf+1)+".npy",Bmat/float(iconf+1))
-    
+   
+    ntrain = len(trainrange)
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
     
-    if iend==0:
+    if block_idx == -1:
         np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(ntrain)+".npy",Avec)
         np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(ntrain)+".npy",Bmat)
     else:
-        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(ntrain)+"_chunck"+str(istart+1)+"-"+str(iend)+".npy",Avec)
-        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(ntrain)+"_chunck"+str(istart+1)+"-"+str(iend)+".npy",Bmat)
+        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(ntrain)+"_chunk"+str(block_idx)+".npy",Avec)
+        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(ntrain)+"_chunk"+str(block_idx)+".npy",Bmat)
 
     return
 

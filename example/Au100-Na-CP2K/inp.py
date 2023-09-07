@@ -6,6 +6,7 @@ periodic = "2D"              # system periodicity
 field = False                # option for external field
 
 ncut = -1
+nsamples = 40
 sparsify = False
 
 # SALTED set up 
@@ -13,7 +14,6 @@ sparsify = False
 saltedpath = "/scratchbeta/grisafia/Au-fcc100-223-Na/"
 saltedname = "rc8.0_rho-sg0.5_V-sg0.5_alan_branch"        
 predname = "N_33-40" 
-coefdir = "coefficients-response/" # directory of density coefficients
 parallel = False                   # option for MPI parallelization
 average = False                    # option for spherical average baseline 
 combo = False 
@@ -47,8 +47,9 @@ neighspe2 = ["Au","Na"]    # number of chemical species
 
 # SALTED parameters
 #----------------------------------------------------------
-Menv = 50         # number of sparse atomic environments 
+Menv = 50        # number of sparse atomic environments 
 z = 2             # kernels exponent
+trainsel = "sequential"
 Ntrain = 32       # number of training structures
 trainfrac = 1.0   # training set fraction
 regul = 1e-08     # regularization parameter

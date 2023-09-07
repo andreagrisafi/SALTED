@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import numpy as np
-from mpi4py import MPI
 from scipy import sparse
 
 from salted.sys_utils import read_system,get_atom_idx,get_conf_range
@@ -13,6 +12,7 @@ def build():
     import inp
     
     if inp.parallel:
+        from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
         size = comm.Get_size()
@@ -95,7 +95,7 @@ def build():
         print(iconf,flush=True)
     
         # load reference QM data
-        coefs = np.load(inp.saltedpath+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
+        coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
         Tsize = len(coefs)
     
         # initialize RKHS feature vectors for each channel 

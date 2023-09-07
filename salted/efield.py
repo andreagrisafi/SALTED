@@ -1,8 +1,6 @@
 import sys,os
 import numpy as np
 import scipy.special as sc
-import math
-import time
 
 def setup_orthomatrix(nmax,rc):
     """Compute orthogonalization matrix"""

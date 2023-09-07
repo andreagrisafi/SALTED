@@ -127,15 +127,6 @@ def build():
         V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
         np.save(kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy",V)
     
-    #    if inp.field:
-    #        kernel_mm = (np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) + kernel0_mm) * kernel0_mm[spe]**(zeta -1)
-    
-    #        eva, eve = np.linalg.eigh(kernel_mm)
-    #        eva = eva[eva>eigcut]
-    #        eve = eve[:,-len(eva):]
-    #        V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-    #        np.save(kdir+"spe"+str(spe)+"_l"+str(0)+"/M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/projector_field.npy",V)
-    
     for l in range(1,llmax+1):
         power = h5py.File(sdir+"FEAT-"+str(l)+".h5",'r')['descriptor'][:]
         nfeat = power.shape[-1]

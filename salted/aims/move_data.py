@@ -14,12 +14,12 @@ else:
     rank = 0
 
 if (rank == 0):
-    if not os.path.exists(inp.path2qm+inp.ovlpdir):
-        os.mkdir(inp.path2qm+inp.ovlpdir)
-    if not os.path.exists(inp.path2qm+inp.coefdir):
-        os.mkdir(inp.path2qm+inp.coefdir)
-    if not os.path.exists(inp.path2qm+inp.projdir):
-        os.mkdir(inp.path2qm+inp.projdir)
+    if not os.path.exists(inp.saltedpath+"overlaps"):
+        os.mkdir(inp.saltedpath+"overlaps")
+    if not os.path.exists(inp.saltedpath+"coefficients"):
+        os.mkdir(inp.saltedpath+"coefficients")
+    if not os.path.exists(inp.saltedpath+"projections"):
+        os.mkdir(inp.saltedpath+"projections")
 
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
@@ -28,7 +28,7 @@ ndata = len(xyzfile)
 if inp.parallel:
     if rank == 0:
         conf_range = [[] for _ in range(size)]
-        blocksize = int(round(ndata/np.float(size)))
+        blocksize = int(round(ndata/float(size)))
         for i in range(size):
             if i == (size-1):
                 conf_range[i] = list(range(ndata))[i*blocksize:ndata]
@@ -65,8 +65,8 @@ for i in conf_range:
     t = t[idx]
     ovlp = ovlp[idx,:]
     ovlp = ovlp[:,idx]
-    np.save(inp.path2qm+inp.ovlpdir+'overlap_conf'+str(i)+'.npy',ovlp)
-    np.save(inp.path2qm+inp.projdir+'projections_conf'+str(i)+'.npy',o)
-    np.save(inp.path2qm+inp.coefdir+'coefficients_conf'+str(i)+'.npy',t)
+    np.save(inp.saltedpath+'overlaps/overlap_conf'+str(i)+'.npy',ovlp)
+    np.save(inp.saltedpath+'projections/projections_conf'+str(i)+'.npy',o)
+    np.save(inp.saltedpath+'coefficients/coefficients_conf'+str(i)+'.npy',t)
     os.remove(dirpath+'ri_ovlp.out')
     os.remove(dirpath+'ri_projections.out')
