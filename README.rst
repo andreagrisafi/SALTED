@@ -15,7 +15,7 @@ References
 
 Installation
 ------------
-In the SALTED directory, simply run :code:`make`, followed by :code:`pip install .`
+In the SALTED directory, simply run :code:`make`, followed by :code:`pip install`.
    
 Dependencies
 ------------
