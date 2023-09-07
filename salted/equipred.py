@@ -16,6 +16,7 @@ from salted.lib import equicombfield
 
 from salted import sph_utils
 from salted import basis
+from salted import efield
 from salted.sys_utils import read_system, get_atom_idx,get_conf_range
 
 
