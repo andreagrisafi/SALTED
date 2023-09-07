@@ -34,7 +34,7 @@ provided HDF5 has been compiled with MPI support.
 
 Usage
 -----
-For detailed examples of how to use SALTED, refer to the example corresponding to the electronic structure code you wish to use. In general, functions may be called either directly from a terminal script, or using a python script via :code: `import salted`.
+For detailed examples of how to use SALTED, refer to the example corresponding to the electronic structure code you wish to use. In general, functions may be called either directly from a terminal script, or using a python script via :code:`import salted`.
 
 Input Dataset
 -------------
@@ -53,6 +53,7 @@ The possible basis set choices appear in :code:`src/basis.py`. If you want to us
 Contact
 -------
 andrea.grisafi@ens.psl.eu
+
 alan.m.lewis@york.ac.uk
 
 Contributors
