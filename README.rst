@@ -15,7 +15,7 @@ References
 
 Installation
 ------------
-In the SALTED directory, simply run :code: `make`, followed by :code: `pip install .`
+In the SALTED directory, simply run :code:`make`, followed by :code:`pip install .`
    
 Dependencies
 ------------
@@ -26,7 +26,7 @@ rascaline can then be installed using
 
 **mpi4py**: mpi4py is required to use MPI parallelisation; SALTED can be run without this.
 A parallel h5py installation is required to use MPI parellelisation of equirepr.py only. This can be installed by running:
-:code: `HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
+:code:`HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
 provided HDF5 has been compiled with MPI support.
 
 Usage
@@ -45,7 +45,7 @@ Training data consists in the projection of the scalar field over atom-centered 
 
 3) Cycle over the angular functions sorted as -L, ..., 0 , ... , +L
 
-The possible basis set choices appear in :code:`src/basis.py` and are consistent with the electronic structure codes that are to date interfaced with SALTED, i.e., PySCF, FHI-aims, CP2K. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper dimensions.
+The possible basis set choices appear in :code:`src/basis.py` and are consistent with the electronic structure codes that are to date interfaced with SALTED, i.e., PySCF, FHI-aims, CP2K. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper dimensions to the file.
 
 Contact
 -------
