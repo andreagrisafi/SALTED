@@ -45,7 +45,7 @@ Training data consists in the projection of the scalar field over atom-centered 
 
 3) Cycle over the angular functions sorted as -L, ..., 0 , ... , +L
 
-The possible basis set choices appear in :code:`src/basis.py` and are consistent with the electronic structure codes that are to date interfaced with SALTED, i.e., PySCF, FHI-aims, CP2K. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper dimensions to the file.
+The possible basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic structure codes that are to date interfaced with SALTED, i.e., PySCF, FHI-aims, CP2K. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper dimensions to the file.
 
 Contact
 -------
