@@ -10,7 +10,7 @@ References
 
 3. Alan M. Lewis, Andrea Grisafi, Michele Ceriotti, Mariana Rossi, "Learning electron densities in the condensed-phase", *Journal of Chemical Theory and Computation* **17**, 7203-7214 (2021) 
 
-4. Andrea Grisafi, Alan M. Lewis, Mariana Rossi, Michele Ceriotti,, "Electronic-Structure Properties from Atom-Centered Predictions of the Electron Density", *Journal of Chemical Theory and Computation* **19**, 4451-4460 (2023) 
+4. Andrea Grisafi, Alan M. Lewis, Mariana Rossi, Michele Ceriotti, "Electronic-Structure Properties from Atom-Centered Predictions of the Electron Density", *Journal of Chemical Theory and Computation* **19**, 4451-4460 (2023) 
 
 Installation
 ------------
@@ -28,11 +28,9 @@ A parallel h5py installation is required to use MPI parellelisation of equirepr.
 :code:`HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
 provided HDF5 has been compiled with MPI support.
 
-Input Dataset
--------------
-Geometries of the input structures are required in :code:`xyz` format.
-
-Training data consists in the projection of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. The overlap matrix between the basis functions is also required as an input. The size of these arrays has to correspond to the number of atoms, as sorted in the geometry file, times the non-redundant number of basis functions belonging to each atom. The ordering of the basis set must follow the structure: 
+Training dataset
+----------------
+Training data consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis, the overlap matrix between the basis functions is also required as input. The size of these arrays has to correspond to the number of atoms, as sorted in the geometry file, times the non-redundant number of basis functions belonging to each atom. The ordering of the basis set must follow the structure: 
 
 - For a given atomic species X, cycle over angular momenta L 
 
@@ -40,11 +38,11 @@ Training data consists in the projection of the scalar field over atom-centered 
 
 - Cycle over the angular functions sorted as -L,...,0,...,+L
 
-The possible basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic structure codes that are to date interfaced with SALTED, i.e., PySCF, FHI-aims, CP2K. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper dimensions to the file.
+The possible basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic-structure codes that are to date interfaced with SALTED: **PySCF**, **FHI-aims**, **CP2K**. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper basis set dimensions to the file.
 
 Usage
 -----
-For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
+For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. Input structures are required in XYZ format and are specified in :code:`filename`. SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
 
 - Import SALTED modules
 
