@@ -1,5 +1,5 @@
-Symmetry-Adapted Learning of Three-dimensional Electron Densities
-=================================================================
+SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
+=========================================================================
 This repository contains an implementation of symmetry-adapted Gaussian Process Regression that is suitable to do machine learning of any three-dimensional scalar field, e.g., the electron density of a system, decomposed on an atom-centered basis made of radial functions and spherical harmonics. 
 
 References
@@ -60,7 +60,7 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`rkhs.build()`
 
-- Build SALTED feature vector.
+- Build SALTED feature vectors.
 
 :code:`feature_vector.build()`
 
