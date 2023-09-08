@@ -56,7 +56,7 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`sparsify.build()`
 
-- Build equivariant kernels for each density channel (aLn) and project them over the RKHS as described in Ref.(4).
+- Build equivariant kernels for each density channel and project them over the RKHS as described in Ref.(4).
 
 :code:`rkhs.build()`
 
