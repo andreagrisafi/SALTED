@@ -52,19 +52,19 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`equirepr.build()`
 
-- Sparsify equivariant representations over a subset :code:`Menv` of atomic environment and compute RKHS projector as described in Ref.(4). The non-linearity degree of the model can be defined at this stage by setting the zeta parameter :code:`z` as a positive integer (:code:`z=1` corresponds to a linear model). 
+- Sparsify equivariant representations over a subset :code:`Menv` of atomic environment and compute RKHS projector as described in Ref.(4). The non-linearity degree of the model can be defined at this stage by setting the zeta parameter :code:`z` as a positive integer as described in Ref.(1). :code:`z=1` corresponds to a linear model.
 
 :code:`sparsify.build()`
 
-- Build equivariant kernels and project them over the RKHS as described in Ref.(4).
+- Build equivariant kernels for each density channel (aLn) and project them over the RKHS as described in Ref.(4).
 
 :code:`rkhs.build()`
 
-- Build SALTED feature vectors.
+- Build SALTED feature vectors for each structure in the training set.
 
 :code:`feature_vector.build()`
 
-- Build regression matrices over :code:`Ntrain` training structure.
+- Build regression matrices over a maximum of :code:`Ntrain` training structure. These can be either selected at random :code:'trainsel='random'' or sequentially :code:'trainsel='sequential'' from the total dataset. The variable :code:`trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning cruves). 
 
 :code:`matrices.build()`
 
