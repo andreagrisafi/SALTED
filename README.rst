@@ -52,7 +52,7 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`equirepr.build()`
 
-- Sparsify equivariant representations over a subset :code:`Menv` of atomic environment and compute RKHS projector as described in Ref.(4). The non-linearity degree of the model can be defined at this stage by setting the zeta parameter :code:`z` as a positive integer. :code:`z=1` corresponds to a linear model.
+- Sparsify equivariant representations over a subset :code:`Menv` of atomic environment and compute RKHS projector as described in Ref.(4). The non-linearity degree of the model must be defined at this stage by setting the zeta parameter :code:`z` as a positive integer. :code:`z=1` corresponds to a linear model.
 
 :code:`sparsify.build()`
 
@@ -76,13 +76,13 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`validation.build()`
 
-Once the SALTED model has been trained and validated, a SALTED prediction on an additional dataset can be performed as follows:
+Once the SALTED model has been trained and validated, SALTED predictions for a new dataset can be performed as follows:
 
 - Import prediction module
 
 :code:`from salted import equipred`
 
-- Perform equivariant prediction
+- Perform equivariant prediction and save prediction outputs in dedicated prediction folders located in :code:`saltedpath` by making used of a customized :code:`predname` string that is appended to the name of the prediction directories.
 
 :code:`equipred.build()`
 
