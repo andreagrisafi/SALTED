@@ -24,17 +24,15 @@ Training data consists in the expansion coefficients of the scalar field over at
 
 - For a given atomic species X, cycle over angular momenta L 
 
-- For a given combination (X,L), cycle over radial functions n 
+- For each (X,L), cycle over radial functions n 
 
-- Cycle over the angular functions sorted as -L,...,0,...,+L
+- For each (X,L,n), cycle over the angular functions sorted as -L,...,0,...,+L
 
-The possible basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic-structure codes that are to date interfaced with SALTED, i.e., **PySCF**, **FHI-aims**, **CP2K**. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper basis set dimensions to the file.
+The possible density-fitting basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic-structure codes that are to date interfaced with SALTED, i.e., **PySCF**, **FHI-aims**, **CP2K**. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information to the file. In alternative, it is enough to directly edit the file to add the proper basis set sizes.
 
 Usage
 -----
-For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. Input structures are required in XYZ format and are read by SALTED as  :code:`filename="COORDSFILENAME.xyz"`. SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. 
-
-A general SALTED workflow reads as follows:
+For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. The density-fitting basis set must be specified as :code:`dfbasis="DFBASISNAME"`, as appear in the corresponding entry in :code:`./salted/basis.py`. Input structures are required in XYZ format and are read by SALTED as :code:`filename="COORDSFILENAME.xyz"`. The SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
 
 - Import SALTED modules
 
@@ -44,7 +42,7 @@ A general SALTED workflow reads as follows:
 
 :code:`equirepr.build()`
 
-- Sparsify equivariant representations over a subset :code:`Menv` of atomic environment and compute truncated RKHS projectors as described in Ref.(4). The non-linearity degree of the model must be defined at this stage by setting the variable :code:`z` as a positive integer. :code:`z=1` corresponds to a linear model. The truncation of small and negative eigenvalues when computing the RKHS projector can be modulated by the threshold :code:`eigcut` (default value $10^{-10}$).
+- Sparsify training set by selecting a subset :code:`Menv` of atomic environment in order to compute sparse kernels and truncated RKHS projectors as described in Ref.(4). The non-linearity degree of the model must be defined at this stage by setting the variable :code:`z` as a positive integer. :code:`z=1` corresponds to a linear model. The truncation of small and negative eigenvalues when computing the RKHS projector can be modulated by the threshold :code:`eigcut` (default value $10^{-10}$).
 
 :code:`sparsify.build()`
 
