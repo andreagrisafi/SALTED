@@ -23,8 +23,8 @@ Dependencies
 rascaline can then be installed using
 :code:`pip install git+https://github.com/Luthaf/rascaline.git`
 
-- **mpi4py**: mpi4py is required to use MPI parallelisation; SALTED can be run without this.
-A parallel h5py installation is required to use MPI parellelisation of equirepr.py only. This can be installed by running:
+- **mpi4py**: mpi4py is required to use MPI parallelisation; SALTED can nonetheless be run without this.
+A parallel h5py installation is required to use MPI parellelisation. This can be installed by running:
 :code:`HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
 provided HDF5 has been compiled with MPI support.
 
@@ -68,11 +68,11 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`matrices.build()`
 
-- Perform regression with a given regularization parameter :code:`regul`.
+- Perform regression with a given regularization parameter :code:`regul`. NB: An explicit minimization of the loss function is recommended when the dimensionality of the problem exceed $`10^5`$; see the MPI examples for how to run SALTED in this case.
 
 :code:`regression.build()`
 
-- Validate predictions over the structures that have not been retained for training.
+- Validate predictions over the structures that have not been retained for training by estimating the density error as reported in Ref.(4).
 
 :code:`validation.build()`
 
