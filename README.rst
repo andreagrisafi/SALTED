@@ -64,7 +64,7 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`feature_vector.build()`
 
-- Build regression matrices over a maximum of :code:`Ntrain` training structure. These can be either selected at random :code:'trainsel="random"' or sequentially :code:'trainsel="sequential"' from the total dataset. The variable :code:`trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning cruves). 
+- Build regression matrices over a maximum of :code:`Ntrain` training structure. These can be either selected at random :code:'trainsel=\"random\"' or sequentially :code:'trainsel=\"sequential\"' from the total dataset. The variable :code:`trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning cruves). 
 
 :code:`matrices.build()`
 
