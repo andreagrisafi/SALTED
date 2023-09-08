@@ -2,16 +2,6 @@ SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
 =========================================================================
 This repository contains an implementation of symmetry-adapted Gaussian Process Regression that is suitable to do machine learning of any three-dimensional scalar field, e.g., the electron density of a system, decomposed on an atom-centered basis made of radial functions and spherical harmonics. 
 
-References
-----------
-1. Andrea Grisafi, Alberto Fabrizio, David M. Wilkins, Benjamin A. R. Meyer, Clemence Corminboeuf, Michele Ceriotti, "Transferable Machine-Learning Model of the Electron Density", *ACS Central Science* **5**, 57 (2019)
-
-2. Alberto Fabrizio, Andrea Grisafi, Benjamin A. R. Meyer, Michele Ceriotti, Clemence Corminboeuf, "Electron density learning of non-covalent systems", *Chemical Science* **10**, 9424 (2019)
-
-3. Alan M. Lewis, Andrea Grisafi, Michele Ceriotti, Mariana Rossi, "Learning electron densities in the condensed-phase", *Journal of Chemical Theory and Computation* **17**, 7203 (2021) 
-
-4. Andrea Grisafi, Alan M. Lewis, Mariana Rossi, Michele Ceriotti, "Electronic-Structure Properties from Atom-Centered Predictions of the Electron Density", *Journal of Chemical Theory and Computation* **19**, 4451 (2023) 
-
 Installation
 ------------
 In the SALTED directory, simply run :code:`make`, followed by :code:`pip install .`
@@ -38,11 +28,13 @@ Training data consists in the expansion coefficients of the scalar field over at
 
 - Cycle over the angular functions sorted as -L,...,0,...,+L
 
-The possible basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic-structure codes that are to date interfaced with SALTED: **PySCF**, **FHI-aims**, **CP2K**. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper basis set dimensions to the file.
+The possible basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic-structure codes that are to date interfaced with SALTED, i.e., **PySCF**, **FHI-aims**, **CP2K**. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information or manually add the proper basis set dimensions to the file.
 
 Usage
 -----
-For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. Input structures are required in XYZ format and are specified as :code:`filename="COORDSFILENAME.xyz"`. SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
+For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. Input structures are required in XYZ format and are read by SALTED as  :code:`filename="COORDSFILENAME.xyz"`. SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. 
+
+A general SALTED workflow reads as follows:
 
 - Import SALTED modules
 
@@ -85,6 +77,16 @@ Once the SALTED model has been trained and validated, SALTED predictions for a n
 - Perform equivariant prediction and save prediction outputs in dedicated prediction folders located in :code:`saltedpath` by making used of a customized :code:`predname` string that is appended to the name of the prediction directories.
 
 :code:`equipred.build()`
+
+References
+----------
+1. Andrea Grisafi, Alberto Fabrizio, David M. Wilkins, Benjamin A. R. Meyer, Clemence Corminboeuf, Michele Ceriotti, "Transferable Machine-Learning Model of the Electron Density", *ACS Central Science* **5**, 57 (2019)
+
+2. Alberto Fabrizio, Andrea Grisafi, Benjamin A. R. Meyer, Michele Ceriotti, Clemence Corminboeuf, "Electron density learning of non-covalent systems", *Chemical Science* **10**, 9424 (2019)
+
+3. Alan M. Lewis, Andrea Grisafi, Michele Ceriotti, Mariana Rossi, "Learning electron densities in the condensed-phase", *Journal of Chemical Theory and Computation* **17**, 7203 (2021) 
+
+4. Andrea Grisafi, Alan M. Lewis, Mariana Rossi, Michele Ceriotti, "Electronic-Structure Properties from Atom-Centered Predictions of the Electron Density", *Journal of Chemical Theory and Computation* **19**, 4451 (2023) 
 
 Contact
 -------
