@@ -42,7 +42,7 @@ The possible basis set choices appear in :code:`./salted/basis.py` and are consi
 
 Usage
 -----
-For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. Input structures are required in XYZ format and are specified as :code:`filename="$COORDSFILE.xyz"`. SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
+For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. Input structures are required in XYZ format and are specified as :code:`filename="COORDSFILENAME.xyz"`. SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
 
 - Import SALTED modules
 
