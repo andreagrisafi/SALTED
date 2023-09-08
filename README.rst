@@ -68,7 +68,7 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`matrices.build()`
 
-- Perform regression with a given regularization parameter :code:`regul`. NB: An explicit minimization of the loss function is recommended when the dimensionality of the problem exceed $`10^5`$; see the MPI examples for how to run SALTED in this case.
+- Perform regression with a given regularization parameter :code:`regul`. NB: An explicit minimization of the loss function is recommended when the dimensionality of the problem exceed $10^5$; see the MPI examples for how to run SALTED in this case.
 
 :code:`regression.build()`
 
