@@ -38,7 +38,7 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`from salted import equirepr, sparsify, rkhs, feature_vector, matrices, regression, validation`
 
-- Build equivariant structural representations up to the maximum L used to expand the scalar field. 
+- Build symmetry-adapted structural representations up to the maximum angular momentum L used to expand the scalar field. These correspond to 3-body atom-centered descriptors that follow spherical harmonics transformations as described in PRL **120**, 036002 (2018). It is possible to sparsify the feature space by setting :code:`sparsify=True` together with the positive integer :code:`nc` in order to retain a corresponding number of features. The sparsification is performed with a "farthest point sampling" (FPS) algorithm using the full descriptor to define the Euclidean distance between the structural features. In order to reduce the computational burden of this procedure, it is possible to perform the FPS selection over a prescribed subset of samples :code:`nsamples` chosen at random from the entire training dataset.
 
 :code:`equirepr.build()`
 
