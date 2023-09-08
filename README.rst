@@ -10,7 +10,7 @@ References
 
 3. Alan M. Lewis, Andrea Grisafi, Michele Ceriotti, Mariana Rossi, "Learning electron densities in the condensed-phase", *Journal of Chemical Theory and Computation* **17**, 7203 (2021) 
 
-4. Andrea Grisafi, Alan Lewis, Mariana Rossi, Michele Ceriotti, "Electronic-Structure Properties from Atom-Centered Predictions of the Electron Density", *Journal of Chemical Theory and Computation* **19**, 4451 (2023) 
+4. Andrea Grisafi, Alan M. Lewis, Mariana Rossi, Michele Ceriotti, "Electronic-Structure Properties from Atom-Centered Predictions of the Electron Density", *Journal of Chemical Theory and Computation* **19**, 4451 (2023) 
 
 Installation
 ------------
@@ -30,7 +30,7 @@ provided HDF5 has been compiled with MPI support.
 
 Training dataset
 ----------------
-Training data consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis, the overlap matrix between the basis functions is also required as input. The size of these arrays has to correspond to the number of atoms, as sorted in the geometry file, times the non-redundant number of basis functions belonging to each atom. The ordering of the basis set must follow the structure: 
+Training data consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. We assume to work with real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis, the overlap matrix between the basis functions is also required as input. The size of these arrays has to correspond to the number of atoms, as sorted in the geometry file, times the number of basis functions belonging to each atom. The ordering of the basis set must follow the structure: 
 
 - For a given atomic species X, cycle over angular momenta L 
 
@@ -48,11 +48,11 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`from salted import equirepr, sparsify, rkhs, feature_vector, matrices, regression, validation`
 
-- Build equivariant structural representations up to the maximum L used to expand the scalar field.
+- Build equivariant structural representations up to the maximum L used to expand the scalar field. 
 
 :code:`equirepr.build()`
 
-- Sparsify equivariant representations over a subset :code:`M` of atomic environment and compute RKHS projector as described in Ref.(4).
+- Sparsify equivariant representations over a subset :code:`Menv` of atomic environment and compute RKHS projector as described in Ref.(4). The non-linearity degree of the model can be defined at this stage by setting the zeta parameter :code:`z` as a positive integer (:code:`z=1` corresponds to a linear model). 
 
 :code:`sparsify.build()`
 
@@ -68,7 +68,7 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`matrices.build()`
 
-- Perform regression with a given regularization parameter :code:`reg`.
+- Perform regression with a given regularization parameter :code:`regul`.
 
 :code:`regression.build()`
 
