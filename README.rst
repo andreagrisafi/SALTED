@@ -44,7 +44,7 @@ A general SALTED workflow reads as follows:
 
 :code:`equirepr.build()`
 
-- Sparsify equivariant representations over a subset :code:`Menv` of atomic environment and compute RKHS projector as described in Ref.(4). The non-linearity degree of the model must be defined at this stage by setting the $\zeta$-parameter :code:`z` as a positive integer. :code:`z=1` corresponds to a linear model. The truncation of small and negative eigenvalues when computing the RKHS projector can be modulated by the threshold :code:`eigcut` (default value $10^{-10}$).
+- Sparsify equivariant representations over a subset :code:`Menv` of atomic environment and compute RKHS projector as described in Ref.(4). The non-linearity degree of the model must be defined at this stage by setting the variable :code:`z` as a positive integer. :code:`z=1` corresponds to a linear model. The truncation of small and negative eigenvalues when computing the RKHS projector can be modulated by the threshold :code:`eigcut` (default value $10^{-10}$).
 
 :code:`sparsify.build()`
 
