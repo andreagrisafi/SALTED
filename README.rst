@@ -32,7 +32,7 @@ The possible density-fitting basis set choices appear in :code:`./salted/basis.p
 
 Usage
 -----
-For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. The density-fitting basis set must be specified as :code:`dfbasis="DFBASISNAME"`, as appear in the corresponding entry in :code:`./salted/basis.py`. Input structures are required in XYZ format and are read by SALTED as :code:`filename="COORDSFILENAME.xyz"`. The SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
+For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic-structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. The density-fitting basis set must be specified as :code:`dfbasis="DFBASISNAME"`, as appears in the corresponding entry in :code:`./salted/basis.py`. Input structures are required in XYZ format and are read by SALTED as :code:`filename="COORDSFILENAME.xyz"`. The SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
 
 - Import SALTED modules
 
@@ -42,7 +42,7 @@ For a detailed description of how to use SALTED, refer to the examples correspon
 
 :code:`equirepr.build()`
 
-- Sparsify training set by selecting a subset :code:`Menv` of atomic environment in order to compute sparse kernels and truncated RKHS projectors as described in Ref.(4). The non-linearity degree of the model must be defined at this stage by setting the variable :code:`z` as a positive integer. :code:`z=1` corresponds to a linear model. The truncation of small and negative eigenvalues when computing the RKHS projector can be modulated by the threshold :code:`eigcut` (default value $10^{-10}$).
+- Sparsify training set by selecting a subset :code:`Menv` of atomic environments in order to compute sparse kernels and truncated RKHS projectors as described in Ref.(4). The non-linearity degree of the model must be defined at this stage by setting the variable :code:`z` as a positive integer. :code:`z=1` corresponds to a linear model. The truncation of small and negative eigenvalues when computing the RKHS projector can be modulated by the threshold :code:`eigcut` (default value $10^{-10}$).
 
 :code:`sparsify.build()`
 
@@ -72,7 +72,7 @@ Once the SALTED model has been trained and validated, SALTED predictions for a n
 
 :code:`from salted import equipred`
 
-- Perform equivariant prediction and save prediction outputs in dedicated prediction folders located in :code:`saltedpath` by making use of a customized :code:`predname` string that is appended to the name of the prediction directories.
+- Perform equivariant predictions and save prediction outputs in dedicated folders located in :code:`saltedpath` by making use of a customized :code:`predname` string that is appended to the name of the prediction directories.
 
 :code:`equipred.build()`
 
