@@ -32,7 +32,7 @@ The possible density-fitting basis set choices appear in :code:`./salted/basis.p
 
 Usage
 -----
-For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic-structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. The density-fitting basis set must be specified as :code:`dfbasis="DFBASISNAME"`, as appears in the corresponding entry in :code:`./salted/basis.py`. Input structures are required in XYZ format and are read by SALTED as :code:`filename="COORDSFILENAME.xyz"`. The SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. A general SALTED workflow reads as follows:
+For a detailed description of how to use SALTED, refer to the examples corresponding to the electronic-structure code you wish to use. SALTED functions may be called either directly from a terminal script, or by importing SALTED modules in python. SALTED input variables must be defined in a :code:`inp.py` file located in the working directory. The density-fitting basis set must be specified as :code:`dfbasis="DFBASISNAME"`, as appears in the corresponding entry in :code:`./salted/basis.py`. Input structures are required in XYZ format and are read by SALTED as :code:`filename="COORDSFILENAME.xyz"`. The SALTED outputs are saved in the directory specified by the input variable :code:`saltedpath`. In order to test different SALTED models, a :code:`saltedname` string must also be specified which will be appended to the name of the output folders. A general SALTED workflow reads as follows:
 
 - Import SALTED modules
 
