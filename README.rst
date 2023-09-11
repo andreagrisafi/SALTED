@@ -28,7 +28,7 @@ Training data consists in the expansion coefficients of the scalar field over at
 
 - For each (X,L,n), cycle over the angular functions sorted as -L,...,0,...,+L
 
-The possible density-fitting basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic-structure codes that are to date interfaced with SALTED, i.e., **PySCF**, **FHI-aims**, **CP2K**. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information to the file. In alternative, it is enough to directly edit the file to add the proper basis set sizes.
+The possible density-fitting basis set choices appear in :code:`./salted/basis.py` and are consistent with the electronic-structure codes that are to date interfaced with SALTED, i.e., **PySCF**, **FHI-aims**, **CP2K**. If you want to use a basis that is not included in this file, follow the code-specific instructions to append the needed information to the file. In alternative, it is enough to directly edit the file to add the proper basis set sizes. Please rerun :code:`pip install .` after any addition of new basis sets to SALTED.
 
 Usage
 -----
