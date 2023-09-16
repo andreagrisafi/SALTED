@@ -57,6 +57,7 @@ restart = False   # restart minimization
 # Parameters if performing matrix inversion
 #------------------------------------------
 blocksize = 10
+trainsel = 'random'
 
 # Prediction Paths
 # ------------

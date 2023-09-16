@@ -15,7 +15,7 @@ The AIMS output must be re-ordered and the Condon-Shottley convention applied be
 :code:`mpirun -np $ntasks python -m salted.aims.move_data`
 This removes the overlap matrix and projections vector from the AIMS output folder to save space, and creates re-ordered numpy files in the folders "projections", "overlaps" and "coefficients".
 
-IMPORTANT NOTE: The auxiliary basis used by AIMS depends sensitively on a number of choices made in control.in. Please check that the information about the auxiliary basis in `$SALTEDPATH/basis.py` matches that output by FHI-aims in `basis_info.out`. To facilitate integration between AIMS and SALTED, the following script generates a dictionary entry called `new_basis_entry` which can be appended to `$SALTEDPATH/basis.py` containing the necessary information about the auxiliary basis used to generate the training data:
+IMPORTANT NOTE: The auxiliary basis used by AIMS depends sensitively on a number of choices made in control.in. Please check that the information about the auxiliary basis in `$SALTEDPATH/basis.py` matches that output by FHI-aims in `basis_info.out`. To facilitate integration between AIMS and SALTED, the following script generates a dictionary entry called `new_basis_entry` which will be automaticallyappended to SALTED's internal list of bases, which contains the necessary information about the auxiliary basis used to generate the training data:
 :code:`python -m salted.aims.get_basis_info`
 
 To check the accuracy of the auxilliary basis, run :code:`python -m salted.aims.get_df_err`. This will produce a file called df_maes listing the percentage integrated mean absolute error in the density for every structure in the dataset. In this example it should be just over 0.1% for each structure.
@@ -54,15 +54,17 @@ EITHER:
 
 For smaller problems, they can be found via a matrix inversion (see Ref 3. in the main README). This is carried out via a two- or three- step process. For very small problems, the matrix can be built in a single calculation by running:
 :code: `python -m salted.matrices`.
-This will be the case if `inp.blocksize` is not present, or is not a positive integer. For this usage the code should be run serially.
+This will be the case if `inp.blocksize` is not present, or is not a positive integer. For this usage the code should be run serially. 
 
 Alternatively, the matrix can be constructed in several blocks, each constructed from an equally sized subset of the training set. This will be the case if `inp.blocksize` is a positive integer. Note that `inp.blocksize` must be an exact divisor of the training set size determined by `inp.Ntrain*inp.trainfrac`. If calculating the matrix blockwise, the code can be run in parallel:
 :code: `mpirun -np $ntasks python -m salted.matrices`.
+In either case, the training set will either be chosen as a `sequential` or `random` selection, depending on the value of `inp.trainsel`.
+
 The blocks then need to be combined to form a single matrix; this is done by running (serially):
-:code: `mpirun -np $ntasks python -m salted.collect_matrices`.
+:code: `python -m salted.collect_matrices`.
 
 Finally, the matrix is inverted:
-:code: `mpirun -np $ntasks python -m salted.regression`.
+:code: `python -m salted.regression`.
 
 OR:
 

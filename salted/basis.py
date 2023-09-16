@@ -271,8 +271,8 @@ def basiset(basis):
 
    if basis=="FHI-aims-ZrS":
 
-      lmax["S"] = 6
-      lmax["Zr"] = 6
+      lmax["S"] = 5
+      lmax["Zr"] = 5
 
       nmax[("S",0)] = 10
       nmax[("S",1)] = 10
@@ -280,7 +280,6 @@ def basiset(basis):
       nmax[("S",3)] = 10
       nmax[("S",4)] = 8
       nmax[("S",5)] = 5
-      nmax[("S",6)] = 4
 
       nmax[("Zr",0)] = 14
       nmax[("Zr",1)] = 13
@@ -288,7 +287,6 @@ def basiset(basis):
       nmax[("Zr",3)] = 12
       nmax[("Zr",4)] = 12
       nmax[("Zr",5)] = 8
-      nmax[("Zr",6)] = 4
 
       return [lmax,nmax]
 

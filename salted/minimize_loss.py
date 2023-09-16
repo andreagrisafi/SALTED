@@ -51,6 +51,7 @@ def build():
         dirpath = os.path.join(inp.saltedpath+rdir+"/", "M"+str(M)+"_zeta"+str(zeta))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
+    if size > 1: comm.Barrier()
 
     # define training set at random
     if (inp.Ntrain > ndata):
@@ -213,12 +214,7 @@ def build():
     totsize = psi_list[0].shape[1]
     norm = 1.0/float(ntraintot)
 
-    if rank == 0: 
-        print("problem dimensionality:", totsize)
-        dirpath = os.path.join(inp.saltedpath, rdir)
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-
+    if rank == 0: print("problem dimensionality:", totsize)
 
     start = time.time()
 

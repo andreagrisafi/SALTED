@@ -23,7 +23,9 @@ def build():
         size = comm.Get_size()
         rank = comm.Get_rank()
     #    print('This is task',rank+1,'of',size)
-    else: rank = 0
+    else:
+        rank = 0
+        size = 1
     
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
@@ -95,6 +97,7 @@ def build():
         dirpath = os.path.join(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/","N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
+    if size > 1: comm.Barrier()
     
     
     if inp.qmcode=="cp2k":

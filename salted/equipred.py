@@ -34,6 +34,7 @@ def build():
     #    print('This is task',rank+1,'of',size)
     else:
         rank = 0
+        size = 1
 
     filename = inp.filename
     saltedname = inp.saltedname
@@ -254,6 +255,7 @@ def build():
     dirpath = os.path.join(dirpath,"N"+str(ntrain)+"_reg"+str(int(np.log10(reg))))
     if rank == 0 and not os.path.exists(dirpath):
         os.mkdir(dirpath)
+    if size > 1: comm.Barrier()
     
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     psi_nm = {}
