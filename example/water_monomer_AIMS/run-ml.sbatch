@@ -27,8 +27,6 @@
 
 ### RUN YOUR CODE:
 
-python $SALTEDPATH/get_averages.py
-
 srun -n 16 python -m salted.equirepr
 python -m salted.sparsify
 
@@ -37,5 +35,6 @@ srun -n 16 python -m salted.feature_vector
 
 srun -n 16 python -m salted.matrices
 python -m salted.collect_matrices
+python -m salted.regression
 srun -n 16 python -m salted.validation > validation.out
 

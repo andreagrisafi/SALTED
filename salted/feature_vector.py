@@ -20,6 +20,7 @@ def build():
     #    print('This is task',rank+1,'of',size)
     else:
         rank=0
+        size=1
     
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     
@@ -80,6 +81,7 @@ def build():
         dirpath = os.path.join(inp.saltedpath+fdir, "M"+str(M)+"_zeta"+str(zeta))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
+    if size > 1: comm.Barrier()
     
     # Distribute structures to tasks
     if inp.parallel:

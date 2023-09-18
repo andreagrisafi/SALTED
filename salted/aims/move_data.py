@@ -12,6 +12,7 @@ if inp.parallel:
     print('This is task',rank+1,'of',size,flush=True)
 else:
     rank = 0
+    size = 1
 
 if (rank == 0):
     if not os.path.exists(inp.saltedpath+"overlaps"):
@@ -68,5 +69,10 @@ for i in conf_range:
     np.save(inp.saltedpath+'overlaps/overlap_conf'+str(i)+'.npy',ovlp)
     np.save(inp.saltedpath+'projections/projections_conf'+str(i)+'.npy',o)
     np.save(inp.saltedpath+'coefficients/coefficients_conf'+str(i)+'.npy',t)
+
+if size > 1: comm.Barrier()
+
+for i in conf_range:
+    dirpath = inp.path2qm+'data/'+str(i+1)+'/'
     os.remove(dirpath+'ri_ovlp.out')
     os.remove(dirpath+'ri_projections.out')

@@ -41,8 +41,9 @@ def build():
         dirpath = os.path.join(inp.saltedpath+rdir+"/", "M"+str(M)+"_zeta"+str(zeta))
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
+    if size > 1: comm.Barrier()
 
-    # define training set at random
+    # define training set at random or sequentially
     dataset = list(range(ndata))
     if inp.trainsel=="sequential":
         trainrangetot = dataset[:inp.Ntrain]

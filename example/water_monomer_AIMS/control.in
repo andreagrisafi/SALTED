@@ -13,6 +13,7 @@
   k_grid 	     1 1 1
   ri_density_restart write
   ri_full_output .True.
+  ri_output_density_only .True.
 
   default_max_l_prodbas 5
   default_prodbas_acc 1d-4
