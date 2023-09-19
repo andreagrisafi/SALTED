@@ -413,23 +413,33 @@ def build():
                     kernel0_nm[(iconf,spe)] = np.dot(pvec[i,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
                     if inp.field:
                         kernel_nm = np.dot(pvec_field[i,atom_idx[(iconf,spe)]],power_env_sparse_field[(lam,spe)].T) + kernel0_nm[(iconf,spe)]
-                        kernel_nm *= kernel0_nm[(iconf,spe)]**(zeta-1)
+                        if zeta>1:
+                            kernel_nm *= kernel0_nm[(iconf,spe)]**(zeta-1)
                     else:
                         kernel_nm = kernel0_nm[(iconf,spe)]**zeta
                     # Project on RKHS
                     psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
         else:
-    
-            # Compute covariant kernels
-            for i,iconf in enumerate(conf_range):
-                for spe in species:
-                    kernel_nm = np.dot(pvec[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
-                    if inp.field: kernel_nm += np.dot(pvec_field[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
-                    for i1 in range(natom_dict[(iconf,spe)]):
-                        for i2 in range(Mspe[spe]):
-                            kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
-                    # Project on RKHS
-                    psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
+   
+            if zeta==1: 
+                # Compute covariant kernels
+                for i,iconf in enumerate(conf_range):
+                    for spe in species:
+                        kernel_nm = np.dot(pvec[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                        if inp.field: kernel_nm += np.dot(pvec_field[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
+                        # Project on RKHS
+                        psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
+            else: 
+                # Compute covariant kernels
+                for i,iconf in enumerate(conf_range):
+                    for spe in species:
+                        kernel_nm = np.dot(pvec[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                        if inp.field: kernel_nm += np.dot(pvec_field[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
+                        for i1 in range(natom_dict[(iconf,spe)]):
+                            for i2 in range(Mspe[spe]):
+                                kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
+                        # Project on RKHS
+                        psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
     
         if rank == 0: print("rkhs time:", time.time()-rkhsstart,flush=True)
     
