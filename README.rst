@@ -72,7 +72,7 @@ Once the SALTED model has been trained and validated, SALTED predictions for a n
 
 :code:`from salted import equipred`
 
-- Perform equivariant predictions and save prediction outputs in dedicated folders located in :code:`saltedpath` by making use of a customized :code:`predname` string that is appended to the name of the prediction directories.
+- Perform equivariant predictions and save prediction outputs in dedicated folders located in :code:`saltedpath` by making use of a dedicated :code:`predname` string that is appended to the name of the prediction directories.
 
 :code:`equipred.build()`
 
