@@ -13,7 +13,6 @@ from metatensor.core import Labels
 
 from salted.lib import equicomb 
 from salted.lib import equicombfield 
-from salted.lib import kernel 
 
 from salted import sph_utils
 from salted import basis
