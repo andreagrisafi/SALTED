@@ -13,6 +13,7 @@ from metatensor.core import Labels
 
 from salted.lib import equicomb 
 from salted.lib import equicombfield 
+from salted.lib import kernel 
 
 from salted import sph_utils
 from salted import basis
@@ -119,13 +120,19 @@ def build():
         if ncut > -1: vfps[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
         if ncut > -1 and inp.field: vfps_field[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy")
         for spe in species:
+            # load sparse equivariant descriptors 
             power_env_sparse[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M-"+str(M)+".h5",'r')[spe][:]
             if inp.field: power_env_sparse_field[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M-"+str(M)+"_field.h5",'r')[spe][:]
             if lam == 0: Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
+            # load RKHS projectors 
             if inp.field:
                 Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"_field/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
             else:
                 Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
+            # precompute projection on RKHS if linear model 
+            if zeta==1:
+                power_env_sparse[(lam,spe)] = np.dot(Vmat[(lam,spe)].T,power_env_sparse[(lam,spe)])
+                if inp.field: power_env_sparse_field[(lam,spe)] = np.dot(Vmat[(lam,spe)].T,power_env_sparse_field[(lam,spe)])
     
     # load regression weights
     ntrain = int(inp.Ntrain*inp.trainfrac)
@@ -403,32 +410,37 @@ def build():
     #             pvec_field = pvec_field.T[vfps_field[lam]].T
     
         rkhsstart = time.time()
-    
+ 
         if lam==0:
     
-            # Compute scalar kernels
-            kernel0_nm = {}
-            for i,iconf in enumerate(conf_range):
-                for spe in species:
-                    kernel0_nm[(iconf,spe)] = np.dot(pvec[i,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
-                    if inp.field:
-                        kernel_nm = np.dot(pvec_field[i,atom_idx[(iconf,spe)]],power_env_sparse_field[(lam,spe)].T) + kernel0_nm[(iconf,spe)]
-                        if zeta>1:
-                            kernel_nm *= kernel0_nm[(iconf,spe)]**(zeta-1)
-                    else:
-                        kernel_nm = kernel0_nm[(iconf,spe)]**zeta
-                    # Project on RKHS
-                    psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
+            if zeta==1: 
+                 # Compute scalar kernels
+                 kernel0_nm = {}
+                 for i,iconf in enumerate(conf_range):
+                     for spe in species:
+                         psi_nm[(iconf,spe,lam)] = np.dot(pvec[i,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
+                         if inp.field: psi_nm[(iconf,spe,lam)] += np.dot(pvec_field[i,atom_idx[(iconf,spe)]],power_env_sparse_field[(lam,spe)].T) 
+            else:
+                 # Compute scalar kernels
+                 kernel0_nm = {}
+                 for i,iconf in enumerate(conf_range):
+                     for spe in species:
+                         kernel0_nm[(iconf,spe)] = np.dot(pvec[i,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
+                         if inp.field:
+                             kernel_nm = np.dot(pvec_field[i,atom_idx[(iconf,spe)]],power_env_sparse_field[(lam,spe)].T) + kernel0_nm[(iconf,spe)]
+                         else:
+                             kernel_nm = kernel0_nm[(iconf,spe)]**zeta
+                         # Project on RKHS
+                         psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
+ 
         else:
-   
+  
             if zeta==1: 
                 # Compute covariant kernels
                 for i,iconf in enumerate(conf_range):
                     for spe in species:
-                        kernel_nm = np.dot(pvec[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
-                        if inp.field: kernel_nm += np.dot(pvec_field[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
-                        # Project on RKHS
-                        psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
+                        psi_nm[(iconf,spe,lam)] = np.dot(pvec[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                        if inp.field: psi_nm[(iconf,spe,lam)] += np.dot(pvec_field[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
             else: 
                 # Compute covariant kernels
                 for i,iconf in enumerate(conf_range):
