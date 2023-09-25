@@ -106,32 +106,6 @@ def equirepr(sparsify,field):
             dl = np.minimum(dl,nd)
         return iy
     
-    def FPS_sparsify(PS,featsize,ncut,initial):
-        """Sparsify power spectrum with FPS"""
-    
-        # Get FPS vector.
-        if (ncut>featsize):
-            ncut = featsize
-        vec_fps = do_fps(PS.T,ncut,initial)
-        # Get A matrix.
-        C_matr = PS[:,vec_fps]
-        UR = np.dot(np.linalg.pinv(C_matr),PS)
-        ururt = np.dot(UR,np.conj(UR.T))
-        [eigenvals,eigenvecs] = np.linalg.eigh(ururt)
-        print("Lowest eigenvalue = %f"%eigenvals[0])
-        eigenvals = np.array([np.sqrt(max(eigenvals[i],0)) for i in range(len(eigenvals))])
-        diagmatr = np.diag(eigenvals)
-        A_matrix = np.dot(np.dot(eigenvecs,diagmatr),eigenvecs.T)
-    
-        # Sparsify the matrix by taking the requisite columns.
-        psparse = np.array([PS.T[i] for i in vec_fps]).T
-        psparse = np.dot(psparse,A_matrix)
-    
-        # Return the sparsification vector (which we will need for later sparsification) and the A matrix (which we will need for recombination).
-        sparse_details = [vec_fps,A_matrix]
-    
-        return [psparse,sparse_details]
-    
     HYPER_PARAMETERS_DENSITY = {
         "cutoff": rcut1,
         "max_radial": nrad1,
