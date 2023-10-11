@@ -9,7 +9,7 @@ from salted import sph_utils
 from salted import basis
 
 
-def build():
+def build(field):
     sys.path.insert(0, './')
     import inp
     
@@ -28,7 +28,7 @@ def build():
         print("lambda =", lam)
     
         # External field?
-        if inp.field:
+        if field:
             # Select relevant angular components for equivariant descriptor calculation
             llmax = 0
             lvalues = {}
@@ -57,7 +57,7 @@ def build():
             llvec[il,1] = lvalues[il][1]
         
         # Precompute Wigner-3J symbols and save to file as dense arrays 
-        if inp.field:
+        if field:
             wig = open(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(inp.nang1)+"_field.dat","a")
             iwig = 0
             for il in range(llmax):

@@ -225,7 +225,7 @@ def equirepr(sparsify,field):
     dirpath = os.path.join(inp.saltedpath, "equirepr_"+saltedname)
     
     if rank == 0:
-        wigner.build()
+        wigner.build(field)
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
     if size > 1: comm.Barrier()
