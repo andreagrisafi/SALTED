@@ -9,7 +9,7 @@ import random
 
 from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
-from metatensor.core import Labels
+from metatensor import Labels
 
 from salted import wigner
 from salted import sph_utils
