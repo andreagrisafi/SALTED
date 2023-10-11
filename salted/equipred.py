@@ -9,7 +9,7 @@ from ase.io import read
 
 from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
-from metatensor.core import Labels
+from metatensor import Labels
 
 from salted.lib import equicomb 
 from salted.lib import equicombfield 
