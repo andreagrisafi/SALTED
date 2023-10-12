@@ -113,14 +113,11 @@ def build():
     
     for spe in species:
         kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
-        # Only one of this and the next if inp.field statements are needed. Need to decide which
         if inp.field:
-            kernel_mm = (np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) + kernel0_mm[spe]) * kernel0_mm[spe]**(zeta -1)
+            kernel_mm = (np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) + kernel0_mm[spe]) * kernel0_mm[spe]**(zeta-1)
         else:
             kernel_mm = kernel0_mm[spe]**zeta
         
-        kernel_mm = kernel0_mm[spe]**zeta
-    
         eva, eve = np.linalg.eigh(kernel_mm)
         eva = eva[eva>eigcut]
         eve = eve[:,-len(eva):]
