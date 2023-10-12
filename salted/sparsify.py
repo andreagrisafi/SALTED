@@ -72,17 +72,12 @@ def build():
     power = h5py.File(sdir+"FEAT-0.h5",'r')['descriptor'][:]
     nfeat = power.shape[-1]
     
-    if os.path.exists(sdir+"sparse_set_"+str(M)+".txt"):
-        sparse_set = np.loadtxt(sdir+"sparse_set_"+str(M)+".txt",dtype=int).T
-        fps_idx = sparse_set[0]
-        fps_species = sparse_set[1]
-    else:
-        # compute sparse set with FPS
-        fps_idx = np.array(do_fps(power.reshape(ndata*natmax,nfeat),M),int)
-        fps_species = species_array[fps_idx]
-        sparse_set = np.vstack((fps_idx,fps_species)).T
-        print("Computed sparse set made of ", M, "environments")
-        np.savetxt(sdir+"sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
+    # compute sparse set with FPS
+    fps_idx = np.array(do_fps(power.reshape(ndata*natmax,nfeat),M),int)
+    fps_species = species_array[fps_idx]
+    sparse_set = np.vstack((fps_idx,fps_species)).T
+    print("Computed sparse set made of ", M, "environments")
+    np.savetxt(sdir+"sparse_set_"+str(M)+".txt",sparse_set,fmt='%i')
     
     # divide sparse set per species
     fps_indexes = {}
@@ -117,7 +112,7 @@ def build():
             kernel_mm = (np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) + kernel0_mm[spe]) * kernel0_mm[spe]**(zeta-1)
         else:
             kernel_mm = kernel0_mm[spe]**zeta
-        
+       
         eva, eve = np.linalg.eigh(kernel_mm)
         eva = eva[eva>eigcut]
         eve = eve[:,-len(eva):]
