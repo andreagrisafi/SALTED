@@ -74,7 +74,7 @@ def build():
     
     # define test set
     trainrangetot = np.loadtxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",int)
-    ntrain = int(inp.trainfrac*len(trainrangetot))
+    ntrain = round(inp.trainfrac*len(trainrangetot))
     testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
     
     # Distribute structures to tasks
@@ -273,6 +273,8 @@ def build():
         # save predicted coefficients
         np.save(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/prediction_conf"+str(iconf)+".npy",pred_coefs)
     
+        # save reference coefficients
+        np.savetxt(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/RI-COEFFS-"+str(iconf+1)+".dat",ref_coefs)
         # save predicted coefficients
         np.savetxt(inp.saltedpath+vdir+"/M"+str(M)+"_zeta"+str(zeta)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+"/COEFFS-"+str(iconf+1)+".dat",pred_coefs)
     

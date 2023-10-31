@@ -88,7 +88,7 @@ def build():
     Mspe = {}
     for spe in species:
         Mspe[spe] = len(fps_indexes[spe])
-    
+   
     kernel0_mm = {}
     power_env_sparse = {}
     h5f = h5py.File(sdir+'FEAT-0-M-'+str(M)+'.h5','w')
@@ -109,7 +109,8 @@ def build():
     for spe in species:
         kernel0_mm[spe] = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
         if inp.field:
-            kernel_mm = (np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) + kernel0_mm[spe]) * kernel0_mm[spe]**(zeta-1)
+            kernel_mm = np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) * kernel0_mm[spe]**(zeta-1)
+            #kernel_mm = np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T) * np.exp(kernel0_mm[spe])
         else:
             kernel_mm = kernel0_mm[spe]**zeta
        
@@ -139,11 +140,14 @@ def build():
         if inp.field: h5f2.close()
     
         for spe in species:
-            kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
-            if inp.field: kernel_mm += np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T)
+            if inp.field: 
+                kernel_mm = np.dot(power_env_sparse2[spe],power_env_sparse2[spe].T)
+            else:
+                kernel_mm = np.dot(power_env_sparse[spe],power_env_sparse[spe].T)
             for i1 in range(Mspe[spe]):
                 for i2 in range(Mspe[spe]):
                     kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_mm[spe][i1,i2]**(zeta-1)
+                    #kernel_mm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= np.exp(kernel0_mm[spe][i1,i2])
             eva, eve = np.linalg.eigh(kernel_mm)
             eva = eva[eva>eigcut]
             eve = eve[:,-len(eva):]

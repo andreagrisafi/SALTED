@@ -19,13 +19,15 @@ def build():
     M = inp.Menv
     zeta = inp.z
     
-    # load training set 
-    ntrain = int(inp.trainfrac*inp.Ntrain)
-    
-    if ntrain%blocksize != 0:
+    if inp.Ntrain%blocksize != 0:
         print("Please choose a blocksize which is an exact divisor of ntrain")
         return
 
+    # load training set
+    trainrangetot = np.loadtxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",int)
+    ntrain = round(inp.trainfrac*inp.Ntrain)
+    np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(ntrain)+".txt",fmt='%i')
+    
     nblocks = int(ntrain/blocksize)
     print("blocksize =",blocksize)
     print("number of blocks = ",nblocks)

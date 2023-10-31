@@ -77,8 +77,8 @@ def build():
             kernel0_nm[(iconf,spe)] = np.dot(power[i,atom_idx[(iconf,spe)]],power_env_sparse[spe].T)
             if inp.field:
                 kernel_nm = np.dot(power2[i,atom_idx[(iconf,spe)]],power_env_sparse2[spe].T)
-                kernel_nm += kernel0_nm[(iconf,spe)]
                 kernel_nm *= kernel0_nm[(iconf,spe)]**(zeta-1)
+                #kernel_nm *= np.exp(kernel0_nm[(iconf,spe)])
             else:
                 kernel_nm = kernel0_nm[(iconf,spe)]**zeta
             psi_nm = np.real(np.dot(kernel_nm,V))
@@ -96,14 +96,6 @@ def build():
             power2 = h5py.File(sdir+"FEAT-"+str(l)+"_field.h5",'r')["descriptor"][conf_range,:]
             nfeat2 = power2.shape[-1]
     
-    #    if inp.field:
-    #        power = h5py.File(sdir+"FEAT-"+str(l)+"_field.h5",'r')["descriptor"][conf_range,:]
-    #        power2 = h5py.File(sdir+"FEAT-"+str(l)+".h5",'r')["descriptor"][conf_range,:]
-    #        nfeat = power.shape[-1]
-    #    else:
-    #        power = h5py.File(sdir+"FEAT-"+str(l)+".h5",'r')["descriptor"][conf_range,:]
-    #        nfeat = power.shape[-1]
-    
         for spe in species:
             if rank == 0: print("lambda = ", l, "species:", spe)
             start = time.time()
@@ -116,17 +108,23 @@ def build():
             # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T
             if zeta==1:
                 for i,iconf in enumerate(conf_range):
-                    kernel_nm = np.dot(power[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat),power_env_sparse[spe].T) 
-                    if inp.field: kernel_nm += np.dot(power2[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat2),power_env_sparse2[spe].T) 
+                    if inp.field: 
+                        kernel_nm = np.dot(power2[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat2),power_env_sparse2[spe].T) 
+                    else:
+                        kernel_nm = np.dot(power[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat),power_env_sparse[spe].T) 
                     psi_nm = np.real(np.dot(kernel_nm,V))
                     np.save(kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
             else:
                 for i,iconf in enumerate(conf_range):
-                    kernel_nm = np.dot(power[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat),power_env_sparse[spe].T) 
-                    if inp.field: kernel_nm += np.dot(power2[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat2),power_env_sparse2[spe].T) 
+                    if inp.field: 
+                        kernel_nm = np.dot(power2[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat2),power_env_sparse2[spe].T)
+                    else: 
+                        kernel_nm = np.dot(power[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*l+1),nfeat),power_env_sparse[spe].T)
+                    
                     for i1 in range(natom_dict[(iconf,spe)]):
                         for i2 in range(Mspe[spe]):
                             kernel_nm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
+                            #kernel_nm[i1*(2*l+1):i1*(2*l+1)+2*l+1][:,i2*(2*l+1):i2*(2*l+1)+2*l+1] *= np.exp(kernel0_nm[(iconf,spe)][i1,i2])
                     psi_nm = np.real(np.dot(kernel_nm,V))
                     np.save(kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npy",psi_nm)
             if rank == 0: print((time.time()-start)/60.0)

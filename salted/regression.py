@@ -22,7 +22,7 @@ def build():
         rdir = "regrdir_"+inp.saltedname
     
     # define training set size 
-    ntrain = int(inp.trainfrac*inp.Ntrain)
+    ntrain = round(inp.trainfrac*inp.Ntrain)
     
     # load regression matrices
     Avec = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(ntrain)+".npy")
