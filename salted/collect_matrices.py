@@ -26,7 +26,6 @@ def build():
     # load training set
     trainrangetot = np.loadtxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",int)
     ntrain = round(inp.trainfrac*inp.Ntrain)
-    np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(ntrain)+".txt",fmt='%i')
     
     nblocks = int(ntrain/blocksize)
     print("blocksize =",blocksize)

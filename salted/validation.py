@@ -317,12 +317,12 @@ def build():
         variance = comm.allreduce(variance)
         if rank == 0:
             errs = np.loadtxt(efname)
-            np.savetxt(efname,errs[errs[:,0].argsort()],fmt='%i %f')
+            np.savetxt(efname,errs[errs[:,0].argsort()])
             if inp.qmcode == "cp2k":
                 dips = np.loadtxt(dfname)
-                np.savetxt(dfname,dips[dips[:,0].argsort()],fmt='%i %f')
+                np.savetxt(dfname,dips[dips[:,0].argsort()])
                 qs = np.loadtxt(qfname)
-                np.savetxt(qfname,qs[qs[:,0].argsort()],fmt='%i %f')
+                np.savetxt(qfname,qs[qs[:,0].argsort()])
     if rank == 0: print("")
     if rank == 0: print("% RMSE =", 100*np.sqrt(error_density/variance))
 

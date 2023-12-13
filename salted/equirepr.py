@@ -24,12 +24,26 @@ def build():
     sys.path.insert(0, './')
     import inp
 
-    if inp.field:
-        if inp.ncut > -1: equirepr(sparsify=True,field=True)
-        equirepr(sparsify=False,field=True)
+    if inp.sparsify:
+        
+        if inp.ncut > 0:
 
-    if inp.ncut > -1: equirepr(sparsify=True,field=False)
-    equirepr(sparsify=False,field=False)
+            if inp.field:
+                equirepr(sparsify=True,field=True)
+
+            equirepr(sparsify=True,field=False)
+
+        else:
+
+            if rank==0: print("ERROR: features cutoff ncut must be a positive integer!")
+            sys.exit(0)
+    
+    else: 
+
+        if inp.field:
+            equirepr(sparsify=False,field=True)
+
+        equirepr(sparsify=False,field=False)
 
     return
 
@@ -329,8 +343,6 @@ def equirepr(sparsify,field):
     
         # Do feature selection with FPS sparsification
         if sparsify:
-            if ncut==-1:
-                if rank == 0: print("ERROR: please select a finite number of features!")
             if ncut >= featsize:
                 ncut = featsize  
             if rank == 0: print("fps...")
