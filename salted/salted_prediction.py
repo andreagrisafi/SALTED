@@ -18,7 +18,7 @@ from salted import sph_utils
 from salted import basis
 from salted import efield
 
-def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,structure):
+def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals,structure):
 
     sys.path.insert(0, './')
     import inp
@@ -406,6 +406,40 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,structure):
     if inp.average:
         pred_coefs += Av_coeffs
     
+   
+    if inp.qmcode=="cp2k":
+
+        # compute integral of predicted density
+        iaux = 0
+        rho_int = 0.0
+        nele = 0.0
+        for iat in range(natoms):
+            spe = atomic_symbols[iat]
+            if inp.average:
+                nele += inp.pseudocharge
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    if l==0:
+                        rho_int += charge_integrals[(spe,l,n)] * pred_coefs[iaux]
+                    iaux += 2*l+1
+
+
+        # enforce charge conservation 
+        iaux = 0
+        for iat in range(natoms):
+            spe = atomic_symbols[iat]
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    for im in range(2*l+1):
+                        if l==0 and im==0:
+                            if inp.average:
+                                pred_coefs[iaux] *= nele/rho_int
+                            else:
+                                if n==nmax[(spe,l)]-1:
+                                    pred_coefs[iaux] -= rho_int/(charge_integrals[(spe,l,n)]*natoms)
+                        iaux += 1
+
+ 
 #    if rank == 0: print("pred time:", time.time()-predstart,flush=True)
     
     return pred_coefs

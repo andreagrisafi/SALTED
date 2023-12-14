@@ -3,6 +3,7 @@ import sys
 import time
 import h5py
 import numpy as np
+from scipy import special
 
 from salted import basis
 
@@ -27,6 +28,32 @@ def build():
         for l in range(lmax[spe]+1):
             nlist.append(nmax[(spe,l)])
     lmax_max = max(llist)
+
+    if inp.qmcode=="cp2k":
+
+        # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
+        alphas = {}
+        sigmas = {}
+        for spe in species:
+            for l in range(lmax[spe]+1):
+                avals = np.loadtxt(inp.saltedpath+"basis/"+spe+"-"+inp.dfbasis+"-alphas-L"+str(l)+".dat")
+                if nmax[(spe,l)]==1:
+                    alphas[(spe,l,0)] = float(avals)
+                    sigmas[(spe,l,0)] = np.sqrt(0.5/alphas[(spe,l,0)]) # bohr
+                else:
+                    for n in range(nmax[(spe,l)]):
+                        alphas[(spe,l,n)] = avals[n]
+                        sigmas[(spe,l,n)] = np.sqrt(0.5/alphas[(spe,l,n)]) # bohr
+
+        # compute integrals of basis functions (needed to a posteriori correction of the charge)
+        charge_integrals = {}
+        for spe in species:
+            for l in range(lmax[spe]+1):
+                charge_integrals_temp = np.zeros(nmax[(spe,l)])
+                for n in range(nmax[(spe,l)]):
+                    inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5)
+                    charge_radint = 0.5 * special.gamma(float(l+3)/2.0) / ( (alphas[(spe,l,n)])**(float(l+3)/2.0) )
+                    charge_integrals[(spe,l,n)] = charge_radint * np.sqrt(4.0*np.pi) / np.sqrt(inner)
     
     loadstart = time.time()
     
@@ -65,7 +92,7 @@ def build():
     
     print("load time:", (time.time()-loadstart))
     
-    return [lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps]
+    return [lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals]
 
 if __name__ == "__main__":
     build()
