@@ -1,9 +1,12 @@
-import numpy as np
+import os
 import sys
+
+import numpy as np
+
 import inp
 
 from salted.sys_utils import read_system
-    
+
 species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
 pdir = 'predictions_'+inp.saltedname+'_'+inp.predname+'/'
@@ -15,8 +18,8 @@ for i in range(ndata):
     t = np.load(inp.saltedpath+pdir+"M"+str(M)+"_zeta"+str(inp.z)+"/N"+str(ntrain)+"_reg"+str(int(np.log10(inp.regul)))+"/prediction_conf"+str(i)+".npy")
     n = len(t)
 
-    dirpath = inp.path2qm+inp.predict_data+str(i+1)
-        
+    dirpath = os.path.join(inp.path2qm, inp.predict_data, str(i+1))
+
     idx = np.loadtxt(dirpath+'/idx_prodbas.out').astype(int)
     idx -= 1
     idx = list(idx)

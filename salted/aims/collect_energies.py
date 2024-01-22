@@ -1,9 +1,12 @@
-import numpy as np
+import os
 import sys
-import inp
 from os import listdir
 
-dn = inp.path2qm+inp.predict_data
+import numpy as np
+
+import inp
+
+dn = os.path.join(inp.path2qm, inp.predict_data)
 l = listdir(dn+'geoms/')
 nfiles = len(l)
 testset = list(range(nfiles))

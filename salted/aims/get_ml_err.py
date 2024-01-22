@@ -1,15 +1,18 @@
-import numpy as np
+import os
 import time
 import sys
+
+import numpy as np
+
 import inp
 
 def main():
     from salted.sys_utils import read_system
     spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
-    
+
     start_time = time.time()
 
-    dirname = inp.path2qm+inp.predict_data
+    dirname = os.path.join(inp.path2qm, inp.predict_data)
     av_err = 0
     errs = np.zeros(ndata)
     g = open('ml_maes','w+')
