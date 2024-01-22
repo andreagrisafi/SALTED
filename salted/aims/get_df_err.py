@@ -1,6 +1,8 @@
-import numpy as np
 import time
 import sys
+import os.path as osp
+
+import numpy as np
 import inp
 
 def main():
@@ -9,23 +11,23 @@ def main():
     
     start_time = time.time()
 
-    dirname = inp.path2qm+'data/'
+    dirname = osp.join(inp.path2qm, 'data')
     av_err = 0
     errs = np.zeros(ndata)
     g = open('df_maes','w+')
     for i in range(1,ndata+1):
-        dirn = dirname+str(i)+'/'
+        dirn = osp.join(dirname, str(i))
 #        f = open(dirn+'rho_scf.out')
 #        r_con = [float(line.split()[-1]) for line in f]
-        r_con = np.loadtxt(dirn+'rho_scf.out')
+        r_con = np.loadtxt(osp.join(dirn, 'rho_scf.out'))
         r_con.view('f8,f8,f8,f8').sort(order=['f0','f1','f2'],axis = 0)
 #        f = open(dirn+'rho_df.out')
 #        r_ri = [float(line.split()[-1]) for line in f]
-        r_ri = np.loadtxt(dirn+'rho_df.out')
+        r_ri = np.loadtxt(osp.join(dirn, 'rho_df.out'))
         r_ri.view('f8,f8,f8,f8').sort(order=['f0','f1','f2'],axis = 0)
 #        f = open(dirn+'partition_tab.out')
 #        part = [float(line.split()[-1]) for line in f]
-        part = np.loadtxt(dirn+'partition_tab.out')
+        part = np.loadtxt(osp.join(dirn, 'partition_tab.out'))
         part.view('f8,f8,f8,f8').sort(order=['f0','f1','f2'],axis = 0)
         err = np.abs(r_ri[:,3]-r_con[:,3])
         norm = np.dot(r_con[:,3],part[:,3])
