@@ -24,21 +24,21 @@ def build():
         return
 
     # load training set
-    trainrangetot = np.loadtxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",int)
+    trainrangetot = np.loadtxt(os.path.join(inp.saltedpath, rdir, f"training_set_N{inp.Ntrain}.txt"), int)
     ntrain = round(inp.trainfrac*inp.Ntrain)
     
     nblocks = int(ntrain/blocksize)
     print("blocksize =",blocksize)
     print("number of blocks = ",nblocks)
     
-    Avec = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(blocksize)+"_chunk0.npy")
-    Bmat = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(blocksize)+"_chunk0.npy")
+    Avec = np.load(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{blocksize}_chunk0.npy"))
+    Bmat = np.load(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{blocksize}_chunk0.npy"))
     for iblock in range(1,nblocks):
-        Avec += np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(blocksize)+"_chunk"+str(iblock)+".npy")
-        Bmat += np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(blocksize)+"_chunk"+str(iblock)+".npy")
+        Avec += np.load(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{blocksize}_chunk{iblock}.npy"))
+        Bmat += np.load(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{blocksize}_chunk{iblock}.npy"))
     
-    np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(ntrain)+".npy",Avec)
-    np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(ntrain)+".npy",Bmat)
+    np.save(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", "Avec_N{ntrain}.npy", Avec))
+    np.save(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", "Bmat_N{ntrain}.npy", Bmat))
  
     return
 
