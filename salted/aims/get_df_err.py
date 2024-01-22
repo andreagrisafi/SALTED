@@ -1,9 +1,15 @@
+"""
+Compare the density from DF and from SCF, output the real space electron density MAE
+TODO: parallelize the comparison code
+"""
+
 import time
 import sys
 import os.path as osp
 
 import numpy as np
 import inp
+
 
 def sort_grid_data(data:np.ndarray) -> np.ndarray:
     """Sort real space grid data
@@ -25,13 +31,13 @@ def sort_grid_data(data:np.ndarray) -> np.ndarray:
 def main():
     from salted.sys_utils import read_system
     spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
-    
+
     start_time = time.time()
 
     dirname = osp.join(inp.path2qm, 'data')
     av_err = 0
     errs = np.zeros(ndata)
-    g = open('df_maes','w+')
+    g = open(osp.join(inp.saltedpath, 'df_maes'),'w+')  # stay in salted dir
     for i in range(1,ndata+1):
         dirn = osp.join(dirname, str(i))
         # f = open(dirn+'rho_scf.out')
@@ -69,6 +75,8 @@ def main():
     sem = np.std(errs)/np.sqrt(ndata)
 
     print('% MAE =', av_err)
-#    print(round(time.time() - start_time,1),'seconds')
+    end_time = time.time()
+    print(f"time_cost = {end_time - start_time:.2f} s")
 
-main()
+if __name__ == '__main__':
+    main()
