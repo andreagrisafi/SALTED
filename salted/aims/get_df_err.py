@@ -31,10 +31,8 @@ def main():
     dirname = osp.join(inp.path2qm, 'data')
     av_err = 0
     errs = np.zeros(ndata)
-    # g = open('df_maes','w+')
-    # for i in range(1,ndata+1):
-    g = open('df_maes_test','w+')
-    for i in range(1,4):
+    g = open('df_maes','w+')
+    for i in range(1,ndata+1):
         dirn = osp.join(dirname, str(i))
         # f = open(dirn+'rho_scf.out')
         # r_con = [float(line.split()[-1]) for line in f]
