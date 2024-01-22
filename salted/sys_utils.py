@@ -9,10 +9,10 @@ import inp
 
 
 def read_system(filename=inp.filename):
-    
+
     # read species
     spelist = inp.species
-    
+
     # read basis
     [lmax,nmax] = basis.basiset(inp.dfbasis)
     llist = []
@@ -23,14 +23,14 @@ def read_system(filename=inp.filename):
             nlist.append(nmax[(spe,l)])
     nnmax = max(nlist)
     llmax = max(llist)
-    
+
     # read system
     xyzfile = read(filename,":")
     ndata = len(xyzfile)
-   
-    # Define system excluding atoms that belong to species not listed in SALTED input 
+
+    # Define system excluding atoms that belong to species not listed in SALTED input
     atomic_symbols = []
-    natoms = np.zeros(ndata,int) 
+    natoms = np.zeros(ndata,int)
     for iconf in range(len(xyzfile)):
         atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
         natoms_total = len(atomic_symbols[iconf])
@@ -55,7 +55,7 @@ def get_atom_idx(ndata,natoms,spelist,atomic_symbols):
     natom_dict = {}
     for iconf in range(ndata):
         for spe in spelist:
-            atom_idx[(iconf,spe)] = [] 
+            atom_idx[(iconf,spe)] = []
             natom_dict[(iconf,spe)] = 0
         for iat in range(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
