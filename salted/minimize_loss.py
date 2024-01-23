@@ -254,7 +254,7 @@ def build():
     # preconditioner
     P = np.ones(totsize)
 
-    reg_log10_intstr = str(int(np.log10(reg)))
+    reg_log10_intstr = str(int(np.log10(reg)))  # for consistency
 
     if inp.restart == True:
         w = np.load(osp.join(
