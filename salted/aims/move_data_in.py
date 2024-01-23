@@ -27,21 +27,33 @@ for i in range(ndata):
 
     idx = np.loadtxt(os.path.join(dirpath, f"idx_prodbas.out")).astype(int)
     idx -= 1
-    idx = list(idx)
-    idx_rev = []
-    for i in range(n):
-        idx_rev.append(idx.index(i))
+
+    # # old method
+    # idx = list(idx)
+    # idx_rev = []
+    # for i in range(n):
+    #     idx_rev.append(idx.index(i))
+
+    # accelerated method
+    idx_rev = np.empty_like(idx)
+    idx_rev[idx] = np.arange(len(idx))
+
     #	np.savetxt('../idx_prodbas_rev.out',idx_rev)
     #	idx_rev = np.loadtxt('../idx_prodbas_rev.out').astype(int)
     cs_list = np.loadtxt(os.path.join(
         dirpath, f"prodbas_condon_shotley_list.out"
     )).astype(int)
     cs_list -= 1
-    cs_list = list(cs_list)
 
+    # # old method
+    # cs_list = list(cs_list)
+    # t = t[idx_rev]
+    # for j in cs_list:
+    #     t[j] *= -1
+
+    # accelerated method
     t = t[idx_rev]
-    for j in cs_list:
-        t[j] *= -1
+    t[cs_list] *= -1
 
     np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted.out"), t)
 
