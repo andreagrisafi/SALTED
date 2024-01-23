@@ -35,12 +35,9 @@ def build():
     zeta = inp.z
     
     if rank == 0:    
-        dirpath = os.path.join(inp.saltedpath, rdir)
+        dirpath = os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}")
         if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-        dirpath = os.path.join(inp.saltedpath+rdir+"/", "M"+str(M)+"_zeta"+str(zeta))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
+            os.makedirs(dirpath)
     if size > 1: comm.Barrier()
 
     # define training set at random or sequentially

@@ -83,12 +83,9 @@ def build():
     if rank == 0: print(f"problem dimensionality: {totsize}", flush=True)
 
     if (rank == 0):
-        dirpath = os.path.join(inp.saltedpath, fdir)
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
         dirpath = os.path.join(inp.saltedpath, fdir, f"M{M}_zeta{zeta}")
         if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
+            os.makedirs(dirpath)
     if size > 1:  comm.Barrier()
 
     # Distribute structures to tasks
