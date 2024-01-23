@@ -95,16 +95,10 @@ def build():
         inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"weights_N{ntrain}_reg{reg_log10_intstr}.npy"
     ))
 
+    dirpath = os.path.join(inp.saltedpath, vdir, f"M{M}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}")
     if rank == 0:
-        dirpath = os.path.join(inp.saltedpath, vdir)
         if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-        dirpath = os.path.join(inp.saltedpath, vdir, f"M{M}_zeta{zeta}")
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-        dirpath = os.path.join(inp.saltedpath, vdir, f"M{M}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}")
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
+            os.makedirs(dirpath)
     if size > 1: comm.Barrier()
 
 
