@@ -22,7 +22,7 @@ def build():
     #    print('This is task',rank+1,'of',size)
     else:
         rank = 0
-        size = 0
+        size = 1
 
     saltedname = inp.saltedname
 
