@@ -1,8 +1,10 @@
 import os
 import sys
-import numpy as np
 import time
 import random
+import os.path as osp
+
+import numpy as np
 from scipy import sparse
 
 from salted.sys_utils import read_system,get_atom_idx,get_conf_range
@@ -26,9 +28,9 @@ def build():
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     
     if inp.field:
-        rdir = "regrdir_"+inp.saltedname+"_field"
+        rdir = f"regrdir_{inp.saltedname}_field"
     else:
-        rdir = "regrdir_"+inp.saltedname
+        rdir = f"regrdir_{inp.saltedname}"
     
     # sparse-GPR parameters
     M = inp.Menv
@@ -48,9 +50,10 @@ def build():
         random.Random(3).shuffle(dataset)
         trainrangetot = dataset[:inp.Ntrain]
     else:
-        print("ERROR: training set selection not available!")
-        sys.exit(0)
-    np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
+        raise ValueError(f"training set selection {inp.trainsel=} not available!")
+    np.savetxt(osp.join(
+        inp.saltedpath, rdir, f"training_set_N{inp.Ntrain}.txt"
+    ), trainrangetot, fmt='%i')
     ntraintot = int(inp.trainfrac*inp.Ntrain)
     trainrange = trainrangetot[:ntraintot]
     ntrain = len(trainrange)
@@ -90,11 +93,11 @@ def matrices(block_idx,trainrange,rank):
     if inp.parallel: print("Task",rank,"handling structures:",trainrange)
 
     if inp.field:
-        fdir = "rkhs-vectors_"+inp.saltedname+"_field"
-        rdir = "regrdir_"+inp.saltedname+"_field"
+        fdir = f"rkhs-vectors_{inp.saltedname}_field"
+        rdir = f"regrdir_{inp.saltedname}_field"
     else:
-        fdir = "rkhs-vectors_"+inp.saltedname
-        rdir = "regrdir_"+inp.saltedname
+        fdir = f"rkhs-vectors_{inp.saltedname}"
+        rdir = f"regrdir_{inp.saltedname}"
     
     # sparse-GPR parameters
     M = inp.Menv
@@ -103,12 +106,13 @@ def matrices(block_idx,trainrange,rank):
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
     
-    p = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf0.npz")
+    p = sparse.load_npz(osp.join(
+        inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf0.npz"
+    ))
     totsize = p.shape[-1]
     if rank == 0: print("problem dimensionality:", totsize,flush=True)
     if totsize>70000:
-        print("ERROR: problem dimension too large, minimize directly loss-function instead!")
-        sys.exit(0)
+        raise ValueError(f"problem dimension too large ({totsize=}), minimize directly loss-function instead!")
     
     if inp.average:
         # load average density coefficients
@@ -125,9 +129,15 @@ def matrices(block_idx,trainrange,rank):
        
         start = time.time()
         # load reference QM data
-        ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
-        over = np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy")
-        psivec = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz")
+        ref_coefs = np.load(osp.join(
+            inp.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+        ))
+        over = np.load(osp.join(
+            inp.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+        ))
+        psivec = sparse.load_npz(osp.join(
+            inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+        ))
         psi = psivec.toarray()
     
         if inp.average:
@@ -159,11 +169,11 @@ def matrices(block_idx,trainrange,rank):
     Bmat /= float(ntrain)
     
     if block_idx == -1:
-        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(ntrain)+".npy",Avec)
-        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(ntrain)+".npy",Bmat)
+        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}.npy", Avec)
+        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}.npy", Bmat)
     else:
-        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(ntrain)+"_chunk"+str(block_idx)+".npy",Avec)
-        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(ntrain)+"_chunk"+str(block_idx)+".npy",Bmat)
+        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}_chunk{block_idx}.npy", Avec)
+        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{block_idx}.npy", Bmat)
 
     return
 

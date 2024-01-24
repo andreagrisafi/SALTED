@@ -11,9 +11,9 @@ def build():
     blocksize = inp.blocksize
     
     if inp.field:
-        rdir = "regrdir_"+inp.saltedname+"_field"
+        rdir = f"regrdir_{inp.saltedname}_field"
     else:
-        rdir = "regrdir_"+inp.saltedname
+        rdir = f"regrdir_{inp.saltedname}"
     
     # sparse-GPR parameters
     M = inp.Menv
@@ -37,8 +37,8 @@ def build():
         Avec += np.load(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{blocksize}_chunk{iblock}.npy"))
         Bmat += np.load(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{blocksize}_chunk{iblock}.npy"))
     
-    np.save(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", "Avec_N{ntrain}.npy", Avec))
-    np.save(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", "Bmat_N{ntrain}.npy", Bmat))
+    np.save(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}.npy", Avec))
+    np.save(os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}.npy", Bmat))
  
     return
 
