@@ -1,13 +1,12 @@
 import os
 import sys
-from os import listdir
 
 import numpy as np
 
 import inp
 
 dn = os.path.join(inp.path2qm, inp.predict_data)
-l = listdir(dn+'geoms/')
+l = os.listdir(os.path.join(dn, "geoms"))
 nfiles = len(l)
 testset = list(range(nfiles))
 testset = [x+1 for x in testset]
@@ -23,8 +22,8 @@ for k,i in enumerate(testset):
     xc = []
     har = []
     ele = []
-    dirn = dn+str(i)+'/'
-    
+    dirn = os.path.join(dn, str(i))
+
     f1 = open(dirn+'aims.out')
     for line in f1:
         if line.find('| Number of atoms') != -1:
