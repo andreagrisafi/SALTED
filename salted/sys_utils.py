@@ -89,3 +89,20 @@ def get_conf_range(rank,size,ntest,testrangetot):
 
     return testrange
 
+
+def sort_grid_data(data:np.ndarray) -> np.ndarray:
+    """Sort real space grid data
+    The grid data is 2D array with 4 columns (x,y,z,value).
+    Sort the grid data in the order of x, y, z.
+
+    Args:
+        data (np.ndarray): grid data, shape (n,4)
+
+    Returns:
+        np.ndarray: sorted grid data, shape (n,4)
+    """
+    assert data.ndim == 2
+    assert data.shape[1] == 4
+    data = data[np.lexsort((data[:,2], data[:,1], data[:,0]))]  # last key is primary
+    return data
+

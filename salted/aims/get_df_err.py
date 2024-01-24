@@ -10,23 +10,7 @@ import os.path as osp
 import numpy as np
 import inp
 
-
-def sort_grid_data(data:np.ndarray) -> np.ndarray:
-    """Sort real space grid data
-    The grid data is 2D array with 4 columns (x,y,z,value).
-    Sort the grid data in the order of x, y, z.
-
-    Args:
-        data (np.ndarray): grid data
-
-    Returns:
-        np.ndarray: sorted grid data
-    """
-    assert data.ndim == 2
-    assert data.shape[1] == 4
-    data = data[np.lexsort((data[:,2], data[:,1], data[:,0]))]  # last key is primary
-    return data
-
+from salted.sys_utils import sort_grid_data
 
 def main():
     from salted.sys_utils import read_system
