@@ -1,7 +1,7 @@
 import os
 import time
 import sys
-import osp as osp
+import os.path as osp
 
 import numpy as np
 
