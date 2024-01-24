@@ -28,6 +28,7 @@ def build():
         print(f"This is task {rank+1} of {size}", flush=True)
     else:
         rank=0
+        size=1
 
     if inp.field:
         fdir = f"rkhs-vectors_{inp.saltedname}_field"
