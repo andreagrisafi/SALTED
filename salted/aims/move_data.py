@@ -70,9 +70,9 @@ for i in conf_range:
     t = t[idx]
     ovlp = ovlp[idx,:]
     ovlp = ovlp[:,idx]
-    np.save(osp.join(inp.saltedpath, f'overlaps/overlap_conf{i}.npy'), ovlp)
-    np.save(osp.join(inp.saltedpath, f'projections/projections_conf{i}.npy'), o)
-    np.save(osp.join(inp.saltedpath, f'coefficients/coefficients_conf{i}.npy'), t)
+    np.save(osp.join(inp.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
+    np.save(osp.join(inp.saltedpath, "projections", f"projections_conf{i}.npy"), o)
+    np.save(osp.join(inp.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
 
 if size > 1: comm.Barrier()
 
