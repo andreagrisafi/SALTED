@@ -1,9 +1,12 @@
+import os
+import sys
+
 import numpy as np
 from pyscf import gto
 from ase.io import read
 from scipy import special
-import basis
-import sys
+
+import basis  # WARNING: relative import
 sys.path.insert(0, './')
 import inp
 
@@ -115,7 +118,9 @@ for iconf in testrange:
     natoms = len(atoms)
     # Load projections and overlaps
 #    projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
-    rcoeffs = np.load(inp.path2ml+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(iconf)+".npy")
+    rcoeffs = np.load(os.path.join(
+        inp.path2ml, pdir, f"M{M}_eigcut{int(np.log10(eigcut))}", f"N_{ntrain}", f"prediction_conf{iconf}.npy"
+    ))
     ref_coeffs = np.zeros((natoms,llmax+1,nnmax,llmax*2+1))
     ref_rho = np.zeros(rcoeffs.shape,float)
     icoeff = 0

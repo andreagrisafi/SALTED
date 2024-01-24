@@ -1,10 +1,12 @@
+import sys
 import time
+
 import numpy as np
 from pyscf import gto
 from ase.io import read
 from scipy import special
-import basis
-import sys
+
+import basis  # WARNING: relative import
 sys.path.insert(0, './')
 import inp
 
@@ -102,7 +104,9 @@ for iconf in range(ndata):
     nele = np.sum(valences)
     natoms = len(atoms)
     # Load projections and overlaps
-    rcoeffs = np.load(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy")
+    rcoeffs = np.load(os.path.join(
+        inp.path2qm, inp.coefdir, f"coefficients_conf{iconf}.npy"
+    ))
     ref_coeffs = np.zeros((natoms,llmax+1,nnmax,2*llmax+1))
     ref_rho = np.zeros(len(rcoeffs))
     icoeff = 0
