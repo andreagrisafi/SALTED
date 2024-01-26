@@ -315,7 +315,7 @@ def build():
             ref_coefs -= Av_coeffs
         var = np.dot(ref_coefs,ref_projs)
         variance += var
-        print(iconf+1, np.sqrt(error/var)*100, file=efile)
+        print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
         print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
         #print(iconf+1, ":", "rho integral =", rho_int, "normalized rho integral =", charge, "ref_dipole =", ref_dipole, "dipole =",dipole, ", error =", np.sqrt(error/var)*100, "% RMSE", flush=True)
 
