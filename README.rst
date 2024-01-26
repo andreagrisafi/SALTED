@@ -94,4 +94,4 @@ alan.m.lewis@york.ac.uk
 
 Contributors
 ------------
-Andrea Grisafi, Alan Lewis, Mariana Rossi, Michele Ceriotti
+Andrea Grisafi, Alan Lewis
