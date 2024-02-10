@@ -1,5 +1,7 @@
-import numpy as np
 import os
+import os.path as osp
+
+import numpy as np
 import inp
 from ase.io import read
 
@@ -15,12 +17,14 @@ else:
     size = 1
 
 if (rank == 0):
-    if not os.path.exists(inp.saltedpath+"overlaps"):
-        os.mkdir(inp.saltedpath+"overlaps")
-    if not os.path.exists(inp.saltedpath+"coefficients"):
-        os.mkdir(inp.saltedpath+"coefficients")
-    if not os.path.exists(inp.saltedpath+"projections"):
-        os.mkdir(inp.saltedpath+"projections")
+    """check if all subdirectories exist, if not create them"""
+    sub_dirs = [
+        osp.join(inp.saltedpath, d)
+        for d in ("overlaps", "coefficients", "projections")
+    ]
+    for sub_dir in sub_dirs:
+        if not osp.exists(sub_dir):
+            os.mkdir(sub_dir)
 
 xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
@@ -42,37 +46,40 @@ else:
     conf_range = list(range(ndata))
 
 for i in conf_range:
-    dirpath = inp.path2qm+'data/'+str(i+1)+'/'
-    idx = np.loadtxt(dirpath+'idx_prodbas.out').astype(int)
-    cs_list = np.loadtxt(dirpath+'prodbas_condon_shotley_list.out').astype(int)
+    dirpath = osp.join(inp.path2qm, 'data', str(i+1))
+    idx = np.loadtxt(osp.join(dirpath, 'idx_prodbas.out')).astype(int)
+    cs_list = np.loadtxt(osp.join(dirpath, 'prodbas_condon_shotley_list.out')).astype(int)
     idx -= 1
     cs_list -= 1
     idx = list(idx)
     cs_list = list(cs_list)
-    o = np.loadtxt(dirpath+'ri_projections.out').reshape(-1)
-    t = np.loadtxt(dirpath+'ri_restart_coeffs_df.out').reshape(-1)
-    ovlp = np.loadtxt(dirpath+'ri_ovlp.out').reshape(-1)
-    
+    o = np.loadtxt(osp.join(dirpath, 'ri_projections.out')).reshape(-1)
+    t = np.loadtxt(osp.join(dirpath, 'ri_restart_coeffs_df.out')).reshape(-1)
+    ovlp = np.loadtxt(osp.join(dirpath, 'ri_ovlp.out')).reshape(-1)
+
     n = len(o)
     ovlp = ovlp.reshape(n,n)
-    
+
     for j in cs_list:
         ovlp[j,:] *= -1
         ovlp[:,j] *= -1
         o[j] *= -1
         t[j] *= -1
-    
+
     o = o[idx]
     t = t[idx]
     ovlp = ovlp[idx,:]
     ovlp = ovlp[:,idx]
-    np.save(inp.saltedpath+'overlaps/overlap_conf'+str(i)+'.npy',ovlp)
-    np.save(inp.saltedpath+'projections/projections_conf'+str(i)+'.npy',o)
-    np.save(inp.saltedpath+'coefficients/coefficients_conf'+str(i)+'.npy',t)
+    np.save(osp.join(inp.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
+    np.save(osp.join(inp.saltedpath, "projections", f"projections_conf{i}.npy"), o)
+    np.save(osp.join(inp.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
 
 if size > 1: comm.Barrier()
 
+
+"""delte ri basis overlap and proj coeffs files"""
+
 for i in conf_range:
-    dirpath = inp.path2qm+'data/'+str(i+1)+'/'
-    os.remove(dirpath+'ri_ovlp.out')
-    os.remove(dirpath+'ri_projections.out')
+    dirpath = osp.join(inp.path2qm, 'data', str(i+1))
+    os.remove(osp.join(dirpath, 'ri_ovlp.out'))
+    os.remove(osp.join(dirpath, 'ri_projections.out'))

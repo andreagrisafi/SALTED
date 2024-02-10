@@ -1,17 +1,20 @@
+import argparse
 import os
+import sys
+import os.path as osp
+
 import numpy as np
 from pyscf import gto
 from ase.io import read
 from scipy import special
-import argparse
-import basis
 
-import sys
+import basis  # WARNING: relative import
+
 sys.path.insert(0, './')
 import inp
 
-def add_command_line_arguments(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+def add_command_line_arguments():
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-iconf", "--confidx",  type=int, default=-1, help="Structure index")
     args = parser.parse_args()
     return args
@@ -87,7 +90,9 @@ for iconf in conf_list:
     eri3c = pmol.intor('int3c2e_sph', shls_slice=(0,mol.nbas,0,mol.nbas,mol.nbas,mol.nbas+auxmol.nbas))
     eri3c = eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
     # Load 1-electron reduced density-matrix
-    dm=np.load(inp.path2qm+"density_matrices/dm_conf"+str(iconf+1)+".npy")
+    dm=np.load(osp.join(
+        inp.path2qm, "density_matrices", f"dm_conf{iconf+1}.npy"
+    ))
     # Compute density fitted coefficients
     rho = np.einsum('ijp,ij->p', eri3c, dm)
     rho = np.linalg.solve(eri2c, rho)
@@ -140,9 +145,9 @@ for iconf in conf_list:
     Proj = np.dot(Over,Coef)
     
     # Save projections and overlaps
-    np.save(inp.path2qm+inp.coefdir+"coefficients_conf"+str(iconf)+".npy",Coef)
-    np.save(inp.path2qm+inp.projdir+"projections_conf"+str(iconf)+".npy",Proj)
-    np.save(inp.path2qm+inp.ovlpdir+"overlap_conf"+str(iconf)+".npy",Over)
+    np.save(f"inp.path2qm", "inp.coefdir", "coefficients_conf{iconf}.npy", Coef)
+    np.save(f"inp.path2qm", "inp.projdir", "projections_conf{iconf}.npy", Proj)
+    np.save(f"inp.path2qm", "inp.ovlpdir", "overlap_conf{iconf}.npy", Over)
     
     # --------------------------------------------------
     

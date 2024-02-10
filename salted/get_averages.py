@@ -1,3 +1,4 @@
+import os
 import sys
 import numpy as np
 
@@ -19,7 +20,7 @@ def build():
     print("computing averages...")
     for iconf in range(ndata):
         atoms = atomic_symbols[iconf]
-        coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
+        coefs = np.load(os.path.join(inp.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"))
         i = 0
         for iat in range(natoms[iconf]):
             spe = atoms[iat] 
@@ -33,7 +34,7 @@ def build():
     
     for spe in spelist:
         avcoefs[spe] /= nat_per_species[spe]
-        np.save("averages_"+str(spe)+".npy",avcoefs[spe])
+        np.save(f"averages_{spe}.npy", avcoefs[spe])
 
     return
 

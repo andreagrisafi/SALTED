@@ -1,3 +1,7 @@
+"""
+WARNING: many variables are referenced before defined
+"""
+
 import os
 import sys
 import time
@@ -208,7 +212,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
             llvec[il,1] = lvalues[il][1]
         
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-        wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_lmax2-"+str(nang2)+".dat")
+        wigner3j = np.loadtxt(os.path.join(
+            inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
+        ))
         wigdim = wigner3j.size
       
         # Reshape arrays of expansion coefficients for optimal Fortran indexing 
@@ -275,7 +281,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
                  llvec[il,1] = lvalues[il][1]
     
              # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-             wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field.dat")
+             wigner3j = np.loadtxt(os.path.join(
+                 inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_field.dat"
+             ))
              wigdim = wigner3j.size
           
              # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)

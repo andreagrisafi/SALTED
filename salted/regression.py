@@ -1,6 +1,10 @@
+import os
 import sys
-import numpy as np
 import time
+import os.path as osp
+
+import numpy as np
+
 
 def build():
 
@@ -13,33 +17,32 @@ def build():
     zeta = inp.z
     
     if inp.field:
-        kdir = "kernels_"+inp.saltedname+"_field"
-        fdir = "rkhs-vectors_"+inp.saltedname+"_field"
-        rdir = "regrdir_"+inp.saltedname+"_field"
+        kdir = f"kernels_{inp.saltedname}_field"
+        fdir = f"rkhs-vectors_{inp.saltedname}_field"
+        rdir = f"regrdir_{inp.saltedname}_field"
     else:
-        kdir = "kernels_"+inp.saltedname
-        fdir = "rkhs-vectors_"+inp.saltedname
-        rdir = "regrdir_"+inp.saltedname
+        kdir = f"kernels_{inp.saltedname}"
+        fdir = f"rkhs-vectors_{inp.saltedname}"
+        rdir = f"regrdir_{inp.saltedname}"
     
     # define training set size 
     ntrain = round(inp.trainfrac*inp.Ntrain)
     
     # load regression matrices
-    Avec = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Avec_N"+str(ntrain)+".npy")
+    Avec = np.load(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}.npy"))
     totsize = Avec.shape[0]
     print("problem dimensionality:", totsize,flush=True)
-    if totsize>70000:
-        print("ERROR: problem dimension too large, minimize directly loss-function instead!")
-        sys.exit(0)
-    Bmat = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/Bmat_N"+str(ntrain)+".npy")
+    if totsize > 70000:
+        raise ValueError(f"problem dimension too large ({totsize=}), minimize directly loss-function instead!")
+    Bmat = np.load(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}.npy"))
     
     start = time.time()
     
     w = np.linalg.solve(Bmat+np.eye(totsize)*reg,Avec)
     
-    print("regression time:", (time.time()-start)/60, "minutes")
+    print(f"regression time: {((time.time()-start)/60):.3f} minutes")
     
-    np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy",w)
+    np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"), w)
 
     return
 

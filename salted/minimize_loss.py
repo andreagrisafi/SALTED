@@ -1,9 +1,16 @@
+"""
+TODO:
+- stop minimization with explicit message from rank 0
+"""
+
 import os
-import numpy as np
-import time
 import random
-from scipy import sparse
 import sys
+import time
+import os.path as osp
+
+import numpy as np
+from scipy import sparse
 from salted.sys_utils import read_system, get_atom_idx, get_conf_range
 
 def build():
@@ -18,16 +25,17 @@ def build():
         comm = MPI.COMM_WORLD
         size = comm.Get_size()
         rank = comm.Get_rank()
-        print('This is task',rank+1,'of',size,flush=True)
+        print(f"This is task {rank+1} of {size}", flush=True)
     else:
         rank=0
+        size=1
 
     if inp.field:
-        fdir = "rkhs-vectors_"+inp.saltedname+"_field"
-        rdir = "regrdir_"+inp.saltedname+"_field"
+        fdir = f"rkhs-vectors_{inp.saltedname}_field"
+        rdir = f"regrdir_{inp.saltedname}_field"
     else:
-        fdir = "rkhs-vectors_"+inp.saltedname
-        rdir = "regrdir_"+inp.saltedname
+        fdir = f"rkhs-vectors_{inp.saltedname}"
+        rdir = f"regrdir_{inp.saltedname}"
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -42,37 +50,44 @@ def build():
     if inp.average:
         av_coefs = {}
         for spe in species:
-            av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
+            av_coefs[spe] = np.load(f"averages_{spe}.npy")
 
+    dirpath = os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}")
     if rank==0:
-        dirpath = os.path.join(inp.saltedpath, rdir)
         if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
-        dirpath = os.path.join(inp.saltedpath+rdir+"/", "M"+str(M)+"_zeta"+str(zeta))
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
+            os.makedirs(dirpath)
     if size > 1: comm.Barrier()
 
     # define training set at random
     if (inp.Ntrain > ndata):
-        print("More training structures have been requested than are present in the input data.")
-        exit()
+        if rank == 0:
+            raise ValueError(f"More training structures {inp.Ntrain=} have been requested than are present in the input data {ndata=}.")
+        else:
+            exit()
     dataset = list(range(ndata))
     random.Random(3).shuffle(dataset)
     trainrangetot = dataset[:inp.Ntrain]
-    if rank == 0: np.savetxt(inp.saltedpath+rdir+"/training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
+    if rank == 0:
+        np.savetxt(osp.join(
+            inp.saltedpath, rdir, f"training_set_N{inp.Ntrain}.txt"
+        ), trainrangetot, fmt='%i')
     #trainrangetot = np.loadtxt("training_set.txt",int)
 
     # Distribute structures to tasks
     ntraintot = int(inp.trainfrac*inp.Ntrain)
 
     if paral:
-        if rank == 0 and ntraintot < size:
-            print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
-            comm.Abort()
+        if ntraintot < size:
+            if rank == 0:
+                raise ValueError(f"More processes {size=} have been requested than training structures {ntraintot=}. Please reduce the number of processes.")
+            else:
+                exit()
+        # if rank == 0 and ntraintot < size:
+        #     print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
+        #     comm.Abort()
         trainrange = get_conf_range(rank,size,ntraintot,trainrangetot)
         trainrange = comm.scatter(trainrange,root=0)
-        print('Task',rank+1,'handles the following structures:',trainrange,flush=True)
+        print(f"Task {rank+1} handles the following structures: {trainrange}", flush=True)
     else:
         trainrange = trainrangetot[:ntraintot]
     ntrain = int(len(trainrange))
@@ -80,8 +95,8 @@ def build():
 
     def loss_func(weights,ovlp_list,psi_list):
         """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
-      
-#        global totsize 
+
+#        global totsize
         totsize = psi_list[0].shape[1]
 
         # init gradient
@@ -90,11 +105,15 @@ def build():
         loss = 0.0
         # loop over training structures
         for iconf in range(ntrain):
-       
+
             # load reference QM data
-            ref_projs = np.load(inp.saltedpath+"projections/projections_conf"+str(trainrange[iconf])+".npy")
-            ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(trainrange[iconf])+".npy")
-           
+            ref_projs = np.load(osp.join(
+                inp.saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
+            ))
+            ref_coefs = np.load(osp.join(
+                inp.saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
+            ))
+
             if inp.average:
                 Av_coeffs = np.zeros(ref_coefs.shape[0])
             i = 0
@@ -123,13 +142,15 @@ def build():
         # add regularization term
         loss += reg * np.dot(weights,weights)
 
-        return loss 
+        return loss
 
 
-    def grad_func(weights,ovlp_list,psi_list):
-        """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
-      
-#        global totsize 
+    def grad_func(weights, ovlp_list, psi_list):
+        """
+        Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function.
+        """
+
+#        global totsize
         totsize = psi_list[0].shape[1]
 
         # init gradient
@@ -137,11 +158,15 @@ def build():
 
         # loop over training structures
         for iconf in range(ntrain):
-       
+
             # load reference QM data
-            ref_projs = np.load(inp.saltedpath+"projections/projections_conf"+str(trainrange[iconf])+".npy")
-            ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(trainrange[iconf])+".npy")
-          
+            ref_projs = np.load(osp.join(
+                inp.saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
+            ))
+            ref_coefs = np.load(osp.join(
+                inp.saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
+            ))
+
             if inp.average:
                 Av_coeffs = np.zeros(ref_coefs.shape[0])
             i = 0
@@ -179,19 +204,19 @@ def build():
             print(iconf+1,flush=True)
             #psi_vector = psi_list[iconf].toarray()
             #ovlp_times_psi = np.dot(ovlp_list[iconf],psi_vector)
-            #diag_hessian += 2.0*np.sum(np.multiply(ovlp_times_psi,psi_vector),axis=0)  
+            #diag_hessian += 2.0*np.sum(np.multiply(ovlp_times_psi,psi_vector),axis=0)
 
             ovlp_times_psi = sparse.csc_matrix.dot(psi_list[iconf].T,ovlp_list[iconf])
             temp = np.sum(sparse.csc_matrix.multiply(psi_list[iconf].T,ovlp_times_psi),axis=1)
             diag_hessian += 2.0*np.squeeze(np.asarray(temp))
 
-        #del psi_vector  
+        #del psi_vector
 
-        return diag_hessian 
+        return diag_hessian
 
     def curv_func(cg_dire,ovlp_list,psi_list):
         """Compute curvature on the given CG-direction."""
-      
+
 #        global totsize
         totsize = psi_list[0].shape[1]
 
@@ -203,30 +228,42 @@ def build():
 
         return Ap
 
-    if rank == 0: print("loading matrices...")
-    ovlp_list = [] 
-    psi_list = [] 
+    if rank == 0:  print("loading matrices...")
+    ovlp_list = []
+    psi_list = []
     for iconf in trainrange:
-        ovlp_list.append(np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy"))
+        ovlp_list.append(np.load(osp.join(
+            inp.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+        )))
         # load feature vector as a scipy sparse object
-        psi_list.append(sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz"))
+        psi_list.append(sparse.load_npz(osp.join(
+            inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+        )))
 
     totsize = psi_list[0].shape[1]
-    norm = 1.0/float(ntraintot)
+    norm = 1.0 / float(ntraintot)
 
-    if rank == 0: print("problem dimensionality:", totsize)
+    if rank == 0:  print(f"problem dimensionality: {totsize}")
 
     start = time.time()
 
-    tol = inp.gradtol 
+    tol = inp.gradtol
 
     # preconditioner
     P = np.ones(totsize)
 
+    reg_log10_intstr = str(int(np.log10(reg)))  # for consistency
+
     if inp.restart == True:
-        w = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
-        d = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
-        r = np.load(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy")
+        w = np.load(osp.join(
+            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"weights_N{ntraintot}_reg{reg_log10_intstr}.npy"
+        ))
+        d = np.load(osp.join(
+            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"dvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+        ))
+        r = np.load(osp.join(
+            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+        ))
         s = np.multiply(P,r)
         delnew = np.dot(r,s)
     else:
@@ -244,7 +281,7 @@ def build():
     for i in range(100000):
         Ad = curv_func(d,ovlp_list,psi_list)
         if paral:
-            Ad = comm.allreduce(Ad)*norm + 2.0 * reg * d 
+            Ad = comm.allreduce(Ad)*norm + 2.0 * reg * d
         else:
             Ad *= norm
             Ad += 2.0*reg*d
@@ -252,12 +289,20 @@ def build():
         alpha = delnew/curv
         w = w + alpha*d
         if (i+1)%50==0 and rank==0:
-            np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
-            np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
-            np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r)
-        r -= alpha * Ad 
-        if rank == 0: print(i+1, "gradient norm:", np.sqrt(np.sum((r**2))),flush=True)
-        if np.sqrt(np.sum((r**2))) < tol:
+            np.save(osp.join(
+                inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"weights_N{ntraintot}_reg{reg_log10_intstr}.npy"
+            ), w)
+            np.save(osp.join(
+                inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"dvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+            ), d)
+            np.save(osp.join(
+                inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+            ), r)
+        r -= alpha * Ad
+        if rank == 0:
+            # np.sqrt(np.sum((r**2))) == np.linalg.norm(r)
+            print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
+        if np.linalg.norm(r) < tol:
             break
         else:
             s = np.multiply(P,r)
@@ -267,11 +312,17 @@ def build():
             d = s + beta*d
 
     if rank == 0:
-        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",w)
-        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/dvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",d)
-        np.save(inp.saltedpath+rdir+"/M"+str(M)+"_zeta"+str(zeta)+"/rvector_N"+str(ntraintot)+"_reg"+str(int(np.log10(reg)))+".npy",r)
+        np.save(osp.join(
+            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"weights_N{ntraintot}_reg{reg_log10_intstr}.npy"
+        ), w)
+        np.save(osp.join(
+            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"dvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+        ), d)
+        np.save(osp.join(
+            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+        ), r)
         print("minimization compleated succesfully!")
-        print("minimization time:", (time.time()-start)/60, "minutes")
+        print(f"minimization time: {((time.time()-start)/60):.2f} minutes")
 
 if __name__ == "__main__":
     build()

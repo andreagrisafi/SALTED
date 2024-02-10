@@ -1,5 +1,7 @@
-import numpy as np
+import os
 import sys
+
+import numpy as np
 from ase.io import read
 
 from salted.sys_utils import read_system
@@ -63,7 +65,7 @@ def build():
     te_energ = energies[testrange]
     
     # load feature vector and define sparse feature vector
-    power_per_conf = np.load(inp.path2ml+inp.soapdir+"FEAT-0.npy")
+    power_per_conf = np.load(os.path.join(inp.path2ml, inp.soapdir, "FEAT-0.npy"))
     nfeat = power_per_conf.shape[-1]
     power_ref_sparse = power_per_conf.reshape(ndata*3,nfeat)[fps_indexes]
     

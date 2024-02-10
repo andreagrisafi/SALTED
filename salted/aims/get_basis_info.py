@@ -1,7 +1,11 @@
-import inp
+import os
+import os.path as osp
+
 import numpy as np
 from ase.io import read
+
 from salted import basis
+import inp
 
 # read species
 spelist = inp.species
@@ -10,7 +14,7 @@ xyzfile = read(inp.filename,":")
 
 done_list = []
 
-dirpath = inp.path2qm + 'data/'
+dirpath = osp.join(inp.path2qm, 'data')
 
 afname = basis.__file__
 
@@ -22,11 +26,11 @@ for iconf in range(len(xyzfile)):
     for iat in range(natoms):
         spe = atomic_symbols[iat]
         if spe not in done_list:
-            f = open(dirpath+str(iconf+1)+'/basis_info.out')
+            f = open(osp.join(dirpath, str(iconf+1), 'basis_info.out'))
             l = 0
             while True:
                 line = f.readline()
-                if not line: 
+                if not line:
                     f.close()
                     break
 

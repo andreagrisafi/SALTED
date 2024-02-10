@@ -1,6 +1,8 @@
 import os
 import sys
 import time
+import os.path as osp
+
 import h5py
 import numpy as np
 from scipy import special
@@ -36,7 +38,9 @@ def build():
         sigmas = {}
         for spe in species:
             for l in range(lmax[spe]+1):
-                avals = np.loadtxt(inp.saltedpath+"basis/"+spe+"-"+inp.dfbasis+"-alphas-L"+str(l)+".dat")
+                avals = np.loadtxt(osp.join(
+                    inp.saltedpath, "basis", f"{spe}-{inp.dfbasis}-alphas-L{l}.dat"
+                ))
                 if nmax[(spe,l)]==1:
                     alphas[(spe,l,0)] = float(avals)
                     sigmas[(spe,l,0)] = np.sqrt(0.5/alphas[(spe,l,0)]) # bohr
@@ -66,18 +70,32 @@ def build():
     if inp.field: vfps_field = {}
     for lam in range(lmax_max+1):
         # Load sparsification details
-        if ncut > 0: vfps[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
-        if ncut > 0 and inp.field: vfps_field[lam] = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy")
+        if ncut > 0:
+            vfps[lam] = np.load(osp.join(
+                inp.saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
+            ))
+        if ncut > 0 and inp.field:
+            vfps_field[lam] = np.load(osp.join(
+                inp.saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}_field.npy"
+            ))
         for spe in species:
             # load sparse equivariant descriptors 
-            power_env_sparse[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M-"+str(M)+".h5",'r')[spe][:]
-            if inp.field: power_env_sparse_field[(lam,spe)] = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-M-"+str(M)+"_field.h5",'r')[spe][:]
+            power_env_sparse[(lam,spe)] = h5py.File(osp.join(
+                inp.saltedpath, f"equirepr_{saltedname}", f"FEAT-{lam}-M-{M}.h5"
+            ), 'r')[spe][:]
+            if inp.field: power_env_sparse_field[(lam,spe)] = h5py.File(osp.join(
+                inp.saltedpath, f"equirepr_{saltedname}", f"FEAT-{lam}-M-{M}_field.h5"
+            ), 'r')[spe][:]
             if lam == 0: Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
             # load RKHS projectors 
             if inp.field:
-                Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"_field/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
+                Vmat[(lam,spe)] = np.load(osp.join(
+                    inp.saltedpath, f"kernels_{saltedname}_field", f"spe{spe}_l{lam}", f"M{M}_zeta{zeta}", "projector.npy"
+                ))
             else:
-                Vmat[(lam,spe)] = np.load(inp.saltedpath+"kernels_"+saltedname+"/spe"+str(spe)+"_l"+str(lam)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy")
+                Vmat[(lam,spe)] = np.load(osp.join(
+                    inp.saltedpath, f"kernels_{saltedname}", f"spe{spe}_l{lam}", f"M{M}_zeta{zeta}", "projector.npy"
+                ))
             # precompute projection on RKHS if linear model 
             if zeta==1:
                 power_env_sparse[(lam,spe)] = np.dot(Vmat[(lam,spe)].T,power_env_sparse[(lam,spe)])
@@ -86,9 +104,13 @@ def build():
     # load regression weights
     ntrain = int(inp.Ntrain*inp.trainfrac)
     if inp.field:
-        weights = np.load(inp.saltedpath+"regrdir_"+saltedname+"_field/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
+        weights = np.load(osp.join(
+            inp.saltedpath, f"regrdir_{saltedname}_field", f"M{M}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
+        ))
     else:
-        weights = np.load(inp.saltedpath+"regrdir_"+saltedname+"/M"+str(M)+"_zeta"+str(zeta)+"/weights_N"+str(ntrain)+"_reg"+str(int(np.log10(reg)))+".npy")
+        weights = np.load(osp.join(
+            inp.saltedpath, f"regrdir_{saltedname}", f"M{M}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
+        ))
     
     print("load time:", (time.time()-loadstart))
     

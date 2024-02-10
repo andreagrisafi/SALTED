@@ -1,12 +1,13 @@
+import argparse
 import os
 import sys
+
 import numpy as np
+from ase.io import read
 from pyscf import gto
 from pyscf import scf,dft
-from ase.io import read
-from scipy import special
-import argparse
 from pyscf import grad
+from scipy import special
 
 sys.path.insert(0, './')
 import inp
@@ -69,4 +70,4 @@ for iconf in conf_list:
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
     
-    np.save(inp.path2qm+"density_matrices/dm_conf"+str(iconf+1)+".npy",dm)
+    np.save(os.path.join(inp.path2qm, "density_matrices", f"dm_conf{iconf+1}.npy", dm))
