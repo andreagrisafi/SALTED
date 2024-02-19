@@ -25,7 +25,7 @@ CC=gcc
 init:
 	cd salted/lib; touch __init__.py
 
-f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so 
+f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so salted/lib/equicombfieldx.so salted/lib/equicombfieldy.so 
 #salted/lib/gausslegendre.so salted/lib/neighlist_ewald.so salted/lib/nearfield_ewald.so salted/lib/lebedev.so
 
 salted/lib/ovlp2c.so: src/ovlp2c.f90
@@ -51,6 +51,12 @@ salted/lib/equicomb.so: src/equicomb.f90
 
 salted/lib/equicombfield.so: src/equicombfield.f90
 	cd salted/lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../../src/equicombfield.f90 -m equicombfield --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombfield.*.so equicombfield.so
+
+salted/lib/equicombfieldx.so: src/equicombfieldx.f90
+	cd salted/lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../../src/equicombfieldx.f90 -m equicombfieldx --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombfieldx.*.so equicombfieldx.so
+
+salted/lib/equicombfieldy.so: src/equicombfieldy.f90
+	cd salted/lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../../src/equicombfieldy.f90 -m equicombfieldy --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombfieldy.*.so equicombfieldy.so
 
 #salted/lib/gausslegendre.so: src/gausslegendre.f90
 #	cd salted/lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../../src/gausslegendre.f90 -m gausslegendre --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv gausslegendre.*.so gausslegendre.so

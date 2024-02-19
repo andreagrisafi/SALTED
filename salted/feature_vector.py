@@ -68,7 +68,10 @@ def build():
     for spe in species:
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
-                Mcut = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(0)+".npy").shape[1]
+                if inp.vfield:
+                    Mcut = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm-x_conf"+str(0)+".npy").shape[1]
+                else:
+                    Mcut = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(0)+".npy").shape[1]
                 cuml_Mcut[(spe,l,n)] = totsize
                 totsize += Mcut
     
@@ -96,68 +99,114 @@ def build():
         start = time.time()
         print(iconf,flush=True)
     
-        # load reference QM data
-        coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
-        Tsize = len(coefs)
+        if inp.vfield:
+
+            for ix in ['x','y','z']:
+
+                # load reference QM data
+                coefs = np.load(inp.saltedpath+"coefficients/coefficients-"+str(ix)+"_conf"+str(iconf)+".npy")
+                Tsize = len(coefs)
+                            
+                # initialize RKHS feature vectors for each channel 
+                Psi = {}
+                ispe = {}
+                for spe in species:
+                    ispe[spe] = 0
+                    for l in range(lmax[spe]+1):
+                        psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm-"+str(ix)+"_conf"+str(iconf)+".npy")
+                        Psi[(spe,l)] = psi_nm
     
-        # initialize RKHS feature vectors for each channel 
-        Psi = {}
+                # build sparse feature-vector memory efficiently
     
-        ispe = {}
-        for spe in species:
-            ispe[spe] = 0
-            for l in range(lmax[spe]+1):
-                psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npy") 
-                Psi[(spe,l)] = psi_nm
+                nrows = Tsize
+                ncols = totsize
+                srows = arraylist()
+                scols = arraylist()
+                psi_nonzero = arraylist()
+                i = 0
+                for iat in range(natoms[iconf]):
+                    spe = atomic_symbols[iconf][iat]
+                    for l in range(lmax[spe]+1):
+                        i1 = ispe[spe]*(2*l+1)
+                        i2 = ispe[spe]*(2*l+1)+2*l+1
+                        x = Psi[(spe,l)][i1:i2]
+                        nz = np.nonzero(x)
+                        vals = x[x!=0]
+                        for n in range(nmax[(spe,l)]):
+                            psi_nonzero.update(vals)
+                            srows.update(nz[0]+i)
+                            scols.update(nz[1]+cuml_Mcut[(spe,l,n)])
+                            i += 2*l+1
+                    ispe[spe] += 1
     
-    # This would be needed if psi_nm depended on n
-    #            Mcut = psi_nm.shape[1]
-    #            for n in range(nmax[(spe,l)]):
-    #                Psi[(spe,l,n)][:,isize:isize+Mcut] = psi_nm
-    #                isize += Mcut
+                psi_nonzero = psi_nonzero.finalize()
+                srows = srows.finalize()
+                scols = scols.finalize()
+                ij = np.vstack((srows,scols))
+
+                del srows
+                del scols
+
+                sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
+                sparse.save_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm-"+str(ix)+"_conf"+str(iconf)+".npz", sparse_psi)
+
+                del sparse_psi
+                del psi_nonzero
+                del ij
+
+        else:
+
+            # load reference QM data
+            coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
+            Tsize = len(coefs)
+    
+            # initialize RKHS feature vectors for each channel 
+            Psi = {}
+            ispe = {}
+            for spe in species:
+                ispe[spe] = 0
+                for l in range(lmax[spe]+1):
+                    psi_nm = np.load(inp.saltedpath+kdir+"/spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npy") 
+                    Psi[(spe,l)] = psi_nm
     
     
-        # build sparse feature-vector memory efficiently
+            # build sparse feature-vector memory efficiently
     
-        nrows = Tsize
-        ncols = totsize
-        srows = arraylist()
-        scols = arraylist()
-        psi_nonzero = arraylist()
-        i = 0
-        for iat in range(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
-            for l in range(lmax[spe]+1):
-                i1 = ispe[spe]*(2*l+1)
-                i2 = ispe[spe]*(2*l+1)+2*l+1
-                x = Psi[(spe,l)][i1:i2]
-                nz = np.nonzero(x)
-                vals = x[x!=0]
-                for n in range(nmax[(spe,l)]):
-    # If psi_nm depended on n, would need the follwing lines
-    #                x = Psi[(spe,l,n)][i1:i2]
-    #                nz = np.nonzero(x)
-    #                vals = x[x!=0]
-                    psi_nonzero.update(vals)
-                    srows.update(nz[0]+i)
-                    scols.update(nz[1]+cuml_Mcut[(spe,l,n)])
-                    i += 2*l+1
-            ispe[spe] += 1
+            nrows = Tsize
+            ncols = totsize
+            srows = arraylist()
+            scols = arraylist()
+            psi_nonzero = arraylist()
+            i = 0
+            for iat in range(natoms[iconf]):
+                spe = atomic_symbols[iconf][iat]
+                for l in range(lmax[spe]+1):
+                    i1 = ispe[spe]*(2*l+1)
+                    i2 = ispe[spe]*(2*l+1)+2*l+1
+                    x = Psi[(spe,l)][i1:i2]
+                    nz = np.nonzero(x)
+                    vals = x[x!=0]
+                    for n in range(nmax[(spe,l)]):
+                        psi_nonzero.update(vals)
+                        srows.update(nz[0]+i)
+                        scols.update(nz[1]+cuml_Mcut[(spe,l,n)])
+                        i += 2*l+1
+                ispe[spe] += 1
     
-        psi_nonzero = psi_nonzero.finalize()
-        srows = srows.finalize()
-        scols = scols.finalize()
-        ij = np.vstack((srows,scols))
+            psi_nonzero = psi_nonzero.finalize()
+            srows = srows.finalize()
+            scols = scols.finalize()
+            ij = np.vstack((srows,scols))
     
-        del srows
-        del scols
+            del srows
+            del scols
     
-        sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
-        sparse.save_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz", sparse_psi)
+            sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
+            sparse.save_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz", sparse_psi)
     
-        del sparse_psi
-        del psi_nonzero
-        del ij
+            del sparse_psi
+            del psi_nonzero
+            del ij
 
     return
 

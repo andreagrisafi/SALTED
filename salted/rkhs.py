@@ -90,19 +90,22 @@ def build():
     
         # load power spectrum
         if rank == 0: print("loading lambda =", l)
-        power = h5py.File(sdir+"FEAT-"+str(l)+".h5",'r')["descriptor"][conf_range,:]
-        nfeat = power.shape[-1]
         if inp.field:
             power2 = h5py.File(sdir+"FEAT-"+str(l)+"_field.h5",'r')["descriptor"][conf_range,:]
             nfeat2 = power2.shape[-1]
-    
+        else:
+            power = h5py.File(sdir+"FEAT-"+str(l)+".h5",'r')["descriptor"][conf_range,:]
+            nfeat = power.shape[-1]
+
         for spe in species:
             if rank == 0: print("lambda = ", l, "species:", spe)
             start = time.time()
     
             # get sparse feature vector for each atomic species
-            power_env_sparse[spe] = h5py.File(sdir+"FEAT-"+str(l)+"-M-"+str(M)+".h5",'r')[spe][:]
-            if inp.field: power_env_sparse2[spe] = h5py.File(sdir+"FEAT-"+str(l)+"-M-"+str(M)+"_field.h5",'r')[spe][:]
+            if inp.field: 
+                power_env_sparse2[spe] = h5py.File(sdir+"FEAT-"+str(l)+"-M-"+str(M)+"_field.h5",'r')[spe][:]
+            else:
+                power_env_sparse[spe] = h5py.File(sdir+"FEAT-"+str(l)+"-M-"+str(M)+".h5",'r')[spe][:]
             V = np.load(kdir+"spe"+str(spe)+"_l"+str(l)+"/M"+str(M)+"_zeta"+str(zeta)+"/projector.npy") 
     
             # compute feature vector Phi associated with the RKHS of K_NM * K_MM^-1 * K_NM^T

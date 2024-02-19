@@ -18,20 +18,29 @@ from salted import basis
 
 from salted.lib import equicomb
 from salted.lib import equicombfield
+from salted.lib import equicombfieldx
+from salted.lib import equicombfieldy
 
 def build():
 
     sys.path.insert(0, './')
     import inp
 
+    if inp.field==True and inp.vfield==True:
+        if rank==0: print("ERROR: field and vfield cannot be run together!")
+        sys.exit(0)
+
     if inp.sparsify:
         
         if inp.ncut > 0:
 
             if inp.field:
-                equirepr(sparsify=True,field=True)
+                equirepr(sparsify=True,field=True,vfield=False)
 
-            equirepr(sparsify=True,field=False)
+            if inp.vfield:
+                equirepr(sparsify=True,field=False,vfield=True)
+
+            equirepr(sparsify=True,field=False,vfield=False)
 
         else:
 
@@ -41,14 +50,17 @@ def build():
     else: 
 
         if inp.field:
-            equirepr(sparsify=False,field=True)
+            equirepr(sparsify=False,field=True,vfield=False)
 
-        equirepr(sparsify=False,field=False)
+        if inp.vfield:
+            equirepr(sparsify=False,field=False,vfield=True)
+
+        equirepr(sparsify=False,field=False,vfield=False)
 
     return
 
 
-def equirepr(sparsify,field):
+def equirepr(sparsify,field,vfield):
     sys.path.insert(0, './')
     import inp
     
@@ -89,14 +101,26 @@ def equirepr(sparsify,field):
    
     if nsamples < ndata and sparsify: ndata = inp.nsamples
     ndata_true = ndata
+    if rank == 0: print(f"The dataset contains {ndata_true} frames.")
+    
     if inp.parallel:
+        if sparsify: 
+            print("ERROR: sparsification cannot be run in parallel!")
+            sys.exit(0)
         conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
         conf_range = comm.scatter(conf_range,root=0)
         print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
         ndata = len(conf_range)
     else:
-        conf_range = list(range(ndata))
+        if sparsify: 
+            conf_range = list(range(ndata_true))
+            random.Random(3).shuffle(list(range(ndata_true)))
+            conf_range = conf_range[:ndata]
+        else:
+            conf_range = list(range(ndata))
     
+    frames = read(filename,":")
+    frames = [frames[i] for i in conf_range]
     natoms_total = sum(natoms[conf_range])
     
     def do_fps(x, d=0,initial=-1):
@@ -140,12 +164,6 @@ def equirepr(sparsify,field):
         "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
     }
     
-    frames = read(filename,":")
-    if sparsify: random.Random(3).shuffle(frames)
-    frames = [frames[i] for i in conf_range]
-    
-    if rank == 0: print(f"The dataset contains {ndata_true} frames.")
-    
     if rep1=="rho":
         # get SPH expansion for atomic density    
         calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
@@ -183,12 +201,12 @@ def equirepr(sparsify,field):
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
         omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(spherical_harmonics_l=l).values)
     
-    if rank == 0: print("rho time:", (time.time()-rhostart))
+    if rank == 0: print("Repr. 1 time:", (time.time()-rhostart))
     
     potstart = time.time()
     
     # External field?
-    if field:
+    if field or vfield:
     
         # get SPH expansion for a uniform and constant external field aligned along Z 
         omega2 = np.zeros((natoms_total,nrad2),complex)
@@ -233,26 +251,28 @@ def equirepr(sparsify,field):
             c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
             omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
     
-    if rank == 0: print("pot time:", (time.time()-potstart))
+    if rank == 0: print("Repr. 2 time:", (time.time()-potstart))
     
     # Generate directories for saving descriptors 
     dirpath = os.path.join(inp.saltedpath, "equirepr_"+saltedname)
     
     if rank == 0:
-        wigner.build(field)
+        wigner.build(field,vfield)
         if not os.path.exists(dirpath):
             os.mkdir(dirpath)
     if size > 1: comm.Barrier()
 
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
+    if field==False and inp.field==True: lmax_max=0
+    if vfield==False and inp.vfield==True: lmax_max=0
     for lam in range(lmax_max+1):
     
         if rank == 0: print("lambda =", lam)
     
-        equistart = time.time()
+        #equistart = time.time()
     
         # External field?
-        if field:
+        if field or vfield:
             # Select relevant angular components for equivariant descriptor calculation
             llmax = 0
             lvalues = {}
@@ -283,75 +303,137 @@ def equirepr(sparsify,field):
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         if field:
             wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field.dat")
-            wigdim = wigner3j.size 
+            wigdim = wigner3j.size
+        elif vfield:
+            wigner3j_x = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field-x.dat")
+            wigner3j_y = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field-y.dat")
+            wigner3j_z = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_field-z.dat")
+            wigdim_x = wigner3j_x.size
+            wigdim_y = wigner3j_y.size
+            wigdim_z = wigner3j_z.size
         else:
             wigner3j = np.loadtxt(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(nang1)+"_lmax2-"+str(nang2)+".dat")
             wigdim = wigner3j.size
       
         # Reshape arrays of expansion coefficients for optimal Fortran indexing 
         v1 = np.transpose(omega1,(2,0,3,1))
-        if field:
+        if field or vfield:
             v2 = omega2.T
         else:
             v2 = np.transpose(omega2,(2,0,3,1))
-        
     
         # Compute complex to real transformation matrix for the given lambda value
         c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
     
         if field:
-           # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018) by having the field components as second entry
-           p = equicombfield.equicombfield(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
-           # Define feature space size
-           featsize = nspe1*nrad1*nrad2*llmax
+            # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018) by having the field components as second entry
+            p = equicombfield.equicombfield(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
+            # Define feature space size
+            featsize = nspe1*nrad1*nrad2*llmax
+            p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsize)
+
+        elif vfield:
+            # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018) by having the field components as second entry
+            px = equicombfieldx.equicombfieldx(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim_x,wigner3j_x,llmax,llvec.T,lam,c2r)
+            py = equicombfieldy.equicombfieldy(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim_y,wigner3j_y,llmax,llvec.T,lam,c2r)
+            pz = equicombfield.equicombfield(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim_z,wigner3j_z,llmax,llvec.T,lam,c2r)
+            # Define feature space size
+            featsize = nspe1*nrad1*nrad2*llmax
+            px = np.transpose(px,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsize)
+            py = np.transpose(py,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsize)
+            pz = np.transpose(pz,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsize)
+            
         else:
-           # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
-           p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
-           # Define feature space size 
-           featsize = nspe1*nspe2*nrad1*nrad2*llmax
+            # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
+            p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
+            # Define feature space size 
+            featsize = nspe1*nspe2*nrad1*nrad2*llmax
+            p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsize)
     
         # Reshape equivariant descriptor
-        p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsize)
      
-        if rank == 0: print("equivariant time:", (time.time()-equistart))
+        #if rank == 0: print("equivariant time:", (time.time()-equistart))
         
-        normstart = time.time()
+        #normstart = time.time()
         
-        # Normalize equivariant descriptor 
-        inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featsize),p.reshape(natoms_total,(2*lam+1)*featsize))
-        p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
+        # Normalize equivariant descriptor
+        if vfield:
+            inner = np.zeros(natoms_total)
+            inner += np.einsum('ab,ab->a', px.reshape(natoms_total,(2*lam+1)*featsize),px.reshape(natoms_total,(2*lam+1)*featsize))
+            inner += np.einsum('ab,ab->a', py.reshape(natoms_total,(2*lam+1)*featsize),py.reshape(natoms_total,(2*lam+1)*featsize))
+            inner += np.einsum('ab,ab->a', pz.reshape(natoms_total,(2*lam+1)*featsize),pz.reshape(natoms_total,(2*lam+1)*featsize))
+            px = np.einsum('abc,a->abc', px,1.0/np.sqrt(inner))
+            py = np.einsum('abc,a->abc', py,1.0/np.sqrt(inner))
+            pz = np.einsum('abc,a->abc', pz,1.0/np.sqrt(inner))
+        else:
+            inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featsize),p.reshape(natoms_total,(2*lam+1)*featsize))
+            p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
     
-        if rank == 0: print("norm time:", (time.time()-normstart))
+        #if rank == 0: print("norm time:", (time.time()-normstart))
     
-        savestart = time.time()
+        #savestart = time.time()
        
         if rank == 0: print("feature space size =", featsize)
     
         #TODO modify SALTED to directly deal with compact natoms_total dimension
-        if lam==0:
-            p = p.reshape(natoms_total,featsize)
-            pvec = np.zeros((ndata,natmax,featsize))
+        if vfield:
+
+            if lam==0:
+                px = px.reshape(natoms_total,featsize)
+                py = py.reshape(natoms_total,featsize)
+                pz = pz.reshape(natoms_total,featsize)
+                pvec_x = np.zeros((ndata,natmax,featsize))
+                pvec_y = np.zeros((ndata,natmax,featsize))
+                pvec_z = np.zeros((ndata,natmax,featsize))
+            else:
+                px = px.reshape(natoms_total,2*lam+1,featsize)
+                py = py.reshape(natoms_total,2*lam+1,featsize)
+                pz = pz.reshape(natoms_total,2*lam+1,featsize)
+                pvec_x = np.zeros((ndata,natmax,2*lam+1,featsize))
+                pvec_y = np.zeros((ndata,natmax,2*lam+1,featsize))
+                pvec_z = np.zeros((ndata,natmax,2*lam+1,featsize))
+   
+            j = 0
+            for i,iconf in enumerate(conf_range):
+                for iat in range(natoms[iconf]):
+                    pvec_x[i,iat] = px[j]
+                    pvec_y[i,iat] = py[j]
+                    pvec_z[i,iat] = pz[j]
+                    j += 1
         else:
-            p = p.reshape(natoms_total,2*lam+1,featsize)
-            pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
-    
-        j = 0
-        for i,iconf in enumerate(conf_range):
-            for iat in range(natoms[iconf]):
-                pvec[i,iat] = p[j]
-                j += 1
+
+            if lam==0:
+                p = p.reshape(natoms_total,featsize)
+                pvec = np.zeros((ndata,natmax,featsize))
+            else:
+                p = p.reshape(natoms_total,2*lam+1,featsize)
+                pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
+
+            j = 0
+            for i,iconf in enumerate(conf_range):
+                for iat in range(natoms[iconf]):
+                    pvec[i,iat] = p[j]
+                    j += 1
     
         # Do feature selection with FPS sparsification
         if sparsify:
             if ncut >= featsize:
                 ncut = featsize  
             if rank == 0: print("fps...")
-            pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
-            vfps = do_fps(pvec.T,ncut,0)
-            if field:
-                np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy", vfps)
+            if vfield:
+                pvec_x = pvec_x.reshape(ndata*natmax*(2*lam+1),featsize)
+                pvec_y = pvec_y.reshape(ndata*natmax*(2*lam+1),featsize)
+                pvec_z = pvec_z.reshape(ndata*natmax*(2*lam+1),featsize)
+                pvec = np.vstack((pvec_x,np.vstack((pvec_y,pvec_z))))
+                vfps = do_fps(pvec.T,ncut,0)
+                np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_vfield.npy", vfps)
             else:
-                np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy", vfps)
+                pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
+                vfps = do_fps(pvec.T,ncut,0)
+                if field:
+                    np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy", vfps)
+                else:
+                    np.save(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy", vfps)
     
         else:
             if field==True:
@@ -359,20 +441,39 @@ def equirepr(sparsify,field):
                     h5f = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"_field.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
                 else:
                     h5f = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"_field.h5",'w')
+            elif vfield==True:
+                if inp.parallel:
+                    h5f_x = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-x.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
+                    h5f_y = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-y.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
+                    h5f_z = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-z.h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
+                else:
+                    h5f_x = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-x.h5",'w')
+                    h5f_y = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-y.h5",'w')
+                    h5f_z = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+"-z.h5",'w')
             else:
                 if inp.parallel:
                     h5f = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+".h5",'w',driver='mpio',comm=MPI.COMM_WORLD)
                 else:
                     h5f = h5py.File(inp.saltedpath+"equirepr_"+saltedname+"/FEAT-"+str(lam)+".h5",'w')
     
-            if ncut < 0 or ncut >= featsize:
+            if ncut == 0 or ncut >= featsize:
                 ncut_l = featsize
             else:
                 ncut_l = ncut
-            if lam==0:
-                dset = h5f.create_dataset("descriptor",(ndata_true,natmax,ncut_l),dtype='float64')
+            if vfield:
+                if lam==0:
+                    dset_x = h5f_x.create_dataset('descriptor_x',(ndata_true,natmax,ncut_l),dtype='float64')
+                    dset_y = h5f_y.create_dataset('descriptor_y',(ndata_true,natmax,ncut_l),dtype='float64')
+                    dset_z = h5f_z.create_dataset('descriptor_z',(ndata_true,natmax,ncut_l),dtype='float64')
+                else:
+                    dset_x = h5f_x.create_dataset("descriptor_x",(ndata_true,natmax,(2*lam+1),ncut_l),dtype='float64')
+                    dset_y = h5f_y.create_dataset("descriptor_y",(ndata_true,natmax,(2*lam+1),ncut_l),dtype='float64')
+                    dset_z = h5f_z.create_dataset("descriptor_z",(ndata_true,natmax,(2*lam+1),ncut_l),dtype='float64')
             else:
-                dset = h5f.create_dataset("descriptor",(ndata_true,natmax,(2*lam+1),ncut_l),dtype='float64')
+                if lam==0:
+                    dset = h5f.create_dataset("descriptor",(ndata_true,natmax,ncut_l),dtype='float64')
+                else:
+                    dset = h5f.create_dataset("descriptor",(ndata_true,natmax,(2*lam+1),ncut_l),dtype='float64')
     
             # Apply sparsification with precomputed FPS selection 
             if ncut_l < featsize:
@@ -380,28 +481,59 @@ def equirepr(sparsify,field):
                 try:
                     if field:
                         vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_field.npy")
+                    elif vfield:
+                        vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+"_vfield.npy")
                     else:
                         vfps = np.load(inp.saltedpath+"equirepr_"+saltedname+"/fps"+str(ncut)+"-"+str(lam)+".npy")
                 except:
-                    if rank == 0: print("Sparsification must be performed prior to calculating the descritors if ncut > -1. First run this script with the flag -s, then rerun with no flag.")
+                    if rank == 0: print("Sparsification must be performed prior to calculating the descritors if ncut > 0.")
                     exit()
                 if rank == 0: print("sparsifying...")
-                pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
-                psparse = pvec.T[vfps].T
-                if lam==0:
-                    psparse = psparse.reshape(ndata,natmax,psparse.shape[-1])
+
+                if vfield:
+                    pvec_x = pvec_x.reshape(ndata*natmax*(2*lam+1),featsize)
+                    pvec_y = pvec_y.reshape(ndata*natmax*(2*lam+1),featsize)
+                    pvec_z = pvec_z.reshape(ndata*natmax*(2*lam+1),featsize)
+                    psparse_x = pvec_x.T[vfps].T
+                    psparse_y = pvec_y.T[vfps].T
+                    psparse_z = pvec_z.T[vfps].T
+                    if lam==0:
+                        psparse_x = psparse_x.reshape(ndata,natmax,psparse_x.shape[-1])
+                        psparse_y = psparse_y.reshape(ndata,natmax,psparse_y.shape[-1])
+                        psparse_z = psparse_z.reshape(ndata,natmax,psparse_z.shape[-1])
+                    else:
+                        psparse_x = psparse_x.reshape(ndata,natmax,(2*lam+1),psparse_x.shape[-1])
+                        psparse_y = psparse_y.reshape(ndata,natmax,(2*lam+1),psparse_y.shape[-1])
+                        psparse_z = psparse_z.reshape(ndata,natmax,(2*lam+1),psparse_z.shape[-1])
+                    # Save sparse feature vector
+                    dset_x[conf_range] = psparse_x
+                    dset_y[conf_range] = psparse_y
+                    dset_z[conf_range] = psparse_z
                 else:
-                    psparse = psparse.reshape(ndata,natmax,(2*lam+1),psparse.shape[-1])
-                # Save sparse feature vector
-                dset[conf_range] = psparse
+                    pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
+                    psparse = pvec.T[vfps].T
+                    if lam==0:
+                        psparse = psparse.reshape(ndata,natmax,psparse.shape[-1])
+                    else:
+                        psparse = psparse.reshape(ndata,natmax,(2*lam+1),psparse.shape[-1])
+                    # Save sparse feature vector
+                    dset[conf_range] = psparse
     
             # Save non-sparse descriptor  
             else:
-                dset[conf_range] = pvec
+                if vfield:
+                    dset_x[conf_range] = pvec_x
+                    dset_y[conf_range] = pvec_y
+                    dset_z[conf_range] = pvec_z
+                    h5f_x.close()
+                    h5f_y.close()
+                    h5f_z.close()
+                else:
+                    dset[conf_range] = pvec
+                    h5f.close()
     
-            h5f.close()
     
-        if rank == 0: print("save time:", (time.time()-savestart))
+        #if rank == 0: print("save time:", (time.time()-savestart))
     
     if rank == 0: print("time:", (time.time()-start))
     

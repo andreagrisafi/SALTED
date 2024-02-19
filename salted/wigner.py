@@ -9,7 +9,7 @@ from salted import sph_utils
 from salted import basis
 
 
-def build(field):
+def build(field,vfield):
     sys.path.insert(0, './')
     import inp
     
@@ -25,10 +25,8 @@ def build(field):
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     for lam in range(lmax_max+1):
     
-        print("lambda =", lam)
-    
         # External field?
-        if field:
+        if field or vfield:
             # Select relevant angular components for equivariant descriptor calculation
             llmax = 0
             lvalues = {}
@@ -59,6 +57,59 @@ def build(field):
         # Precompute Wigner-3J symbols and save to file as dense arrays 
         if field:
             wig = open(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(inp.nang1)+"_field.dat","a")
+            iwig = 0
+            for il in range(llmax):
+                l1 = lvalues[il][0]
+                l2 = lvalues[il][1]
+                for imu in range(2*lam+1):
+                    mu = imu-lam
+                    for im1 in range(2*l1+1):
+                        m1 = im1-l1
+                        m2 = m1-mu
+                        if abs(m2) <= l2 and m2==0:
+                            im2 = m2+l2
+                            w3j = wigner_3j(lam,l2,l1,mu,m2,-m1) * (-1.0)**(m1)
+                            print(float(w3j),file=wig)
+            wig.close()
+        elif vfield:
+            # x symmetry: |1,-1> - |1,1>
+            wig = open(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(inp.nang1)+"_field-x.dat","a")
+            iwig = 0
+            for il in range(llmax):
+                l1 = lvalues[il][0]
+                l2 = lvalues[il][1]
+                for imu in range(2*lam+1):
+                    mu = imu-lam
+                    for im1 in range(2*l1+1):
+                        m1 = im1-l1
+                        m2 = m1-mu
+                        if abs(m2) <= l2 and m2==-1:
+                            im2 = m2+l2
+                            w3j = wigner_3j(lam,l2,l1,mu,m2,-m1) 
+                            w3j -= wigner_3j(lam,l2,l1,mu,-m2,-m1) 
+                            w3j *= (-1.0)**(m1)/np.sqrt(2.0)
+                            print(float(w3j),file=wig)
+            wig.close()
+            # y symmetry: |1,1> + |1,-1>
+            wig = open(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(inp.nang1)+"_field-y.dat","a")
+            iwig = 0
+            for il in range(llmax):
+                l1 = lvalues[il][0]
+                l2 = lvalues[il][1]
+                for imu in range(2*lam+1):
+                    mu = imu-lam
+                    for im1 in range(2*l1+1):
+                        m1 = im1-l1
+                        m2 = m1-mu
+                        if abs(m2) <= l2 and m2==1:
+                            im2 = m2+l2
+                            w3j = wigner_3j(lam,l2,l1,mu,m2,-m1) 
+                            w3j += wigner_3j(lam,l2,l1,mu,-m2,-m1) 
+                            w3j *= (-1.0)**(m1)/np.sqrt(2.0)
+                            print(float(w3j),file=wig)
+            wig.close()
+            # z symmetry: |1,0>
+            wig = open(inp.saltedpath+"wigners/wigner_lam-"+str(lam)+"_lmax1-"+str(inp.nang1)+"_field-z.dat","a")
             iwig = 0
             for il in range(llmax):
                 l1 = lvalues[il][0]

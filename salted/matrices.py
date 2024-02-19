@@ -106,7 +106,10 @@ def matrices(block_idx,trainrange,rank):
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
     
-    p = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf0.npz")
+    if inp.vfield:
+        p = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm-x_conf0.npz")
+    else:
+        p = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf0.npz")
     totsize = p.shape[-1]
     if rank == 0: print("problem dimensionality:", totsize,flush=True)
     if totsize>70000:
@@ -126,34 +129,68 @@ def matrices(block_idx,trainrange,rank):
     for iconf in trainrange:
         print("conf:", iconf+1,flush=True)
        
-        start = time.time()
-        # load reference QM data
-        ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
         over = np.load(inp.saltedpath+"overlaps/overlap_conf"+str(iconf)+".npy")
-        psivec = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz")
-        psi = psivec.toarray()
+
+        start = time.time()
+        if inp.vfield:
+
+            for ix in ['x','y','z']:
+
+                # load reference QM data
+                ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients-"+str(ix)+"_conf"+str(iconf)+".npy")
+                psivec = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm-"+str(ix)+"_conf"+str(iconf)+".npz")
+                psi = psivec.toarray()
+
+                if inp.average:
+
+                    # fill array of average spherical components
+                    Av_coeffs = np.zeros(ref_coefs.shape[0])
+                    i = 0
+                    for iat in range(natoms[iconf]):
+                        spe = atomic_symbols[iconf][iat]
+                        if spe in species:
+                            for l in range(lmax[spe]+1):
+                                for n in range(nmax[(spe,l)]):
+                                    if l==0:
+                                       Av_coeffs[i] = av_coefs[spe][n]
+                                    i += 2*l+1
+
+                    # subtract average
+                    ref_coefs -= Av_coeffs
+
+                ref_projs = np.dot(over,ref_coefs)
+
+                Avec += np.dot(psi.T,ref_projs)
+                Bmat += np.dot(psi.T,np.dot(over,psi))
+
+        else:
+
+            # load reference QM data
+            ref_coefs = np.load(inp.saltedpath+"coefficients/coefficients_conf"+str(iconf)+".npy")
+            psivec = sparse.load_npz(inp.saltedpath+fdir+"/M"+str(M)+"_zeta"+str(zeta)+"/psi-nm_conf"+str(iconf)+".npz")
+            psi = psivec.toarray()
     
-        if inp.average:
+            if inp.average:
     
-            # fill array of average spherical components
-            Av_coeffs = np.zeros(ref_coefs.shape[0])
-            i = 0
-            for iat in range(natoms[iconf]):
-                spe = atomic_symbols[iconf][iat]
-                if spe in species:
-                    for l in range(lmax[spe]+1):
-                        for n in range(nmax[(spe,l)]):
-                            if l==0:
-                               Av_coeffs[i] = av_coefs[spe][n]
-                            i += 2*l+1
+                # fill array of average spherical components
+                Av_coeffs = np.zeros(ref_coefs.shape[0])
+                i = 0
+                for iat in range(natoms[iconf]):
+                    spe = atomic_symbols[iconf][iat]
+                    if spe in species:
+                        for l in range(lmax[spe]+1):
+                            for n in range(nmax[(spe,l)]):
+                                if l==0:
+                                   Av_coeffs[i] = av_coefs[spe][n]
+                                i += 2*l+1
+                
+                # subtract average
+                ref_coefs -= Av_coeffs
             
-            # subtract average
-            ref_coefs -= Av_coeffs
-        
-        ref_projs = np.dot(over,ref_coefs)
-        
-        Avec += np.dot(psi.T,ref_projs)
-        Bmat += np.dot(psi.T,np.dot(over,psi))
+            ref_projs = np.dot(over,ref_coefs)
+            
+            Avec += np.dot(psi.T,ref_projs)
+            Bmat += np.dot(psi.T,np.dot(over,psi))
     
         print("conf time =", time.time()-start)
    
