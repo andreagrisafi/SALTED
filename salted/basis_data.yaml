@@ -1,0 +1,129 @@
+DF-DZVP-MOLOPT-GTH:
+  Ag:
+    lmax: 6
+    nmax: [15, 15, 15, 15, 15, 15, 15]
+  Au:
+    lmax: 6
+    nmax: [18, 18, 18, 18, 18, 18, 18]
+RI_AUTO_OPT-ccGRB:
+  Au:
+    lmax: 6
+    nmax: [8, 8, 8, 8, 8, 1, 1]
+RI-cc-pvqz:
+  H:
+    lmax: 4
+    nmax: [4, 3, 3, 2, 1]
+  O:
+    lmax: 5
+    nmax: [10, 7, 5, 3, 2, 1]
+  C:
+    lmax: 5
+    nmax: [10, 7, 5, 3, 2, 1]
+  N:
+    lmax: 5
+    nmax: [10, 7, 5, 3, 2, 1]
+  F:
+    lmax: 5
+    nmax: [10, 7, 5, 3, 2, 1]
+LRI-DZVP-MOLOPT-GTH-MEDIUM-FULL-ANGULAR-SUPER-FAT-WIDER-18:
+  Cu:
+    lmax: 6
+    nmax: [18, 18, 18, 18, 18, 18, 18]
+LRI-DZVP-MOLOPT-GTH-MEDIUM-FULL-ANGULAR:
+  H:
+    lmax: 3
+    nmax: [10, 10, 10, 10]
+  O:
+    lmax: 4
+    nmax: [15, 15, 15, 15, 15]
+  Cu:
+    lmax: 6
+    nmax: [15, 15, 15, 15, 15, 15, 15]
+LRI-DZVP-MOLOPT-GTH-MEDIUM:
+  H:
+    lmax: 3
+    nmax: [10, 9, 8, 6]
+  O:
+    lmax: 4
+    nmax: [15, 13, 12, 11, 9]
+  Cu:
+    lmax: 6
+    nmax: [15, 13, 12, 11, 10, 9, 8]
+FHI-aims-min:
+  H:
+    lmax: 0
+    nmax: [1]
+  O:
+    lmax: 2
+    nmax: [3, 2, 1]
+  Al:
+    lmax: 2
+    nmax: [7, 7, 3]
+  Si:
+    lmax: 2
+    nmax: [7, 7, 3]
+FHI-aims-first-tier:
+  H:
+    lmax: 2
+    nmax: [4, 3, 2]
+  O:
+    lmax: 4
+    nmax: [6, 5, 4, 3, 1]
+FHI-aims-third-tier:
+  H:
+    lmax: 5
+    nmax: [11, 9, 7, 5, 3, 2]
+  O:
+    lmax: 5
+    nmax: [10, 10, 9, 9, 8, 5]
+FHI-aims-clusters:
+  H:
+    lmax: 4
+    nmax: [9, 7, 6, 3, 1]
+  O:
+    lmax: 5
+    nmax: [9, 10, 9, 8, 6, 4]
+  C:
+    lmax: 5
+    nmax: [11, 10, 9, 8, 7, 5]
+  N:
+    lmax: 5
+    nmax: [9, 10, 9, 8, 6, 4]
+  F:
+    lmax: 5
+    nmax: [11, 10, 10, 7, 7, 5]
+FHI-aims-light:
+  H:
+    lmax: 2
+    nmax: [4, 3, 1]
+  O:
+    lmax: 4
+    nmax: [9, 9, 8, 3, 1]
+  C:
+    lmax: 4
+    nmax: [9, 8, 7, 3, 1]
+FHI-aims-MoSe:
+  Se:
+    lmax: 6
+    nmax: [13, 13, 11, 11, 9, 7, 4]
+  Mo:
+    lmax: 6
+    nmax: [14, 13, 13, 12, 11, 8, 5]
+FHI-aims-graphene:
+  C:
+    lmax: 4
+    nmax: [7, 7, 6, 5, 3]
+FHI-aims-ZrS:
+  S:
+    lmax: 5
+    nmax: [10, 10, 10, 10, 8, 5]
+  Zr:
+    lmax: 5
+    nmax: [14, 13, 13, 12, 12, 8]
+FHI-aims-tight:
+  H:
+    lmax: 4
+    nmax: [9, 7, 6, 3, 1]
+  O:
+    lmax: 8
+    nmax: [9, 10, 9, 8, 6, 4, 4, 2, 1]
