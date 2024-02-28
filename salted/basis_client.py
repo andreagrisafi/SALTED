@@ -1,11 +1,10 @@
 import logging
 import os
 import pickle
+import sys
 from typing import Any, Dict, List, Tuple, TypedDict, Union
 
 import yaml
-
-_log = logging.getLogger(__name__)
 
 
 def compare_by_pickle(obj1: Any, obj2: Any) -> bool:
@@ -80,8 +79,9 @@ class BasisClient:
 
         """create the data file if it does not exist"""
         if not os.path.isfile(self.data_fpath):
-            _log.info(
-                f"Creating density fitting basis dataset file at {self.data_fpath}"
+            print(
+                f"Creating density fitting basis dataset file at {self.data_fpath}",
+                file=sys.stderr,
             )
             with open(self.data_fpath, "w") as f:
                 f.write("")
@@ -112,7 +112,7 @@ class BasisClient:
         with open(self.data_fpath) as f:
             basis_data = yaml.safe_load(f)
         if basis_data is None:
-            _log.warning(f"Empty basis dataset file at {self.data_fpath}")
+            print(f"Empty basis dataset file at {self.data_fpath}", file=sys.stderr)
             return
         basis_names = basis_data.keys()
         for basis_name in basis_names:
@@ -121,7 +121,6 @@ class BasisClient:
                 assert (
                     spe_data["lmax"] == len(spe_data["nmax"]) - 1
                 ), f"lmax nmax discrepancy: {basis_name=}, {spe_name=}, {spe_data=}"
-        _log.debug(f"{self.data_fpath} passed sanity check.")
 
     def read(self, basis_name: str) -> Dict[str, BasisSpeciesData]:
         """read basis data from the dataset file"""
@@ -152,7 +151,10 @@ class BasisClient:
         }
         ```
         """
-        _log.warning("Old format is deprecated and will be removed in the future.")
+        # print(
+        #     "Old format is deprecated and will be removed in the future. Please call read() instead.",
+        #     file=sys.stderr,
+        # )
         basis_data = self.read(basis_name)
         lmax = {spe_name: spe_data["lmax"] for spe_name, spe_data in basis_data.items()}
         nmax = {
@@ -171,7 +173,7 @@ class BasisClient:
         if basis_name in basis_data_all.keys():
             """compare each basis data serialized by pickle"""
             if compare_by_pickle(basis_data_all[basis_name], basis_data):
-                _log.info(
+                print(
                     f"{basis_name=} already exists in {self.data_fpath}, no change is made."
                 )
                 return
@@ -192,58 +194,58 @@ class BasisClient:
         with open(self.data_fpath) as f:
             basis_data_all = yaml.safe_load(f)
         if basis_name not in basis_data_all.keys():
-            _log.warning(
-                f"{basis_name=} not found in {self.data_fpath}, no change is made."
+            print(
+                f"{basis_name=} not found in {self.data_fpath}, no change is made.",
+                file=sys.stderr,
             )
         else:
             basis_data_all.pop(basis_name)
             with open(self.data_fpath, "w") as f:
                 yaml.safe_dump(basis_data_all, f, default_flow_style=None)
-            _log.info(f"{basis_name=} has been removed from {self.data_fpath}")
+            print(f"{basis_name=} has been removed from {self.data_fpath}")
 
 
 def test_BasisClient():
     """test the BasisClient class"""
-    _log.level = logging.DEBUG
-    _log.debug("TEST: testing BasisClient...")
+    print("TEST: testing BasisClient...")
 
-    _log.debug("TEST: init with the default dataset file")
+    print("TEST: init with the default dataset file")
     basis_client = BasisClient()
 
-    _log.debug("TEST: init with a specific dataset file")
+    print("TEST: init with a specific dataset file")
     basis_client = BasisClient(
         os.path.join(os.path.dirname(__file__), BasisClient.DEFAULT_DATA_FNAME)
     )
 
-    _log.debug("TEST: read basis data")
+    print("TEST: read basis data")
     basis_data = basis_client.read("FHI-aims-light")
-    _log.debug(basis_data)
+    print(basis_data)
 
-    _log.debug("TEST: read basis data in the old format")
+    print("TEST: read basis data in the old format")
     basis_data_old_format = basis_client.read_as_old_format("FHI-aims-light")
-    _log.debug(basis_data_old_format)
+    print(basis_data_old_format)
 
-    _log.debug("TEST: write duplicated basis data")
+    print("TEST: write duplicated basis data")
     basis_client.write("FHI-aims-light", basis_data)
 
-    _log.debug("TEST: try to catch same-name duplication error")
+    print("TEST: try to catch same-name duplication error")
     basis_data_fake = basis_data.copy()
     basis_data_fake["Ghost"] = {"lmax": 1, "nmax": [4, 3]}
     try:
         basis_client.write("FHI-aims-light", basis_data_fake)
     except ValueError as e:
-        _log.debug("Duplication error caught, print error info:")
-        _log.debug(e)
+        print("Duplication error caught, print error info:")
+        print(e)
     else:
         raise ValueError("Did not catch the duplication error!")
 
-    _log.debug("TEST: write basis data")
+    print("TEST: write basis data")
     basis_client.write("FHI-aims-light_copy", basis_data)
 
-    _log.debug("TEST: remove basis data")
+    print("TEST: remove basis data")
     basis_client.pop("FHI-aims-light_copy")
 
-    _log.debug("TEST: test done.")
+    print("TEST: test done.")
 
 
 if __name__ == "__main__":
