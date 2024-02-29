@@ -24,7 +24,7 @@ for k,i in enumerate(testset):
     ele = []
     dirn = os.path.join(dn, str(i))
 
-    f1 = open(dirn+'/aims.out')
+    f1 = open(os.path.join(dirn, 'aims.out'))
     for line in f1:
         if line.find('| Number of atoms') != -1:
            n_atoms.append(line.split()[5])
@@ -37,7 +37,7 @@ for k,i in enumerate(testset):
         else:
             continue
 
-    f1 = open(dirn+'/aims_predict.out')
+    f1 = open(os.path.join(dirn, 'aims_predict.out'))
     for line in f1:
         if line.find('| Electrostatic energy') != -1:
             ele.append(line.split()[6])
