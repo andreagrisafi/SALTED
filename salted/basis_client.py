@@ -6,28 +6,32 @@ from typing import Dict, List, Optional, Tuple, TypedDict
 import yaml
 
 
-class BasisSpeciesData(TypedDict):
-    """len(nmax) == lmax + 1.
-    nmax: [s, p, d, ...]
+class SpeciesBasisData(TypedDict):
+    """Basis data for one chemical species.
+    Satisfies: len(nmax) == lmax + 1, and nmax: [s, p, d, ...]
     """
     lmax: int
     nmax: List[int]
 
+def compare_species_basis_data(data1: SpeciesBasisData, data2: SpeciesBasisData):
+    """Compare two species basis data.
+    If the two species basis data are the same, return True.
+    Else, return False.
+    """
+    return pickle.dumps(data1) == pickle.dumps(data2)
 
 def compare_basis_data_dup_spe(
-    basis_data1: Dict[str, BasisSpeciesData],
-    basis_data2: Dict[str, BasisSpeciesData],
+    basis_data1: Dict[str, SpeciesBasisData],
+    basis_data2: Dict[str, SpeciesBasisData],
 ):
     """Compare two basis data.
-    If the BasisSpeciesData for duplicated species are the same, return True.
+    If the SpeciesBasisData for duplicated species are the same, return True.
     Else, return False.
     """
     species_union = set(basis_data1.keys()).intersection(set(basis_data2.keys()))
     for spe_name in species_union:
         # compare by pickle serialization to avoid the problem of comparing lists
-        if not pickle.dumps(basis_data1[spe_name]) == pickle.dumps(
-            basis_data2[spe_name]
-        ):
+        if not compare_species_basis_data(basis_data1[spe_name], basis_data2[spe_name]):
             return False
     return True
 
@@ -146,13 +150,13 @@ class BasisClient:
                     spe_data["lmax"] == len(spe_data["nmax"]) - 1
                 ), f"lmax nmax discrepancy: {basis_name=}, {spe_name=}, {spe_data=}"
 
-    def _read_all(self) -> Dict[str, Dict[str, BasisSpeciesData]]:
+    def _read_all(self) -> Dict[str, Dict[str, SpeciesBasisData]]:
         """Read all basis data from the dataset file"""
         with open(self.data_fpath) as f:
             basis_data_all = yaml.safe_load(f)
         return basis_data_all
 
-    def read(self, basis_name: str) -> Dict[str, BasisSpeciesData]:
+    def read(self, basis_name: str) -> Dict[str, SpeciesBasisData]:
         """Read basis data from the dataset file"""
         basis_data_all = self._read_all()
         assert (
@@ -193,14 +197,14 @@ class BasisClient:
         }
         return (lmax, nmax)
 
-    def _write_all(self, basis_data_all: Dict[str, Dict[str, BasisSpeciesData]]):
+    def _write_all(self, basis_data_all: Dict[str, Dict[str, SpeciesBasisData]]):
         """Rewrite the whole dataset file with the new basis data"""
         with open(self.data_fpath, "w") as f:
             yaml.safe_dump(
                 basis_data_all, f, default_flow_style=None
             )  # default_flow_style is important!
 
-    def write(self, basis_name: str, basis_data: Dict[str, BasisSpeciesData]):
+    def write(self, basis_name: str, basis_data: Dict[str, SpeciesBasisData]):
         """Write basis data to the dataset file"""
         with open(self.data_fpath) as f:
             basis_data_all: Dict = yaml.safe_load(f)
