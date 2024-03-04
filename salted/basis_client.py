@@ -1,15 +1,18 @@
 import os
 import pickle
 import sys
-from typing import Any, Dict, List, Tuple, TypedDict, Union, Optional
+from typing import Dict, List, Optional, Tuple, TypedDict
 
 import yaml
 
 
-
 class BasisSpeciesData(TypedDict):
+    """len(nmax) == lmax + 1.
+    nmax: [s, p, d, ...]
+    """
     lmax: int
     nmax: List[int]
+
 
 def compare_basis_data_dup_spe(
     basis_data1: Dict[str, BasisSpeciesData],
@@ -22,13 +25,18 @@ def compare_basis_data_dup_spe(
     species_union = set(basis_data1.keys()).intersection(set(basis_data2.keys()))
     for spe_name in species_union:
         # compare by pickle serialization to avoid the problem of comparing lists
-        if not pickle.dumps(basis_data1[spe_name]) == pickle.dumps(basis_data2[spe_name]):
+        if not pickle.dumps(basis_data1[spe_name]) == pickle.dumps(
+            basis_data2[spe_name]
+        ):
             return False
     return True
+
 
 class BasisClient:
     """
     Maintain a KSDFT basis data dataset (in yaml format), provide methods to read and write the dataset.
+    The class will check the sanity of the dataset file when initialized,
+    and check the consistency of the basis data when writing.
     This class will never keep the basis data in memory, but read and write the dataset file every time needed.
 
     Usage:
@@ -256,8 +264,8 @@ def test_BasisClient():
     print("\nTEST: write basis data")
     test_basis_name = "__I_am_unique__"
     test_basis_data = {
-        'H': {'lmax': 1, 'nmax': [4, 3]},
-        'O': {'lmax': 2, 'nmax': [5, 4, 3]}
+        "H": {"lmax": 1, "nmax": [4, 3]},
+        "O": {"lmax": 2, "nmax": [5, 4, 3]},
     }
     basis_client.write(test_basis_name, test_basis_data)
 
@@ -273,17 +281,22 @@ def test_BasisClient():
     test_basis_data1["_Ghost"] = {"lmax": 1, "nmax": [4, 3]}
     print(f"write {test_basis_data1=}")
     basis_client.write(test_basis_name, test_basis_data1)
-    print(f"Current basis data: {test_basis_name} = {basis_client.read(test_basis_name)}")
+    print(
+        f"Current basis data: {test_basis_name} = {basis_client.read(test_basis_name)}"
+    )
 
     print("\nTEST: deal with duplicate species but different data")
     test_basis_data2 = test_basis_data.copy()
-    test_basis_data2['H']['nmax'] = test_basis_data['H']['nmax'][::-1]  # make a little change
+    test_basis_data2["H"]["nmax"] = test_basis_data["H"]["nmax"][
+        ::-1
+    ]  # make a little change
     try:
         print(f"write {test_basis_data2=}")
         basis_client.write(test_basis_name, test_basis_data2)
     except ValueError:
         print("Duplication error caught, print error info:")
         import traceback
+
         traceback.print_exc()
     else:
         raise ValueError("Did not catch the duplication error!")
@@ -299,10 +312,12 @@ if __name__ == "__main__":
         test_BasisClient()
     except Exception:
         import traceback
+
         traceback.print_exc()
         print(f"Restore the original basis data")
         BasisClient()._write_all(basis_data_all)
 
     # ensure the original basis data is unchanged
-    assert pickle.dumps(basis_data_all) == pickle.dumps(BasisClient()._read_all()), \
-        "The original basis data has been changed!"
+    assert pickle.dumps(basis_data_all) == pickle.dumps(
+        BasisClient()._read_all()
+    ), "The original basis data has been changed!"
