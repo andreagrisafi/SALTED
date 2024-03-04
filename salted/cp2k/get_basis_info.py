@@ -22,7 +22,7 @@ def build(dryrun: bool = False):
     for spe in lmax.keys():
         assert lmax[spe] + 1 == len(
             [i for i in nmax.keys() if i[0] == spe]
-        )  # compare l_list with n_list
+        ), f"{lmax=}, {nmax=}"  # compare l_list with n_list
         basis_data[spe] = {
             "lmax": lmax[spe],
             "nmax": [nmax[(spe, l)] for l in range(lmax[spe] + 1)],
@@ -66,7 +66,7 @@ def parse_files_basis_info(species, dfbasis) -> (
         lmaxlist = []
         alphalist = {}
         for l in range(10):
-            nmax[(spe, l)] = 0
+            # nmax[(spe, l)] = 0
             alphalist[l] = []
         with open(spe + "-" + dfbasis) as f:
             for line in f:
@@ -80,7 +80,8 @@ def parse_files_basis_info(species, dfbasis) -> (
                     for l in range(llmin, llmax + 1):
                         lmaxlist.append(l)
                         nmaxtemp[l] = int(line.split()[4 + l - llmin])
-                        nmax[(spe, l)] += nmaxtemp[l]
+                        # nmax[(spe, l)] += nmaxtemp[l]
+                        nmax[(spe, l)] = nmax.get((spe, l), 0) + nmaxtemp[l]
                         alphalist[l].append(np.zeros(nnpgf))
                         contra[(spe, l)] = np.zeros((nmaxtemp[l], nnpgf))
                     lines = list(islice(f, nnpgf))
