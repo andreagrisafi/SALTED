@@ -1,8 +1,8 @@
-"""translate basis info from aims calculation to SALTED basis info"""
+"""Translate basis info from FHI-aims calculation to SALTED basis info"""
 
 import argparse
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import inp
 import yaml
@@ -136,32 +136,9 @@ def parse_file_basis_info(basis_info_fpath: str) -> List[SpeciesBasisData]:
     return basis_data
 
 
-def write_basis_info_old(
-    l_list: Dict[str, int], n_list: Dict[Tuple[str, int], int], dryrun: bool = False
-):
-    l_list = {k: v - 1 for k, v in l_list.items()}
-    basis_name = inp.dfbasis
-    basis_data: Dict[str, SpeciesBasisData] = {}
-    for spe in l_list.keys():
-        assert l_list[spe] + 1 == len(
-            [i for i in n_list.keys() if i[0] == spe]
-        )  # compare l_list with n_list
-        basis_data[spe] = {
-            "lmax": l_list[spe],
-            "nmax": [n_list[(spe, l)] for l in range(l_list[spe] + 1)],
-        }
-    if dryrun:
-        print("Dryrun mode, not writing to the database")
-        print(f"{inp.species=}")
-        print(f"{l_list=}, {n_list=}")
-        print(f"inp.dfbasis={basis_name=}")
-        print(f"{basis_data=}")
-    else:
-        basis_client = BasisClient()
-        basis_client.write(basis_name, basis_data)
-
-
 if __name__ == "__main__":
+    print("Please call `python -m salted.get_basis_info` instead of this file")
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--dryrun",
