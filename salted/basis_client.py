@@ -65,6 +65,7 @@ class BasisClient:
     DEFAULT_DATA_FNAME = "basis_data.yaml"
 
     def __init__(self, data_fpath: Union[None, str] = None):
+        # TODO: REMOVE data_fpath parameter, use the default dataset file only
         """Initialize the basis client with the data file path.
 
         Args:
@@ -172,6 +173,7 @@ class BasisClient:
         """cope with duplication"""
         if basis_name in basis_data_all.keys():
             """compare each basis data serialized by pickle"""
+            # TODO: WARNING: IMPORTANT: basis_data from data file could have more contents than basis_data, only check the duplicated part!
             if compare_by_pickle(basis_data_all[basis_name], basis_data):
                 print(
                     f"{basis_name=} already exists in {self.data_fpath}, no change is made."
