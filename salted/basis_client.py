@@ -1,35 +1,41 @@
-import logging
 import os
 import pickle
 import sys
-from typing import Any, Dict, List, Tuple, TypedDict, Union
+from typing import Any, Dict, List, Tuple, TypedDict, Union, Optional
 
 import yaml
 
-
-def compare_by_pickle(obj1: Any, obj2: Any) -> bool:
-    if pickle.dumps(obj1) == pickle.dumps(obj2):
-        return True
-    else:
-        return False
 
 
 class BasisSpeciesData(TypedDict):
     lmax: int
     nmax: List[int]
 
+def compare_basis_data_dup_spe(
+    basis_data1: Dict[str, BasisSpeciesData],
+    basis_data2: Dict[str, BasisSpeciesData],
+):
+    """Compare two basis data.
+    If the BasisSpeciesData for duplicated species are the same, return True.
+    Else, return False.
+    """
+    species_union = set(basis_data1.keys()).intersection(set(basis_data2.keys()))
+    for spe_name in species_union:
+        # compare by pickle serialization to avoid the problem of comparing lists
+        if not pickle.dumps(basis_data1[spe_name]) == pickle.dumps(basis_data2[spe_name]):
+            return False
+    return True
 
 class BasisClient:
     """
     Maintain a KSDFT basis data dataset (in yaml format), provide methods to read and write the dataset.
-    This class will not keep the basis data in memory, but read and write the dataset file every time needed.
+    This class will never keep the basis data in memory, but read and write the dataset file every time needed.
 
     Usage:
     ```python
-    basis_client = BasisClient()        # use the default dataset file
-    basis_client = BasisClient("path/to/basis_data.yaml")  # use a specific dataset file
+    basis_client = BasisClient()        # instantiate the basis client
     basis_data = basis_client.read("my_basis")       # read basis data
-    lmax, nmax = basis_client.read_as_old_format("my_basis")  # read basis data in the old format
+    lmax, nmax = basis_client.read_as_old_format("my_basis")  # read basis data in the old format (see docstring)
     basis_client.write("my_basis", {"H": {"lmax": 1, "nmax": [4, 3]}, "O": {"lmax": 2, "nmax": [5, 4, 3]}})  # write basis data
     basis_client.pop("my_basis")        # remove basis data
     ```
@@ -64,19 +70,23 @@ class BasisClient:
 
     DEFAULT_DATA_FNAME = "basis_data.yaml"
 
-    def __init__(self, data_fpath: Union[None, str] = None):
-        # TODO: REMOVE data_fpath parameter, use the default dataset file only
+    def __init__(self, _dev_data_fpath: Optional[str] = None):
         """Initialize the basis client with the data file path.
 
         Args:
-            data_fpath (optional): The path to the dataset file. If not provided, the default dataset file will be used.
+            _dev_data_fpath (optional): For development only!!! Do not use this argument!!!
+                The path to the dataset file. If not provided, the default dataset file will be used.
         """
-        if data_fpath is None:
+        if _dev_data_fpath is None:
             self.data_fpath = os.path.join(
                 self.__salted_package_root, self.DEFAULT_DATA_FNAME
             )
         else:
-            self.data_fpath = data_fpath
+            print(
+                f"[{self.__class__.__name__}] WARNING: _dev_data_fpath is for development only!!!",
+                file=sys.stderr,
+            )
+            self.data_fpath = _dev_data_fpath
 
         """create the data file if it does not exist"""
         if not os.path.isfile(self.data_fpath):
@@ -97,7 +107,9 @@ class BasisClient:
         try:
             import salted
         except ImportError:
-            raise ImportError("The salted package is not installed.")
+            raise ImportError(
+                "The salted package is not (properly) installed. Please see https://github.com/andreagrisafi/SALTED"
+            )
         assert len(salted.__path__) == 1
         salted_root = salted.__path__[0]
         assert os.path.isdir(salted_root)
@@ -107,10 +119,12 @@ class BasisClient:
         """Check the sanity of the dataset file.
 
         Current check:
-        - lmax nmax consistency
-        - (plz add more checks here if needed)
+        1. If there are duplicated basis names (by yaml raising error)
+        2. lmax nmax consistency
+        n. (plz add more checks here if needed)
         """
         with open(self.data_fpath) as f:
+            """Checking 1 is done here"""
             basis_data = yaml.safe_load(f)
         if basis_data is None:
             print(f"Empty basis dataset file at {self.data_fpath}", file=sys.stderr)
@@ -119,14 +133,20 @@ class BasisClient:
         for basis_name in basis_names:
             basis_data = self.read(basis_name)
             for spe_name, spe_data in basis_data.items():
+                """Checking 2 is done here"""
                 assert (
                     spe_data["lmax"] == len(spe_data["nmax"]) - 1
                 ), f"lmax nmax discrepancy: {basis_name=}, {spe_name=}, {spe_data=}"
 
-    def read(self, basis_name: str) -> Dict[str, BasisSpeciesData]:
-        """read basis data from the dataset file"""
+    def _read_all(self) -> Dict[str, Dict[str, BasisSpeciesData]]:
+        """Read all basis data from the dataset file"""
         with open(self.data_fpath) as f:
             basis_data_all = yaml.safe_load(f)
+        return basis_data_all
+
+    def read(self, basis_name: str) -> Dict[str, BasisSpeciesData]:
+        """Read basis data from the dataset file"""
+        basis_data_all = self._read_all()
         assert (
             basis_name in basis_data_all.keys()
         ), f"{basis_name=} not found in {self.data_fpath}"
@@ -135,7 +155,7 @@ class BasisClient:
     def read_as_old_format(
         self, basis_name: str
     ) -> Tuple[Dict[str, int], Dict[Tuple[str, int], int]]:
-        """read basis data and return as the old format
+        """Read basis data and return as the old format
 
         Old format:
         ```python
@@ -165,36 +185,42 @@ class BasisClient:
         }
         return (lmax, nmax)
 
+    def _write_all(self, basis_data_all: Dict[str, Dict[str, BasisSpeciesData]]):
+        """Rewrite the whole dataset file with the new basis data"""
+        with open(self.data_fpath, "w") as f:
+            yaml.safe_dump(
+                basis_data_all, f, default_flow_style=None
+            )  # default_flow_style is important!
+
     def write(self, basis_name: str, basis_data: Dict[str, BasisSpeciesData]):
-        """write basis data to the dataset file"""
+        """Write basis data to the dataset file"""
         with open(self.data_fpath) as f:
             basis_data_all: Dict = yaml.safe_load(f)
 
         """cope with duplication"""
         if basis_name in basis_data_all.keys():
             """compare each basis data serialized by pickle"""
-            # TODO: WARNING: IMPORTANT: basis_data from data file could have more contents than basis_data, only check the duplicated part!
-            if compare_by_pickle(basis_data_all[basis_name], basis_data):
+            print(f"{basis_name=} already exists in {self.data_fpath}")
+            if compare_basis_data_dup_spe(basis_data, basis_data_all[basis_name]):
                 print(
-                    f"{basis_name=} already exists in {self.data_fpath}, no change is made."
+                    f"Basis data for the duplicated species are the same. Write data union to file."
                 )
-                return
+                basis_data_all[basis_name].update(basis_data)
             else:
                 raise ValueError(
-                    f"{basis_name=} already exists in {self.data_fpath}, but with different content.\
-                    \rCurrent basis data:\n\t{basis_data}\
-                    \rBasis data in {self.data_fpath}:\n\t{basis_data_all[basis_name]}"
+                    f"Basis data for the duplicated species are different.\
+                    \n\rCurrent basis data:\n\t{basis_data}\
+                    \n\rBasis data in {self.data_fpath}:\n\t{basis_data_all[basis_name]}"
                 )
+        else:
+            basis_data_all[basis_name] = basis_data
 
         """write basis data to the file"""
-        basis_data_all.update({basis_name: basis_data})
-        with open(self.data_fpath, "w") as f:
-            yaml.safe_dump(basis_data_all, f, default_flow_style=None)
+        self._write_all(basis_data_all)
 
     def pop(self, basis_name: str):
-        """pop basis data from the dataset file"""
-        with open(self.data_fpath) as f:
-            basis_data_all = yaml.safe_load(f)
+        """Pop basis data from the dataset file"""
+        basis_data_all = self._read_all()
         if basis_name not in basis_data_all.keys():
             print(
                 f"{basis_name=} not found in {self.data_fpath}, no change is made.",
@@ -202,53 +228,81 @@ class BasisClient:
             )
         else:
             basis_data_all.pop(basis_name)
-            with open(self.data_fpath, "w") as f:
-                yaml.safe_dump(basis_data_all, f, default_flow_style=None)
+            self._write_all(basis_data_all)
             print(f"{basis_name=} has been removed from {self.data_fpath}")
 
 
 def test_BasisClient():
-    """test the BasisClient class"""
-    print("TEST: testing BasisClient...")
+    """Test the BasisClient class"""
 
-    print("TEST: init with the default dataset file")
+    print("\nTEST: testing BasisClient...")
+
+    print("\nTEST: init with the default dataset file")
     basis_client = BasisClient()
 
-    print("TEST: init with a specific dataset file")
+    print("\nTEST: init with a specific dataset file")
     basis_client = BasisClient(
         os.path.join(os.path.dirname(__file__), BasisClient.DEFAULT_DATA_FNAME)
     )
 
-    print("TEST: read basis data")
+    print("\nTEST: read basis data")
     basis_data = basis_client.read("FHI-aims-light")
     print(basis_data)
 
-    print("TEST: read basis data in the old format")
+    print("\nTEST: read basis data in the old format")
     basis_data_old_format = basis_client.read_as_old_format("FHI-aims-light")
     print(basis_data_old_format)
 
-    print("TEST: write duplicated basis data")
-    basis_client.write("FHI-aims-light", basis_data)
+    print("\nTEST: write basis data")
+    test_basis_name = "__I_am_unique__"
+    test_basis_data = {
+        'H': {'lmax': 1, 'nmax': [4, 3]},
+        'O': {'lmax': 2, 'nmax': [5, 4, 3]}
+    }
+    basis_client.write(test_basis_name, test_basis_data)
 
-    print("TEST: try to catch same-name duplication error")
-    basis_data_fake = basis_data.copy()
-    basis_data_fake["Ghost"] = {"lmax": 1, "nmax": [4, 3]}
+    print("\nTEST: remove basis data")
+    basis_client.pop(test_basis_name)
+
+    print("\nTEST: write duplicated basis data")
+    assert test_basis_name not in basis_client._read_all().keys()
+    basis_client.write(test_basis_name, test_basis_data)
+
+    print("\nTEST: deal with duplicate species but same data")
+    test_basis_data1 = test_basis_data.copy()
+    test_basis_data1["_Ghost"] = {"lmax": 1, "nmax": [4, 3]}
+    print(f"write {test_basis_data1=}")
+    basis_client.write(test_basis_name, test_basis_data1)
+    print(f"Current basis data: {test_basis_name} = {basis_client.read(test_basis_name)}")
+
+    print("\nTEST: deal with duplicate species but different data")
+    test_basis_data2 = test_basis_data.copy()
+    test_basis_data2['H']['nmax'] = test_basis_data['H']['nmax'][::-1]  # make a little change
     try:
-        basis_client.write("FHI-aims-light", basis_data_fake)
-    except ValueError as e:
+        print(f"write {test_basis_data2=}")
+        basis_client.write(test_basis_name, test_basis_data2)
+    except ValueError:
         print("Duplication error caught, print error info:")
-        print(e)
+        import traceback
+        traceback.print_exc()
     else:
         raise ValueError("Did not catch the duplication error!")
+    basis_client.pop(test_basis_name)
 
-    print("TEST: write basis data")
-    basis_client.write("FHI-aims-light_copy", basis_data)
-
-    print("TEST: remove basis data")
-    basis_client.pop("FHI-aims-light_copy")
-
-    print("TEST: test done.")
+    print("\nTEST: test done.")
 
 
 if __name__ == "__main__":
-    test_BasisClient()
+    basis_data_all = BasisClient()._read_all()
+
+    try:
+        test_BasisClient()
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        print(f"Restore the original basis data")
+        BasisClient()._write_all(basis_data_all)
+
+    # ensure the original basis data is unchanged
+    assert pickle.dumps(basis_data_all) == pickle.dumps(BasisClient()._read_all()), \
+        "The original basis data has been changed!"
