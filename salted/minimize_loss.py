@@ -233,7 +233,7 @@ def build():
     psi_list = []
     for iconf in trainrange:
         ovlp_list.append(np.load(osp.join(
-            inp.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+            inp.path2qm, inp.ovlpdir, f"overlap_conf{iconf}.npy"
         )))
         # load feature vector as a scipy sparse object
         psi_list.append(sparse.load_npz(osp.join(

@@ -38,7 +38,7 @@ def build():
         rank = 0
         size = 1
 
-    filename = inp.filename
+    filename = inp.predict_filename
     saltedname = inp.saltedname
     predname = inp.predname
     rep1 = inp.rep1
@@ -210,16 +210,16 @@ def build():
     descstart = time.time()
 
     nspe1 = len(neighspe1)
-    keys_array = np.zeros(((nang1+1)*len(species)*nspe1,3),int)
+    keys_array = np.zeros(((nang1+1)*len(species)*nspe1,4),int)
     i = 0
     for l in range(nang1+1):
         for specen in species:
             for speneigh in neighspe1:
-                keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
                 i += 1
 
     keys_selection = Labels(
-        names=["o3_lambda","center_type","neighbor_type"],
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
         values=keys_array
     )
 
@@ -248,16 +248,16 @@ def build():
             exit()
 
     nspe2 = len(neighspe2)
-    keys_array = np.zeros(((nang2+1)*len(species)*nspe2,3),int)
+    keys_array = np.zeros(((nang2+1)*len(species)*nspe2,4),int)
     i = 0
     for l in range(nang2+1):
         for specen in species:
             for speneigh in neighspe2:
-                keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
                 i += 1
 
     keys_selection = Labels(
-        names=["o3_lambda","center_type","neighbor_type"],
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
         values=keys_array
     )
 
@@ -269,7 +269,7 @@ def build():
     omega2 = np.zeros((nang2+1,natoms_total,2*nang2+1,nspe2*nrad2),complex)
     for l in range(nang2+1):
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
-        omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(o3_lambda_l=l).values)
+        omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(o3_lambda=l).values)
 
     if inp.field:
     # get SPH expansion for a uniform and constant external field aligned along Z
