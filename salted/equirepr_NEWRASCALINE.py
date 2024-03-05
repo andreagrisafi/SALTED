@@ -172,30 +172,30 @@ def equirepr(sparsify,field):
         print("Error: requested representation", rep1, "not provided")
 
     nspe1 = len(neighspe1)
-    keys_array = np.zeros(((nang1+1)*len(species)*nspe1,3),int)
+    keys_array = np.zeros(((nang1+1)*len(species)*nspe1,4),int)
     i = 0
     for l in range(nang1+1):
         for specen in species:
             for speneigh in neighspe1:
-                keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
                 i += 1
 
     keys_selection = Labels(
-        names=["spherical_harmonics_l","species_center","species_neighbor"],
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
         values=keys_array
     )
 
     rhostart = time.time()
 
     spx = calculator.compute(frames, selected_keys=keys_selection)
-    spx = spx.keys_to_properties("species_neighbor")
-    spx = spx.keys_to_samples("species_center")
+    spx = spx.keys_to_properties("neighbor_type")
+    spx = spx.keys_to_samples("center_type")
 
     # Get 1st set of coefficients as a complex numpy array
     omega1 = np.zeros((nang1+1,natoms_total,2*nang1+1,nspe1*nrad1),complex)
     for l in range(nang1+1):
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
-        omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(spherical_harmonics_l=l).values)
+        omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
 
     if rank == 0: print(f"rho time: {(time.time()-rhostart):.2f}")
 
@@ -223,30 +223,30 @@ def equirepr(sparsify,field):
             print("Error: requested representation", rep2, "not provided")
 
         nspe2 = len(neighspe2)
-        keys_array = np.zeros(((nang2+1)*len(species)*nspe2,3),int)
+        keys_array = np.zeros(((nang2+1)*len(species)*nspe2,4),int)
         i = 0
         for l in range(nang2+1):
             for specen in species:
                 for speneigh in neighspe2:
-                    keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                    keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
                     i+=1
 
         keys_selection = Labels(
-            names=["spherical_harmonics_l","species_center","species_neighbor"],
+            names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
             values=keys_array
         )
 
         spx_pot = calculator.compute(frames, selected_keys=keys_selection)
-        spx_pot = spx_pot.keys_to_properties("species_neighbor")
-        spx_pot = spx_pot.keys_to_samples("species_center")
+        spx_pot = spx_pot.keys_to_properties("neighbor_type")
+        spx_pot = spx_pot.keys_to_samples("center_type")
 
 
         # Get 2nd set of coefficients as a complex numpy array
         omega2 = np.zeros((nang2+1,natoms_total,2*nang2+1,nspe2*nrad2),complex)
         for l in range(nang2+1):
             c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
-            omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
-            
+            omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(o3_lambda=l).values)
+
     if rank == 0: print(f"pot time: {(time.time()-potstart):.2f}")
 
     # Generate directories for saving descriptors
