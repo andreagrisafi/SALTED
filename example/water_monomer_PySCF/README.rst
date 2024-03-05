@@ -1,13 +1,23 @@
 #---------------------------------------------------
 # SETUP
 #---------------------------------------------------
-
-Before beginning, run
-:code:`source YOUR_SALTED_DIRECTORY/env.sh`
-and 
-:code:`source YOUR_TENSOAP_DIRECTORY/env.sh`
-
 Ensure that the file $SALTEDPATH/basis.py contains an entry corresponding to the dfbasis you wish to use. Helper programs to interface PySCF with SALTED are included in this example folder.
+
+
+```mermaid
+%% Example of sequence diagram
+  sequenceDiagram
+    Alice->>Bob: Hello Bob, how are you?
+    alt is sick
+    Bob->>Alice: Not so good :(
+    else is well
+    Bob->>Alice: Feeling fresh like a daisy
+    end
+    opt Extra response
+    Bob->>Alice: Thanks for asking
+    end
+```
+
 
 #---------------------------------------------------
 # GENERATE TRAINING DATA
@@ -24,14 +34,6 @@ Each of these commands can be run with the flag `-iconf n` to generate the train
 Calculate the spherically averaged baseline coefficients across the training set
 :code:`python $SALTEDPATH/get_averages.py`
 
-#---------------------------------------------------
-# GENERATE DESCRIPTORS
-#---------------------------------------------------
-
-Calculate the lambda-SOAP descriptors, using
-:code:`python $SALTEDPATH/run-tensoap.py`
-
-The number of sparse features and number of structures used for sparsification can be specified using the flags `-nc` and `-ns` respectively
 
 #---------------------------------------------------
 # PERFORM SALTED MINIMISATION AND VALIDATION
