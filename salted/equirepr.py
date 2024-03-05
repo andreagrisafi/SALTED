@@ -182,14 +182,15 @@ def equirepr(sparsify,field):
 
     keys_selection = Labels(
         names=["spherical_harmonics_l","species_center","species_neighbor"],
+        names=["o3_lambda","center_type","neighbor_type"],
         values=keys_array
     )
 
     rhostart = time.time()
 
     spx = calculator.compute(frames, selected_keys=keys_selection)
-    spx = spx.keys_to_properties("species_neighbor")
-    spx = spx.keys_to_samples("species_center")
+    spx = spx.keys_to_properties("neighbor_type")
+    spx = spx.keys_to_samples("center_type")
 
     # Get 1st set of coefficients as a complex numpy array
     omega1 = np.zeros((nang1+1,natoms_total,2*nang1+1,nspe1*nrad1),complex)
@@ -232,13 +233,13 @@ def equirepr(sparsify,field):
                     i+=1
 
         keys_selection = Labels(
-            names=["spherical_harmonics_l","species_center","species_neighbor"],
+            names=["o3_lambda","center_type","neighbor_type"],
             values=keys_array
         )
 
         spx_pot = calculator.compute(frames, selected_keys=keys_selection)
-        spx_pot = spx_pot.keys_to_properties("species_neighbor")
-        spx_pot = spx_pot.keys_to_samples("species_center")
+        spx_pot = spx_pot.keys_to_properties("neighbor_type")
+        spx_pot = spx_pot.keys_to_samples("center_type")
 
 
         # Get 2nd set of coefficients as a complex numpy array
