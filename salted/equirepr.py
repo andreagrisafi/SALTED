@@ -181,7 +181,6 @@ def equirepr(sparsify,field):
                 i += 1
 
     keys_selection = Labels(
-        names=["spherical_harmonics_l","species_center","species_neighbor"],
         names=["o3_lambda","center_type","neighbor_type"],
         values=keys_array
     )
