@@ -74,7 +74,7 @@ def build():
     for spe in species:
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
-                Mcut = np.load(os.path.join(
+                Mcut = np.load(osp.join(
                     inp.saltedpath, kdir, f"spe{spe}_l{l}", f"M{M}_zeta{zeta}", f"psi-nm_conf{0}.npy"
                 )).shape[1]
                 cuml_Mcut[(spe,l,n)] = totsize
@@ -83,8 +83,8 @@ def build():
     if rank == 0: print(f"problem dimensionality: {totsize}", flush=True)
 
     if (rank == 0):
-        dirpath = os.path.join(inp.saltedpath, fdir, f"M{M}_zeta{zeta}")
-        if not os.path.exists(dirpath):
+        dirpath = osp.join(inp.saltedpath, fdir, f"M{M}_zeta{zeta}")
+        if not osp.exists(dirpath):
             os.makedirs(dirpath)
     if size > 1:  comm.Barrier()
 
@@ -102,7 +102,7 @@ def build():
         print(f"{iconf} start", flush=True)
 
         # load reference QM data
-        coefs = np.load(osp.join(inp.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"))
+        coefs = np.load(osp.join(inp.path2qm, inp.coefdir, f"coefficients_conf{iconf}.npy"))
         Tsize = len(coefs)
 
         # initialize RKHS feature vectors for each channel

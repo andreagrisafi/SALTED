@@ -161,10 +161,10 @@ def build():
 
             # load reference QM data
             ref_projs = np.load(osp.join(
-                inp.saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
+                inp.path2qm, inp.projdir, f"projections_conf{trainrange[iconf]}.npy"
             ))
             ref_coefs = np.load(osp.join(
-                inp.saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
+                inp.path2qm, inp.coefdir, f"coefficients_conf{trainrange[iconf]}.npy"
             ))
 
             if inp.average:

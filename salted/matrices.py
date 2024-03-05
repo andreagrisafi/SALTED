@@ -37,8 +37,8 @@ def build():
     zeta = inp.z
     
     if rank == 0:    
-        dirpath = os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}")
-        if not os.path.exists(dirpath):
+        dirpath = osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}")
+        if not osp.exists(dirpath):
             os.makedirs(dirpath)
     if size > 1: comm.Barrier()
 
@@ -129,15 +129,9 @@ def matrices(block_idx,trainrange,rank):
        
         start = time.time()
         # load reference QM data
-        ref_coefs = np.load(osp.join(
-            inp.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
-        ))
-        over = np.load(osp.join(
-            inp.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
-        ))
-        psivec = sparse.load_npz(osp.join(
-            inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
-        ))
+        ref_coefs = np.load(osp.join(inp.path2qm, inp.coefdir, f"coefficients_conf{iconf}.npy"))
+        over = np.load(osp.join(inp.path2qm, inp.ovlpdir, f"overlap_conf{iconf}.npy"))
+        psivec = sparse.load_npz(osp.join(inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"))
         psi = psivec.toarray()
     
         if inp.average:
@@ -169,11 +163,11 @@ def matrices(block_idx,trainrange,rank):
     Bmat /= float(ntrain)
     
     if block_idx == -1:
-        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}.npy", Avec)
-        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}.npy", Bmat)
+        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
+        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
     else:
-        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}_chunk{block_idx}.npy", Avec)
-        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{block_idx}.npy", Bmat)
+        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}_chunk{block_idx}.npy"), Avec)
+        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{block_idx}.npy"), Bmat)
 
     return
 

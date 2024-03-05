@@ -1,4 +1,4 @@
-import os
+import os.path as osp
 import sys
 import numpy as np
 
@@ -20,7 +20,7 @@ def build():
     print("computing averages...")
     for iconf in range(ndata):
         atoms = atomic_symbols[iconf]
-        coefs = np.load(os.path.join(inp.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"))
+        coefs = np.load(osp.join(inp.path2qm, inp.coefdir, f"coefficients_conf{iconf}.npy"))
         i = 0
         for iat in range(natoms[iconf]):
             spe = atoms[iat] 

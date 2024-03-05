@@ -7,8 +7,7 @@ import numpy as np
 from pyscf import gto
 from ase.io import read
 from scipy import special
-
-import basis  # WARNING: relative import
+from salted import basis  # WARNING: relative import
 
 sys.path.insert(0, './')
 import inp
@@ -23,7 +22,7 @@ def set_variable_values(args):
     iconf = args.confidx
     return iconf 
 
-args = add_command_line_arguments("")
+args = add_command_line_arguments()
 iconf = set_variable_values(args)
 
 xyzfile = read(inp.filename,":")
@@ -39,14 +38,14 @@ else:
 # read basis
 [lmax,nmax] = basis.basiset(inp.dfbasis)
     
-dirpath = os.path.join(inp.path2qm, inp.coefdir)
-if not os.path.exists(dirpath):
+dirpath = osp.join(inp.path2qm, inp.coefdir)
+if not osp.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2qm, inp.projdir)
-if not os.path.exists(dirpath):
+dirpath = osp.join(inp.path2qm, inp.projdir)
+if not osp.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2qm, inp.ovlpdir)
-if not os.path.exists(dirpath):
+dirpath = osp.join(inp.path2qm, inp.ovlpdir)
+if not osp.exists(dirpath):
     os.mkdir(dirpath)
 
 print("PySCF orders all angular momentum components for L>1 as -L,...,0,...,+L,") 
@@ -145,9 +144,9 @@ for iconf in conf_list:
     Proj = np.dot(Over,Coef)
     
     # Save projections and overlaps
-    np.save(f"inp.path2qm", "inp.coefdir", "coefficients_conf{iconf}.npy", Coef)
-    np.save(f"inp.path2qm", "inp.projdir", "projections_conf{iconf}.npy", Proj)
-    np.save(f"inp.path2qm", "inp.ovlpdir", "overlap_conf{iconf}.npy", Over)
+    np.save(osp.join(inp.path2qm, inp.coefdir, f"coefficients_conf{iconf}.npy"), Coef)
+    np.save(osp.join(inp.path2qm, inp.projdir, f"projections_conf{iconf}.npy"), Proj)
+    np.save(osp.join(inp.path2qm, inp.ovlpdir, f"overlap_conf{iconf}.npy"), Over)
     
     # --------------------------------------------------
     
