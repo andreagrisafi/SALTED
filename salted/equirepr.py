@@ -158,6 +158,9 @@ def equirepr(sparsify,field):
     if sparsify: random.Random(3).shuffle(frames)
     frames = [frames[i] for i in conf_range]
 
+    for frame in frames:
+        frame.pbc = [False, False, False]
+
     if rank == 0: print(f"The dataset contains {ndata_true} frames.")
 
     if rep1=="rho":
