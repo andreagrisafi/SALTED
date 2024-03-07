@@ -12,7 +12,7 @@ sys.path.insert(0, './')
 import inp
 
 # Initialize geometry
-geoms = read(inp.filename,":")
+geoms = read(inp.predict_filename,":")
 conf_list = range(len(geoms))
 
 # read basis
@@ -73,9 +73,9 @@ for iconf in conf_list:
                         Coef[i1] = rho[i1]
                     i1 += 1
     
-    dirpath = osp.join(inp.path2qm, inp.coefdir)
-    if not osp.exists(dirpath):
-        os.mkdir(dirpath)
+
+    if not osp.exists("reference"):
+        os.mkdir("reference")
     # Save Coefficents
     np.save(osp.join("reference/", f"ref_coefficients_conf{iconf}.npy"), Coef)
    
