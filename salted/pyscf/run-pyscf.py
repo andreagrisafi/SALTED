@@ -39,7 +39,7 @@ if iconf != -1:
 else:
     conf_list = range(len(geoms))
 
-for iconf in conf_list:
+for i,iconf in enumerate(conf_list):
     geom = geoms[iconf]
     symb = geom.get_chemical_symbols()
     coords = geom.get_positions()
@@ -52,9 +52,21 @@ for iconf in conf_list:
     # Get PySCF objects for wave-function and density-fitted basis
     mol = gto.M(atom=atoms,basis=inp.qmbasis)
     m = dft.RKS(mol)
+    m.grids.radi_method = dft.gauss_chebyshev
+    m.grids.level = 0
+    m.with_df.auxbasis = 'def2-tzvp-jkfit'
+    m.chkfile = f'temp{i}.chk'
     m.xc = inp.functional
-    # Save density matrix
-    m.kernel()
+    if i != 0:
+        dm = dft.rks.from_chk(mol, f'temp{i-1}.chk')
+        # Save density matrix
+        m.kernel(dm)
+    else:
+        m.kernel()
+    
+
+
+    
 
     #ks_scanner = m.apply(grad.RKS).as_scanner()
     #etot, grad = ks_scanner(mol)
