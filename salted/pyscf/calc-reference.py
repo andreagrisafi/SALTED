@@ -6,7 +6,11 @@ import numpy as np
 from ase.io import read
 from pyscf import gto
 from pyscf import scf,dft
+from pyscf import lib
 from salted import basis  # WARNING: relative import
+
+
+lib.num_threads(10)
 
 sys.path.insert(0, './')
 import inp

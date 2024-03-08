@@ -8,9 +8,12 @@ from pyscf import gto
 from ase.io import read
 from scipy import special
 from salted import basis  # WARNING: relative import
+import tqdm
 
 sys.path.insert(0, './')
 import inp
+
+debug = False
 
 def add_command_line_arguments():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -54,7 +57,7 @@ print("Make sure to provide the density matrix following this convention!")
 print("---------------------------------------------------------------------------------")
 print("Reading geometry and basis sets...")
 
-for iconf in conf_list:
+for iconf in tqdm.tqdm(conf_list):
 
     # Initialize geometry
     geom = xyzfile[iconf]
@@ -72,12 +75,12 @@ for iconf in conf_list:
     auxmol = gto.M(atom=atoms,basis=ribasis)
     pmol = mol + auxmol
     
-    print("Computing overlap matrix...")
+    if debug: print("Computing overlap matrix...")
     
     # Get and save overlap matrix
     overlap = auxmol.intor('int1e_ovlp_sph')
     
-    print("Computing density-fitted coefficients...")
+    if debug: print("Computing density-fitted coefficients...")
     
     # Number of atomic orbitals
     nao = mol.nao_nr()
@@ -96,7 +99,7 @@ for iconf in conf_list:
     rho = np.einsum('ijp,ij->p', eri3c, dm)
     rho = np.linalg.solve(eri2c, rho)
     
-    print("Reordering...")
+    if debug: print("Reordering...")
     
     # Reorder L=1 components following the -1,0,+1 convention
     Coef = np.zeros(len(rho),float)

@@ -1,13 +1,17 @@
 import argparse
 import os
 import sys
-
+from multiprocessing import Pool
+import tqdm
 import numpy as np
 from ase.io import read
 from pyscf import gto
 from pyscf import scf,dft
+from pyscf import lib
 from pyscf import grad
 from scipy import special
+
+lib.num_threads(1)
 
 sys.path.insert(0, './')
 import inp
@@ -27,10 +31,10 @@ iconf = set_variable_values(args)
 
 # Initialize geometry
 geoms = read(inp.filename,":")
+dirpath = os.path.join(inp.path2qm, "density_matrices")
 
-dirpath = inp.path2qm
 if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
+    os.makedirs(dirpath)
 
 if iconf != -1:
     print("Calculating density matrix for configuration", iconf)
@@ -39,47 +43,36 @@ if iconf != -1:
 else:
     conf_list = range(len(geoms))
 
-for i,iconf in enumerate(conf_list):
-    geom = geoms[iconf]
+
+def doSCF(i):
+    geom = geoms[i]
     symb = geom.get_chemical_symbols()
     coords = geom.get_positions()
     natoms = len(coords)
     atoms = []
-    for i in range(natoms):
-        coord = coords[i]
-        atoms.append([symb[i],(coord[0],coord[1],coord[2])])
+    for j in range(natoms):
+        coord = coords[j]
+        atoms.append([symb[j],(coord[0],coord[1],coord[2])])
 
     # Get PySCF objects for wave-function and density-fitted basis
     mol = gto.M(atom=atoms,basis=inp.qmbasis)
     m = dft.RKS(mol)
     m.grids.radi_method = dft.gauss_chebyshev
     m.grids.level = 0
+    m = m.density_fit()
     m.with_df.auxbasis = 'def2-tzvp-jkfit'
-    m.chkfile = f'temp{i}.chk'
     m.xc = inp.functional
-    if i != 0:
-        dm = dft.rks.from_chk(mol, f'temp{i-1}.chk')
-        # Save density matrix
-        m.kernel(dm)
-    else:
-        m.kernel()
-    
+    m.kernel()
 
-
-    
-
-    #ks_scanner = m.apply(grad.RKS).as_scanner()
-    #etot, grad = ks_scanner(mol)
-    #
-    #f = open("gradients/grad_conf"+str(iconf+1)+".dat","w")
-    #for i in range(natoms):
-    #    print >> f, symb[i], grad[i,0], grad[i,1], grad[i,2]
-    #f.close()
 
     dm = m.make_rdm1()
 
-    dirpath = os.path.join(inp.path2qm, "density_matrices")
-    if not os.path.exists(dirpath):
-        os.mkdir(dirpath)
+    np.save(os.path.join(dirpath, f"dm_conf{i+1}.npy"), dm)
 
-    np.save(os.path.join(dirpath, f"dm_conf{iconf+1}.npy"), dm)
+
+print(f"Running {len(conf_list)} PySCF Calculations")
+with Pool() as p:
+    for _ in tqdm.tqdm(p.imap(doSCF, conf_list), total = len(conf_list)):
+        pass
+
+

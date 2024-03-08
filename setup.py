@@ -9,7 +9,7 @@ setup(
     author_email='andrea.grisafi@ens.psl.eu, alan.m.lewis@york.ac.uk',
     license='GNU GENERAL PUBLIC LICENSE',
     packages=['salted','salted.cp2k','salted.pyscf','salted.aims','salted.lib'],
-    install_requires=['rascaline','ase','numpy','scipy','sympy'],
+    install_requires=['rascaline','ase','numpy','scipy','sympy', "tqdm"],
     include_package_data=True,
     package_data={"salted": ["salted/lib/*.so"]},
     classifiers=[

@@ -58,6 +58,7 @@ def basiset(basis):
       lmax["C"] = 5
       lmax["N"] = 5
       lmax["O"] = 5
+      lmax["S"] = 5
 
       # hydrogen
       nmax[("H",0)] = 4
@@ -86,7 +87,14 @@ def basiset(basis):
       nmax[("O",3)] = 3
       nmax[("O",4)] = 2
       nmax[("O",5)] = 1
-
+      # sulfur
+      nmax[("S",0)] = 13
+      nmax[("S",1)] = 11
+      nmax[("S",2)] = 9
+      nmax[("S",3)] = 4
+      nmax[("S",4)] = 2
+      nmax[("S",5)] = 1
+      
       return [lmax,nmax]
    
    if basis=="FHI-aims-first-tier":
