@@ -103,14 +103,26 @@ def equirepr(sparsify,field):
 
     if nsamples < ndata and sparsify: ndata = inp.nsamples
     ndata_true = ndata
+    if rank == 0: print(f"The dataset contains {ndata_true} frames.")
+
     if inp.parallel:
+        if sparsify:
+            print("ERROR: sparsification cannot be run in parallel!")
+            sys.exit(0)
         conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
         conf_range = comm.scatter(conf_range,root=0)
         print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
         ndata = len(conf_range)
     else:
-        conf_range = list(range(ndata))
+        if sparsify:
+            conf_range = list(range(ndata_true))
+            random.Random(3).shuffle(list(range(ndata_true)))
+            conf_range = conf_range[:ndata]
+        else:
+            conf_range = list(range(ndata))
 
+    frames = read(filename,":")
+    frames = [frames[i] for i in conf_range]
     natoms_total = sum(natoms[conf_range])
 
     def do_fps(x, d=0, initial=-1):
@@ -153,12 +165,6 @@ def equirepr(sparsify,field):
         "center_atom_weight": 1.0,
         "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
     }
-
-    frames = read(filename,":")
-    if sparsify: random.Random(3).shuffle(frames)
-    frames = [frames[i] for i in conf_range]
-
-    if rank == 0: print(f"The dataset contains {ndata_true} frames.")
 
     if rep1=="rho":
         # get SPH expansion for atomic density
@@ -391,7 +397,7 @@ def equirepr(sparsify,field):
                         mode='w',
                     )
 
-            if ncut < 0 or ncut >= featsize:
+            if ncut <= 0 or ncut >= featsize:
                 ncut_l = featsize
             else:
                 ncut_l = ncut
@@ -410,7 +416,7 @@ def equirepr(sparsify,field):
                         vfps = np.load(osp.join(inp.saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"))
                 except:
                     if rank == 0:
-                        raise ValueError("Sparsification must be performed prior to calculating the descritors if ncut > -1. First run this script with the flag -s, then rerun with no flag.")
+                        raise ValueError("Sparsification must be performed prior to calculating the descritors if ncut > 0.")
                     else:
                         exit()
                 if rank == 0: print("sparsifying...")
