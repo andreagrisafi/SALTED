@@ -56,6 +56,7 @@ def doSCF(i):
 
     # Get PySCF objects for wave-function and density-fitted basis
     mol = gto.M(atom=atoms,basis=inp.qmbasis)
+    mol.verbose = 0
     m = dft.RKS(mol)
     m.grids.radi_method = dft.gauss_chebyshev
     m.grids.level = 0

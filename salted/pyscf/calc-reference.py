@@ -34,7 +34,12 @@ for iconf in conf_list:
 
     # Get PySCF objects for wave-function and density-fitted basis
     mol = gto.M(atom=atoms,basis=inp.qmbasis)
+    mol.verbose = 6
     m = dft.RKS(mol)
+    m.grids.radi_method = dft.gauss_chebyshev
+    m.grids.level = 0
+    m = m.density_fit()
+    m.with_df.auxbasis = 'def2-tzvp-jkfit'
     m.xc = inp.functional
     # Save density matrix
     m.kernel()
