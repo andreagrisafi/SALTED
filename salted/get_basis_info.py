@@ -4,7 +4,9 @@ in salted/aims/get_basis_info.py and salted/cp2k/get_basis_info.py.
 """
 
 import argparse
+import sys
 
+sys.path.insert(0, './')
 import inp
 
 if __name__ == "__main__":
