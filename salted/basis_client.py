@@ -208,6 +208,8 @@ class BasisClient:
         """Write basis data to the dataset file"""
         with open(self.data_fpath) as f:
             basis_data_all: Dict = yaml.safe_load(f)
+        if basis_data_all is None:  # in case the file is empty
+            basis_data_all = dict()
 
         """cope with duplication"""
         if basis_name in basis_data_all.keys():
