@@ -20,14 +20,14 @@ def add_command_line_arguments(parsetext):
 
 def set_variable_values(args):
     iconf = args.confidx
-    return iconf 
+    return iconf
 
 args = add_command_line_arguments("")
 iconf = set_variable_values(args)
 
 # Initialize geometry
 geoms = read(inp.filename,":")
-    
+
 dirpath = inp.path2qm
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
@@ -48,14 +48,14 @@ for iconf in conf_list:
     for i in range(natoms):
         coord = coords[i]
         atoms.append([symb[i],(coord[0],coord[1],coord[2])])
-    
+
     # Get PySCF objects for wave-function and density-fitted basis
     mol = gto.M(atom=atoms,basis=inp.qmbasis)
     m = dft.RKS(mol)
     m.xc = inp.functional
     # Save density matrix
     m.kernel()
-    
+
     #ks_scanner = m.apply(grad.RKS).as_scanner()
     #etot, grad = ks_scanner(mol)
     #
@@ -63,11 +63,11 @@ for iconf in conf_list:
     #for i in range(natoms):
     #    print >> f, symb[i], grad[i,0], grad[i,1], grad[i,2]
     #f.close()
-    
+
     dm = m.make_rdm1()
-    
+
     dirpath = os.path.join(inp.path2qm, "density_matrices")
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
-    
-    np.save(os.path.join(inp.path2qm, "density_matrices", f"dm_conf{iconf+1}.npy", dm))
+
+    np.save(os.path.join(dirpath, f"dm_conf{iconf+1}.npy"), dm)

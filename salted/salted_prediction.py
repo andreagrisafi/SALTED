@@ -243,7 +243,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
     
         sparsestart = time.time()
         
-        if ncut > -1:
+        if ncut > 0:
             p = p.reshape(natoms*(2*lam+1),featsize)
             p = p.T[vfps[lam]].T
             featsize = inp.ncut
@@ -304,7 +304,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
         
 #             if rank == 0: print("field norm time:", (time.time()-normstart))
     
-             if ncut > -1:
+             if ncut > 0:
                  p = p.reshape(natoms*(2*lam+1),featsizefield)
                  p = p.T[vfps_field[lam]].T
                  featsizefield = inp.ncut 
