@@ -86,7 +86,7 @@ for iconf in conf_list:
     if not osp.exists("reference"):
         os.mkdir("reference")
     # Save Coefficents
-    np.save(osp.join("reference/", f"{inp.predict_filename.removesuffix(".xyz")}_{iconf}.npy"), Coef)
+    np.save(osp.join("reference/", f'{inp.predict_filename.removesuffix(".xyz")}_{iconf}_ref.npy'), Coef)
    
     
     # --------------------------------------------------
