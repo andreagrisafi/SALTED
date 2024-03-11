@@ -53,48 +53,134 @@ def basiset(basis):
       return [lmax,nmax]
 
    if basis=="RI-cc-pvqz":
-
       lmax["H"] = 4
+      lmax["B"] = 5
       lmax["C"] = 5
       lmax["N"] = 5
       lmax["O"] = 5
+      lmax["F"] = 5
+      lmax["Al"] = 5
+      lmax["Si"] = 5
+      lmax["P"] = 5
       lmax["S"] = 5
+      lmax["Cl"] = 5
+      lmax["Ga"] = 5
+      lmax["Ge"] = 5
+      lmax["As"] = 5
+      lmax["Se"] = 5
+      lmax["Br"] = 5
 
-      # hydrogen
-      nmax[("H",0)] = 4
-      nmax[("H",1)] = 3
-      nmax[("H",2)] = 3
-      nmax[("H",3)] = 2
-      nmax[("H",4)] = 1
-      # carbon
-      nmax[("C",0)] = 10
-      nmax[("C",1)] = 7
-      nmax[("C",2)] = 5
-      nmax[("C",3)] = 3
-      nmax[("C",4)] = 2
-      nmax[("C",5)] = 1
-      # nytrogen
-      nmax[("N",0)] = 10
-      nmax[("N",1)] = 7
-      nmax[("N",2)] = 5
-      nmax[("N",3)] = 3
-      nmax[("N",4)] = 2
-      nmax[("N",5)] = 1
-      # oxygen
-      nmax[("O",0)] = 10
-      nmax[("O",1)] = 7
-      nmax[("O",2)] = 5
-      nmax[("O",3)] = 3
-      nmax[("O",4)] = 2
-      nmax[("O",5)] = 1
-      # sulfur
-      nmax[("S",0)] = 13
-      nmax[("S",1)] = 11
-      nmax[("S",2)] = 9
-      nmax[("S",3)] = 4
-      nmax[("S",4)] = 2
-      nmax[("S",5)] = 1
-      
+      nmax["H", 0] = 4
+      nmax["H", 1] = 3
+      nmax["H", 2] = 3
+      nmax["H", 3] = 2
+      nmax["H", 4] = 1
+
+      nmax["B", 0] = 10
+      nmax["B", 1] = 7
+      nmax["B", 2] = 5
+      nmax["B", 3] = 3
+      nmax["B", 4] = 2
+      nmax["B", 5] = 1
+
+      nmax["C", 0] = 10
+      nmax["C", 1] = 7
+      nmax["C", 2] = 5
+      nmax["C", 3] = 3
+      nmax["C", 4] = 2
+      nmax["C", 5] = 1
+
+      nmax["N", 0] = 10
+      nmax["N", 1] = 7
+      nmax["N", 2] = 5
+      nmax["N", 3] = 3
+      nmax["N", 4] = 2
+      nmax["N", 5] = 1
+
+      nmax["O", 0] = 10
+      nmax["O", 1] = 7
+      nmax["O", 2] = 5
+      nmax["O", 3] = 3
+      nmax["O", 4] = 2
+      nmax["O", 5] = 1
+
+      nmax["F", 0] = 10
+      nmax["F", 1] = 7
+      nmax["F", 2] = 5
+      nmax["F", 3] = 3
+      nmax["F", 4] = 2
+      nmax["F", 5] = 1
+
+      nmax["Al", 0] = 13
+      nmax["Al", 1] = 11
+      nmax["Al", 2] = 9
+      nmax["Al", 3] = 4
+      nmax["Al", 4] = 2
+      nmax["Al", 5] = 1
+
+      nmax["Si", 0] = 13
+      nmax["Si", 1] = 11
+      nmax["Si", 2] = 9
+      nmax["Si", 3] = 4
+      nmax["Si", 4] = 2
+      nmax["Si", 5] = 1
+
+      nmax["P", 0] = 13
+      nmax["P", 1] = 11
+      nmax["P", 2] = 9
+      nmax["P", 3] = 4
+      nmax["P", 4] = 2
+      nmax["P", 5] = 1
+
+      nmax["S", 0] = 13
+      nmax["S", 1] = 11
+      nmax["S", 2] = 9
+      nmax["S", 3] = 4
+      nmax["S", 4] = 2
+      nmax["S", 5] = 1
+
+      nmax["Cl", 0] = 13
+      nmax["Cl", 1] = 11
+      nmax["Cl", 2] = 9
+      nmax["Cl", 3] = 4
+      nmax["Cl", 4] = 2
+      nmax["Cl", 5] = 1
+
+      nmax["Ga", 0] = 14
+      nmax["Ga", 1] = 13
+      nmax["Ga", 2] = 11
+      nmax["Ga", 3] = 9
+      nmax["Ga", 4] = 4
+      nmax["Ga", 5] = 1
+
+      nmax["Ge", 0] = 14
+      nmax["Ge", 1] = 13
+      nmax["Ge", 2] = 11
+      nmax["Ge", 3] = 9
+      nmax["Ge", 4] = 4
+      nmax["Ge", 5] = 1
+
+      nmax["As", 0] = 14
+      nmax["As", 1] = 13
+      nmax["As", 2] = 11
+      nmax["As", 3] = 9
+      nmax["As", 4] = 4
+      nmax["As", 5] = 1
+
+      nmax["Se", 0] = 14
+      nmax["Se", 1] = 13
+      nmax["Se", 2] = 11
+      nmax["Se", 3] = 9
+      nmax["Se", 4] = 4
+      nmax["Se", 5] = 1
+
+      nmax["Br", 0] = 14
+      nmax["Br", 1] = 13
+      nmax["Br", 2] = 11
+      nmax["Br", 3] = 9
+      nmax["Br", 4] = 4
+      nmax["Br", 5] = 1
+
       return [lmax,nmax]
    
    if basis=="FHI-aims-first-tier":

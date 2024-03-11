@@ -35,6 +35,7 @@ for iconf in conf_list:
     # Get PySCF objects for wave-function and density-fitted basis
     mol = gto.M(atom=atoms,basis=inp.qmbasis)
     mol.verbose = 6
+    mol.max_memory = 10_000
     m = dft.RKS(mol)
     m.grids.radi_method = dft.gauss_chebyshev
     m.grids.level = 0
@@ -82,11 +83,10 @@ for iconf in conf_list:
                         Coef[i1] = rho[i1]
                     i1 += 1
     
-
     if not osp.exists("reference"):
         os.mkdir("reference")
     # Save Coefficents
-    np.save(osp.join("reference/", f"ref_coefficients_conf{iconf}.npy"), Coef)
+    np.save(osp.join("reference/", f"{inp.predict_filename.removesuffix(".xyz")}_{iconf}.npy"), Coef)
    
     
     # --------------------------------------------------
