@@ -5,6 +5,7 @@ import os.path as osp
 
 import numpy as np
 from scipy import special
+from scipy import sparse
 
 #from sympy.parsing import mathematica
 #from sympy import symbols
@@ -37,11 +38,11 @@ def build():
     if inp.field:
         vdir = f"validations_{inp.saltedname}_field"
         rdir = f"regrdir_{inp.saltedname}_field"
-        kdir = f"kernels_{inp.saltedname}_field"
+        fdir = f"rkhs-vectors_{inp.saltedname}_field"
     else:
         vdir = f"validations_{inp.saltedname}"
         rdir = f"regrdir_{inp.saltedname}"
-        kdir = f"kernels_{inp.saltedname}"
+        fdir = f"rkhs-vectors_{inp.saltedname}"
 
     # read basis
 
@@ -192,41 +193,25 @@ def build():
         ref_projs = np.dot(overl,ref_coefs)
         Tsize = len(ref_coefs)
 
-        # compute predictions per channel
-        C = {}
-        ispe = {}
-        isize = 0
-        iii = 0
-        for spe in species:
-            ispe[spe] = 0
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    psi_nm = np.load(osp.join(
-                        inp.saltedpath, kdir, f"spe{spe}_l{l}", f"M{M}_zeta{zeta}",
-                        f"psi-nm_conf{iconf}.npy"
-                    ))
-                    Mcut = psi_nm.shape[1]
-                    C[(spe,l,n)] = np.dot(psi_nm,weights[isize:isize+Mcut])
-                    isize += Mcut
-                    iii += 1
+        psivec = sparse.load_npz(osp.join(
+            inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+        ))
+        psi = psivec.toarray()
 
-        # fill vector of predictions
-        pred_coefs = np.zeros(Tsize)
+        pred_coefs = np.dot(psi,weights)
+
+        # Compute vector of isotropic average coefficients
         if inp.average:
             Av_coeffs = np.zeros(Tsize)
-        i = 0
-        for iat in range(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
-                    if inp.average and l==0:
-                        Av_coeffs[i] = av_coefs[spe][n]
-                    i += 2*l+1
-            ispe[spe] += 1
-
-        # add back spherical averages if required
-        if inp.average:
+            i = 0
+            for iat in range(natoms[iconf]):
+                spe = atomic_symbols[iconf][iat]
+                for l in range(lmax[spe]+1):
+                    for n in range(nmax[(spe,l)]):
+                        if l==0:
+                            Av_coeffs[i] = av_coefs[spe][n]
+                        i += 2*l+1
+            # add back spherical averages if required
             pred_coefs += Av_coeffs
 
         if inp.qmcode=="cp2k":

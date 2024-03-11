@@ -169,11 +169,11 @@ def matrices(block_idx,trainrange,rank):
     Bmat /= float(ntrain)
     
     if block_idx == -1:
-        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}.npy", Avec)
-        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}.npy", Bmat)
+        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
+        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
     else:
-        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}_chunk{block_idx}.npy", Avec)
-        np.save(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{block_idx}.npy", Bmat)
+        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}_chunk{block_idx}.npy"), Avec)
+        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{block_idx}.npy"), Bmat)
 
     return
 
