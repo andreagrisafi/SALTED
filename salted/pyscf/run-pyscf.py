@@ -58,6 +58,8 @@ def doSCF(i):
     mol = gto.M(atom=atoms,basis=inp.qmbasis)
     mol.verbose = 0
     m = dft.RKS(mol)
+    if "r2scan" in inp.functional.lower():
+        m._numint.libxc = dft.xcfun
     m.grids.radi_method = dft.gauss_chebyshev
     m.grids.level = 0
     m = m.density_fit()
@@ -73,7 +75,7 @@ def doSCF(i):
 
 print(f"Running {len(conf_list)} PySCF Calculations")
 with Pool() as p:
-    for _ in tqdm.tqdm(p.imap(doSCF, conf_list), total = len(conf_list)):
+    for _ in tqdm.tqdm(p.imap_unordered(doSCF, conf_list), total = len(conf_list)):
         pass
 
 

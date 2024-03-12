@@ -37,6 +37,8 @@ for iconf in conf_list:
     mol.verbose = 6
     mol.max_memory = 10_000
     m = dft.RKS(mol)
+    if "r2scan" in inp.functional.lower():
+        m._numint.libxc = dft.xcfun
     m.grids.radi_method = dft.gauss_chebyshev
     m.grids.level = 0
     m = m.density_fit()
