@@ -34,7 +34,7 @@ for iconf in conf_list:
 
     # Get PySCF objects for wave-function and density-fitted basis
     mol = gto.M(atom=atoms,basis=inp.qmbasis)
-    mol.verbose = 6
+    mol.verbose = 4
     mol.max_memory = 10_000
     m = dft.RKS(mol)
     if "r2scan" in inp.functional.lower():

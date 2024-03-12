@@ -1,6 +1,8 @@
 import argparse
 import os
 import sys
+import glob
+import re
 from multiprocessing import Pool
 import tqdm
 import numpy as np
@@ -10,8 +12,6 @@ from pyscf import scf,dft
 from pyscf import lib
 from pyscf import grad
 from scipy import special
-
-lib.num_threads(1)
 
 sys.path.insert(0, './')
 import inp
@@ -43,8 +43,15 @@ if iconf != -1:
 else:
     conf_list = range(len(geoms))
 
+#See if any structures already exist, if they do, do not compute again.
+alreadyCalculated = np.array([re.findall(r'\d+',s) for s in glob.glob(f"{dirpath}/*")], dtype=int).flatten()-1
+if len(alreadyCalculated) > 0:
+    print("Found existing calculations, resuming from bevore")
+    conf_list = list(conf_list)
+    for i in alreadyCalculated:
+        conf_list.remove(i)
 
-def doSCF(i):
+def doSCF(i, preliminary = False):
     geom = geoms[i]
     symb = geom.get_chemical_symbols()
     coords = geom.get_positions()
@@ -57,7 +64,8 @@ def doSCF(i):
     # Get PySCF objects for wave-function and density-fitted basis
     mol = gto.M(atom=atoms,basis=inp.qmbasis)
     mol.verbose = 0
-    m = dft.RKS(mol)
+    m = dft.rks.RKS(mol)
+    
     if "r2scan" in inp.functional.lower():
         m._numint.libxc = dft.xcfun
     m.grids.radi_method = dft.gauss_chebyshev
@@ -65,17 +73,29 @@ def doSCF(i):
     m = m.density_fit()
     m.with_df.auxbasis = 'def2-tzvp-jkfit'
     m.xc = inp.functional
-    m.kernel()
 
+    #Read checkpoint from a preliminary run
+    m.chkfile = 'start_checkpoint'
+    if preliminary:
+        m.kernel()
+        return
+    else:
+        m.init_guess = "chkfile"
+        m.kernel(dump_chk = False)
 
     dm = m.make_rdm1()
-
     np.save(os.path.join(dirpath, f"dm_conf{i+1}.npy"), dm)
 
 
+
+lib.num_threads(20)
+# Do a preliminary calculation to generate a checkpoint file
+print("Running pleriminary calculation to generate a starting point")
+doSCF(0, preliminary=True)
+
+lib.num_threads(1)
 print(f"Running {len(conf_list)} PySCF Calculations")
 with Pool() as p:
     for _ in tqdm.tqdm(p.imap_unordered(doSCF, conf_list), total = len(conf_list)):
         pass
-
 
