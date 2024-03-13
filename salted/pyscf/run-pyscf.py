@@ -3,7 +3,7 @@ import os
 import sys
 import glob
 import re
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 import tqdm
 import numpy as np
 from ase.io import read
@@ -93,9 +93,11 @@ lib.num_threads(20)
 print("Running pleriminary calculation to generate a starting point")
 doSCF(0, preliminary=True)
 
-lib.num_threads(1)
+N_THREADS_PER_CALC = 5
+N_CALC = int(cpu_count()/N_THREADS_PER_CALC)
+lib.num_threads(N_THREADS_PER_CALC)
 print(f"Running {len(conf_list)} PySCF Calculations")
-with Pool() as p:
+with Pool(N_CALC) as p:
     for _ in tqdm.tqdm(p.imap_unordered(doSCF, conf_list), total = len(conf_list)):
         pass
 
