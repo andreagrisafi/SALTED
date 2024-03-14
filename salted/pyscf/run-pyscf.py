@@ -73,11 +73,13 @@ def doSCF(i, preliminary = False):
     m = m.density_fit()
     m.with_df.auxbasis = 'def2-tzvp-jkfit'
     m.xc = inp.functional
-
     #Read checkpoint from a preliminary run
     m.chkfile = 'start_checkpoint'
     m.init_guess = "chkfile"
-    m.kernel()
+    if i % 100 == 0:
+        m.kernel()
+    else:
+        m.kernel(dump_chk = False)
 
     dm = m.make_rdm1()
     np.save(os.path.join(dirpath, f"dm_conf{i+1}.npy"), dm)
