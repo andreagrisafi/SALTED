@@ -76,28 +76,16 @@ def doSCF(i, preliminary = False):
 
     #Read checkpoint from a preliminary run
     m.chkfile = 'start_checkpoint'
-    if preliminary:
-        m.kernel()
-        return
-    else:
-        m.init_guess = "chkfile"
-        m.kernel(dump_chk = False)
+    m.init_guess = "chkfile"
+    m.kernel()
 
     dm = m.make_rdm1()
     np.save(os.path.join(dirpath, f"dm_conf{i+1}.npy"), dm)
 
 
 
-lib.num_threads(20)
-# Do a preliminary calculation to generate a checkpoint file
-print("Running pleriminary calculation to generate a starting point")
-doSCF(0, preliminary=True)
+lib.num_threads(22)
 
-N_THREADS_PER_CALC = 5
-N_CALC = int(cpu_count()/N_THREADS_PER_CALC)
-lib.num_threads(N_THREADS_PER_CALC)
-print(f"Running {len(conf_list)} PySCF Calculations")
-with Pool(N_CALC) as p:
-    for _ in tqdm.tqdm(p.imap_unordered(doSCF, conf_list), total = len(conf_list)):
-        pass
+for i in tqdm.tqdm(conf_list,total=len(conf_list)):
+    doSCF(i)
 
