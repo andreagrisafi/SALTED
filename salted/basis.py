@@ -7,6 +7,146 @@ def basiset(basis):
    lmax = {}
    nmax = {}
 
+
+   if basis=="def2-SV(P)-JKFIT":
+      lmax["H"] = 2
+      lmax["He"] = 2
+      lmax["Li"] = 3
+      lmax["Be"] = 3
+      lmax["B"] = 4
+      lmax["C"] = 4
+      lmax["N"] = 4
+      lmax["O"] = 4
+      lmax["F"] = 4
+      lmax["Ne"] = 4
+      lmax["Na"] = 4
+      lmax["Mg"] = 4
+      lmax["Al"] = 4
+      lmax["Si"] = 4
+      lmax["P"] = 4
+      lmax["S"] = 4
+      lmax["Cl"] = 4
+      lmax["Ar"] = 4
+      lmax["K"] = 4
+      lmax["Ca"] = 4
+
+      nmax["H", 0] = 2
+      nmax["H", 1] = 2
+      nmax["H", 2] = 2
+
+      nmax["He", 0] = 4
+      nmax["He", 1] = 3
+      nmax["He", 2] = 2
+
+      nmax["Li", 0] = 7
+      nmax["Li", 1] = 5
+      nmax["Li", 2] = 3
+      nmax["Li", 3] = 2
+
+      nmax["Be", 0] = 7
+      nmax["Be", 1] = 5
+      nmax["Be", 2] = 3
+      nmax["Be", 3] = 2
+
+      nmax["B", 0] = 10
+      nmax["B", 1] = 8
+      nmax["B", 2] = 5
+      nmax["B", 3] = 1
+      nmax["B", 4] = 1
+
+      nmax["C", 0] = 10
+      nmax["C", 1] = 8
+      nmax["C", 2] = 5
+      nmax["C", 3] = 1
+      nmax["C", 4] = 1
+
+      nmax["N", 0] = 10
+      nmax["N", 1] = 8
+      nmax["N", 2] = 4
+      nmax["N", 3] = 2
+      nmax["N", 4] = 1
+
+      nmax["O", 0] = 10
+      nmax["O", 1] = 8
+      nmax["O", 2] = 4
+      nmax["O", 3] = 2
+      nmax["O", 4] = 1
+
+      nmax["F", 0] = 10
+      nmax["F", 1] = 8
+      nmax["F", 2] = 4
+      nmax["F", 3] = 2
+      nmax["F", 4] = 1
+
+      nmax["Ne", 0] = 10
+      nmax["Ne", 1] = 8
+      nmax["Ne", 2] = 4
+      nmax["Ne", 3] = 2
+      nmax["Ne", 4] = 1
+
+      nmax["Na", 0] = 13
+      nmax["Na", 1] = 9
+      nmax["Na", 2] = 7
+      nmax["Na", 3] = 4
+      nmax["Na", 4] = 1
+
+      nmax["Mg", 0] = 13
+      nmax["Mg", 1] = 9
+      nmax["Mg", 2] = 7
+      nmax["Mg", 3] = 4
+      nmax["Mg", 4] = 1
+
+      nmax["Al", 0] = 13
+      nmax["Al", 1] = 11
+      nmax["Al", 2] = 9
+      nmax["Al", 3] = 4
+      nmax["Al", 4] = 1
+
+      nmax["Si", 0] = 13
+      nmax["Si", 1] = 11
+      nmax["Si", 2] = 9
+      nmax["Si", 3] = 4
+      nmax["Si", 4] = 1
+
+      nmax["P", 0] = 13
+      nmax["P", 1] = 11
+      nmax["P", 2] = 9
+      nmax["P", 3] = 4
+      nmax["P", 4] = 1
+
+      nmax["S", 0] = 13
+      nmax["S", 1] = 11
+      nmax["S", 2] = 9
+      nmax["S", 3] = 4
+      nmax["S", 4] = 1
+
+      nmax["Cl", 0] = 13
+      nmax["Cl", 1] = 11
+      nmax["Cl", 2] = 9
+      nmax["Cl", 3] = 4
+      nmax["Cl", 4] = 1
+
+      nmax["Ar", 0] = 13
+      nmax["Ar", 1] = 11
+      nmax["Ar", 2] = 9
+      nmax["Ar", 3] = 4
+      nmax["Ar", 4] = 1
+
+      nmax["K", 0] = 15
+      nmax["K", 1] = 11
+      nmax["K", 2] = 10
+      nmax["K", 3] = 5
+      nmax["K", 4] = 3
+
+      nmax["Ca", 0] = 15
+      nmax["Ca", 1] = 11
+      nmax["Ca", 2] = 10
+      nmax["Ca", 3] = 5
+      nmax["Ca", 4] = 3
+
+      return [lmax,nmax]
+
+
    if basis=="FHI-aims-clusters":
    
       lmax["H"] = 4
