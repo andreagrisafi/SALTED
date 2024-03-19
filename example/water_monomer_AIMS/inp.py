@@ -28,6 +28,7 @@ neighspe2 = ["H","O"] # ordered list of species
 # ---------------------------------
 nsamples = 150 # Number of structures to use for feature sparsification
 ncut = -1 # Set ncut = -1 to skip feature sparisification
+sparsify = False  # sparsify features
 
 # paths to data
 # -------------
