@@ -70,7 +70,6 @@ print("-------------------------------------------------------------------------
 print("Reading geometry and basis sets...")
 
 sys.path.insert(0, "/usr/local/lib/python3.10/site-packages/salted/pyscf")
-import reorder
 for iconf in tqdm.tqdm(conf_list):
 
     # Initialize geometry
