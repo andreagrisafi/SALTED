@@ -8,10 +8,13 @@ from pyscf import gto
 from ase.io import read
 from scipy import special
 from salted import basis  # WARNING: relative import
+import salted.cython.dm2df_fast_reorder as dm2df
 import tqdm
 import glob, re
 sys.path.insert(0, './')
 import inp
+
+
 
 debug = False
 
@@ -112,7 +115,7 @@ for iconf in tqdm.tqdm(conf_list):
     
     if debug: print("Reordering...")
     
-    Coef, Over = reorder.reorder(rho, overlap, symb, lmax, nmax)
+    Coef, Over = dm2df.reorder(rho, overlap, symb, lmax, nmax)
 
     # Reorder L=1 components following the -1,0,+1 convention
     # Coef = rho.copy()
