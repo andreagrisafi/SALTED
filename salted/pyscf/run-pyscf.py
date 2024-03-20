@@ -51,7 +51,7 @@ if len(alreadyCalculated) > 0:
     for i in alreadyCalculated:
         conf_list.remove(i)
 
-def doSCF(i, preliminary = False):
+def doSCF(i):
     geom = geoms[i]
     symb = geom.get_chemical_symbols()
     coords = geom.get_positions()
