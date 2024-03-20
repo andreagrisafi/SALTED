@@ -14,7 +14,7 @@ setup(
     install_requires=['rascaline','ase','numpy','scipy','sympy', "tqdm", "cython"],
     include_package_data=True,
     package_data={"salted": ["salted/lib/*.so"]},
-    ext_modules = cythonize("cython/dm2df_fast_reorder.pyx"),
+    ext_modules = cythonize("salted/cython/dm2df_fast_reorder.pyx"),
     include_dirs=[numpy.get_include()],
     classifiers=[
         'Development Status :: 1 - Planning',
