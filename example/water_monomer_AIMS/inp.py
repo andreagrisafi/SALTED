@@ -1,13 +1,13 @@
 # system definition 
 # -----------------
-#filename = "water_monomers_1k_periodic.xyz" # XYZ file
-filename = "water_dimers_10.xyz" # XYZ file
+filename = "water_monomers_100.xyz" # XYZ file
+#filename = "water_dimers_10.xyz" # XYZ file
 species = ["H","O"] # ordered list of species
 qmcode = 'AIMS'
 average = True
 parallel = True
 field = False
-combo = False
+sparsify = False
 
 # Rascaline atomic environment parameters
 # ---------------------------------------
@@ -33,12 +33,12 @@ sparsify = False  # sparsify features
 # paths to data
 # -------------
 saltedpath = './'
-saltedname = 'serial_field_sparse_merge'
+saltedname = 'test'
 
 # AIMS variables 
 # --------------
 dfbasis = "FHI-aims-clusters" # auxiliary basis
-path2qm = "qmdata/" # path to the raw AIMS output
+path2qm = "./" # path to the raw AIMS output
 predict_data = 'predicted_data/' # path with path2qm where derived propoerties from predicted densities will be stored
 
 # ML variables  
