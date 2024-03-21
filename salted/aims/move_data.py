@@ -55,7 +55,7 @@ def build():
             for i,line in enumerate(afile):
                 if i == 51:
                     if line.split()[:2] == ['FHI-aims','version']:
-                        if line.split()[-1] > 240319:
+                        if int(line.split()[-1]) > 240319:
                             reorder = False
                         else:
                             reorder = True

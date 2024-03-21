@@ -1,7 +1,7 @@
 # system definition 
 # -----------------
-#filename = "water_monomers_1k_periodic.xyz" # XYZ file
-filename = "shortlisted.xyz" # XYZ file
+filename = "water_monomers_100.xyz" # XYZ file
+#filename = "water_dimers_10.xyz" # XYZ file
 species = ["H","O"] # ordered list of species
 qmcode = 'AIMS'
 average = True
