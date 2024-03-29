@@ -123,7 +123,14 @@ class AttrDict:
         self._mydict = d
 
     def __repr__(self):
-        return '\n'.join([f"{k}: {repr(v)}" for k, v in self._mydict.items()])
+        def rec_repr(d: dict, offset=''):
+            return '\n'.join([
+                offset + f"{k}: {repr(v)}"
+                if not isinstance(v, dict)
+                else offset + f"{k}:\n{rec_repr(v, offset+'  ')}"
+                for k, v in d.items()
+            ])
+        return rec_repr(self._mydict, offset='')
 
     def __getattr__(self, name):
         assert name in self._mydict.keys(), f"{name} not in {self._mydict.keys()}"
@@ -139,13 +146,27 @@ class ParseConfig:
     """
 
     def __init__(self, _dev_inp_fpath: Optional[str]=None):
+        """Initialize configuration parser
+
+        Args:
+            _dev_inp_fpath (Optional[str], optional): Path to the input file. Defaults to None.
+                Don't use this argument, it's for testing only!!!
+        """
         if _dev_inp_fpath is None:
             self.inp_fpath = os.path.join(os.getcwd(), 'inp.yaml')
         else:
             self.inp_fpath = _dev_inp_fpath
         assert os.path.exists(self.inp_fpath), f"Input file not found: {self.inp_fpath}"
 
-    def parse_input(self):
+    def parse_input(self) -> AttrDict:
+        """Parse input file
+        Procedure:
+        - get loader (for constructors and resolvers)
+        - load yaml
+
+        Returns:
+            AttrDict: Parsed input file
+        """
         with open(self.inp_fpath) as file:
             inp = yaml.load(file, Loader=self.get_loader())
         if inp is None:
@@ -153,82 +174,145 @@ class ParseConfig:
         inp = self.check_input(inp)
         return AttrDict(inp)
 
+    def get_all_params(self) -> Tuple:
+        """return all parameters with a tuple
+
+        Please copy & paste:
+        ```python
+        (saltedname, saltedpath,
+         filename, species, average, field, parallel,
+         path2qm, qmcode, qmbasis, dfbasis,
+         filename_pred, predname, predict_data,
+         rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+         rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+         sparsify, nsamples, ncut,
+         z, Menv, Ntrain, trainfrac, regul, eigcut, gradtol, restart,
+         blocksize, trainsel) = ParseConfig().get_all_params()
+        ```
+        """
+        inp = self.parse_input()
+        sparsify = False if inp.dcpt.sparsify.ncut == 0 else True
+        return (
+            inp.salted.saltedname, inp.salted.saltedpath,
+            inp.sys.filename, inp.sys.species, inp.sys.average, inp.sys.field, inp.sys.parallel,
+            inp.qm.path2qm, inp.qm.qmcode, inp.qm.qmbasis, inp.qm.dfbasis,
+            inp.pred.filename_pred, inp.pred.predname, inp.pred.predict_data,
+            inp.dcpt.rep1, inp.dcpt.rcut1, inp.dcpt.sig1, inp.dcpt.nrad1, inp.dcpt.nang1, inp.dcpt.neighspe1,
+            inp.dcpt.rep2, inp.dcpt.rcut2, inp.dcpt.sig2, inp.dcpt.nrad2, inp.dcpt.nang2, inp.dcpt.neighspe2,
+            sparsify, inp.dcpt.sparsify.nsamples, inp.dcpt.sparsify.ncut,
+            inp.gpr.z, inp.gpr.Menv, inp.gpr.Ntrain, inp.gpr.trainfrac, inp.gpr.regul, inp.gpr.eigcut,
+            inp.gpr.gradtol, inp.gpr.restart, inp.gpr.blocksize, inp.gpr.trainsel
+        )
+
+
     def check_input(self, inp:Dict):
         """Check keys (required, optional, not allowed), and value types and ranges
 
         Just check keys and values one by one, silly err haha"""
 
-        """Format: (key, required, default value, value type, value extra check)
+        """Format: (required, default value, value type, value extra check)
         About required:
             - True -> required
             - False -> optional, will fill in default value if not found
-            - None -> optional, will NOT fill in default value if not found
         """
-        inp_template: Tuple[Tuple[str, Optional[bool], Any, Any, Optional[Callable]]] = (
-            # System definition
-            ('saltedname', True, None, str, None),  # salted workflow identifier
-            ('dfbasis', True, None, str, None),  # density fitting basis
-            ('species', True, None, list, lambda x: all(isinstance(i, str) for i in x)),  # list of species in all geometries
-            ('qmcode', True, None, str, lambda x: x.lower() in ('aims', 'pyscf', 'cp2k')),  # quantum mechanical code
-            ('parallel', False, True, bool, None),  # if use mpi4py
-            ('average', False, True, bool, None),  # if bias the GPR by the average of predictions
-            ('field', False, False, bool, None),  # if predict the field response
-            # Paths
-            ('filename', True, None, str, lambda x: os.path.exists(x)),  # path to geometry file
-            ('saltedpath', True, None, str, lambda x: os.path.exists(x)),  # path to SALTED outputs
-            ('path2qm', True, None, str, lambda x: os.path.exists(x)),  # path to the QM calculation outputs
-            ('predname', True, None, str, None),  # SALTED prediction identifier
-            ('predict_data', False, "predictoins", str, None),  # path to the prediction data by QM code
-            # Rascaline atomic environment parameters
-            ('rep1', True, None, str, lambda x: x in ('rho', 'V')),  # descriptor, rho -> SOAP, V -> LODE
-            ('rcut1', True, None, float, lambda x: x > 0),  # cutoff radius
-            ('sig1', True, None, float, lambda x: x > 0),  # Gaussian width
-            ('nrad1', True, None, int, lambda x: x > 0),  # number of radial basis functions
-            ('nang1', True, None, int, lambda x: x > 0),  # number of angular basis functions
-            ('neighspe1', True, None, list, lambda x: all(isinstance(i, str) for i in x)),  # list of neighbor species
-            ('rep2', True, None, str, lambda x: x in ('rho', 'V')),
-            ('rcut2', True, None, float, lambda x: x > 0),
-            ('sig2', True, None, float, lambda x: x > 0),
-            ('nrad2', True, None, int, lambda x: x > 0),
-            ('nang2', True, None, int, lambda x: x > 0),
-            ('neighspe2', True, None, list, lambda x: all(isinstance(i, str) for i in x)),
-            # Feature sparsification parameters
-            ('sparsify', False, False, bool, lambda x: isinstance(x, bool)),  # if sparsify features channels
-            ('nsamples', False, 100, int, lambda x: x > 0),  # number of samples for sparsifying feature channel
-            ('ncut', False, -1, int, lambda x: (x == -1) or (x > 0)),  # number of features to keep
-            # ML variables
-            ('z', False, 2.0, float, lambda x: x > 0),  # kernel exponent
-            ('Menv', True, None, int, lambda x: x > 0),  # number of sparsified atomic environments
-            ('Ntrain', True, None, int, lambda x: x > 0),  # size of the training set (rest is validation set)
-            ('trainfrac', False, 1.0, float, lambda x: (x > 0) and (x <= 1.0)),  # fraction of the training set used for training
-            ('regul', False, 1e-6, float, lambda x: x > 0),  # regularisation parameter
-            ('eigcut', False, 1e-10, float, lambda x: x > 0),  # eigenvalues cutoff
-            ('gradtol', False, 1e-5, float, lambda x: x > 0),  # min gradient as stopping criterion for CG minimization
-            ('restart', False, False, bool, lambda x: isinstance(x, bool)),  # if restart the minimization
-            # Special ML variables for direct minimization
-            ('blocksize', None, None, int, lambda x: x > 0),  # block size for matrix inversion
-            ('trainsel', False, 'random', str, lambda x: x in ('random', 'sequential')),  # if shuffle the training set
-        )
+        inp_template = {
+            "salted": {
+                "saltedname": (True, None, str, None),  # salted workflow identifier
+                "saltedpath": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to SALTED outputs
+            },
+            "sys": {
+                "filename": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to geometry file
+                "species": (True, None, list, lambda inp, val: all(isinstance(i, str) for i in val)),  # list of species in all geometries
+                "average": (False, True, bool, None),  # if bias the GPR by the average of predictions
+                "field": (False, False, bool, None),  # if predict the field response
+                "parallel": (False, False, bool, None),  # if use mpi4py
+            },
+            "qm": {
+                "path2qm": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to the QM calculation outputs
+                "qmcode": (True, None, str, lambda inp, val: val.lower() in ('aims', 'pyscf', 'cp2k')),  # quantum mechanical code
+                "qmbasis": (False, "_DEFULT", str, lambda inp, val: (val != "_DEFAULT") or (inp["qm"]["qmcode"].lower() != 'pyscf')),  # quantum mechanical basis, only for PySCF
+                "dfbasis": (True, None, str, None),  # density fitting basis
+            },
+            "pred": {
+                "filename_pred": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to the prediction file
+                "predname": (True, None, str, None),  # SALTED prediction identifier
+                "predict_data": (False, "aims_pred_data", str, None),  # path to the prediction data by QM code, for AIMS only
+            },
+            "dcpt": {
+                "rep1": (True, None, str, lambda inp, val: val in ('rho', 'V')),  # descriptor, rho -> SOAP, V -> LODE
+                "rcut1": (True, None, float, lambda inp, val: val > 0),  # cutoff radius
+                "sig1": (True, None, float, lambda inp, val: val > 0),  # Gaussian width
+                "nrad1": (True, None, int, lambda inp, val: val > 0),  # number of radial basis functions
+                "nang1": (True, None, int, lambda inp, val: val > 0),  # number of angular basis functions
+                "neighspe1": (True, None, list, lambda inp, val: all(isinstance(i, str) for i in val)),  # list of neighbor species
+                "rep2": (True, None, str, lambda inp, val: val in ('rho', 'V')),
+                "rcut2": (True, None, float, lambda inp, val: val > 0),
+                "sig2": (True, None, float, lambda inp, val: val > 0),
+                "nrad2": (True, None, int, lambda inp, val: val > 0),
+                "nang2": (True, None, int, lambda inp, val: val > 0),
+                "neighspe2": (True, None, list, lambda inp, val: all(isinstance(i, str) for i in val)),
+                "sparsify": {
+                    "nsamples": (False, 100, int, lambda inp, val: val > 0),  # number of samples for sparsifying feature channel
+                    "ncut": (False, 0, int, lambda inp, val: (val == 0) or (val > 0)),  # number of features to keep
+                }
+            },
+            "gpr": {
+                "z": (False, 2.0, float, lambda inp, val: val > 0),  # kernel exponent
+                "Menv": (True, None, int, lambda inp, val: val > 0),  # number of sparsified atomic environments
+                "Ntrain": (True, None, int, lambda inp, val: val > 0),  # size of the training set (rest is validation set)
+                "trainfrac": (False, 1.0, float, lambda inp, val: (val > 0) and (val <= 1.0)),  # fraction of the training set used for training
+                "regul": (False, 1e-6, float, lambda inp, val: val > 0),  # regularisation parameter
+                "eigcut": (False, 1e-10, float, lambda inp, val: val > 0),  # eigenvalues cutoff
+                "gradtol": (False, 1e-5, float, lambda inp, val: val > 0),  # min gradient as stopping criterion for CG minimization
+                "restart": (False, False, bool, lambda inp, val: isinstance(val, bool)),  # if restart the minimization
+                "blocksize": (False, 100, int, lambda inp, val: val > 0),  # block size for matrix inversion
+                "trainsel": (False, 'random', str, lambda inp, val: val in ('random', 'sequential')),  # if shuffle the training set
+            }
+        }
 
-        for key, required, val_default, val_type, extra_check_func in inp_template:
-            """apply value defaults"""
-            if required is None:
-                """special case, optional without default value"""
-                if key not in inp:
-                    continue  # without checking value
-            elif required:
-                if key not in inp.keys():
-                    raise ValueError(f"Required key not found: {key}")
-            elif not required:
-                if key not in inp.keys():
-                    inp[key] = val_default
+        def rec_apply_default_vals(_inp, _inp_template):
+            """apply default values if optional parameters are not found"""
 
-            """check values"""
-            if not isinstance(inp[key], val_type):
-                raise ValueError(f"Value type mismatch: {key} -> {val_type}, {key = }")
-            if extra_check_func is not None:
-                if not extra_check_func(inp[key]):
-                    raise ValueError(f"Extra value check failed: {key} -> {inp[key]}")
+            """check if the keys in inp exist in inp_template"""
+            for key, val in _inp.items():
+                if key not in _inp_template.keys():
+                    raise ValueError(f"Key not allowed: {key}")
+            """apply default values"""
+            for key, val in _inp_template.items():
+                if isinstance(val, dict):
+                    """we can ignore a section if it's not required"""
+                    if key not in _inp.keys():
+                        _inp[key] = dict()  # make it an empty dict
+                    _inp[key] = rec_apply_default_vals(_inp[key], _inp_template[key])
+                elif isinstance(val, tuple):
+                    (required, val_default, val_type, extra_check_func) = val
+                    if key not in _inp.keys():
+                        if required:
+                            raise ValueError(f"Required key not found: {key}")
+                        else:
+                            _inp[key] = val_default
+                else:
+                    raise ValueError(f"Invalid template value: {val}")
+            return _inp
+
+        def rec_check_vals(_inp, _inp_template):
+            """check values' type and range"""
+            for key, template in _inp_template.items():
+                if isinstance(template, dict):
+                    rec_check_vals(_inp[key], _inp_template[key])
+                elif isinstance(template, tuple):
+                    val = _inp[key]
+                    (required, val_default, val_type, extra_check_func) = _inp_template[key]
+                    if not isinstance(val, val_type):
+                        raise ValueError(f"Value type error: {key=}, {val=}, current_type={type(val)}, expected_type={val_type}")
+                    if extra_check_func is not None:
+                        if not extra_check_func(inp, val):
+                            raise ValueError(f"Value check failed: {key=}, {val=}. Please check the required conditions.")
+                else:
+                    raise ValueError(f"Invalid template value: {template}")
+
+        inp = rec_apply_default_vals(inp, inp_template)  # now inp has all the keys as in inp_template in all levels
+        rec_check_vals(inp, inp_template)
 
         return inp
 
@@ -252,3 +336,4 @@ class ParseConfig:
             return float(value)
         loader.add_constructor('!float_sci', float_sci)
         return loader
+
