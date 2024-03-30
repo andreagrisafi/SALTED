@@ -11,16 +11,18 @@ import os.path as osp
 
 import numpy as np
 from scipy import sparse
+
+from salted import get_averages
 from salted.sys_utils import read_system, get_atom_idx, get_conf_range
 
 def build():
 
     sys.path.insert(0, './')
     import inp
-    paral = inp.parallel
+    parallel = inp.parallel
 
     # MPI information
-    if paral:
+    if parallel:
         from mpi4py import MPI
         comm = MPI.COMM_WORLD
         size = comm.Get_size()
@@ -48,9 +50,13 @@ def build():
 
     # load average density coefficients if needed
     if inp.average:
+        # compute average density coefficients
+        if rank==0: get_averages.build()
+        if parallel: comm.Barrier()
+        # load average density coefficients
         av_coefs = {}
         for spe in species:
-            av_coefs[spe] = np.load(f"averages_{spe}.npy")
+            av_coefs[spe] = np.load(os.path.join(inp.saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
 
     dirpath = os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}")
     if rank==0:
@@ -76,7 +82,7 @@ def build():
     # Distribute structures to tasks
     ntraintot = int(inp.trainfrac*inp.Ntrain)
 
-    if paral:
+    if parallel:
         if ntraintot < size:
             if rank == 0:
                 raise ValueError(f"More processes {size=} have been requested than training structures {ntraintot=}. Please reduce the number of processes.")
@@ -269,7 +275,7 @@ def build():
     else:
         w = np.ones(totsize)*1e-04
         r = - grad_func(w,ovlp_list,psi_list)
-        if paral:
+        if parallel:
             r = comm.allreduce(r)*norm  + 2.0 * reg * w
         else:
             r *= norm
@@ -280,7 +286,7 @@ def build():
     if rank == 0: print("minimizing...")
     for i in range(100000):
         Ad = curv_func(d,ovlp_list,psi_list)
-        if paral:
+        if parallel:
             Ad = comm.allreduce(Ad)*norm + 2.0 * reg * d
         else:
             Ad *= norm

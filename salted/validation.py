@@ -153,8 +153,8 @@ def build():
     # Load spherical averages if required
     if inp.average:
         av_coefs = {}
-        for spe in inp.species:
-            av_coefs[spe] = np.load(f"averages_{spe}.npy")
+        for spe in species:
+            av_coefs[spe] = np.load(os.path.join(inp.saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
 
     # compute error over test set
 
