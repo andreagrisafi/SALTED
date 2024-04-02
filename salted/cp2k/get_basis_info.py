@@ -2,7 +2,7 @@
 
 import argparse
 from itertools import islice
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 
 import inp
 import numpy as np
@@ -52,14 +52,14 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
         BasisClient().write(inp.dfbasis, basis_data, force_overwrite)
 
 
-def parse_files_basis_info(species, dfbasis) -> (
+def parse_files_basis_info(species:List[str], dfbasis:str) -> (
     Tuple[Dict[str, int], Dict[Tuple[str, int], int], Dict[Tuple[str, int], np.ndarray]]
 ):
     """Parse the basis files of cp2k
     File naming convention: `[species]-[basis_name]`.
     No file IO here, just parsing the data.
 
-    This function is copied from the original implementation in `salted/aims/get_basis_info.py`,
+    This function is copied from the original implementation by Andrea,
     see https://github.com/andreagrisafi/SALTED/blob/8f686cda/example/Au100-CP2K/get_basis_info.py
     """
 
