@@ -21,6 +21,12 @@ from salted.get_basis_info import get_parser
 
 
 def build(dryrun: bool = False, force_overwrite: bool = False):
+    """Scheme: load density fitting basis from pyscf module,
+    update the basis_data dict,
+    and write to the database when all species are recorded.
+    """
+    assert inp.qmcode.lower() == "pyscf", f"{inp.qmcode=}, but expected 'pyscf'"
+
     spe_set = set(inp.species)  # remove duplicates
     qmbasis = inp.qmbasis
 
