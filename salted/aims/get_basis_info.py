@@ -1,6 +1,5 @@
 """Translate basis info from FHI-aims calculation to SALTED basis info"""
 
-import argparse
 import os
 from typing import Dict, List
 
