@@ -12,8 +12,10 @@ from salted.basis_client import (
     SpeciesBasisData,
 )
 
+from salted.get_basis_info import get_parser
 
-def build(dryrun: bool = False):
+
+def build(dryrun: bool = False, force_overwrite: bool = False):
     """Run Andrea's code"""
     lmax, nmax, alphas = parse_files_basis_info(inp.species, inp.dfbasis)
 
@@ -41,7 +43,7 @@ def build(dryrun: bool = False):
             for l in range(lmax[spe] + 1):
                 np.savetxt(f"{spe}-{inp.dfbasis}-alphas-L{l}.dat", alphas[(spe, l)])
                 # np.savetxt(spe+"-"+inp.dfbasis+"-contraction-coeffs-L"+str(l)+".dat",contra[(spe,l)])
-        BasisClient().write(inp.dfbasis, basis_data)
+        BasisClient().write(inp.dfbasis, basis_data, force_overwrite)
 
 
 def parse_files_basis_info(species, dfbasis) -> (
@@ -106,13 +108,7 @@ def parse_files_basis_info(species, dfbasis) -> (
 if __name__ == "__main__":
     print("Please call `python -m salted.get_basis_info` instead of this file")
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--dryrun",
-        action="store_true",
-        help="run without writing to the database, print the result",
-    )
-
+    parser = get_parser()
     args = parser.parse_args()
 
-    build(dryrun=args.dryrun)
+    build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)

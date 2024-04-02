@@ -14,8 +14,10 @@ from salted.basis_client import (
     compare_species_basis_data,
 )
 
+from salted.get_basis_info import get_parser
 
-def build(dryrun: bool = False):
+
+def build(dryrun: bool = False, force_overwrite: bool = False):
     """Scheme: parse all basis_info.out one by one,
     update the basis_data dict,
     and write to the database when all species are recorded.
@@ -61,12 +63,12 @@ def build(dryrun: bool = False):
             f"Not all species are recorded: {basis_data.keys()} vs {spe_set}"
         )
 
-    """write to the database"""
+    """write to the database and working directory"""
     if dryrun:
         print("Dryrun mode, not writing to the database")
         print(f"{basis_data=}")
     else:
-        BasisClient().write(inp.dfbasis, basis_data)
+        BasisClient().write(inp.dfbasis, basis_data, force_overwrite)
         with open(os.path.join(inp.saltedpath, "new_basis_entry.yaml"), "w") as f:
             yaml.safe_dump(basis_data, f, default_flow_style=None)
 
@@ -115,7 +117,7 @@ def parse_file_basis_info(basis_info_fpath: str) -> List[SpeciesBasisData]:
     #     print(f"{boundary_1atom=}")
     #     print(f"{lines_by_atoms=}")
 
-    """Step 2: derive SpeciesBasisData and do some checks"""
+    """Step 2: derive SpeciesBasisData and do some checks (to ensure the file is not corrupted)"""
     basis_data: List[SpeciesBasisData] = []
     for lines_atom in lines_by_atoms:
         err_msg = f"{basis_info_fpath=}, {lines_atom=}"
@@ -139,13 +141,7 @@ def parse_file_basis_info(basis_info_fpath: str) -> List[SpeciesBasisData]:
 if __name__ == "__main__":
     print("Please call `python -m salted.get_basis_info` instead of this file")
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--dryrun",
-        action="store_true",
-        help="run without writing to the database, print the result",
-    )
-
+    parser = get_parser()
     args = parser.parse_args()
 
-    build(dryrun=args.dryrun)
+    build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)

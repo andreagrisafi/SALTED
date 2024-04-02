@@ -204,7 +204,7 @@ class BasisClient:
                 basis_data_all, f, default_flow_style=None
             )  # default_flow_style is important!
 
-    def write(self, basis_name: str, basis_data: Dict[str, SpeciesBasisData]):
+    def write(self, basis_name: str, basis_data: Dict[str, SpeciesBasisData], force_overwrite: bool = False):
         """Write basis data to the dataset file"""
         with open(self.data_fpath) as f:
             basis_data_all: Dict = yaml.safe_load(f)
@@ -221,11 +221,21 @@ class BasisClient:
                 )
                 basis_data_all[basis_name].update(basis_data)
             else:
-                raise ValueError(
-                    f"Basis data for the duplicated species are different.\
-                    \n\rCurrent basis data:\n\t{basis_data}\
-                    \n\rBasis data in {self.data_fpath}:\n\t{basis_data_all[basis_name]}"
-                )
+                if force_overwrite:
+                    print(
+                        f"Force overwrite {basis_name=} in {self.data_fpath} with the new basis data.\n",
+                        f"Original basis data: {basis_data_all[basis_name]}\n",
+                        f"Forced basis data: {basis_data}\n",
+                        "Will write the union of the two basis data to the file.\n",
+                        file=sys.stderr,
+                    )
+                    basis_data_all[basis_name].update(basis_data)
+                else:
+                    raise ValueError(
+                        f"Basis data for the duplicated species are different.\
+                        \n\rCurrent basis data:\n\t{basis_data}\
+                        \n\rBasis data in {self.data_fpath}:\n\t{basis_data_all[basis_name]}"
+                    )
         else:
             basis_data_all[basis_name] = basis_data
 
