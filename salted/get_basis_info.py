@@ -9,23 +9,38 @@ import sys
 sys.path.insert(0, './')
 import inp
 
-if __name__ == "__main__":
+
+def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--dryrun",
         action="store_true",
         help="run without writing to files, and print the result",
     )
+    parser.add_argument(
+        "--force_overwrite",
+        action="store_true",
+        help="force overwrite the existing basis data",
+    )
+    return parser
 
+
+if __name__ == "__main__":
+    parser = get_parser()
     args = parser.parse_args()
 
     if inp.qmcode.lower() == "aims":
         from salted.aims.get_basis_info import build
 
-        build(dryrun=args.dryrun)
+        build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)
     elif inp.qmcode.lower() == "cp2k":
         from salted.cp2k.get_basis_info import build
 
-        build(dryrun=args.dryrun)
+        build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)
+    elif inp.qmcode.lower() == "pyscf":
+        from salted.pyscf.get_basis_info import build
+
+        build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)
     else:
         raise ValueError(f"Unknown qmcode: {inp.qmcode}")
+
