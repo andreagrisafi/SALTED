@@ -16,6 +16,12 @@ from salted.get_basis_info import get_parser
 
 
 def build(dryrun: bool = False, force_overwrite: bool = False):
+    """Scheme: parse all basis data (.dat files) in the working directory,
+    update the basis_data dict,
+    and write to the database when all species are recorded.
+    """
+    assert inp.qmcode.lower() == "cp2k", f"{inp.qmcode=}, but expected 'cp2k'"
+
     """Run Andrea's code"""
     lmax, nmax, alphas = parse_files_basis_info(inp.species, inp.dfbasis)
 

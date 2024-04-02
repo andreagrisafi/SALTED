@@ -22,6 +22,8 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     update the basis_data dict,
     and write to the database when all species are recorded.
     """
+    assert inp.qmcode.lower() == "aims", f"{inp.qmcode=}, but expected 'aims'"
+
     spe_set = set(inp.species)
     geoms_list = read(inp.filename, ":")
     qmdata_dpath = os.path.join(inp.path2qm, "data")
