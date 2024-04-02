@@ -54,9 +54,9 @@ def load_from_pyscf(species_list: List[str], qmbasis: str):
     Returns:
         Dict[str, SpeciesBasisData]: species and basis data
     """
-    ribasis = df.addons.DEFAULT_AUXBASIS[basis._format_basis_name(qmbasis)][0]
+    ribasis = df.addons.DEFAULT_AUXBASIS[basis._format_basis_name(qmbasis)][0]  # get the proper DF basis name in PySCF
     print(f"{species_list=}, {qmbasis=}, and the parsed {ribasis=}")
-    spe_ribasis_info = {spe: basis.load(ribasis, spe) for spe in species_list}
+    spe_ribasis_info = {spe: basis.load(ribasis, spe) for spe in species_list}  # load with PySCF basis module
     """
     Each dict value is like:
         format: [angular_momentum, [exponents, coefficients]]
@@ -80,7 +80,7 @@ def load_from_pyscf(species_list: List[str], qmbasis: str):
 # def collect_l_nums(data:List[int, List[float]]) -> SpeciesBasisData:
 # use Annotated
 def collect_l_nums(data: List) -> SpeciesBasisData:
-    """
+    """collect l numbers for each species based on the data from PySCF
     input: above dict value,
         e.g. [[0, [1113.9867719, 1.0]], [1, [102.99176249, 1.0]], ...]
     output: max l number, and a list of counts of each l number
