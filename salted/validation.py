@@ -335,7 +335,7 @@ def build():
                 qs = np.loadtxt(qfname)
                 np.savetxt(qfname, qs[qs[:,0].argsort()])
     if rank == 0:
-        print(f"\nsummary: {(100*np.sqrt(error_density/variance)):.3e} % RMSE", flush=True)
+        print(f"\n % RMSE: {(100*np.sqrt(error_density/variance)):.3e}", flush=True)
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ neighspe2 = ["H","O"] # ordered list of species
 # ---------------------------------
 sparsify = False 
 nsamples = 100 # Number of structures to use for feature sparsification
-ncut = 0 # Set ncut = 0 to skip feature sparisification
+ncut = 1000 # Set ncut = 0 to skip feature sparisification
 
 # paths to data
 # -------------
@@ -63,4 +63,4 @@ trainsel = 'random'
 
 # Prediction Paths
 # ------------
-predname = 'prediction'
+predname = 'dimer'

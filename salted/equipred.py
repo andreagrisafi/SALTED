@@ -118,11 +118,13 @@ def build():
     if inp.field: vfps_field = {}
     for lam in range(lmax_max+1):
         # Load sparsification details
-        if ncut > -1:
+        if ncut > 0:
+            vfps[lam] = np.load(osp.join(
+                inp.saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
+            ))
+        if ncut > 0 and inp.field:
             vfps_field[lam] = np.load(osp.join(
-                inp.saltedpath,
-                f"equirepr_{saltedname}",
-                f"fps{ncut}-{lam}_field.npy" if inp.field else f"fps{ncut}-{lam}.npy"
+                inp.saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}_field.npy"
             ))
         for spe in species:
             # load sparse equivariant descriptors
@@ -350,7 +352,7 @@ def build():
 
         sparsestart = time.time()
 
-        if ncut > -1:
+        if ncut > 0:
             p = p.reshape(natoms_total*(2*lam+1),featsize)
             p = p.T[vfps[lam]].T
             featsize = inp.ncut
