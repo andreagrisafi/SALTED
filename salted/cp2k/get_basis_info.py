@@ -1,6 +1,5 @@
 """Translate basis info from CP2K calculation to SALTED basis info"""
 
-import argparse
 from itertools import islice
 from typing import Dict, Tuple, List
 
