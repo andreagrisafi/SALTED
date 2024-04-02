@@ -7,26 +7,26 @@ import numpy as np
 from pyscf import gto
 from ase.io import read
 from scipy import special
-from salted import basis  # WARNING: relative import
-import salted.cython.dm2df_fast_reorder as dm2df
 import tqdm
+
 import glob, re
+import salted.cython.dm2df_fast_reorder as dm2df
+
+debug = False
+from salted import basis
+
 sys.path.insert(0, './')
 import inp
 
-
-
-debug = False
-
-def add_command_line_arguments():
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+def add_command_line_arguments(parsetext):
+    parser = argparse.ArgumentParser(description=parsetext,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-iconf", "--confidx",  type=int, default=-1, help="Structure index")
     args = parser.parse_args()
     return args
 
 def set_variable_values(args):
     iconf = args.confidx
-    return iconf 
+    return iconf
 
 args = add_command_line_arguments()
 iconf = set_variable_values(args)
@@ -53,14 +53,14 @@ if len(alreadyCalculated) > 0:
 # read basis
 [lmax,nmax] = basis.basiset(inp.dfbasis)
     
-dirpath = osp.join(inp.path2qm, inp.coefdir)
-if not osp.exists(dirpath):
+dirpath = os.path.join(inp.path2qm, "coefficients")
+if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = osp.join(inp.path2qm, inp.projdir)
-if not osp.exists(dirpath):
+dirpath = os.path.join(inp.path2qm, "projections")
+if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = osp.join(inp.path2qm, inp.ovlpdir)
-if not osp.exists(dirpath):
+dirpath = os.path.join(inp.path2qm, "overlaps")
+if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
 print("PySCF orders all angular momentum components for L>1 as -L,...,0,...,+L,") 
@@ -167,9 +167,10 @@ for iconf in tqdm.tqdm(conf_list):
     Proj = np.dot(Over,Coef)
     
     # Save projections and overlaps
-    np.save(osp.join(inp.path2qm, inp.coefdir, f"coefficients_conf{iconf}.npy"), Coef)
-    np.save(osp.join(inp.path2qm, inp.projdir, f"projections_conf{iconf}.npy"), Proj)
-    np.save(osp.join(inp.path2qm, inp.ovlpdir, f"overlap_conf{iconf}.npy"), Over)
+
+    np.save(osp.join(inp.path2qm, "coefficients", f"coefficients_conf{iconf}.npy"), Coef)
+    np.save(osp.join(inp.path2qm, "projections", f"projections_conf{iconf}.npy"), Proj)
+    np.save(osp.join(inp.path2qm, "overlaps", f"overlap_conf{iconf}.npy"), Over)
     
     # --------------------------------------------------
     

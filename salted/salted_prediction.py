@@ -175,7 +175,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
     for l in range(nang2+1):
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
         omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
-    
+
     if inp.field:
     # get SPH expansion for a uniform and constant external field aligned along Z 
         omega_field = np.zeros((natoms,nrad2),complex)
@@ -243,7 +243,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
     
         sparsestart = time.time()
         
-        if ncut > -1:
+        if ncut > 0:
             p = p.reshape(natoms*(2*lam+1),featsize)
             p = p.T[vfps[lam]].T
             featsize = inp.ncut
@@ -304,7 +304,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
         
 #             if rank == 0: print("field norm time:", (time.time()-normstart))
     
-             if ncut > -1:
+             if ncut > 0:
                  p = p.reshape(natoms*(2*lam+1),featsizefield)
                  p = p.T[vfps_field[lam]].T
                  featsizefield = inp.ncut 
@@ -430,6 +430,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
                     if l==0:
                         rho_int += charge_integrals[(spe,l,n)] * pred_coefs[iaux]
                     iaux += 2*l+1
+ 
+        print("charge integral =", rho_int) 
 
 
         # enforce charge conservation 
