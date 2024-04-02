@@ -230,7 +230,16 @@ class ParseConfig:
             "qm": {
                 "path2qm": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to the QM calculation outputs
                 "qmcode": (True, None, str, lambda inp, val: val.lower() in ('aims', 'pyscf', 'cp2k')),  # quantum mechanical code
-                "qmbasis": (False, "_DEFULT", str, lambda inp, val: (val != "_DEFAULT") or (inp["qm"]["qmcode"].lower() != 'pyscf')),  # quantum mechanical basis, only for PySCF
+                "qmbasis": (False, "PLACEHOLDER", str, lambda inp, val: (
+                    ((inp["qm"]["qmcode"].lower() != 'pyscf') and (val == "PLACEHOLDER"))  # if not using pyscf, do not specify it
+                    or
+                    ((inp["qm"]["qmcode"].lower() == 'pyscf') and (val != "PLACEHOLDER"))  # if using pyscf, do specify it
+                )),  # quantum mechanical basis, only for PySCF
+                "functional": (False, "PLACEHOLDER", str, lambda inp, val: (
+                    ((inp["qm"]["qmcode"].lower() != 'pyscf') and (val == "PLACEHOLDER"))  # if not using pyscf, do not specify it
+                    or
+                    ((inp["qm"]["qmcode"].lower() == 'pyscf') and (val != "PLACEHOLDER"))  # if using pyscf, do specify it
+                )),  # quantum mechanical functional, only for PySCF
                 "dfbasis": (True, None, str, None),  # density fitting basis
             },
             "pred": {
@@ -270,7 +279,7 @@ class ParseConfig:
             }
         }
 
-        def rec_apply_default_vals(_inp, _inp_template):
+        def rec_applyPLACEHOLDER_vals(_inp, _inp_template):
             """apply default values if optional parameters are not found"""
 
             """check if the keys in inp exist in inp_template"""
@@ -283,14 +292,14 @@ class ParseConfig:
                     """we can ignore a section if it's not required"""
                     if key not in _inp.keys():
                         _inp[key] = dict()  # make it an empty dict
-                    _inp[key] = rec_apply_default_vals(_inp[key], _inp_template[key])
+                    _inp[key] = rec_applyPLACEHOLDER_vals(_inp[key], _inp_template[key])
                 elif isinstance(val, tuple):
-                    (required, val_default, val_type, extra_check_func) = val
+                    (required, valPLACEHOLDER, val_type, extra_check_func) = val
                     if key not in _inp.keys():
                         if required:
                             raise ValueError(f"Required key not found: {key}")
                         else:
-                            _inp[key] = val_default
+                            _inp[key] = valPLACEHOLDER
                 else:
                     raise ValueError(f"Invalid template value: {val}")
             return _inp
@@ -302,7 +311,7 @@ class ParseConfig:
                     rec_check_vals(_inp[key], _inp_template[key])
                 elif isinstance(template, tuple):
                     val = _inp[key]
-                    (required, val_default, val_type, extra_check_func) = _inp_template[key]
+                    (required, valPLACEHOLDER, val_type, extra_check_func) = _inp_template[key]
                     if not isinstance(val, val_type):
                         raise ValueError(f"Value type error: {key=}, {val=}, current_type={type(val)}, expected_type={val_type}")
                     if extra_check_func is not None:
@@ -311,7 +320,7 @@ class ParseConfig:
                 else:
                     raise ValueError(f"Invalid template value: {template}")
 
-        inp = rec_apply_default_vals(inp, inp_template)  # now inp has all the keys as in inp_template in all levels
+        inp = rec_applyPLACEHOLDER_vals(inp, inp_template)  # now inp has all the keys as in inp_template in all levels
         rec_check_vals(inp, inp_template)
 
         return inp
