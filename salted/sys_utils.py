@@ -251,6 +251,7 @@ class ParseConfig:
                 "average": (False, True, bool, None),  # if bias the GPR by the average of predictions
                 "field": (False, False, bool, None),  # if predict the field response
                 "parallel": (False, False, bool, None),  # if use mpi4py
+                "seed": (False, 42, int, None),  # random seed
             },
             "qm": {
                 "path2qm": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to the QM calculation outputs
