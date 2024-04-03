@@ -41,7 +41,7 @@ def build():
     
     def get_reorder_bool(dirpath):
         """Determine the version of FHI-aims used.
-        If a version newer than 240319, coefficients are 
+        If a version newer than 240403, coefficients are 
         internally reordered on input/output, and the
         SALTED helper functions should not also reorder coefficients.
     
@@ -55,7 +55,7 @@ def build():
             for i,line in enumerate(afile):
                 if i == 51:
                     if line.split()[:2] == ['FHI-aims','version']:
-                        if int(line.split()[-1]) > 240319:
+                        if int(line.split()[-1]) => 240403:
                             reorder = False
                         else:
                             reorder = True
