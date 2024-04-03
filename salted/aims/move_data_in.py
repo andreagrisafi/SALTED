@@ -7,7 +7,7 @@ from salted.sys_utils import read_system, get_conf_range
 
 def build():
 
-    print("WARNING! This script assumes you will use an AIMS version >= 2403XX to read the predicted RI coefficients. If this is not true, please use move_data_in_reorder instead.")
+    print("WARNING! This script assumes you will use an AIMS version >= 240403 to read the predicted RI coefficients. If this is not true, please use move_data_in_reorder instead.")
 
     if inp.parallel:
         from mpi4py import MPI
