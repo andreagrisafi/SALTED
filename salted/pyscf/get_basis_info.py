@@ -38,8 +38,6 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
         print(f"{basis_data=}")
     else:
         BasisClient().write(inp.dfbasis, basis_data, force_overwrite)
-        with open(os.path.join(inp.saltedpath, "new_basis_entry.yaml"), "w") as f:
-            yaml.safe_dump(basis_data, f, default_flow_style=None)
 
 
 
