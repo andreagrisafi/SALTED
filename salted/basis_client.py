@@ -54,7 +54,7 @@ class BasisClient:
 
     YAML structure: (indent with 2 spaces)
     ```yaml
-    my_basis:
+    my_basis_name:
       H:
         lmax: 1
         nmax: [4, 3]
@@ -102,10 +102,7 @@ class BasisClient:
 
         """create the data file if it does not exist"""
         if not os.path.isfile(self.data_fpath):
-            print(
-                f"Creating density fitting basis dataset file at {self.data_fpath}",
-                file=sys.stderr,
-            )
+            print(f"Creating density fitting basis dataset file at {self.data_fpath}")
             with open(self.data_fpath, "w") as f:
                 f.write("")
         self.check_sanity()
@@ -138,9 +135,8 @@ class BasisClient:
         with open(self.data_fpath) as f:
             """Checking 1 is done here"""
             basis_data = yaml.safe_load(f)
-        if basis_data is None:
-            print(f"Empty basis dataset file at {self.data_fpath}", file=sys.stderr)
-            return
+        if basis_data is None:  # Empty data file is allowed, for users might install with `pip install .` without `-e
+            return  # empty dataset -> don't need to check the rest things
         basis_names = basis_data.keys()
         for basis_name in basis_names:
             basis_data = self.read(basis_name)
@@ -217,7 +213,7 @@ class BasisClient:
             print(f"{basis_name=} already exists in {self.data_fpath}")
             if compare_basis_data_dup_spe(basis_data, basis_data_all[basis_name]):
                 print(
-                    f"Basis data for the duplicated species are the same. Write data union to file."
+                    f"Basis data for duplicated species are the same (no conflicts). Write data union to file."
                 )
                 basis_data_all[basis_name].update(basis_data)
             else:
@@ -246,10 +242,7 @@ class BasisClient:
         """Pop basis data from the dataset file"""
         basis_data_all = self._read_all()
         if basis_name not in basis_data_all.keys():
-            print(
-                f"{basis_name=} not found in {self.data_fpath}, no change is made.",
-                file=sys.stderr,
-            )
+            print(f"{basis_name=} not found in {self.data_fpath}, no change is made.")
         else:
             basis_data_all.pop(basis_name)
             self._write_all(basis_data_all)
@@ -330,7 +323,7 @@ if __name__ == "__main__":
         import traceback
 
         traceback.print_exc()
-        print(f"Restore the original basis data")
+        print("Restore the original basis data")
         BasisClient()._write_all(basis_data_all)
 
     # ensure the original basis data is unchanged
