@@ -213,7 +213,7 @@ class BasisClient:
             print(f"{basis_name=} already exists in {self.data_fpath}")
             if compare_basis_data_dup_spe(basis_data, basis_data_all[basis_name]):
                 print(
-                    f"Basis data for duplicated species are the same (no conflicts). Write data union to file."
+                    "Basis data for duplicated species are the same (no conflicts). Write data union to file."
                 )
                 basis_data_all[basis_name].update(basis_data)
             else:

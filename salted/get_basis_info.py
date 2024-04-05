@@ -31,16 +31,11 @@ if __name__ == "__main__":
 
     if inp.qmcode.lower() == "aims":
         from salted.aims.get_basis_info import build
-
-        build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)
     elif inp.qmcode.lower() == "cp2k":
         from salted.cp2k.get_basis_info import build
-
-        build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)
     elif inp.qmcode.lower() == "pyscf":
         from salted.pyscf.get_basis_info import build
-
-        build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)
     else:
         raise ValueError(f"Unknown qmcode: {inp.qmcode}")
 
+    build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)

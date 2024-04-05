@@ -3,15 +3,16 @@
 from itertools import islice
 from typing import Dict, Tuple, List
 
-import inp
 import numpy as np
 
 from salted.basis_client import (
     BasisClient,
     SpeciesBasisData,
 )
-
 from salted.get_basis_info import get_parser
+
+import inp
+
 
 
 def build(dryrun: bool = False, force_overwrite: bool = False):
@@ -35,7 +36,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
             "nmax": [nmax[(spe, l)] for l in range(lmax[spe] + 1)],
         }
 
-    """write to files"""
+    """write to the database"""
     if dryrun:
         print("Dryrun mode, not writing to the database")
         print(f"{inp.species=}")
