@@ -199,7 +199,7 @@ class ParseConfig:
         inp = self.check_input(inp)
         return AttrDict(inp)
 
-    def get_all_params(self) -> Tuple:
+    def get_all_params_deprecated(self) -> Tuple:
         """return all parameters with a tuple
 
         Please copy & paste:
@@ -211,24 +211,53 @@ class ParseConfig:
          rep1, rcut1, sig1, nrad1, nang1, neighspe1,
          rep2, rcut2, sig2, nrad2, nang2, neighspe2,
          sparsify, nsamples, ncut,
-         z, Menv, Ntrain, trainfrac, regul, eigcut, gradtol, restart,
-         blocksize, trainsel) = ParseConfig().get_all_params()
+         z, Menv, Ntrain, trainfrac, regul, eigcut,
+         gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
         ```
         """
         inp = self.parse_input()
-        sparsify = False if inp.dcpt.sparsify.ncut == 0 else True
+        sparsify = False if inp.descriptor.sparsify.ncut == 0 else True
         return (
             inp.salted.saltedname, inp.salted.saltedpath,
-            inp.sys.filename, inp.sys.species, inp.sys.average, inp.sys.field, inp.sys.parallel,
+            inp.system.filename, inp.system.species, inp.system.average, inp.system.field, inp.system.parallel,
             inp.qm.path2qm, inp.qm.qmcode, inp.qm.qmbasis, inp.qm.dfbasis,
-            inp.pred.filename_pred, inp.pred.predname, inp.pred.predict_data,
-            inp.dcpt.rep1, inp.dcpt.rcut1, inp.dcpt.sig1, inp.dcpt.nrad1, inp.dcpt.nang1, inp.dcpt.neighspe1,
-            inp.dcpt.rep2, inp.dcpt.rcut2, inp.dcpt.sig2, inp.dcpt.nrad2, inp.dcpt.nang2, inp.dcpt.neighspe2,
-            sparsify, inp.dcpt.sparsify.nsamples, inp.dcpt.sparsify.ncut,
+            inp.prediction.filename_pred, inp.prediction.predname, inp.prediction.predict_data,
+            inp.descriptor.rep1.type, inp.descriptor.rep1.rcut, inp.descriptor.rep1.sig,
+            inp.descriptor.rep1.nrad, inp.descriptor.rep1.nang, inp.descriptor.rep1.neighspe,
+            inp.descriptor.rep2.type, inp.descriptor.rep2.rcut, inp.descriptor.rep2.sig,
+            inp.descriptor.rep2.nrad, inp.descriptor.rep2.nang, inp.descriptor.rep2.neighspe,
+            sparsify, inp.descriptor.sparsify.nsamples, inp.descriptor.sparsify.ncut,
             inp.gpr.z, inp.gpr.Menv, inp.gpr.Ntrain, inp.gpr.trainfrac, inp.gpr.regul, inp.gpr.eigcut,
             inp.gpr.gradtol, inp.gpr.restart, inp.gpr.blocksize, inp.gpr.trainsel
         )
 
+    def get_all_params(self) -> Tuple:
+        """return all parameters with a tuple
+
+        Please copy & paste:
+        ```python
+        (
+            filename, species, average, field, parallel,
+            rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+            rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+            sparsify, nsamples, ncut,
+            z, Menv, Ntrain, trainfrac, regul, eigcut,
+            gradtol, restart, blocksize, trainsel
+        ) = ParseConfig().get_all_params()
+        ```
+        """
+        inp = self.parse_input()
+        sparsify = False if inp.descriptor.sparsify.ncut == 0 else True
+        return (
+            inp.system.filename, inp.system.species, inp.system.average, inp.system.field, inp.system.parallel,
+            inp.descriptor.rep1.type, inp.descriptor.rep1.rcut, inp.descriptor.rep1.sig,
+            inp.descriptor.rep1.nrad, inp.descriptor.rep1.nang, inp.descriptor.rep1.neighspe,
+            inp.descriptor.rep2.type, inp.descriptor.rep2.rcut, inp.descriptor.rep2.sig,
+            inp.descriptor.rep2.nrad, inp.descriptor.rep2.nang, inp.descriptor.rep2.neighspe,
+            sparsify, inp.descriptor.sparsify.nsamples, inp.descriptor.sparsify.ncut,
+            inp.gpr.z, inp.gpr.Menv, inp.gpr.Ntrain, inp.gpr.trainfrac, inp.gpr.regul, inp.gpr.eigcut,
+            inp.gpr.gradtol, inp.gpr.restart, inp.gpr.blocksize, inp.gpr.trainsel
+        )
 
     def check_input(self, inp:Dict):
         """Check keys (required, optional, not allowed), and value types and ranges
@@ -239,14 +268,28 @@ class ParseConfig:
         About required:
             - True -> required
             - False -> optional, will fill in default value if not found
+            - (if the default value is "PLACEHOLDER", it means the key is optional for some cases, but required for others)
         """
+
+        rep_template = {
+            "type": (True, None, str, lambda inp, val: val in ('rho', 'V')),  # descriptor, rho -> SOAP, V -> LODE
+            "rcut": (True, None, float, lambda inp, val: val > 0),  # cutoff radius
+            "sig": (True, None, float, lambda inp, val: val > 0),  # Gaussian width
+            "nrad": (True, None, int, lambda inp, val: val > 0),  # number of radial basis functions
+            "nang": (True, None, int, lambda inp, val: val > 0),  # number of angular basis functions
+            "neighspe": (True, None, list, lambda inp, val: (
+                all(isinstance(i, str) for i in val)
+                and
+                all(i in inp["system"]["species"] for i in val)
+            )),  # list of neighbor species
+        }
         inp_template = {
             "salted": {
                 "saltedname": (True, None, str, None),  # salted workflow identifier
-                "saltedpath": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to SALTED outputs
+                "saltedpath": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to SALTED outputs / working directory
             },
-            "sys": {
-                "filename": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to geometry file
+            "system": {
+                "filename": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to geometry file (training set)
                 "species": (True, None, list, lambda inp, val: all(isinstance(i, str) for i in val)),  # list of species in all geometries
                 "average": (False, True, bool, None),  # if bias the GPR by the average of predictions
                 "field": (False, False, bool, None),  # if predict the field response
@@ -268,24 +311,14 @@ class ParseConfig:
                 )),  # quantum mechanical functional, only for PySCF
                 "dfbasis": (True, None, str, None),  # density fitting basis
             },
-            "pred": {
+            "prediction": {
                 "filename_pred": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to the prediction file
                 "predname": (True, None, str, None),  # SALTED prediction identifier
                 "predict_data": (False, "aims_pred_data", str, None),  # path to the prediction data by QM code, for AIMS only
             },
-            "dcpt": {
-                "rep1": (True, None, str, lambda inp, val: val in ('rho', 'V')),  # descriptor, rho -> SOAP, V -> LODE
-                "rcut1": (True, None, float, lambda inp, val: val > 0),  # cutoff radius
-                "sig1": (True, None, float, lambda inp, val: val > 0),  # Gaussian width
-                "nrad1": (True, None, int, lambda inp, val: val > 0),  # number of radial basis functions
-                "nang1": (True, None, int, lambda inp, val: val > 0),  # number of angular basis functions
-                "neighspe1": (True, None, list, lambda inp, val: all(isinstance(i, str) for i in val)),  # list of neighbor species
-                "rep2": (True, None, str, lambda inp, val: val in ('rho', 'V')),
-                "rcut2": (True, None, float, lambda inp, val: val > 0),
-                "sig2": (True, None, float, lambda inp, val: val > 0),
-                "nrad2": (True, None, int, lambda inp, val: val > 0),
-                "nang2": (True, None, int, lambda inp, val: val > 0),
-                "neighspe2": (True, None, list, lambda inp, val: all(isinstance(i, str) for i in val)),
+            "descriptor": {
+                "rep1": rep_template,  # descriptor 1
+                "rep2": rep_template,  # descriptor 2
                 "sparsify": {
                     "nsamples": (False, 100, int, lambda inp, val: val > 0),  # number of samples for sparsifying feature channel
                     "ncut": (False, 0, int, lambda inp, val: (val == 0) or (val > 0)),  # number of features to keep
@@ -305,7 +338,7 @@ class ParseConfig:
             }
         }
 
-        def rec_applyPLACEHOLDER_vals(_inp, _inp_template):
+        def rec_apply_default_vals(_inp, _inp_template):
             """apply default values if optional parameters are not found"""
 
             """check if the keys in inp exist in inp_template"""
@@ -318,7 +351,7 @@ class ParseConfig:
                     """we can ignore a section if it's not required"""
                     if key not in _inp.keys():
                         _inp[key] = dict()  # make it an empty dict
-                    _inp[key] = rec_applyPLACEHOLDER_vals(_inp[key], _inp_template[key])
+                    _inp[key] = rec_apply_default_vals(_inp[key], _inp_template[key])
                 elif isinstance(val, tuple):
                     (required, valPLACEHOLDER, val_type, extra_check_func) = val
                     if key not in _inp.keys():
@@ -346,7 +379,7 @@ class ParseConfig:
                 else:
                     raise ValueError(f"Invalid template value: {template}")
 
-        inp = rec_applyPLACEHOLDER_vals(inp, inp_template)  # now inp has all the keys as in inp_template in all levels
+        inp = rec_apply_default_vals(inp, inp_template)  # now inp has all the keys as in inp_template in all levels
         rec_check_vals(inp, inp_template)
 
         return inp
