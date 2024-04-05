@@ -4,7 +4,6 @@ import os
 from typing import Dict, List
 
 import inp
-import yaml
 from ase.io import read
 
 from salted.basis_client import (
@@ -64,7 +63,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
             f"Not all species are recorded: {basis_data.keys()} vs {spe_set}"
         )
 
-    """write to the database and working directory"""
+    """write to the database"""
     if dryrun:
         print("Dryrun mode, not writing to the database")
         print(f"{basis_data=}")

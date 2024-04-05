@@ -1,11 +1,6 @@
 """Translate basis info from PySCF calculation to SALTED basis info"""
 
-import os
 from typing import Dict, List
-
-import inp
-import yaml
-from ase.io import read
 
 from pyscf import df
 from pyscf.gto import basis
@@ -13,10 +8,11 @@ from pyscf.gto import basis
 from salted.basis_client import (
     BasisClient,
     SpeciesBasisData,
-    compare_species_basis_data,
 )
-
 from salted.get_basis_info import get_parser
+
+import inp
+
 
 
 def build(dryrun: bool = False, force_overwrite: bool = False):
@@ -32,7 +28,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     """load density fitting basis from pyscf module"""
     basis_data: Dict[str, SpeciesBasisData] = load_from_pyscf(list(spe_set), qmbasis)
 
-    """write to the database and working directory"""
+    """write to the database"""
     if dryrun:
         print("Dryrun mode, not writing to the database")
         print(f"{basis_data=}")
