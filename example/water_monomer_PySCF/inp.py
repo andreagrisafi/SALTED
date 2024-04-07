@@ -5,7 +5,7 @@ filename = "water_monomers_1k.xyz" # XYZ file
 species = ["H","O"] # ordered list of species
 qmcode = 'pyscf'
 average = True
-parallel = False 
+parallel = True 
 field = False
 
 # Rascaline atomic environment parameters
@@ -25,9 +25,9 @@ neighspe2 = ["H","O"] # ordered list of species
 
 # Feature sparsification parameters
 # ---------------------------------
-sparsify = False 
+sparsify = True 
 nsamples = 100 # Number of structures to use for feature sparsification
-ncut = 0 # Set ncut = 0 to skip feature sparisification
+ncut = 1000 # Set ncut = 0 to skip feature sparisification
 
 # paths to data
 # -------------
@@ -44,8 +44,8 @@ path2qm = "./" # path to the raw AIMS output
 
 # ML variables  
 # ------------
-z = 2.0           # kernel exponent 
-Menv = 10        # number of FPS environments
+z = 1           # kernel exponent 
+Menv = 100        # number of FPS environments
 Ntrain = 800       # number of training structures
 trainfrac = 1.0   # training set fraction
 regul = 1e-10      # regularisation parameter
@@ -63,4 +63,4 @@ trainsel = 'random'
 
 # Prediction Paths
 # ------------
-predname = 'prediction'
+predname = 'dimer'

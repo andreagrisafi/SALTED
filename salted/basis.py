@@ -363,3 +363,14 @@ def basiset(basis):
 
       return [lmax,nmax]
 
+   if basis=="RI_AUTO_OPT-ccGRB-small":
+
+      lmax["Au"] = 4
+
+      nmax[("Au",0)] = 8
+      nmax[("Au",1)] = 8
+      nmax[("Au",2)] = 8
+      nmax[("Au",3)] = 8
+      nmax[("Au",4)] = 6
+
+      return [lmax,nmax]

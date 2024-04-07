@@ -14,11 +14,10 @@ from rascaline import LodeSphericalExpansion
 from metatensor import Labels
 
 from salted.lib import equicomb
-from salted.lib import equicombfield
+from salted.lib import equicombsparse
 
 from salted import sph_utils
 from salted import basis
-from salted import efield
 from salted.sys_utils import read_system, get_atom_idx,get_conf_range
 
 
@@ -27,17 +26,7 @@ def build():
     sys.path.insert(0, './')
     import inp
 
-    if inp.parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        rank = 0
-        size = 1
-
+    parallel = inp.parallel
     filename = inp.filename
     saltedname = inp.saltedname
     predname = inp.predname
@@ -54,16 +43,27 @@ def build():
     nang2 = inp.nang2
     neighspe2 = inp.neighspe2
     ncut = inp.ncut
+    M = inp.Menv
+    zeta = inp.z
+    reg = inp.regul
+    sparsify = inp.sparsify
+    average = inp.average
+
+    if inp.parallel:
+        from mpi4py import MPI
+        # MPI information
+        comm = MPI.COMM_WORLD
+        size = comm.Get_size()
+        rank = comm.Get_rank()
+    #    print('This is task',rank+1,'of',size)
+    else:
+        rank = 0
+        size = 1
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename)
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     bohr2angs = 0.529177210670
-
-    # Kernel parameters
-    M = inp.Menv
-    zeta = inp.z
-    reg = inp.regul
 
     # Distribute structures to tasks
     ndata_true = ndata
@@ -107,51 +107,41 @@ def build():
                     charge_integrals[(spe,l,n)] = charge_radint * np.sqrt(4.0*np.pi) / np.sqrt(inner)
                     dipole_integrals[(spe,l,n)] = dipole_radint * np.sqrt(4.0*np.pi/3.0) / np.sqrt(inner)
 
-    loadstart = time.time()
+    # Load feature space sparsification information if required 
+    if sparsify:
+        vfps = {}
+        for lam in range(lmax_max+1):
+            vfps[lam] = np.load(osp.join(
+                inp.saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
+            ))
 
     # Load training feature vectors and RKHS projection matrix
+    Vmat = {}
     Mspe = {}
     power_env_sparse = {}
-    if inp.field: power_env_sparse_field = {}
-    Vmat = {}
-    vfps = {}
-    if inp.field: vfps_field = {}
-    for lam in range(lmax_max+1):
-        # Load sparsification details
-        if ncut > -1:
-            vfps_field[lam] = np.load(osp.join(
-                inp.saltedpath,
-                f"equirepr_{saltedname}",
-                f"fps{ncut}-{lam}_field.npy" if inp.field else f"fps{ncut}-{lam}.npy"
-            ))
-        for spe in species:
-            # load sparse equivariant descriptors
-            power_env_sparse[(lam,spe)] = h5py.File(osp.join(
-                inp.saltedpath, f"equirepr_{saltedname}", f"FEAT-{lam}-M-{M}.h5"
-            ), 'r')[spe][:]
-            if inp.field:
-                power_env_sparse_field[(lam,spe)] = h5py.File(osp.join(
-                    inp.saltedpath, f"equirepr_{saltedname}", f"FEAT-{lam}-M-{M}_field.h5"
-                ), 'r')[spe][:]
-            if lam == 0:
-                Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
-            # load RKHS projectors
-            Vmat[(lam,spe)] = np.load(osp.join(
-                inp.saltedpath,
-                f"kernels_{saltedname}_field" if inp.field else f"kernels_{saltedname}",
-                f"spe{spe}_l{lam}",
-                f"M{M}_zeta{zeta}",
-                f"projector.npy",
-            ))
-            # precompute projection on RKHS if linear model
-            if zeta==1:
-                power_env_sparse[(lam,spe)] = np.dot(
-                    Vmat[(lam,spe)].T, power_env_sparse[(lam,spe)]
-                )
-                if inp.field:
-                    power_env_sparse_field[(lam,spe)] = np.dot(
-                        Vmat[(lam,spe)].T, power_env_sparse_field[(lam,spe)]
-                    )
+    for spe in species:
+        for lam in range(lmax[spe]+1):
+             # load RKHS projectors
+             Vmat[(lam,spe)] = np.load(osp.join(
+                 inp.saltedpath,
+                 f"equirepr_{saltedname}",
+                 f"spe{spe}_l{lam}",
+                 f"projector_M{M}_zeta{zeta}.npy",
+             ))
+             # load sparse equivariant descriptors
+             power_env_sparse[(lam,spe)] = h5py.File(osp.join(
+                 inp.saltedpath,
+                 f"equirepr_{saltedname}",
+                 f"spe{spe}_l{lam}",
+                 f"FEAT_M-{M}.h5"
+             ), 'r')['sparse_descriptor'][:]
+             if lam == 0:
+                 Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
+             # precompute projection on RKHS if linear model
+             if zeta==1:
+                 power_env_sparse[(lam,spe)] = np.dot(
+                     Vmat[(lam,spe)].T, power_env_sparse[(lam,spe)]
+                 )
 
     reg_log10_intstr = str(int(np.log10(reg)))  # for consistency
 
@@ -159,12 +149,10 @@ def build():
     ntrain = int(inp.Ntrain*inp.trainfrac)
     weights = np.load(osp.join(
         inp.saltedpath,
-        f"regrdir_{saltedname}_field" if inp.field else f"regrdir_{saltedname}",
+        f"regrdir_{saltedname}",
         f"M{M}_zeta{zeta}",
         f"weights_N{ntrain}_reg{reg_log10_intstr}.npy"
     ))
-
-    if rank == 0:  print(f"load time: {(time.time()-loadstart):.2f} s")
 
     start = time.time()
 
@@ -207,31 +195,29 @@ def build():
         else:
             exit()
 
-    descstart = time.time()
-
     nspe1 = len(neighspe1)
-    keys_array = np.zeros(((nang1+1)*len(species)*nspe1,3),int)
+    keys_array = np.zeros(((nang1+1)*len(species)*nspe1,4),int)
     i = 0
     for l in range(nang1+1):
         for specen in species:
             for speneigh in neighspe1:
-                keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
                 i += 1
 
     keys_selection = Labels(
-        names=["spherical_harmonics_l","species_center","species_neighbor"],
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
         values=keys_array
     )
 
     spx = calculator.compute(frames, selected_keys=keys_selection)
-    spx = spx.keys_to_properties("species_neighbor")
-    spx = spx.keys_to_samples("species_center")
+    spx = spx.keys_to_properties("neighbor_type")
+    spx = spx.keys_to_samples("center_type")
 
     # Get 1st set of coefficients as a complex numpy array
     omega1 = np.zeros((nang1+1,natoms_total,2*nang1+1,nspe1*nrad1),complex)
     for l in range(nang1+1):
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
-        omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(spherical_harmonics_l=l).values)
+        omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
 
     if rep2=="rho":
         # get SPH expansion for atomic density
@@ -248,42 +234,37 @@ def build():
             exit()
 
     nspe2 = len(neighspe2)
-    keys_array = np.zeros(((nang2+1)*len(species)*nspe2,3),int)
+    keys_array = np.zeros(((nang2+1)*len(species)*nspe2,4),int)
     i = 0
     for l in range(nang2+1):
         for specen in species:
             for speneigh in neighspe2:
-                keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
                 i += 1
 
     keys_selection = Labels(
-        names=["spherical_harmonics_l","species_center","species_neighbor"],
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
         values=keys_array
     )
 
     spx_pot = calculator.compute(frames, selected_keys=keys_selection)
-    spx_pot = spx_pot.keys_to_properties("species_neighbor")
-    spx_pot = spx_pot.keys_to_samples("species_center")
+    spx_pot = spx_pot.keys_to_properties("neighbor_type")
+    spx_pot = spx_pot.keys_to_samples("center_type")
 
     # Get 2nd set of coefficients as a complex numpy array
     omega2 = np.zeros((nang2+1,natoms_total,2*nang2+1,nspe2*nrad2),complex)
     for l in range(nang2+1):
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
-        omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
+        omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(o3_lambda=l).values)
 
-    if inp.field:
-    # get SPH expansion for a uniform and constant external field aligned along Z
-        omega_field = np.zeros((natoms_total,nrad2),complex)
-        for iat in range(natoms_total):
-            omega_field[iat] = efield.get_efield_sph(nrad2,rcut2)
-
-    if rank == 0: print(f"coefficients time: {(time.time()-descstart):.2f} s\n")
+    # Reshape arrays of expansion coefficients for optimal Fortran indexing
+    v1 = np.transpose(omega1,(2,0,3,1))
+    v2 = np.transpose(omega2,(2,0,3,1))
 
     # base directory path for this prediction
     dirpath = osp.join(
         inp.saltedpath,
-        f"predictions_{saltedname}_field_{predname}" \
-            if inp.field else f"predictions_{saltedname}_{predname}",
+        f"predictions_{saltedname}_{predname}",
         f"M{M}_zeta{zeta}",
         f"N{ntrain}_reg{reg_log10_intstr}",
     )
@@ -294,13 +275,30 @@ def build():
             os.makedirs(dirpath)
     if size > 1:  comm.Barrier()
 
+    if inp.qmcode=="cp2k":
+        xyzfile = read(filename,":")
+        q_fpath = osp.join(dirpath, "charges.dat")
+        d_fpath = osp.join(dirpath, "dipoles.dat")
+        if rank == 0:
+            # remove old output files
+            remove_if_exists = lambda fpath: os.remove(fpath) if os.path.exists(fpath) else None
+            remove_if_exists(q_fpath)
+            remove_if_exists(d_fpath)
+        if inp.parallel: comm.Barrier()
+        qfile = open(q_fpath, "a")
+        dfile = open(d_fpath, "a")
+
+    # Load spherical averages if required
+    if average:
+        av_coefs = {}
+        for spe in species:
+            av_coefs[spe] = np.load(os.path.join(inp.saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
+
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
-    psi_nm = {}
+    pvec = {}
     for lam in range(lmax_max+1):
 
         if rank == 0: print(f"lambda = {lam}")
-
-        equistart = time.time()
 
         # Select relevant angular components for equivariant descriptor calculation
         llmax = 0
@@ -324,204 +322,74 @@ def build():
         ))
         wigdim = wigner3j.size
 
-        # Reshape arrays of expansion coefficients for optimal Fortran indexing
-        v1 = np.transpose(omega1,(2,0,3,1))
-        v2 = np.transpose(omega2,(2,0,3,1))
-
         # Compute complex to real transformation matrix for the given lambda value
         c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
 
-        # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
-        p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
-
-        # Define feature space and reshape equivariant descriptor
-        featsize = nspe1*nspe2*nrad1*nrad2*llmax
-        p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsize)
-
-        if rank == 0: print(f"equivariant time: {(time.time()-equistart):.2f} s")
-
-        normstart = time.time()
-
-        # Normalize equivariant descriptor
-        inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featsize),p.reshape(natoms_total,(2*lam+1)*featsize))
-        p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
-
-        if rank == 0: print(f"norm time: {(time.time()-normstart):.2f} s")
-
-        sparsestart = time.time()
-
-        if ncut > -1:
-            p = p.reshape(natoms_total*(2*lam+1),featsize)
-            p = p.T[vfps[lam]].T
-            featsize = inp.ncut
-
-        if rank == 0: print(f"sparse time: {(time.time()-sparsestart):.2f} s")
-
-        fillstart = time.time()
+        if sparsify:
+    
+            featsize = nspe1*nspe2*nrad1*nrad2*llmax
+            nfps = len(vfps[lam])
+            p = equicombsparse.equicombsparse(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+            p = np.transpose(p,(2,0,1))
+            featsize = ncut
+    
+        else:
+    
+            featsize = nspe1*nspe2*nrad1*nrad2*llmax
+            p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+            p = np.transpose(p,(2,0,1))
 
         # Fill vector of equivariant descriptor
         if lam==0:
             p = p.reshape(natoms_total,featsize)
-            pvec = np.zeros((ndata,natmax,featsize))
+            pvec[lam] = np.zeros((ndata,natmax,featsize))
         else:
             p = p.reshape(natoms_total,2*lam+1,featsize)
-            pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
+            pvec[lam] = np.zeros((ndata,natmax,2*lam+1,featsize))
 
         j = 0
         for i,iconf in enumerate(conf_range):
             for iat in range(natoms[iconf]):
-                pvec[i,iat] = p[j]
+                pvec[lam][i,iat] = p[j]
                 j += 1
 
-        if rank == 0: print(f"fill vector time: {(time.time()-fillstart):.2f} s")
+    if parallel:
+        comm.Barrier()
+        for lam in range(lmax_max+1):
+            pvec[lam] = comm.allreduce(pvec[lam])
 
-        if inp.field:
-            #########################################################
-            #                 START E-FIELD HERE
-            #########################################################
-
-            # Select relevant angular components for equivariant descriptor calculation
-            llmax = 0
-            lvalues = {}
-            for l1 in range(nang1+1):
-                # keep only even combination to enforce inversion symmetry
-                if (lam+l1+1)%2==0 :
-                    if abs(1-lam) <= l1 and l1 <= (1+lam) :
-                        lvalues[llmax] = [l1,1]
-                        llmax+=1
-            # Fill dense array from dictionary
-            llvec = np.zeros((llmax,2),int)
-            for il in range(llmax):
-                llvec[il,0] = lvalues[il][0]
-                llvec[il,1] = lvalues[il][1]
-
-            # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-            wigner3j = np.loadtxt(osp.join(
-                inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_field.dat"
-            ))
-            wigdim = wigner3j.size
-
-            # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
-            v2 = omega_field.T
-            p = equicombfield.equicombfield(natoms_total,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
-
-            # Define feature space and reshape equivariant descriptor
-            featsizefield = nspe1*nrad1*nrad2*llmax
-            p = np.transpose(p,(4,0,1,2,3)).reshape(natoms_total,2*lam+1,featsizefield)
-
-            if rank == 0: print(f"field equivariant time: {(time.time()-equistart):.2f} s")
-
-            normstart = time.time()
-
-            # Normalize equivariant descriptor
-            inner = np.einsum('ab,ab->a', p.reshape(natoms_total,(2*lam+1)*featsizefield),p.reshape(natoms_total,(2*lam+1)*featsizefield))
-            p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
-
-            if rank == 0: print(f"field norm time: {(time.time()-normstart):.2f} s")
-
-            if ncut > -1:
-                p = p.reshape(natoms_total*(2*lam+1),featsizefield)
-                p = p.T[vfps_field[lam]].T
-                featsizefield = inp.ncut
-
-            fillstart = time.time()
-
-            # Fill vector of equivariant descriptor
-            if lam==0:
-                p = p.reshape(natoms_total,featsizefield)
-                pvec_field = np.zeros((ndata,natmax,featsizefield))
-            else:
-                p = p.reshape(natoms_total,2*lam+1,featsizefield)
-                pvec_field = np.zeros((ndata,natmax,2*lam+1,featsizefield))
-
-            j = 0
-            for i,iconf in enumerate(conf_range):
-                for iat in range(natoms[iconf]):
-                    pvec_field[i,iat] = p[j]
-                    j += 1
-
-        rkhsstart = time.time()
-
-        if lam==0:
-
-            if zeta==1:
-                 # Compute scalar kernels
-                 kernel0_nm = {}
-                 for i,iconf in enumerate(conf_range):
-                     for spe in species:
-                         if inp.field:
-                             psi_nm[(iconf,spe,lam)] = np.dot(pvec_field[i,atom_idx[(iconf,spe)]],power_env_sparse_field[(lam,spe)].T)
-                         else:
-                             psi_nm[(iconf,spe,lam)] = np.dot(pvec[i,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
-            else:
-                 # Compute scalar kernels
-                 kernel0_nm = {}
-                 for i,iconf in enumerate(conf_range):
-                     for spe in species:
-                         kernel0_nm[(iconf,spe)] = np.dot(pvec[i,atom_idx[(iconf,spe)]],power_env_sparse[(lam,spe)].T)
-                         if inp.field:
-                             kernel_nm = np.dot(pvec_field[i,atom_idx[(iconf,spe)]],power_env_sparse_field[(lam,spe)].T) * kernel0_nm[(iconf,spe)]**(zeta-1)
-                         else:
-                             kernel_nm = kernel0_nm[(iconf,spe)]**zeta
-                         # Project on RKHS
-                         psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
-
-        else:
-
-            if zeta==1:
-                # Compute covariant kernels
-                for i,iconf in enumerate(conf_range):
-                    for spe in species:
-                        if inp.field:
-                            psi_nm[(iconf,spe,lam)] = np.dot(pvec_field[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
-                        else:
-                            psi_nm[(iconf,spe,lam)] = np.dot(pvec[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
-            else:
-                # Compute covariant kernels
-                for i,iconf in enumerate(conf_range):
-                    for spe in species:
-                        if inp.field:
-                            kernel_nm = np.dot(pvec_field[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
-                        else:
-                            kernel_nm = np.dot(pvec[i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
-                        for i1 in range(natom_dict[(iconf,spe)]):
-                            for i2 in range(Mspe[spe]):
-                                kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[(iconf,spe)][i1,i2]**(zeta-1)
-                        # Project on RKHS
-                        psi_nm[(iconf,spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
-
-        if rank == 0: print("rkhs time:", time.time()-rkhsstart,flush=True)
-
-    predstart = time.time()
-
-    if inp.qmcode=="cp2k":
-        xyzfile = read(filename,":")
-        q_fpath = osp.join(dirpath, "charges.dat")
-        d_fpath = osp.join(dirpath, "dipoles.dat")
-        if rank == 0:
-            # remove old output files
-            remove_if_exists = lambda fpath: os.remove(fpath) if os.path.exists(fpath) else None
-            remove_if_exists(q_fpath)
-            remove_if_exists(d_fpath)
-        if inp.parallel: comm.Barrier()
-        qfile = open(q_fpath, "a")
-        dfile = open(d_fpath, "a")
-
-    # Load spherical averages if required
-    if inp.average:
-        av_coefs = {}
-        for spe in species:
-            av_coefs[spe] = np.load(f"averages_{spe}.npy")
-
-    # Perform equivariant predictions
-    for iconf in conf_range:
-
+    psi_nm = {}
+    for i,iconf in enumerate(conf_range):
+        
         Tsize = 0
         for iat in range(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     Tsize += 2*l+1
+        
+        for spe in species:
+           
+            # lam = 0
+            if zeta==1:
+                psi_nm[(spe,0)] = np.dot(pvec[0][i,atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
+            else:
+                kernel0_nm = np.dot(pvec[0][i,atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
+                kernel_nm = kernel0_nm**zeta
+                psi_nm[(spe,0)] = np.dot(kernel_nm,Vmat[(0,spe)])
+
+            # lam > 0
+            for lam in range(1,lmax[spe]+1):
+
+                featsize = pvec[lam].shape[-1]
+                if zeta==1:
+                    psi_nm[(spe,lam)] = np.dot(pvec[lam][i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                else:
+                    kernel_nm = np.dot(pvec[lam][i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                    for i1 in range(natom_dict[(iconf,spe)]):
+                        for i2 in range(Mspe[spe]):
+                            kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[i1,i2]**(zeta-1)
+                    psi_nm[(spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
 
         # compute predictions per channel
         C = {}
@@ -531,8 +399,8 @@ def build():
             ispe[spe] = 0
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
-                    Mcut = psi_nm[(iconf,spe,l)].shape[1]
-                    C[(spe,l,n)] = np.dot(psi_nm[(iconf,spe,l)],weights[isize:isize+Mcut])
+                    Mcut = psi_nm[(spe,l)].shape[1]
+                    C[(spe,l,n)] = np.dot(psi_nm[(spe,l)],weights[isize:isize+Mcut])
                     isize += Mcut
 
         # init averages array if asked
@@ -607,8 +475,8 @@ def build():
             print(iconf+1,dipole,file=dfile)
             print(iconf+1,rho_int,charge,file=qfile)
 
-            # save predicted coefficients in CP2K format
-            np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
+        # save predicted coefficients in CP2K format
+        np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
 
         # save predicted coefficients
         np.save(osp.join(dirpath, f"prediction_conf{iconf}.npy"), pred_coefs)
@@ -625,9 +493,7 @@ def build():
             qs = np.loadtxt(q_fpath)
             np.savetxt(q_fpath, qs[qs[:,0].argsort()],fmt='%i %f')
 
-    if rank == 0:
-        print(f"\nprediction time: {(time.time()-predstart):.2f} s")
-        print(f"\ntotal time: {(time.time()-start):.2f} s")
+    if rank == 0: print(f"\ntotal time: {(time.time()-start):.2f} s")
 
 
 

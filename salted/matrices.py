@@ -7,14 +7,17 @@ import os.path as osp
 import numpy as np
 from scipy import sparse
 
+from salted import get_averages
 from salted.sys_utils import read_system,get_atom_idx,get_conf_range
 
 def build():
     
     sys.path.insert(0, './')
     import inp
-    
-    if inp.parallel:
+   
+    parallel = inp.parallel
+ 
+    if parallel:
         from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
@@ -40,6 +43,16 @@ def build():
         dirpath = os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}")
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
+
+    if inp.average:
+        # compute average density coefficients
+        if rank==0: get_averages.build()
+        if parallel: comm.Barrier()
+        # load average density coefficients
+        av_coefs = {}
+        for spe in species:
+            av_coefs[spe] = np.load(os.path.join(inp.saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
+
     if size > 1: comm.Barrier()
 
     # define training set at random or sequentially
@@ -79,18 +92,19 @@ def build():
         nblocks = int(ntrain/blocksize)
         j = 0
         for i in range(nblocks):
-            if rank==(i-j*size): matrices(i,trainrange[i*blocksize:(i+1)*blocksize],rank)
+            if rank==(i-j*size): matrices(i,trainrange[i*blocksize:(i+1)*blocksize],av_coefs,rank)
 #            print(rank,i,i+1,(j+1)*size,j)
             if i+1 == (j+1)*size: j += 1
 
     else:
-        matrices(-1,trainrange,rank)
+        matrices(-1,trainrange,av_coefs,rank)
+    
+    if parallel: print("Task",rank,"handling structures:",trainrange)
 
-def matrices(block_idx,trainrange,rank):
+def matrices(block_idx,trainrange,av_coefs,rank):
     
     sys.path.insert(0, './')
     import inp
-    if inp.parallel: print("Task",rank,"handling structures:",trainrange)
 
     if inp.field:
         fdir = f"rkhs-vectors_{inp.saltedname}_field"
@@ -114,12 +128,6 @@ def matrices(block_idx,trainrange,rank):
     if totsize>70000:
         raise ValueError(f"problem dimension too large ({totsize=}), minimize directly loss-function instead!")
     
-    if inp.average:
-        # load average density coefficients
-        av_coefs = {}
-        for spe in species:
-            av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
-   
     if rank == 0: print("computing regression matrices...")
     
     Avec = np.zeros(totsize)
