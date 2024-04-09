@@ -63,43 +63,30 @@ def build():
 
     sdir = osp.join(inp.saltedpath, f"equirepr_{inp.saltedname}")
 
-    # Load training feature vectors and RKHS projection matrix
-    Mspe = {}
-    power_env_sparse = {}
-    for spe in species:
-        for lam in range(lmax[spe]+1):
-             # load sparse equivariant descriptors
-             power_env_sparse[(spe,lam)] = h5py.File(osp.join(
-                 inp.saltedpath,
-                 f"equirepr_{saltedname}",
-                 f"spe{spe}_l{lam}",
-                 f"FEAT_M-{M}.h5"
-             ), 'r')['sparse_descriptor'][:]
-             if lam == 0:
-                 Mspe[spe] = power_env_sparse[(spe,lam)].shape[0]
-
     # compute rkhs projector and save
+    features = h5py.File(osp.join(sdir,f"FEAT_M-{M}.h5",'r')
+    h5f = h5py.File(osp.join(sdir,  f"projector_M{M}_zeta{zeta}.h5"), 'w')
     for spe in species:
-        kernel0_mm = np.dot(power_env_sparse[(spe,0)],power_env_sparse[(spe,0)].T)
+        power_env_sparse = features['sparse_descriptor'][spe]['0'][:]
+        Mspe = power_env_sparse.shape[0]
+        kernel0_mm = np.dot(power_env_sparse,power_env_sparse.T)
         eva, eve = np.linalg.eigh(kernel0_mm**zeta)
         eva = eva[eva>eigcut]
         eve = eve[:,-len(eva):]
         V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-        np.save(osp.join(
-            sdir, f"spe{spe}_l{0}", f"projector_M{M}_zeta{zeta}.npy"
-        ), V)
+        h5f.create_dataset(f"projectors/{spe}/0",data=V)
         for lam in range(1,lmax[spe]+1):
-            kernel_mm = np.dot(power_env_sparse[(spe,lam)],power_env_sparse[(spe,lam)].T)
-            for i1 in range(Mspe[spe]):
-                for i2 in range(Mspe[spe]):
+            power_env_sparse = features['sparse_descriptor'][spe][str(lam)][:]
+            kernel_mm = np.dot(power_env_sparse,power_env_sparse.T)
+            for i1 in range(Mspe):
+                for i2 in range(Mspe):
                     kernel_mm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_mm[i1,i2]**(zeta-1)
             eva, eve = np.linalg.eigh(kernel_mm)
             eva = eva[eva>eigcut]
             eve = eve[:,-len(eva):]
             V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-            np.save(osp.join(
-                sdir, f"spe{spe}_l{lam}", f"projector_M{M}_zeta{zeta}.npy"
-            ), V)
+            h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
+    h5f.close()
 
 
 if __name__ == "__main__":

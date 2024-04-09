@@ -110,14 +110,6 @@ def build():
 
     sdir = osp.join(inp.saltedpath, f"equirepr_{inp.saltedname}")
 
-    # make directories if not exisiting
-    if rank==0:
-        for spe in species:
-            for l in range(lmax[spe]+1):
-                dirpath = osp.join(sdir, f"spe{spe}_l{l}")
-                if not osp.exists(dirpath):
-                    os.mkdir(dirpath)
-
     # Distribute structures to tasks
     if inp.parallel:
         conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
@@ -315,12 +307,12 @@ def build():
     if rank==0:
 
         # reshape sparse vector and save
+        h5f = h5py.File(osp.join(sdir,  f"FEAT_M-{M}.h5"), 'w')
         for spe in species:
             for lam in range(lmax[spe]+1):
-                h5f = h5py.File(osp.join(sdir, f"spe{spe}_l{lam}", f"FEAT_M-{M}.h5"), 'w')
                 power_env_sparse[(spe,lam)] = power_env_sparse[(spe,lam)].reshape(Mspe[spe]*(2*lam+1),power_env_sparse[(spe,lam)].shape[-1])
-                h5f.create_dataset("sparse_descriptor",data=power_env_sparse[(spe,lam)])
-                h5f.close()
+                h5f.create_dataset(f"sparse_descriptor/{spe}/{lam}",data=power_env_sparse[(spe,lam)])
+        h5f.close()
 
 if __name__ == "__main__":
     build()
