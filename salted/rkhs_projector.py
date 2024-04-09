@@ -78,11 +78,7 @@ def build():
             V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
             h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
     h5f.close()
-<<<<<<< HEAD
     features.close()
-
-=======
->>>>>>> 51868a9 (Store sparse features and projectors in single files)
 
 if __name__ == "__main__":
     build()

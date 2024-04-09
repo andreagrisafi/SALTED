@@ -10,7 +10,6 @@ from ase.io import read
 
 from salted import basis
 
-
 def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
     """read a geometry file and return the formatted information
 
