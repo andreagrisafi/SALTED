@@ -64,7 +64,7 @@ def build():
     sdir = osp.join(inp.saltedpath, f"equirepr_{inp.saltedname}")
 
     # compute rkhs projector and save
-    features = h5py.File(osp.join(sdir,f"FEAT_M-{M}.h5",'r')
+    features = h5py.File(osp.join(sdir,f"FEAT_M-{M}.h5"),'r')
     h5f = h5py.File(osp.join(sdir,  f"projector_M{M}_zeta{zeta}.h5"), 'w')
     for spe in species:
         power_env_sparse = features['sparse_descriptor'][spe]['0'][:]
@@ -87,6 +87,7 @@ def build():
             V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
             h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
     h5f.close()
+    features.close()
 
 
 if __name__ == "__main__":

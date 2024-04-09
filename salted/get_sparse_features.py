@@ -311,7 +311,7 @@ def build():
         for spe in species:
             for lam in range(lmax[spe]+1):
                 power_env_sparse[(spe,lam)] = power_env_sparse[(spe,lam)].reshape(Mspe[spe]*(2*lam+1),power_env_sparse[(spe,lam)].shape[-1])
-                h5f.create_dataset(f"sparse_descriptor/{spe}/{lam}",data=power_env_sparse[(spe,lam)])
+                h5f.create_dataset(f"sparse_descriptors/{spe}/{lam}",data=power_env_sparse[(spe,lam)])
         h5f.close()
 
 if __name__ == "__main__":

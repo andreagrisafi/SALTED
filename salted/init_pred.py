@@ -71,25 +71,7 @@ def build():
             ))
 
     # Load training feature vectors and RKHS projection matrix
-    Vmat = {}
-    Mspe = {}
-    power_env_sparse = {}
-    sdir = osp.join(inp.saltedpath, f"equirepr_{saltedname}")
-    features = h5py.File(osp.join(sdir,f"FEAT_M-{M}.h5",'r')
-    projectors = h5py.File(osp.join(sdir,f"projector_M{M}_zeta{zeta}.h5",'r')
-    for spe in species:
-        for lam in range(lmax[spe]+1):
-             # load RKHS projectors
-             Vmat[(lam,spe)] = projectors["projectors"][spe][str(lam)][:]
-             # load sparse equivariant descriptors
-             power_env_sparse[(lam,spe)] = features["sparse_descriptors"][spe][str(lam)][:]
-             if lam == 0:
-                 Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
-             # precompute projection on RKHS if linear model
-             if zeta==1:
-                 power_env_sparse[(lam,spe)] = np.dot(
-                     Vmat[(lam,spe)].T, power_env_sparse[(lam,spe)]
-                 )
+    Vmat,Mspe,power_env_sparse = get_feats_projs(species,lmax)
  
     # load regression weights
     ntrain = int(inp.Ntrain*inp.trainfrac)
