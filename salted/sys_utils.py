@@ -168,6 +168,9 @@ class AttrDict:
 
 class ParseConfig:
     """Input configuration file parser
+
+    To use it, make sure an `inp.yaml` file exists in the current working directory,
+    and simply run `ParseConfig().parse_input()`.
     """
 
     def __init__(self, _dev_inp_fpath: Optional[str]=None):
@@ -338,49 +341,49 @@ class ParseConfig:
             }
         }
 
-        def rec_apply_default_vals(_inp, _inp_template):
+        def rec_apply_default_vals(_inp, _inp_template, _prev_key:str):
             """apply default values if optional parameters are not found"""
 
             """check if the keys in inp exist in inp_template"""
             for key, val in _inp.items():
                 if key not in _inp_template.keys():
-                    raise ValueError(f"Key not allowed: {key}")
+                    raise ValueError(f"Key not allowed: {_prev_key+key}")
             """apply default values"""
             for key, val in _inp_template.items():
                 if isinstance(val, dict):
                     """we can ignore a section if it's not required"""
                     if key not in _inp.keys():
                         _inp[key] = dict()  # make it an empty dict
-                    _inp[key] = rec_apply_default_vals(_inp[key], _inp_template[key])
+                    _inp[key] = rec_apply_default_vals(_inp[key], _inp_template[key], _prev_key+key+".")
                 elif isinstance(val, tuple):
-                    (required, valPLACEHOLDER, val_type, extra_check_func) = val
+                    (required, val_default, val_type, extra_check_func) = val
                     if key not in _inp.keys():
                         if required:
-                            raise ValueError(f"Required key not found: {key}")
+                            raise ValueError(f"Required key not found: {_prev_key+key}")
                         else:
-                            _inp[key] = valPLACEHOLDER
+                            _inp[key] = val_default
                 else:
                     raise ValueError(f"Invalid template value: {val}")
             return _inp
 
-        def rec_check_vals(_inp, _inp_template):
+        def rec_check_vals(_inp, _inp_template, _prev_key:str):
             """check values' type and range"""
             for key, template in _inp_template.items():
                 if isinstance(template, dict):
-                    rec_check_vals(_inp[key], _inp_template[key])
+                    rec_check_vals(_inp[key], _inp_template[key], _prev_key+key+".")
                 elif isinstance(template, tuple):
                     val = _inp[key]
-                    (required, valPLACEHOLDER, val_type, extra_check_func) = _inp_template[key]
+                    (required, val_default, val_type, extra_check_func) = _inp_template[key]
                     if not isinstance(val, val_type):
-                        raise ValueError(f"Value type error: {key=}, {val=}, current_type={type(val)}, expected_type={val_type}")
+                        raise ValueError(f"Value type error: key={_prev_key+key}, {val=}, current_type={type(val)}, expected_type={val_type}")
                     if extra_check_func is not None:
                         if not extra_check_func(inp, val):
-                            raise ValueError(f"Value check failed: {key=}, {val=}. Please check the required conditions.")
+                            raise ValueError(f"Value check failed: key={_prev_key+key}, {val=}. Please check the required conditions.")
                 else:
                     raise ValueError(f"Invalid template value: {template}")
 
-        inp = rec_apply_default_vals(inp, inp_template)  # now inp has all the keys as in inp_template in all levels
-        rec_check_vals(inp, inp_template)
+        inp = rec_apply_default_vals(inp, inp_template, "")  # now inp has all the keys as in inp_template in all levels
+        rec_check_vals(inp, inp_template, "")
 
         return inp
 
