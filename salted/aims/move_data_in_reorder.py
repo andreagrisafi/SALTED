@@ -6,8 +6,8 @@ import inp
 from salted.sys_utils import read_system, get_conf_range
 
 def build():
-
-    print("WARNING! This script assumes you will use an AIMS version >= 240403 to read the predicted RI coefficients. If this is not true, please use move_data_in_reorder instead.")
+    
+    print("WARNING! This script assumes you will use an AIMS version < 240403 to read the predicted RI coefficients. If this is not true, please use move_data_in instead.")
 
     if inp.parallel:
         from mpi4py import MPI
@@ -44,6 +44,22 @@ def build():
         n = len(t)
     
         dirpath = os.path.join(inp.path2qm, inp.predict_data, f"{i+1}")
+    
+        idx = np.loadtxt(os.path.join(dirpath, f"idx_prodbas.out")).astype(int)
+        idx -= 1
+   
+        # accelerated method
+        idx_rev = np.empty_like(idx)
+        idx_rev[idx] = np.arange(len(idx))
+   
+        cs_list = np.loadtxt(os.path.join(
+            dirpath, f"prodbas_condon_shotley_list.out"
+        )).astype(int)
+        cs_list -= 1
+   
+        # accelerated method
+        t = t[idx_rev]
+        t[cs_list] *= -1
     
         np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted.out"), t)
 
