@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-from typing import Any, Callable, Dict, Optional, Tuple, Union, Literal
+from typing import Any, Callable, Dict, Optional, Tuple, Union, Literal, List
 
 import numpy as np
 import yaml
@@ -411,3 +411,105 @@ class ParseConfig:
         loader.add_constructor('!float_sci', float_sci)
         return loader
 
+
+
+
+class Irreps(tuple):
+    def __new__(cls, irreps:Union[str, List[int], Tuple[int]]) -> 'Irreps':
+        """
+        irreps:
+            - str, e.g. `1x0+2x1+3x2+3x3+2x4+1x5`
+            - Tuple[Tuple[int]], e.g. ((1, 0), (2, 1), (3, 2), (3, 3), (2, 4), (1, 5),)
+                - The super() tuple info
+            - Tuple[int], e.g. (0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5,)
+            - internal representation: the same as Tuple[Tuple[int]]
+        """
+        if isinstance(irreps, str):
+            irreps_info_split = tuple(sec.strip() for sec in irreps.split("+") if len(sec) > 0)  # ("1x0", "2x1", ...)
+            mul_l_tuple = tuple(  # ((1, 0), (2, 1), ...)
+                tuple(int(i.strip()) for i in sec.split("x"))
+                for sec in irreps_info_split
+            )
+            return super().__new__(cls, mul_l_tuple)
+        elif isinstance(irreps, list) or isinstance(irreps, tuple):
+            if len(irreps) == 0:
+                return super().__new__(cls, ())
+            elif isinstance(irreps[0], tuple) or isinstance(irreps[0], list):
+                assert all(
+                    all(isinstance(i, int) for i in mul_l) and len(mul_l) == 2 and mul_l[0] >= 0 and mul_l[1] >= 0
+                    for mul_l in irreps
+                ), ValueError(f"Invalid irreps_info: {irreps}")
+                return super().__new__(cls, tuple(tuple(mul_l) for mul_l in irreps))
+            elif isinstance(irreps[0], int):
+                assert all(isinstance(i, int) and i >= 0 for i in irreps), ValueError(f"Invalid irreps_info: {irreps}")
+                this_l_cnt, this_l = 1, irreps[0]
+                mul_l_list:List[Tuple[int]] = []
+                for l in irreps[1:]:
+                    if l == this_l:
+                        this_l_cnt += 1
+                    else:
+                        mul_l_list.append((this_l_cnt, this_l))
+                        this_l_cnt, this_l = 1, l
+                mul_l_list.append((this_l_cnt, this_l))
+                print(mul_l_list)
+                return super().__new__(cls, tuple(mul_l_list))
+            else:
+                raise ValueError(f"Invalid irreps_info: {irreps}")
+        else:
+            raise ValueError(f"Invalid irreps_info: {irreps}")
+
+    @property
+    def dim(self):
+        """total dimension / length by magnetic quantum number"""
+        return sum(mul * (2*l + 1) for mul, l in self)
+
+    @property
+    def num_irreps(self):
+        """number of irreps, the sum of multiplicities of each l"""
+        return sum(mul for mul, _ in self)
+
+    @property
+    def ls(self) -> List[int]:
+        """list of l values in the irreps"""
+        return tuple(l for mul, l in self for _ in range(mul))
+
+    @property
+    def lmax(self) -> int:
+        """maximum l in the irreps"""
+        return max(tuple(l for _, l in self))
+
+    def __repr__(self):
+        return "+".join(f"{mul}x{l}" for mul, l in self)
+
+    def __add__(self, other: 'Irreps') -> 'Irreps':
+        return Irreps(super().__add__(other))
+
+    def slices(self) -> List[slice]:
+        """return all the slices for each l"""
+        if hasattr(self, "_slices"):
+            return self._slices
+        else:
+            self._slices = []
+            ls = self.ls
+            l_m_nums = tuple(2*l + 1 for l in ls)
+            pointer = 0
+            for m_num in l_m_nums:
+                self._slices.append(slice(pointer, pointer+m_num))
+                pointer += m_num
+            assert pointer == self.dim
+            self._slices = tuple(self._slices)
+        return self._slices
+
+    def slices_l(self, l:int) -> List[slice]:
+        """return all the slices for a specific l"""
+        return tuple(sl for _l, sl in zip(self.ls, self.slices()) if l == _l)
+
+    def simplify(self) -> 'Irreps':
+        """sort by l and combine the same l"""
+        uniq_ls = tuple(set(self.ls))
+        mul_ls = tuple((self.ls.count(l), l) for l in uniq_ls)
+        return Irreps(mul_ls)
+
+    def sort(self) -> 'Irreps':
+        """"""
+        raise NotImplementedError
