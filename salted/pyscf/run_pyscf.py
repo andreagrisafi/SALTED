@@ -8,7 +8,7 @@ import numpy as np
 from ase.io import read
 from pyscf import gto, dft, lib
 
-from salted.sys_utils import ParseConfig
+from salted.sys_utils import ParseConfig, parse_index_str, ARGHELP_INDEX_STR
 
 
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     # formats: 1,2,3 or 1-3 or None (all structures)
     parser.add_argument(
         "-i", "--idx", type=str, default="all",
-        help="Indexes to calculate, start from 0. Format: 1,3-5,7-10. Default is \"all\", which means all structures."
+        help=ARGHELP_INDEX_STR,
     )
     parser.add_argument(
         "-c", "--cpu", type=int, default=1,
@@ -69,18 +69,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if args.idx == "all":
-        indexes = None
-    else:
-        assert isinstance(args.idx, str)
-        indexes = []
-        for s in args.idx.split(","):  # e.g. ["1", "3-5", "7-10"]
-            assert all([c.isdigit() or c == "-" for c in s]), f"Invalid index format: {s}"
-            if "-" in s:
-                assert s.count("-") == 1, f"Invalid index format: {s}"
-                start, end = map(int, s.split("-"))
-                indexes.extend(range(start, end + 1))
-            else:
-                indexes.append(int(s))
-
-    main(indexes, args.cpu)
+    main(parse_index_str(args.idx), args.cpu)
