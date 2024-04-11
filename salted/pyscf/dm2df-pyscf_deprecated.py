@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import os.path as osp
+import time
 
 import numpy as np
 from pyscf import gto
@@ -26,7 +27,7 @@ def set_variable_values(args):
 args = add_command_line_arguments("")
 iconf = set_variable_values(args)
 
-xyzfile = read(inp.sys.filename,":")
+xyzfile = read(inp.system.filename,":")
 ndata = len(xyzfile)
 
 if iconf != -1:
@@ -55,6 +56,7 @@ print("Make sure to provide the density matrix following this convention!")
 print("---------------------------------------------------------------------------------")
 print("Reading geometry and basis sets...")
 
+start_time = time.time()
 for iconf in conf_list:
 
     # Initialize geometry
@@ -166,3 +168,6 @@ for iconf in conf_list:
     #f = open("external_energy.dat", 'a') 
     #print >> f, e_Ne
     #f.close()
+
+end_time = time.time()
+print(f"Calculation finished, time cost on density fitting: {end_time - start_time:.2f}s")
