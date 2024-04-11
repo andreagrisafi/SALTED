@@ -10,8 +10,7 @@ from salted.basis_client import (
     SpeciesBasisData,
 )
 from salted.get_basis_info import get_parser
-
-import inp
+from salted.sys_utils import ParseConfig
 
 
 
@@ -20,10 +19,11 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     update the basis_data dict,
     and write to the database when all species are recorded.
     """
-    assert inp.qmcode.lower() == "pyscf", f"{inp.qmcode=}, but expected 'pyscf'"
+    inp = ParseConfig().parse_input()
+    assert inp.qm.qmcode.lower() == "pyscf", f"{inp.qm.qmcode=}, but expected 'pyscf'"
 
-    spe_set = set(inp.species)  # remove duplicates
-    qmbasis = inp.qmbasis
+    spe_set = set(inp.system.species)  # remove duplicates
+    qmbasis = inp.qm.qmbasis
 
     """load density fitting basis from pyscf module"""
     basis_data: Dict[str, SpeciesBasisData] = load_from_pyscf(list(spe_set), qmbasis)
@@ -33,7 +33,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
         print("Dryrun mode, not writing to the database")
         print(f"{basis_data=}")
     else:
-        BasisClient().write(inp.dfbasis, basis_data, force_overwrite)
+        BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
 

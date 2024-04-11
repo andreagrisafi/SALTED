@@ -6,8 +6,7 @@ in salted/aims/get_basis_info.py and salted/cp2k/get_basis_info.py.
 import argparse
 import sys
 
-sys.path.insert(0, './')
-import inp
+from salted.sys_utils import ParseConfig
 
 
 def get_parser():
@@ -29,13 +28,14 @@ if __name__ == "__main__":
     parser = get_parser()
     args = parser.parse_args()
 
-    if inp.qmcode.lower() == "aims":
+    inp = ParseConfig().parse_input()
+    if inp.qm.qmcode.lower() == "aims":
         from salted.aims.get_basis_info import build
-    elif inp.qmcode.lower() == "cp2k":
+    elif inp.qm.qmcode.lower() == "cp2k":
         from salted.cp2k.get_basis_info import build
-    elif inp.qmcode.lower() == "pyscf":
+    elif inp.qm.qmcode.lower() == "pyscf":
         from salted.pyscf.get_basis_info import build
     else:
-        raise ValueError(f"Unknown qmcode: {inp.qmcode}")
+        raise ValueError(f"Unknown qmcode: {inp.qm.qmcode}")
 
     build(dryrun=args.dryrun, force_overwrite=args.force_overwrite)
