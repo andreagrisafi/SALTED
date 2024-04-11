@@ -50,7 +50,7 @@ def main(geom_indexes: Union[List[int], None], num_threads: int):
         atoms = [(s, c) for s, c in zip(symb, coords)]
 
         dm = run_pyscf(atoms, inp.qm.qmbasis, inp.qm.functional)
-        np.save(os.path.join(dirpath, f"dm_conf{geom_idx}.npy"), dm)
+        np.save(os.path.join(dirpath, f"dm_conf{geom_idx+1}.npy"), dm)
     end_time = time.time()
     print(f"Calculation finished, time cost on DFT: {end_time - start_time:.2f}s")
 
