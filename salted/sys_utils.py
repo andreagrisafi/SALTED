@@ -95,6 +95,8 @@ def get_conf_range(rank,size,ntest,testrangetot):
     return testrange
 
 
+ARGHELP_INDEX_STR = """Indexes to calculate, start from 0. Format: 1,3-5,7-10. Default is "all", which means all structures."""
+
 def parse_index_str(index_str:Union[str, Literal["all"]]) -> Union[None, Tuple]:
     """Parse index string, e.g. "1,3-5,7-10" -> (1,3,4,5,7,8,9,10)
 
@@ -111,8 +113,9 @@ def parse_index_str(index_str:Union[str, Literal["all"]]) -> Union[None, Tuple]:
             assert all([c.isdigit() or c == "-" for c in s]), f"Invalid index format: {s}"
             if "-" in s:
                 assert s.count("-") == 1, f"Invalid index format: {s}"
-                start, end = map(int, s.split("-"))
-                indexes.extend(range(start, end + 1))
+                start, end = s.split("-")
+                assert start.isdigit() and end.isdigit, f"Invalid index format: {s}"
+                indexes.extend(range(int(start), int(end) + 1))
             elif s.isdigit():
                 indexes.append(int(s))
             else:
