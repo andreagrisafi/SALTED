@@ -23,11 +23,11 @@ def run_pyscf(
     return mf.make_rdm1()
 
 
-def main(geom_indexes: Union[List[int], None], num_threads: int):
+def main(geom_indexes: Union[List[int], None], num_threads: int = None):
     inp = ParseConfig().parse_input()
     geoms_all = read(inp.system.filename, ":")
     if geom_indexes is None:
-        geom_indexes = range(len(geoms_all))
+        geom_indexes = list(range(len(geoms_all)))
     else:
         geom_indexes = [i for i in geom_indexes if i < len(geoms_all)]  # indexes start from 0
     print(f"Calculating density matrix for configurations: {geom_indexes}")
@@ -39,7 +39,8 @@ def main(geom_indexes: Union[List[int], None], num_threads: int):
         os.mkdir(dirpath)
 
     """ set pyscf.lib.num_threads """
-    lib.num_threads(num_threads)
+    if num_threads is not None:
+        lib.num_threads(num_threads)
 
     """ do DFT calculation """
     start_time = time.time()
@@ -64,8 +65,8 @@ if __name__ == "__main__":
         help=ARGHELP_INDEX_STR,
     )
     parser.add_argument(
-        "-c", "--cpu", type=int, default=1,
-        help="Number of CPU cores to use. Default is 1."
+        "-c", "--cpu", type=int, default=None,
+        help="Number of CPU cores to use. Default is None (for do nothing)."
     )
     args = parser.parse_args()
 
