@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple, Union, Literal
 
 import numpy as np
 import yaml
@@ -93,6 +93,31 @@ def get_conf_range(rank,size,ntest,testrangetot):
         testrange = None
 
     return testrange
+
+
+def parse_index_str(index_str:Union[str, Literal["all"]]) -> Union[None, Tuple]:
+    """Parse index string, e.g. "1,3-5,7-10" -> (1,3,4,5,7,8,9,10)
+
+    If index_str is "all", return None. (indicating all structures)
+    If index_str is "1,3-5,7-10", return (1,3,4,5,7,8,9,10)
+    """
+
+    if index_str == "all":
+        return None
+    else:
+        assert isinstance(index_str, str)
+        indexes = []
+        for s in index_str.split(","):  # e.g. ["1", "3-5", "7-10"]
+            assert all([c.isdigit() or c == "-" for c in s]), f"Invalid index format: {s}"
+            if "-" in s:
+                assert s.count("-") == 1, f"Invalid index format: {s}"
+                start, end = map(int, s.split("-"))
+                indexes.extend(range(start, end + 1))
+            elif s.isdigit():
+                indexes.append(int(s))
+            else:
+                raise ValueError(f"Invalid index format: {s}")
+        return tuple(indexes)
 
 
 def sort_grid_data(data:np.ndarray) -> np.ndarray:
