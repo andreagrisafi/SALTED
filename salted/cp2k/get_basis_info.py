@@ -10,8 +10,7 @@ from salted.basis_client import (
     SpeciesBasisData,
 )
 from salted.get_basis_info import get_parser
-
-import inp
+from salted.sys_utils import ParseConfig
 
 
 
@@ -20,10 +19,11 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     update the basis_data dict,
     and write to the database when all species are recorded.
     """
-    assert inp.qmcode.lower() == "cp2k", f"{inp.qmcode=}, but expected 'cp2k'"
+    inp = ParseConfig().parse_input()
+    assert inp.qm.qmcode.lower() == "cp2k", f"{inp.qm.qmcode=}, but expected 'cp2k'"
 
     """Run Andrea's code"""
-    lmax, nmax, alphas = parse_files_basis_info(inp.species, inp.dfbasis)
+    lmax, nmax, alphas = parse_files_basis_info(inp.system.species, inp.qm.dfbasis)
 
     """Convert to basis_client format"""
     basis_data: Dict[str, SpeciesBasisData] = {}
@@ -39,17 +39,17 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     """write to the database"""
     if dryrun:
         print("Dryrun mode, not writing to the database")
-        print(f"{inp.species=}")
-        print(f"{inp.dfbasis=}")
+        print(f"{inp.system.species=}")
+        print(f"{inp.qm.dfbasis=}")
         print(f"{lmax=}, {nmax=}")
         print(f"{basis_data=}")
         print(f"{alphas=}")
     else:
-        for spe in inp.species:
+        for spe in inp.system.species:
             for l in range(lmax[spe] + 1):
-                np.savetxt(f"{spe}-{inp.dfbasis}-alphas-L{l}.dat", alphas[(spe, l)])
-                # np.savetxt(spe+"-"+inp.dfbasis+"-contraction-coeffs-L"+str(l)+".dat",contra[(spe,l)])
-        BasisClient().write(inp.dfbasis, basis_data, force_overwrite)
+                np.savetxt(f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat", alphas[(spe, l)])
+                # np.savetxt(spe+"-"+inp.qm.dfbasis+"-contraction-coeffs-L"+str(l)+".dat",contra[(spe,l)])
+        BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
 def parse_files_basis_info(species:List[str], dfbasis:str) -> (
