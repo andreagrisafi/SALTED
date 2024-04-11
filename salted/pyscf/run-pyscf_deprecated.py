@@ -9,8 +9,9 @@ from pyscf import scf,dft
 from pyscf import grad
 from scipy import special
 
-sys.path.insert(0, './')
-import inp
+from salted.sys_utils import ParseConfig
+
+inp = ParseConfig().parse_input()
 
 def add_command_line_arguments(parsetext):
     parser = argparse.ArgumentParser(description=parsetext,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -26,9 +27,9 @@ args = add_command_line_arguments("")
 iconf = set_variable_values(args)
 
 # Initialize geometry
-geoms = read(inp.filename,":")
+geoms = read(inp.system.filename,":")
 
-dirpath = inp.path2qm
+dirpath = inp.qm.path2qm
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -50,9 +51,9 @@ for iconf in conf_list:
         atoms.append([symb[i],(coord[0],coord[1],coord[2])])
 
     # Get PySCF objects for wave-function and density-fitted basis
-    mol = gto.M(atom=atoms,basis=inp.qmbasis)
+    mol = gto.M(atom=atoms,basis=inp.qm.qmbasis)
     m = dft.RKS(mol)
-    m.xc = inp.functional
+    m.xc = inp.qm.functional
     # Save density matrix
     m.kernel()
 
@@ -66,7 +67,7 @@ for iconf in conf_list:
 
     dm = m.make_rdm1()
 
-    dirpath = os.path.join(inp.path2qm, "density_matrices")
+    dirpath = os.path.join(inp.qm.path2qm, "density_matrices")
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
 
