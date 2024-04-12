@@ -22,9 +22,6 @@ For details please check https://pyscf.org/user/gto.html#ordering-of-basis-funct
 Make sure to provide the density matrix following this convention!
 """
 
-# pyscf_time = 0.0
-# reorder_time = 0.0
-
 
 def cal_df_coeffs_old(
     atoms: List,
@@ -34,9 +31,7 @@ def cal_df_coeffs_old(
     lmax: Dict[str, int],
     nmax: Dict[Tuple[str, int], int],
 ):
-    # global reorder_time, pyscf_time
-
-    # start_time = time.time()
+    pyscf_time = time.time()
     mol = gto.M(atom=atoms, basis=qmbasis)
     auxmol = gto.M(atom=atoms, basis=ribasis)
     pmol = mol + auxmol
@@ -51,10 +46,10 @@ def cal_df_coeffs_old(
     eri3c = eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
     rho = np.einsum('ijp,ij->p', eri3c, dm)
     rho = np.linalg.solve(eri2c, rho)
-    # pyscf_time += time.time() - start_time
+    pyscf_time = time.time() - pyscf_time
 
-    # start_time = time.time()
     # Reorder L=1 components following the -1,0,+1 convention
+    reorder_time = time.time()
     Coef = np.zeros(len(rho))
     Over = np.zeros((len(rho), len(rho)))
 
@@ -99,9 +94,15 @@ def cal_df_coeffs_old(
 
     # Compute density projections on auxiliary functions
     Proj = np.dot(Over,Coef)
-    # reorder_time += time.time() - start_time
+    reorder_time = time.time() - reorder_time
 
-    return Coef, Proj, Over
+    return {
+        "coef": Coef,
+        "proj": Proj,
+        "over": Over,
+        "pyscf_time": pyscf_time,
+        "reorder_time": reorder_time,
+    }
 
 
 def cal_df_coeffs(
@@ -111,9 +112,7 @@ def cal_df_coeffs(
     dm: np.ndarray,
     irreps: Irreps,
 ):
-    # global reorder_time, pyscf_time
-
-    # start_time = time.time()
+    pyscf_time = time.time()
     mol = gto.M(atom=atoms, basis=qmbasis)
     auxmol = gto.M(atom=atoms, basis=ribasis)
     pmol = mol + auxmol
@@ -128,14 +127,18 @@ def cal_df_coeffs(
     eri3c = eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
     rho = np.einsum('ijp,ij->p', eri3c, dm)
     rho = np.linalg.solve(eri2c, rho)
-    # pyscf_time += time.time() - start_time
+    pyscf_time = time.time() - pyscf_time
 
     """ Reorder L=1 components from +1,-1,0 to -1,0,+1 """
-    # start_time = time.time()
+    reorder_time = time.time()
     l1_slices = irreps.slices_l(1)
     l1_indexes = np.array([sl.start for sl in l1_slices]).reshape(-1, 1) + np.array([0, 1, 2]).reshape(1, -1)  # shape (n_l1, 3)
+    """
+    +1,-1,0 reordered to -1,0,+1
+    from: 0,1,2; to: 2,0,1 (receiver)
+    """
     l1_indexes_from = l1_indexes.reshape(-1)  # shape (3*n_l1,)
-    l1_indexes_to = l1_indexes[:, [1, 2, 0]].reshape(-1)  # shape (3*n_l1,)
+    l1_indexes_to = l1_indexes[:, [2,0,1]].reshape(-1)  # shape (3*n_l1,)
 
     coef_reordered = rho
     coef_reordered[l1_indexes_to] = rho[l1_indexes_from]
@@ -145,9 +148,16 @@ def cal_df_coeffs(
 
     # Compute density projections on auxiliary functions
     proj_reordered = np.dot(overlap_reordered, coef_reordered)
-    # reorder_time += time.time() - start_time
+    reorder_time = time.time() - reorder_time
 
-    return coef_reordered, proj_reordered, overlap_reordered
+    return {
+        "coef": coef_reordered,
+        "proj": proj_reordered,
+        "over": overlap_reordered,
+        "pyscf_time": pyscf_time,
+        "reorder_time": reorder_time,
+    }
+
 
 #print "Computing ab-initio energies.."
 #
@@ -185,7 +195,7 @@ def main(geom_indexes: Union[List[int], None], num_threads: int = None):
     if num_threads is not None:
         lib.num_threads(num_threads)
 
-    # lmax, nmax = BasisClient().read_as_old_format(inp.qm.dfbasis)
+    lmax, nmax = BasisClient().read_as_old_format(inp.qm.dfbasis)
     ribasis = df.addons.DEFAULT_AUXBASIS[basis._format_basis_name(inp.qm.qmbasis)][0]  # RI basis name in pyscf
     basis_data = BasisClient().read(inp.qm.dfbasis)
     df_irreps_by_spe = {
@@ -194,6 +204,7 @@ def main(geom_indexes: Union[List[int], None], num_threads: int = None):
     }
 
     """ do density fitting """
+    pyscf_time, reorder_time = 0.0, 0.0
     start_time = time.time()
     for cal_idx, (geom_idx, geom) in enumerate(zip(geom_indexes, geoms)):
         print(f"calculate {geom_idx=}, progress: {cal_idx}/{len(geom_indexes)}")
@@ -202,14 +213,20 @@ def main(geom_indexes: Union[List[int], None], num_threads: int = None):
         atoms = [(s, c) for s, c in zip(symb, coords)]
         irreps = sum([df_irreps_by_spe[spe] for spe in symb], Irreps([]))
         dm = np.load(osp.join(inp.qm.path2qm, "density_matrices", f"dm_conf{geom_idx+1}.npy"))
-        # coef, proj, over = cal_df_coeffs_old(atoms, inp.qm.qmbasis, ribasis, dm, lmax, nmax)
-        coef, proj, over = cal_df_coeffs(atoms, inp.qm.qmbasis, ribasis, dm, irreps)
-        np.save(osp.join(inp.qm.path2qm, "coefficients", f"coefficients_conf{geom_idx}.npy"), coef)
-        np.save(osp.join(inp.qm.path2qm, "projections", f"projections_conf{geom_idx}.npy"), proj)
-        np.save(osp.join(inp.qm.path2qm, "overlaps", f"overlap_conf{geom_idx}.npy"), over)
+        reordered_data_old = cal_df_coeffs_old(atoms, inp.qm.qmbasis, ribasis, dm, lmax, nmax)  # for checking consistency
+        # reordered_data = cal_df_coeffs_old(atoms, inp.qm.qmbasis, ribasis, dm, lmax, nmax)
+        reordered_data = cal_df_coeffs(atoms, inp.qm.qmbasis, ribasis, dm, irreps)
+        assert np.allclose(reordered_data_old["coef"], reordered_data["coef"])  # for checking consistency
+        assert np.allclose(reordered_data_old["over"], reordered_data["over"])
+        assert np.allclose(reordered_data_old["proj"], reordered_data["proj"])
+        np.save(osp.join(inp.qm.path2qm, "coefficients", f"coefficients_conf{geom_idx}.npy"), reordered_data["coef"])
+        np.save(osp.join(inp.qm.path2qm, "projections", f"projections_conf{geom_idx}.npy"), reordered_data["proj"])
+        np.save(osp.join(inp.qm.path2qm, "overlaps", f"overlap_conf{geom_idx}.npy"), reordered_data["over"])
+        pyscf_time += reordered_data["pyscf_time"]
+        reorder_time += reordered_data["reorder_time"]
     end_time = time.time()
     print(f"Calculation finished, time cost on density fitting: {end_time - start_time:.2f}s")
-    # print(f"Time cost on PySCF: {pyscf_time:.2f}s, on reordering: {reorder_time:.2f}s")
+    print(f"Time cost on PySCF: {pyscf_time:.2f}s, on reordering: {reorder_time:.2f}s")
 
 
 if __name__ == "__main__":
