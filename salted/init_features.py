@@ -3,41 +3,31 @@ import sys
 import time
 
 from salted import sparse_features, scalar_vector
+from salted.sys_utils import ParseConfig
 
 def build():
-
-    sys.path.insert(0, './')
-    import inp
+    inp = ParseConfig().parse_input()
 
     # salted parameters
-    filename = inp.filename
-    saltedname = inp.saltedname
-    sparsify = inp.sparsify
-    rep1 = inp.rep1
-    rcut1 = inp.rcut1
-    sig1 = inp.sig1
-    nrad1 = inp.nrad1
-    nang1 = inp.nang1
-    neighspe1 = inp.neighspe1
-    rep2 = inp.rep2
-    rcut2 = inp.rcut2
-    sig2 = inp.sig2
-    nrad2 = inp.nrad2
-    nang2 = inp.nang2
-    neighspe2 = inp.neighspe2
-    ncut = inp.ncut
-    M = inp.Menv
-    zeta = inp.z
+    (saltedname, saltedpath,
+    filename, species, average, field, parallel,
+    path2qm, qmcode, qmbasis, dfbasis,
+    filename_pred, predname, predict_data,
+    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+    sparsify, nsamples, ncut,
+    z, Menv, Ntrain, trainfrac, regul, eigcut,
+    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
-  
-    if sparsify:
 
-        sparse_features.build()    
-        scalar_vector.build()  
+    if inp.descriptor.sparsify.ncut > 0:
 
-    else: 
- 
-        scalar_vector.build()  
+        sparse_features.build()
+        scalar_vector.build()
+
+    else:
+
+        scalar_vector.build()
 
 
 if __name__ == "__main__":

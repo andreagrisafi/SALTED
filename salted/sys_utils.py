@@ -9,17 +9,22 @@ from ase.io import read
 
 from salted import basis
 
-sys.path.insert(0, './')
-import inp
 
 
-def read_system(filename=inp.filename):
+def read_system(filename=None, spelist=None, dfbasis=None):
 
-    # read species
-    spelist = inp.species
+    if (filename is None) and (spelist is None) and (dfbasis is None):
+        inp = ParseConfig().parse_input()
+        filename = inp.system.filename
+        spelist = inp.system.species
+        dfbasis = inp.qm.dfbasis
+    elif (filename is not None) and (spelist is not None) and (dfbasis is not None):
+        pass
+    else:
+        raise ValueError("Invalid input, should be either all None or all not None")
 
     # read basis
-    [lmax,nmax] = basis.basiset(inp.dfbasis)
+    [lmax,nmax] = basis.basiset(dfbasis)
     llist = []
     nlist = []
     for spe in spelist:
@@ -205,7 +210,7 @@ class ParseConfig:
         inp = self.check_input(inp)
         return AttrDict(inp)
 
-    def get_all_params_deprecated(self) -> Tuple:
+    def get_all_params(self) -> Tuple:
         """return all parameters with a tuple
 
         Please copy & paste:
@@ -237,7 +242,7 @@ class ParseConfig:
             inp.gpr.gradtol, inp.gpr.restart, inp.gpr.blocksize, inp.gpr.trainsel
         )
 
-    def get_all_params(self) -> Tuple:
+    def get_all_params_simple1(self) -> Tuple:
         """return all parameters with a tuple
 
         Please copy & paste:
@@ -249,7 +254,7 @@ class ParseConfig:
             sparsify, nsamples, ncut,
             z, Menv, Ntrain, trainfrac, regul, eigcut,
             gradtol, restart, blocksize, trainsel
-        ) = ParseConfig().get_all_params()
+        ) = ParseConfig().get_all_params_simple1()
         ```
         """
         inp = self.parse_input()

@@ -17,46 +17,39 @@ from salted import sph_utils
 from salted import basis
 
 from salted.lib import equicomb
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
+
+
 
 def build():
+    inp = ParseConfig().parse_input()
+    (saltedname, saltedpath,
+    filename, species, average, field, parallel,
+    path2qm, qmcode, qmbasis, dfbasis,
+    filename_pred, predname, predict_data,
+    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+    sparsify, nsamples, ncut,
+    z, Menv, Ntrain, trainfrac, regul, eigcut,
+    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
-    sys.path.insert(0, './')
-    import inp
-
-    filename = inp.filename
-    saltedname = inp.saltedname
-    rep1 = inp.rep1
-    rcut1 = inp.rcut1
-    sig1 = inp.sig1
-    nrad1 = inp.nrad1
-    nang1 = inp.nang1
-    neighspe1 = inp.neighspe1
-    rep2 = inp.rep2
-    rcut2 = inp.rcut2
-    sig2 = inp.sig2
-    nrad2 = inp.nrad2
-    nang2 = inp.nang2
-    neighspe2 = inp.neighspe2
-    ncut = inp.ncut
-    nsamples = inp.nsamples
 
     # Generate directories for saving descriptors
-    sdir = osp.join(inp.saltedpath, f"equirepr_{saltedname}")
+    sdir = osp.join(saltedpath, f"equirepr_{saltedname}")
     if not osp.exists(sdir):
         os.mkdir(sdir)
 
     if ncut <= 0:
         print("ERROR: features cutoff ncut must be a positive integer!")
         sys.exit(0)
-    
-    from salted.sys_utils import read_system, get_atom_idx,get_conf_range
+
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     start = time.time()
 
-    if nsamples <= ndata: 
-        ndata = inp.nsamples
+    if nsamples <= ndata:
+        ndata = nsamples
     else:
         print("ERROR: features cutoff ncut must be a positive integer!")
         sys.exit(0)
@@ -208,7 +201,7 @@ def build():
             llvec[il,1] = lvalues[il][1]
 
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-        wigner3j = np.loadtxt(osp.join(inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"))
+        wigner3j = np.loadtxt(osp.join(saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"))
         wigdim = wigner3j.size
 
         # Reshape arrays of expansion coefficients for optimal Fortran indexing

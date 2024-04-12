@@ -18,36 +18,28 @@ from metatensor import Labels
 from salted import wigner
 from salted import sph_utils
 from salted import basis
+from salted.sys_utils import ParseConfig
 
 from salted.lib import equicomb
 from salted.lib import equicombsparse
 
+
+
 def build():
 
-    sys.path.insert(0, './')
-    import inp
-
+    inp = ParseConfig().parse_input()
     # salted parameters
-    filename = inp.filename
-    saltedname = inp.saltedname
-    sparsify = inp.sparsify
-    rep1 = inp.rep1
-    rcut1 = inp.rcut1
-    sig1 = inp.sig1
-    nrad1 = inp.nrad1
-    nang1 = inp.nang1
-    neighspe1 = inp.neighspe1
-    rep2 = inp.rep2
-    rcut2 = inp.rcut2
-    sig2 = inp.sig2
-    nrad2 = inp.nrad2
-    nang2 = inp.nang2
-    neighspe2 = inp.neighspe2
-    ncut = inp.ncut
-    M = inp.Menv
-    zeta = inp.z
+    (saltedname, saltedpath,
+    filename, species, average, field, parallel,
+    path2qm, qmcode, qmbasis, dfbasis,
+    filename_pred, predname, predict_data,
+    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+    sparsify, nsamples, ncut,
+    z, Menv, Ntrain, trainfrac, regul, eigcut,
+    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
-    sdir = osp.join(inp.saltedpath, f"equirepr_{inp.saltedname}")
+    sdir = osp.join(saltedpath, f"equirepr_{saltedname}")
 
     if sparsify==False:
         # Generate directories for saving descriptors
@@ -78,23 +70,23 @@ def build():
     }
 
     if rep1=="rho":
-        # get SPH expansion for atomic density    
+        # get SPH expansion for atomic density
         calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
 
     elif rep1=="V":
-        # get SPH expansion for atomic potential 
+        # get SPH expansion for atomic potential
         calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
 
     else:
         print("Error: requested representation", rep1, "not provided")
 
 
-    # Load feature space sparsification information if required 
+    # Load feature space sparsification information if required
     if sparsify:
         vfps = {}
         for lam in range(lmax_max+1):
             vfps[lam] = np.load(osp.join(
-                inp.saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
+                saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
             ))
 
     frames = read(filename,":")
@@ -124,10 +116,10 @@ def build():
 
     # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
     wigner3j = np.loadtxt(os.path.join(
-        inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
+        saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
     ))
     wigdim = wigner3j.size
-    
+
     nspe1 = len(neighspe1)
     keys_array = np.zeros(((nang1+1)*len(species)*nspe1,4),int)
     i = 0
@@ -153,11 +145,11 @@ def build():
         omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
 
     if rep2=="rho":
-        # get SPH expansion for atomic density    
+        # get SPH expansion for atomic density
         calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
 
     elif rep2=="V":
-        # get SPH expansion for atomic potential 
+        # get SPH expansion for atomic potential
         calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
 
     else:
@@ -181,20 +173,20 @@ def build():
     spx_pot = spx_pot.keys_to_properties("neighbor_type")
     spx_pot = spx_pot.keys_to_samples("center_type")
 
-    # Get 2nd set of coefficients as a complex numpy array 
+    # Get 2nd set of coefficients as a complex numpy array
     omega2 = np.zeros((nang2+1,natoms_total,2*nang2+1,nspe2*nrad2),complex)
     for l in range(nang2+1):
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
         omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(o3_lambda=l).values)
 
-    # Reshape arrays of expansion coefficients for optimal Fortran indexing 
+    # Reshape arrays of expansion coefficients for optimal Fortran indexing
     v1 = np.transpose(omega1,(2,0,3,1))
     v2 = np.transpose(omega2,(2,0,3,1))
-    
+
     # Compute complex to real transformation matrix for the given lambda value
     c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
- 
-    start = time.time()    
+
+    start = time.time()
 
     if sparsify:
 
@@ -209,9 +201,9 @@ def build():
         featsize = nspe1*nspe2*nrad1*nrad2*llmax
         p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
         p = np.transpose(p,(2,0,1))
-  
+
     print("time = ", time.time()-start)
- 
+
     #TODO modify SALTED to directly deal with compact natoms_total dimension
     p = p.reshape(natoms_total,featsize)
     pvec = np.zeros((ndata,natmax,featsize))
@@ -221,8 +213,8 @@ def build():
         for iat in range(natoms[iconf]):
             pvec[i,iat] = p[j]
             j += 1
- 
-    h5f = h5py.File(osp.join(sdir, f"FEAT-0.h5"), 'w')    
+
+    h5f = h5py.File(osp.join(sdir, f"FEAT-0.h5"), 'w')
     h5f.create_dataset("descriptor",data=pvec)
     h5f.close()
 
