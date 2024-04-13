@@ -4,27 +4,27 @@ import sys
 import numpy as np
 from ase.io import read
 
-from salted.sys_utils import read_system
+from salted.sys_utils import ParseConfig, read_system
 
 def build():
 
-    sys.path.insert(0, './')
     import inp
+    inp = ParseConfig().parse_input()
     
     spelist, lmax, nmax, llmax, nnmax, ndata, symbols, natoms, natmax = read_system()
     
     xyzfile = read(inp.filename,":")
     
-    zeta = inp.z
-    M = inp.Menv
-    reg = inp.regul
-    jit = 1e-8
+    zeta = inp.gpr.z
+    Menv = inp.gpr.Menv
+    regul = inp.gpr.regul
+    # jit = 1e-8
     #jit = inp.jitter
     
-    nspecies = len(inp.species) 
+    nspecies = len(inp.system.species) 
     species = {}
     i = 0
-    for spe in inp.species:
+    for spe in inp.system.species:
         species[spe] = i
         i+=1
     
@@ -53,7 +53,7 @@ def build():
     print("STD =", np.std(energies), "[energy units]")
     
     # load reference environments 
-    fps_indexes = np.loadtxt("sparse_set_"+str(M)+".txt",int)[:,0]
+    fps_indexes = np.loadtxt("sparse_set_"+str(Menv)+".txt",int)[:,0]
     
     # load training set and define test set accordingly
     trainrangetot = np.loadtxt("training_set.txt",int)
@@ -70,9 +70,9 @@ def build():
     power_ref_sparse = power_per_conf.reshape(ndata*3,nfeat)[fps_indexes]
     
     # compute kernel that couples N structure with M environments
-    k_NM = np.zeros((ndata,M),float)
+    k_NM = np.zeros((ndata,Menv),float)
     for iconf in range(ndata):
-        for iref in range(M):
+        for iref in range(Menv):
             for iat in range(natoms[iconf]):
                 k_NM[iconf,iref] += np.dot(power_per_conf[iconf,iat],power_ref_sparse[iref].T)**zeta
             k_NM[iconf,iref] /= natoms[iconf]
@@ -86,9 +86,9 @@ def build():
     #                k_NN[iconf,jconf] += np.dot(power_per_conf[iconf,iat],power_per_conf[jconf,jat].T)**zeta
     
     # compute environmental kernel for M environments
-    k_MM = np.zeros((M,M),float)
-    for iref1 in range(M):
-        for iref2 in range(M):
+    k_MM = np.zeros((Menv,Menv),float)
+    for iref1 in range(Menv):
+        for iref2 in range(Menv):
             k_MM[iref1,iref2] = np.dot(power_ref_sparse[iref1],power_ref_sparse[iref2].T)**zeta
     
     # compute the RKHS of K_MM^-1 cutting small/negative eigenvalues
@@ -129,7 +129,7 @@ def build():
         #ml_energ = np.dot(ktest, np.linalg.solve(ktrain + reg*k_MM + jit*np.eye(M), np.dot(k_NM[trainrange].T,tr_energ)))
     
         # perform regression and prediction
-        ml_energ = np.dot(Phi_test, np.linalg.solve(np.dot(Phi.T,Phi) + reg*np.eye(Mcut), np.dot(Phi.T,tr_energ)))
+        ml_energ = np.dot(Phi_test, np.linalg.solve(np.dot(Phi.T,Phi) + regul*np.eye(Mcut), np.dot(Phi.T,tr_energ)))
     
         # reconstruct property
         if nostechio==False:

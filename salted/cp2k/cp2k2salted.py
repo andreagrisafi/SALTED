@@ -9,17 +9,19 @@ import copy
 import time
 
 from salted import basis
-
-sys.path.insert(0, './')
+from salted.sys_utils import ParseConfig
 import inp
 
-xyzfile = read(inp.filename,":")
+
+inp = ParseConfig().parse_input()
+
+xyzfile = read(inp.system.filename,":")
 ndata = len(xyzfile)
-species = inp.species
-[lmax,nmax] = basis.basiset(inp.dfbasis)
+species = inp.system.species
+[lmax,nmax] = basis.basiset(inp.qm.dfbasis)
 
 #dirpath = os.path.join(inp.saltedpath, "coefficients-nofield")
-dirpath = os.path.join(inp.saltedpath, "coefficients-efield")
+dirpath = os.path.join(inp.salted.saltedpath, "coefficients-efield")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -38,8 +40,8 @@ for iconf in range(0,57):
                     nRI += 2*l+1
 
     # load density coefficients and check dimension
-    #coefficients = np.loadtxt(inp.path2qm+"conf_"+str(iconf+1)+"/"+inp.coeffile)
-    coefficients = np.loadtxt(inp.path2qm+"conf_"+str(iconf+1)+"/efield/"+inp.coeffile)
+    #coefficients = np.loadtxt(inp.qm.path2qm+"conf_"+str(iconf+1)+"/"+inp.coeffile)
+    coefficients = np.loadtxt(inp.qm.path2qm+"conf_"+str(iconf+1)+"/efield/"+inp.coeffile)
     if len(coefficients)!=nRI:
         print("ERROR: basis set size does not correspond to size of coefficients vector!")
         sys.exit(0)
@@ -49,8 +51,8 @@ for iconf in range(0,57):
     # save coefficients vector in SALTED format
     if natoms%2 != 0:
         coefficients = np.sum(coefficients,axis=1)   
-    #np.save(inp.saltedpath+"coefficients-nofield/coefficients_conf"+str(iconf)+".npy",coefficients)
-    np.save(inp.saltedpath+"coefficients-efield/coefficients_conf"+str(iconf)+".npy",coefficients)
+    #np.save(inp.salted.saltedpath+"coefficients-nofield/coefficients_conf"+str(iconf)+".npy",coefficients)
+    np.save(inp.salted.saltedpath+"coefficients-efield/coefficients_conf"+str(iconf)+".npy",coefficients)
 
 #    # save overlap matrix in SALTED format
 #    overlap = np.zeros((nRI, nRI)).astype(np.double)
