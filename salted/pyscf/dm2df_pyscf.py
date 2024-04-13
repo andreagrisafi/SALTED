@@ -219,9 +219,9 @@ def main(geom_indexes: Union[List[int], None], num_threads: int = None):
         assert np.allclose(reordered_data_old["coef"], reordered_data["coef"])  # for checking consistency
         assert np.allclose(reordered_data_old["over"], reordered_data["over"])
         assert np.allclose(reordered_data_old["proj"], reordered_data["proj"])
-        np.save(osp.join(inp.qm.path2qm, "coefficients", f"coefficients_conf{geom_idx}.npy"), reordered_data["coef"])
-        np.save(osp.join(inp.qm.path2qm, "projections", f"projections_conf{geom_idx}.npy"), reordered_data["proj"])
-        np.save(osp.join(inp.qm.path2qm, "overlaps", f"overlap_conf{geom_idx}.npy"), reordered_data["over"])
+        np.save(osp.join(inp.system.saltedpath, "coefficients", f"coefficients_conf{geom_idx}.npy"), reordered_data["coef"])
+        np.save(osp.join(inp.system.saltedpath, "projections", f"projections_conf{geom_idx}.npy"), reordered_data["proj"])
+        np.save(osp.join(inp.system.saltedpath, "overlaps", f"overlap_conf{geom_idx}.npy"), reordered_data["over"])
         pyscf_time += reordered_data["pyscf_time"]
         reorder_time += reordered_data["reorder_time"]
     end_time = time.time()
