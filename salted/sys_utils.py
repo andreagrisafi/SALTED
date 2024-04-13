@@ -11,7 +11,7 @@ from salted import basis
 
 
 
-def read_system(filename=None, spelist=None, dfbasis=None):
+def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
 
     if (filename is None) and (spelist is None) and (dfbasis is None):
         inp = ParseConfig().parse_input()
