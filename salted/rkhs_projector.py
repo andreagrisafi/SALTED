@@ -13,7 +13,7 @@ import numpy as np
 from scipy import sparse
 from ase.data import atomic_numbers
 
-from salted.sys_utils import read_system,get_atom_idx,get_conf_range
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
 
 from salted import wigner
 from salted import sph_utils
@@ -23,11 +23,20 @@ from salted.lib import equicomb
 
 
 def build():
+    inp = ParseConfig().parse_input()
 
-    sys.path.insert(0, './')
-    import inp
+    # salted parameters
+    (saltedname, saltedpath,
+    filename, species, average, field, parallel,
+    path2qm, qmcode, qmbasis, dfbasis,
+    filename_pred, predname, predict_data,
+    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+    sparsify, nsamples, ncut,
+    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
+    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
-    if inp.parallel:
+    if parallel:
         from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
@@ -38,30 +47,10 @@ def build():
         rank=0
         size=1
 
-    # salted parameters
-    parallel = inp.parallel
-    filename = inp.filename
-    saltedname = inp.saltedname
-    rep1 = inp.rep1
-    rcut1 = inp.rcut1
-    sig1 = inp.sig1
-    nrad1 = inp.nrad1
-    nang1 = inp.nang1
-    neighspe1 = inp.neighspe1
-    rep2 = inp.rep2
-    rcut2 = inp.rcut2
-    sig2 = inp.sig2
-    nrad2 = inp.nrad2
-    nang2 = inp.nang2
-    neighspe2 = inp.neighspe2
-    M = inp.Menv
-    zeta = inp.z
-    eigcut = inp.eigcut
-
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-    sdir = osp.join(inp.saltedpath, f"equirepr_{inp.saltedname}")
+    sdir = osp.join(saltedpath, f"equirepr_{saltedname}")
 
     # Load training feature vectors and RKHS projection matrix
     Mspe = {}
@@ -70,10 +59,10 @@ def build():
         for lam in range(lmax[spe]+1):
              # load sparse equivariant descriptors
              power_env_sparse[(spe,lam)] = h5py.File(osp.join(
-                 inp.saltedpath,
+                 saltedpath,
                  f"equirepr_{saltedname}",
                  f"spe{spe}_l{lam}",
-                 f"FEAT_M-{M}.h5"
+                 f"FEAT_M-{Menv}.h5"
              ), 'r')['sparse_descriptor'][:]
              if lam == 0:
                  Mspe[spe] = power_env_sparse[(spe,lam)].shape[0]
@@ -82,11 +71,13 @@ def build():
     for spe in species:
         kernel0_mm = np.dot(power_env_sparse[(spe,0)],power_env_sparse[(spe,0)].T)
         eva, eve = np.linalg.eigh(kernel0_mm**zeta)
+        print(eva)
+        print(eva>eigcut)
         eva = eva[eva>eigcut]
         eve = eve[:,-len(eva):]
         V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
         np.save(osp.join(
-            sdir, f"spe{spe}_l{0}", f"projector_M{M}_zeta{zeta}.npy"
+            sdir, f"spe{spe}_l{0}", f"projector_M{Menv}_zeta{zeta}.npy"
         ), V)
         for lam in range(1,lmax[spe]+1):
             kernel_mm = np.dot(power_env_sparse[(spe,lam)],power_env_sparse[(spe,lam)].T)
@@ -98,7 +89,7 @@ def build():
             eve = eve[:,-len(eva):]
             V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
             np.save(osp.join(
-                sdir, f"spe{spe}_l{lam}", f"projector_M{M}_zeta{zeta}.npy"
+                sdir, f"spe{spe}_l{lam}", f"projector_M{Menv}_zeta{zeta}.npy"
             ), V)
 
 

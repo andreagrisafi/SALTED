@@ -222,7 +222,7 @@ class ParseConfig:
          rep1, rcut1, sig1, nrad1, nang1, neighspe1,
          rep2, rcut2, sig2, nrad2, nang2, neighspe2,
          sparsify, nsamples, ncut,
-         z, Menv, Ntrain, trainfrac, regul, eigcut,
+         zeta, Menv, Ntrain, trainfrac, regul, eigcut,
          gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
         ```
         """
