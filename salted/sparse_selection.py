@@ -4,22 +4,18 @@ import h5py
 import os
 import os.path as osp
 
-from salted.sys_utils import read_system, get_atom_idx
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx
 
 def build():
-
-    sys.path.insert(0, './')
-    import inp
+    inp = ParseConfig().parse_input()
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     # number of sparse environments
-    M = inp.Menv
-    zeta = inp.z
-    eigcut = inp.eigcut
-    sdir = osp.join(inp.saltedpath, f"equirepr_{inp.saltedname}")
+    M, zeta, eigcut = inp.gpr.Menv, inp.gpr.z, inp.gpr.eigcut
+    sdir = osp.join(inp.salted.saltedpath, f"equirepr_{inp.salted.saltedname}")
 
     def do_fps(x, d=0):
         # FPS code from Giulio Imbalzano
