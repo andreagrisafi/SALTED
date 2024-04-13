@@ -8,22 +8,23 @@ import numpy as np
 from scipy import special
 
 from salted import basis
+from salted.sys_utils import ParseConfig
 
 def build():
 
-    sys.path.insert(0, './')
-    import inp
+    inp = ParseConfig().parse_input()
 
-    saltedname = inp.saltedname
-    species = inp.species 
-    ncut = inp.ncut 
-    M = inp.Menv
-    zeta = inp.z
-    reg = inp.regul
-    sparsify = inp.sparsify
+    saltedname = inp.salted.saltedname
+    saltedpath = inp.salted.saltedpath
+    species = inp.system.species
+    Menv = inp.gpr.Menv
+    zeta = inp.gpr.z
+    reg = inp.gpr.regul
+    ncut = inp.descriptor.sparsify.ncut
+    sparsify = True if inp.descriptor.sparsify.ncut > 0 else False
   
     # read basis
-    [lmax,nmax] = basis.basiset(inp.dfbasis)
+    [lmax,nmax] = basis.basiset(inp.qm.dfbasis)
     llist = []
     nlist = []
     for spe in species:
@@ -33,7 +34,7 @@ def build():
     lmax_max = max(llist)
 
     charge_integrals = {}
-    if inp.qmcode=="cp2k":
+    if inp.qm.qmcode=="cp2k":
 
         # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
         alphas = {}
@@ -41,7 +42,7 @@ def build():
         for spe in species:
             for l in range(lmax[spe]+1):
                 avals = np.loadtxt(osp.join(
-                    inp.saltedpath, "basis", f"{spe}-{inp.dfbasis}-alphas-L{l}.dat"
+                    saltedpath, "basis", f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat"
                 ))
                 if nmax[(spe,l)]==1:
                     alphas[(spe,l,0)] = float(avals)
@@ -67,21 +68,21 @@ def build():
         vfps = {}
         for lam in range(lmax_max+1):
             vfps[lam] = np.load(osp.join(
-                inp.saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
+                saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
             ))
 
     # Load training feature vectors and RKHS projection matrix
     Vmat,Mspe,power_env_sparse = get_feats_projs(species,lmax)
  
     # load regression weights
-    ntrain = int(inp.Ntrain*inp.trainfrac)
-    if inp.field:
+    ntrain = int(inp.gpr.Ntrain*inp.gpr.trainfrac)
+    if inp.system.field:
         weights = np.load(osp.join(
-            inp.saltedpath, f"regrdir_{saltedname}_field", f"M{M}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
+            saltedpath, f"regrdir_{saltedname}_field", f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
         ))
     else:
         weights = np.load(osp.join(
-            inp.saltedpath, f"regrdir_{saltedname}", f"M{M}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
+            saltedpath, f"regrdir_{saltedname}", f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
         ))
     
     print("load time:", (time.time()-loadstart))
