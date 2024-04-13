@@ -9,18 +9,20 @@ from sympy.physics.wigner import wigner_3j
 
 from salted import sph_utils
 from salted import basis
+from salted.sys_utils import ParseConfig
 
 
 def build(field):
-    sys.path.insert(0, './')
-    import inp
+    inp = ParseConfig().parse_input()
 
     from salted.sys_utils import read_system, get_atom_idx
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
+    nang1, nang2 = inp.descriptor.rep1.nang, inp.descriptor.rep2.nang
+
     # Generate directories for saving descriptors
-    dirpath = os.path.join(inp.saltedpath, "wigners")
+    dirpath = os.path.join(inp.salted.saltedpath, "wigners")
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
 
@@ -34,7 +36,7 @@ def build(field):
             # Select relevant angular components for equivariant descriptor calculation
             llmax = 0
             lvalues = {}
-            for l1 in range(inp.nang1+1):
+            for l1 in range(nang1+1):
                 # keep only even combination to enforce inversion symmetry
                 if (lam+l1+1)%2==0 :
                     if abs(1-lam) <= l1 and l1 <= (1+lam) :
@@ -44,8 +46,8 @@ def build(field):
             # Select relevant angular components for equivariant descriptor calculation
             llmax = 0
             lvalues = {}
-            for l1 in range(inp.nang1+1):
-                for l2 in range(inp.nang2+1):
+            for l1 in range(nang1+1):
+                for l2 in range(nang2+1):
                     # keep only even combination to enforce inversion symmetry
                     if (lam+l1+l2)%2==0 :
                         if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
@@ -61,7 +63,7 @@ def build(field):
         # Precompute Wigner-3J symbols and save to file as dense arrays
         if field:
             wig = open(osp.join(
-                inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{inp.nang1}_field.dat"
+                inp.salted.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_field.dat"
             ), "a")
             iwig = 0
             for il in range(llmax):
@@ -79,7 +81,7 @@ def build(field):
             wig.close()
         else:
             wig = open(osp.join(
-                inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{inp.nang1}_lmax2-{inp.nang2}.dat"
+                inp.salted.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
             ), "a")
             iwig = 0
             for il in range(llmax):
