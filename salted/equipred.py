@@ -18,38 +18,23 @@ from salted.lib import equicombsparse
 
 from salted import sph_utils
 from salted import basis
-from salted.sys_utils import read_system, get_atom_idx,get_conf_range
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx,get_conf_range
 
 
 def build():
 
-    sys.path.insert(0, './')
-    import inp
+    inp = ParseConfig().parse_input()
+    (saltedname, saltedpath,
+    filename, species, average, field, parallel,
+    path2qm, qmcode, qmbasis, dfbasis,
+    filename_pred, predname, predict_data,
+    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+    sparsify, nsamples, ncut,
+    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
+    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
-    parallel = inp.parallel
-    filename = inp.filename
-    saltedname = inp.saltedname
-    predname = inp.predname
-    rep1 = inp.rep1
-    rcut1 = inp.rcut1
-    sig1 = inp.sig1
-    nrad1 = inp.nrad1
-    nang1 = inp.nang1
-    neighspe1 = inp.neighspe1
-    rep2 = inp.rep2
-    rcut2 = inp.rcut2
-    sig2 = inp.sig2
-    nrad2 = inp.nrad2
-    nang2 = inp.nang2
-    neighspe2 = inp.neighspe2
-    ncut = inp.ncut
-    M = inp.Menv
-    zeta = inp.z
-    reg = inp.regul
-    sparsify = inp.sparsify
-    average = inp.average
-
-    if inp.parallel:
+    if parallel:
         from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
@@ -60,14 +45,14 @@ def build():
         rank = 0
         size = 1
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename)
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename_pred, species, dfbasis)
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     bohr2angs = 0.529177210670
 
     # Distribute structures to tasks
     ndata_true = ndata
-    if inp.parallel:
+    if parallel:
         conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
         conf_range = comm.scatter(conf_range,root=0)
         ndata = len(conf_range)
@@ -76,7 +61,7 @@ def build():
         conf_range = list(range(ndata))
     natoms_total = sum(natoms[conf_range])
 
-    if inp.qmcode=="cp2k":
+    if qmcode=="cp2k":
 
         # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
         if rank == 0: print("Reading auxiliary basis info...")
@@ -84,7 +69,7 @@ def build():
         sigmas = {}
         for spe in species:
             for l in range(lmax[spe]+1):
-                avals = np.loadtxt(f"{spe}-{inp.dfbasis}-alphas-L{l}.dat")
+                avals = np.loadtxt(f"{spe}-{dfbasis}-alphas-L{l}.dat")
                 if nmax[(spe,l)]==1:
                     alphas[(spe,l,0)] = float(avals)
                     sigmas[(spe,l,0)] = np.sqrt(0.5/alphas[(spe,l,0)]) # bohr
@@ -107,25 +92,25 @@ def build():
                     charge_integrals[(spe,l,n)] = charge_radint * np.sqrt(4.0*np.pi) / np.sqrt(inner)
                     dipole_integrals[(spe,l,n)] = dipole_radint * np.sqrt(4.0*np.pi/3.0) / np.sqrt(inner)
 
-    # Load feature space sparsification information if required 
+    # Load feature space sparsification information if required
     if sparsify:
         vfps = {}
         for lam in range(lmax_max+1):
             vfps[lam] = np.load(osp.join(
-                inp.saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
+                saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
             ))
 
     # Load training feature vectors and RKHS projection matrix
     Vmat,Mspe,power_env_sparse = get_feats_projs(species,lmax)
 
-    reg_log10_intstr = str(int(np.log10(reg)))  # for consistency
+    reg_log10_intstr = str(int(np.log10(regul)))  # for consistency
 
     # load regression weights
-    ntrain = int(inp.Ntrain*inp.trainfrac)
+    ntrain = int(Ntrain * trainfrac)
     weights = np.load(osp.join(
-        inp.saltedpath,
+        saltedpath,
         f"regrdir_{saltedname}",
-        f"M{M}_zeta{zeta}",
+        f"M{Menv}_zeta{zeta}",
         f"weights_N{ntrain}_reg{reg_log10_intstr}.npy"
     ))
 
@@ -151,7 +136,7 @@ def build():
         "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
     }
 
-    frames = read(filename,":")
+    frames = read(filename_pred,":")
     frames = [frames[i] for i in conf_range]
 
     if rank == 0: print(f"The dataset contains {ndata_true} frames.")
@@ -238,9 +223,9 @@ def build():
 
     # base directory path for this prediction
     dirpath = osp.join(
-        inp.saltedpath,
+        saltedpath,
         f"predictions_{saltedname}_{predname}",
-        f"M{M}_zeta{zeta}",
+        f"M{Menv}_zeta{zeta}",
         f"N{ntrain}_reg{reg_log10_intstr}",
     )
 
@@ -250,8 +235,8 @@ def build():
             os.makedirs(dirpath)
     if size > 1:  comm.Barrier()
 
-    if inp.qmcode=="cp2k":
-        xyzfile = read(filename,":")
+    if qmcode=="cp2k":
+        xyzfile = read(filename_pred,":")
         q_fpath = osp.join(dirpath, "charges.dat")
         d_fpath = osp.join(dirpath, "dipoles.dat")
         if rank == 0:
@@ -259,7 +244,7 @@ def build():
             remove_if_exists = lambda fpath: os.remove(fpath) if os.path.exists(fpath) else None
             remove_if_exists(q_fpath)
             remove_if_exists(d_fpath)
-        if inp.parallel: comm.Barrier()
+        if parallel: comm.Barrier()
         qfile = open(q_fpath, "a")
         dfile = open(d_fpath, "a")
 
@@ -267,7 +252,7 @@ def build():
     if average:
         av_coefs = {}
         for spe in species:
-            av_coefs[spe] = np.load(os.path.join(inp.saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
+            av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
 
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
@@ -293,7 +278,7 @@ def build():
 
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         wigner3j = np.loadtxt(osp.join(
-            inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
+            saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
         ))
         wigdim = wigner3j.size
 
@@ -301,15 +286,15 @@ def build():
         c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
 
         if sparsify:
-    
+
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
             nfps = len(vfps[lam])
             p = equicombsparse.equicombsparse(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
             p = np.transpose(p,(2,0,1))
             featsize = ncut
-    
+
         else:
-    
+
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
             p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
             p = np.transpose(p,(2,0,1))
@@ -335,16 +320,16 @@ def build():
 
     psi_nm = {}
     for i,iconf in enumerate(conf_range):
-        
+
         Tsize = 0
         for iat in range(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     Tsize += 2*l+1
-        
+
         for spe in species:
-           
+
             # lam = 0
             if zeta==1:
                 psi_nm[(spe,0)] = np.dot(pvec[0][i,atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
@@ -379,7 +364,7 @@ def build():
                     isize += Mcut
 
         # init averages array if asked
-        if inp.average:
+        if average:
             Av_coeffs = np.zeros(Tsize)
 
         # fill vector of predictions
@@ -390,16 +375,16 @@ def build():
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
-                    if inp.average and l==0:
+                    if average and l==0:
                         Av_coeffs[i] = av_coefs[spe][n]
                     i += 2*l+1
             ispe[spe] += 1
 
         # add back spherical averages if required
-        if inp.average:
+        if average:
             pred_coefs += Av_coeffs
 
-        if inp.qmcode=="cp2k":
+        if qmcode=="cp2k":
 
             # get geometry ingormation for dipole calculation
             geom = xyzfile[iconf]
@@ -416,7 +401,7 @@ def build():
             for iat in range(all_natoms):
                 spe = all_symbols[iat]
                 if spe in species:
-                    nele += inp.pseudocharge
+                    nele += inp.qm.pseudocharge
                     for l in range(lmax[spe]+1):
                         for n in range(nmax[(spe,l)]):
                             if l==0:
@@ -431,13 +416,13 @@ def build():
             for iat in range(all_natoms):
                 spe = all_symbols[iat]
                 if spe in species:
-                   if inp.average:
-                       dipole += inp.pseudocharge * coords[iat,2]
+                   if average:
+                       dipole += inp.qm.pseudocharge * coords[iat,2]
                    for l in range(lmax[spe]+1):
                        for n in range(nmax[(spe,l)]):
                            for im in range(2*l+1):
                                if l==0 and im==0:
-                                   if inp.average:
+                                   if average:
                                        pred_coefs[iaux] *= nele/rho_int
                                    else:
                                        if n==nmax[(spe,l)]-1:
@@ -450,17 +435,18 @@ def build():
             print(iconf+1,dipole,file=dfile)
             print(iconf+1,rho_int,charge,file=qfile)
 
-        # save predicted coefficients in CP2K format
-        np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
+        if qmcode == "cp2k":
+            # save predicted coefficients in CP2K format
+            np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
 
         # save predicted coefficients
         np.save(osp.join(dirpath, f"prediction_conf{iconf}.npy"), pred_coefs)
 
 
-    if inp.qmcode=="cp2k":
+    if qmcode=="cp2k":
         qfile.close()
         dfile.close()
-        if inp.parallel and rank == 0:
+        if parallel and rank == 0:
             d_fpath = osp.join(dirpath, "dipoles.dat")
             dips = np.loadtxt(d_fpath)
             np.savetxt(d_fpath, dips[dips[:,0].argsort()], fmt='%i %f')
