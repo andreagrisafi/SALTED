@@ -297,6 +297,15 @@ class ParseConfig:
                 all(i in inp["system"]["species"] for i in val)
             )),  # list of neighbor species
         }
+        def entry_with_qmcode(inp, val, qmcode:Union[str, List[str]]) -> bool:
+            """This means the entry is required IF and ONLY IF when using a specific qmcode"""
+            if isinstance(qmcode, str):
+                qmcode = [qmcode]
+            return (
+                ((inp["qm"]["qmcode"].lower() not in qmcode) and (val == PLACEHOLDER))  # if not using this qmcode, do not specify it
+                or
+                ((inp["qm"]["qmcode"].lower() in qmcode) and (val != PLACEHOLDER))  # if using this qmcode, do specify it
+            )
         inp_template = {
             "salted": {
                 "saltedname": (True, None, str, None),  # salted workflow identifier
@@ -314,26 +323,16 @@ class ParseConfig:
                 "path2qm": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to the QM calculation outputs
                 "qmcode": (True, None, str, lambda inp, val: val.lower() in ('aims', 'pyscf', 'cp2k')),  # quantum mechanical code
                 "dfbasis": (True, None, str, None),  # density fitting basis
-                "qmbasis": (False, PLACEHOLDER, str, lambda inp, val: (
-                    ((inp["qm"]["qmcode"].lower() != 'pyscf') and (val == PLACEHOLDER))  # if not using pyscf, do not specify it
-                    or
-                    ((inp["qm"]["qmcode"].lower() == 'pyscf') and (val != PLACEHOLDER))  # if using pyscf, do specify it
-                )),  # quantum mechanical basis, only for PySCF
-                "functional": (False, PLACEHOLDER, str, lambda inp, val: (
-                    ((inp["qm"]["qmcode"].lower() != 'pyscf') and (val == PLACEHOLDER))  # if not using pyscf, do not specify it
-                    or
-                    ((inp["qm"]["qmcode"].lower() == 'pyscf') and (val != PLACEHOLDER))  # if using pyscf, do specify it
-                )),  # quantum mechanical functional, only for PySCF
-                "pseudocharge": (False, PLACEHOLDER, float, lambda inp, val: (
-                    ((inp["qm"]["qmcode"].lower() != 'cp2k') and (val == PLACEHOLDER))  # if not using cp2k, do not specify it
-                    or
-                    ((inp["qm"]["qmcode"].lower() == 'cp2k') and (val != PLACEHOLDER))  # if using cp2k, do specify it
-                )),  # pseudo nuclear charge, only for CP2K
+                "qmbasis": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "pyscf")),  # quantum mechanical basis, only for PySCF
+                "functional": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "pyscf")),  # quantum mechanical functional, only for PySCF
+                "pseudocharge": (False, PLACEHOLDER, float, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),  # pseudo nuclear charge, only for CP2K
+                "coeffile": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),
+                "ovlpfile": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),
             },
             "prediction": {
                 "filename_pred": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to the prediction file
                 "predname": (True, None, str, None),  # SALTED prediction identifier
-                "predict_data": (False, "aims_pred_data", str, None),  # path to the prediction data by QM code, for AIMS only
+                "predict_data": (False, "aims_pred_data", str, lambda inp, val: entry_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
             },
             "descriptor": {
                 "rep1": rep_template,  # descriptor 1

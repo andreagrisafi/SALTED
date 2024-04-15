@@ -104,7 +104,6 @@ def cal_df_coeffs_old(
         "reorder_time": reorder_time,
     }
 
-
 def cal_df_coeffs(
     atoms: List,
     qmbasis: str,
@@ -120,6 +119,8 @@ def cal_df_coeffs(
 
     overlap = auxmol.intor("int1e_ovlp_sph")  # AO overlap matrix
     eri2c = auxmol.intor('int2c2e_sph')  # 2-centers 2-electrons integral
+    # https://github.com/pyscf/pyscf/blob/master/examples/df/42-overwrite_get_jk.py
+    # https://github.com/pyscf/pyscf/issues/1729
     eri3c = pmol.intor(  # 3-centers 2-electrons integral
         'int3c2e_sph',
         shls_slice=(0, mol.nbas, 0, mol.nbas, mol.nbas, mol.nbas + auxmol.nbas)

@@ -135,7 +135,7 @@ def build():
                     dipole_integrals[(spe,l,n)] = dipole_radint * np.sqrt(4.0*np.pi/3.0) / np.sqrt(inner)
 
     # If total charge density is asked, read in the GTH pseudo-charge and return a radial numpy function
-    #if inp.totcharge:
+    #if inp.qm.totcharge:
     #    pseudof = open(inp.qm.pseudochargefile,"r")
     #    pseudochargedensity = mathematica.mathematica(pseudof.readlines()[0],{'Erf[x]':'erf(x)'})
     #    pseudof.close()

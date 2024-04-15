@@ -2,13 +2,13 @@ import os
 import os.path as osp
 
 import numpy as np
-import inp
 from ase.io import read
-from salted.sys_utils import get_conf_range
+from salted.sys_utils import ParseConfig, get_conf_range
 
 def build():
+    inp = ParseConfig().parse_input()
 
-    if inp.parallel:
+    if inp.system.parallel:
         from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
@@ -22,18 +22,18 @@ def build():
     if (rank == 0):
         """check if all subdirectories exist, if not create them"""
         sub_dirs = [
-            osp.join(inp.saltedpath, d)
+            osp.join(inp.salted.saltedpath, d)
             for d in ("overlaps", "coefficients", "projections")
         ]
         for sub_dir in sub_dirs:
             if not osp.exists(sub_dir):
                 os.mkdir(sub_dir)
     
-    xyzfile = read(inp.filename,":")
+    xyzfile = read(inp.system.filename,":")
     ndata = len(xyzfile)
     
     # Distribute structures to tasks
-    if inp.parallel:
+    if inp.system.parallel:
         conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
         conf_range = comm.scatter(conf_range,root=0)
     else:
@@ -55,26 +55,23 @@ def build():
             for i,line in enumerate(afile):
                 if i == 51:
                     if line.split()[:2] == ['FHI-aims','version']:
-                        if int(line.split()[-1]) => 240403:
+                        if int(line.split()[-1]) >= 240403:
                             reorder = False
                         else:
                             reorder = True
                         return reorder
                     else:
                         print('The aims.out file does not have the FHI-aims version listed on line 52 as expected')
-                    file.close()
                     break
                 elif i > 51:
                     print('The aims.out file does not have the FHI-aims version listed on line 52 as expected')
-                    file.close()
                     break
             else:
-                    print('The aims.out is very short; FHI-aims has not executed properly')
-                    file.close()
+                print('The aims.out is very short; FHI-aims has not executed properly')
     
     for i in conf_range:
     
-        dirpath = osp.join(inp.path2qm, 'data', str(i+1))
+        dirpath = osp.join(inp.qm.path2qm, 'data', str(i+1))
         reorder = get_reorder_bool(dirpath)
     
         o = np.loadtxt(osp.join(dirpath, 'ri_projections.out')).reshape(-1)
@@ -104,16 +101,16 @@ def build():
             ovlp = ovlp[idx,:]
             ovlp = ovlp[:,idx]
         
-        np.save(osp.join(inp.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
-        np.save(osp.join(inp.saltedpath, "projections", f"projections_conf{i}.npy"), o)
-        np.save(osp.join(inp.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
+        np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
+        np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{i}.npy"), o)
+        np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
     
     if size > 1: comm.Barrier()
     
     """delte ri basis overlap and proj coeffs files"""
     
     for i in conf_range:
-        dirpath = osp.join(inp.path2qm, 'data', str(i+1))
+        dirpath = osp.join(inp.qm.path2qm, 'data', str(i+1))
         os.remove(osp.join(dirpath, 'ri_ovlp.out'))
         os.remove(osp.join(dirpath, 'ri_projections.out'))
 
