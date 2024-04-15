@@ -1,25 +1,27 @@
 import os
 import sys
+import argparse
 
 import numpy as np
 from ase.io import read
+import h5py
 
 from salted.sys_utils import ParseConfig, read_system
 
-def build():
+def build(propname:str):
 
-    import inp
     inp = ParseConfig().parse_input()
     
     spelist, lmax, nmax, llmax, nnmax, ndata, symbols, natoms, natmax = read_system()
     
-    xyzfile = read(inp.filename,":")
+    xyzfile = read(inp.system.filename,":")
     
     zeta = inp.gpr.z
     Menv = inp.gpr.Menv
     regul = inp.gpr.regul
+    eigcut = inp.gpr.eigcut
     # jit = 1e-8
-    #jit = inp.jitter
+    #jit = inp.gpr.jitter
     
     nspecies = len(inp.system.species) 
     species = {}
@@ -31,7 +33,7 @@ def build():
     energies = np.zeros(ndata)
     stechio = np.zeros((ndata,nspecies),float)
     for iconf in range(ndata):
-        energies[iconf] = xyzfile[iconf].info[inp.propname]
+        energies[iconf] = xyzfile[iconf].info[propname]
         for iat in range(natoms[iconf]):
             ispe = species[symbols[iconf][iat]]
             stechio[iconf,ispe] += 1.0 
@@ -65,7 +67,8 @@ def build():
     te_energ = energies[testrange]
     
     # load feature vector and define sparse feature vector
-    power_per_conf = np.load(os.path.join(inp.path2ml, inp.soapdir, "FEAT-0.npy"))
+    sdir = os.path.join(inp.salted.saltedpath, f"equirepr_{inp.salted.saltedname}")
+    power_per_conf = h5py.File(os.path.join(sdir, "FEAT-0.h5"), 'r')['descriptor'][:]
     nfeat = power_per_conf.shape[-1]
     power_ref_sparse = power_per_conf.reshape(ndata*3,nfeat)[fps_indexes]
     
@@ -95,7 +98,7 @@ def build():
     eva, eve = np.linalg.eigh(k_MM)
     eva = eva[::-1]
     eve = eve[:,::-1]
-    eva = eva[eva>inp.eigcut]
+    eva = eva[eva > eigcut]
     Mcut = len(eva)
     eve = eve[:,:Mcut]
     V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
@@ -145,5 +148,10 @@ def build():
 
     return
 
+
 if __name__ == "__main__":
-    build()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--propname", type=str, required=True, help="Property name")
+    args = parser.parse_args()
+
+    build(propname=args.propname)

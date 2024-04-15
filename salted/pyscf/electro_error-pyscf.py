@@ -6,18 +6,19 @@ from pyscf import gto
 from ase.io import read
 from scipy import special
 
-import basis  # WARNING: relative import
-sys.path.insert(0, './')
-import inp
+from salted import basis  # WARNING: relative import
+from salted.sys_utils import ParseConfig
+
+inp = ParseConfig().parse_input()
 
 # read species
-spelist = inp.species
+spelist = inp.system.species
 spe_dict = {}
 for i in range(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.dfbasis)
+[lmax,nmax] = basis.basiset(inp.qm.dfbasis)
 llist = []
 nlist = []
 for spe in spelist:
@@ -28,7 +29,7 @@ nnmax = max(nlist)
 llmax = max(llist)
 
 # read system
-xyzfile = read(inp.filename,":")
+xyzfile = read(inp.prediction.filename_pred,":")
 ndata = len(xyzfile)
 
 hart2kcal = 627.5096080305927
@@ -49,10 +50,16 @@ testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
-pdir = inp.valcdir
-M = inp.Menv
-eigcut = inp.eigcut
-ntrain = int(inp.Ntrain*inp.trainfrac)
+M = inp.gpr.Menv
+eigcut = inp.gpr.eigcut
+ntrain = int(inp.gpr.Ntrain*inp.gpr.trainfrac)
+reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))  # for consistency
+pdir = os.path.join(
+    inp.salted.saltedpath,
+    f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}",
+    f"M{inp.gpr.Menv}_zeta{inp.gpr.zeta}",
+    f"N{ntrain}_reg{reg_log10_intstr}",
+)
 
 def complex_to_real_transformation(sizes):
     """Transformation matrix from complex to real spherical harmonics"""
@@ -102,8 +109,8 @@ def radint2(lval,alp,d):
     rint2 = 0.5*np.exp(-alp*d**2)/alp
     return rint2/np.sqrt(inner)
 
-#coeffs = np.load(inp.path2ml+pdir+"M"+str(M)+"_eigcut"+str(int(np.log10(eigcut)))+"/N_"+str(ntrain)+"/prediction_conf"+str(iconf)+".npy")
-#coeffs = np.load("pred_coeffs.npy")
+# coeffs = np.load(pdir, f"prediction_conf{iconf}.npy")
+# coeffs = np.load("pred_coeffs.npy")
 
 electro_ref = np.loadtxt("electrostatic_energy.dat")
 electro_pre = np.zeros(len(testrange))
@@ -117,10 +124,8 @@ for iconf in testrange:
     nele = np.sum(valences)
     natoms = len(atoms)
     # Load projections and overlaps
-#    projs = np.load(inp.path2qm+"projections/projections_conf"+str(iconf)+".npy")
-    rcoeffs = np.load(os.path.join(
-        inp.path2ml, pdir, f"M{M}_eigcut{int(np.log10(eigcut))}", f"N_{ntrain}", f"prediction_conf{iconf}.npy"
-    ))
+#    projs = np.load(inp.qm.path2qm+"projections/projections_conf"+str(iconf)+".npy")
+    rcoeffs = np.load(os.path.join(pdir, f"prediction_conf{iconf}.npy"))
     ref_coeffs = np.zeros((natoms,llmax+1,nnmax,llmax*2+1))
     ref_rho = np.zeros(rcoeffs.shape,float)
     icoeff = 0
@@ -138,7 +143,7 @@ for iconf in testrange:
                     else:
                         ref_rho[icoeff] = rcoeffs[icoeff]
                     icoeff +=1
-    
+
     geom = xyzfile[iconf]
     coords = geom.get_positions()
     catoms = []
@@ -147,8 +152,8 @@ for iconf in testrange:
         catoms.append([atoms[i],(coord[0],coord[1],coord[2])])
     coords /= bohr2ang
     # basis
-    mol = gto.M(atom=catoms,basis=inp.qmbasis)
-    ribasis = inp.qmbasis+" jkfit" 
+    mol = gto.M(atom=catoms,basis=inp.qm.qmbasis)
+    ribasis = inp.qm.qmbasis+" jkfit"
     auxmol = gto.M(atom=catoms,basis=ribasis)
     pmol = mol + auxmol
     # ML
@@ -190,7 +195,7 @@ for iconf in testrange:
     itest+=1
 f.close()
 
-abs_errors = (electro_pre - electro_ref[testrange]) 
+abs_errors = (electro_pre - electro_ref[testrange])
 np.savetxt("electro_errors.dat", abs_errors * hart2kcal)
 rmse = np.sqrt(np.sum(abs_errors**2)/ntest)
 std = np.std(electro_ref)

@@ -4,7 +4,8 @@ import os.path as osp
 
 from ase.io import read, write
 
-import inp
+from salted.sys_utils import ParseConfig
+inp = ParseConfig().parse_input()
 
 def add_command_line_arguments_contraction():
     parser = argparse.ArgumentParser()
@@ -15,13 +16,14 @@ def add_command_line_arguments_contraction():
 args = add_command_line_arguments_contraction()
 predict = args.predict
 
-fname = inp.filename
 if predict:
-    datadir = inp.predict_data
+    datadir = inp.prediction.predict_data
+    fname = inp.prediction.filename_pred
 else:
     datadir = "data/"
+    fname = inp.system.filename
 
-dirpath = osp.join(inp.path2qm, datadir, "geoms")
+dirpath = osp.join(inp.qm.path2qm, datadir, "geoms")
 if not osp.exists(dirpath):
     os.makedirs(dirpath)
 

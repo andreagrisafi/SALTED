@@ -58,10 +58,10 @@ def build():
     # define training set at random or sequentially
     dataset = list(range(ndata))
     if inp.gpr.trainsel=="sequential":
-        trainrangetot = dataset[:inp.Ntrain]
+        trainrangetot = dataset[:inp.gpr.Ntrain]
     elif inp.gpr.trainsel=="random":
         random.Random(3).shuffle(dataset)
-        trainrangetot = dataset[:inp.Ntrain]
+        trainrangetot = dataset[:inp.gpr.Ntrain]
     else:
         raise ValueError(f"training set selection {inp.gpr.trainsel=} not available!")
     np.savetxt(osp.join(
@@ -100,6 +100,7 @@ def build():
         matrices(-1,trainrange,av_coefs,rank)
     
     if parallel: print("Task",rank,"handling structures:",trainrange)
+
 
 def matrices(block_idx,trainrange,av_coefs,rank):
     

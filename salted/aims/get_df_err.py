@@ -8,20 +8,19 @@ import sys
 import os.path as osp
 
 import numpy as np
-import inp
 
-from salted.sys_utils import sort_grid_data
+from salted.sys_utils import ParseConfig, read_system, sort_grid_data
 
 def main():
-    from salted.sys_utils import read_system
+    inp = ParseConfig().parse_input()
     spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
     start_time = time.time()
 
-    dirname = osp.join(inp.path2qm, 'data')
+    dirname = osp.join(inp.qm.path2qm, 'data')
     av_err = 0
     errs = np.zeros(ndata)
-    g = open(osp.join(inp.saltedpath, 'df_maes'),'w+')  # stay in salted dir
+    g = open(osp.join(inp.salted.saltedpath, 'df_maes'),'w+')  # stay in salted dir
     for i in range(1,ndata+1):
         dirn = osp.join(dirname, str(i))
         # f = open(dirn+'rho_scf.out')
