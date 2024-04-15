@@ -52,12 +52,13 @@ if __name__ == "__main__":
         print("No input file found, please provide the necessary arguments: filename, path2qm, periodic")
         parser.add_argument("-f", "--filename", type=str, required=True, help="Filename")
         parser.add_argument("-q", "--path2qm", type=str, required=True, help="Path to QM data")
+        parser.add_argument("-p", "--periodic", type=str, required=True, help="Periodic boundary conditions")
     else:
         print("Input file found, using the default values, and please provide the necessary arguments: periodic")
         parser.add_argument("-f", "--filename", type=str, default=inp.system.filename, help="Filename")
         parser.add_argument("-q", "--path2qm", type=str, default=inp.qm.path2qm, help="Path to QM data")
+        parser.add_argument("-p", "--periodic", type=str, required=inp.qm.periodic, help="Periodic boundary conditions")
 
-    parser.add_argument("-p", "--periodic", type=str, required=True, help="Periodic boundary conditions")
     args = parser.parse_args()
 
     main(
