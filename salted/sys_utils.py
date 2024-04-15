@@ -297,22 +297,13 @@ class ParseConfig:
                 all(i in inp["system"]["species"] for i in val)
             )),  # list of neighbor species
         }
-        def entry_with_qmcode(inp, val, qmcode:Union[str, List[str]]) -> bool:
-            """This means the entry is required IF and ONLY IF when using a specific qmcode"""
-            if isinstance(qmcode, str):
-                qmcode = [qmcode]
-            return (
-                ((inp["qm"]["qmcode"].lower() not in qmcode) and (val == PLACEHOLDER))  # if not using this qmcode, do not specify it
-                or
-                ((inp["qm"]["qmcode"].lower() in qmcode) and (val != PLACEHOLDER))  # if using this qmcode, do specify it
-            )
         inp_template = {
             "salted": {
                 "saltedname": (True, None, str, None),  # salted workflow identifier
-                "saltedpath": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to SALTED outputs / working directory
+                "saltedpath": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to SALTED outputs / working directory
             },
             "system": {
-                "filename": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to geometry file (training set)
+                "filename": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to geometry file (training set)
                 "species": (True, None, list, lambda inp, val: all(isinstance(i, str) for i in val)),  # list of species in all geometries
                 "average": (False, True, bool, None),  # if bias the GPR by the average of predictions
                 "field": (False, False, bool, None),  # if predict the field response
@@ -320,19 +311,22 @@ class ParseConfig:
                 "seed": (False, 42, int, None),  # random seed
             },
             "qm": {
-                "path2qm": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to the QM calculation outputs
+                "path2qm": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to the QM calculation outputs
                 "qmcode": (True, None, str, lambda inp, val: val.lower() in ('aims', 'pyscf', 'cp2k')),  # quantum mechanical code
                 "dfbasis": (True, None, str, None),  # density fitting basis
+                #### below are optional, but required for some qmcode ####
                 "qmbasis": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "pyscf")),  # quantum mechanical basis, only for PySCF
                 "functional": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "pyscf")),  # quantum mechanical functional, only for PySCF
                 "pseudocharge": (False, PLACEHOLDER, float, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),  # pseudo nuclear charge, only for CP2K
                 "coeffile": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),
                 "ovlpfile": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),
+                "periodic": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),  # periodic boundary conditions, only for CP2K
             },
             "prediction": {
-                "filename_pred": (True, None, str, lambda inp, val: os.path.exists(val)),  # path to the prediction file
+                "filename_pred": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
                 "predname": (True, None, str, None),  # SALTED prediction identifier
-                "predict_data": (False, "aims_pred_data", str, lambda inp, val: entry_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
+                #### below are optional, but required for some qmcode ####
+                "predict_data": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
             },
             "descriptor": {
                 "rep1": rep_template,  # descriptor 1
@@ -425,8 +419,26 @@ class ParseConfig:
 
 
 
+def entry_with_qmcode(inp, val, qmcode:Union[str, List[str]]) -> bool:
+    """This means the entry is required IF and ONLY IF when using a specific qmcode"""
+    if isinstance(qmcode, str):
+        qmcode = [qmcode]
+    return (
+        ((inp["qm"]["qmcode"].lower() not in qmcode) and (val == PLACEHOLDER))  # if not using this qmcode, do not specify it
+        or
+        ((inp["qm"]["qmcode"].lower() in qmcode) and (val != PLACEHOLDER))  # if using this qmcode, do specify it
+    )
+
+def check_path_exists(path:str) -> bool:
+    """Check if the path exists, the path should be either absolute or relative to the current working directory"""
+    # return True  # for testing only
+    return os.path.exists(path)
+
+
 
 class Irreps(tuple):
+    """Handle irreducible representation arrays, like slices, multiplicities, etc."""
+
     def __new__(cls, irreps:Union[str, List[int], Tuple[int]]) -> 'Irreps':
         """
         irreps:
