@@ -322,8 +322,8 @@ class ParseConfig:
             "nang": (True, None, int, lambda inp, val: val > 0),  # number of angular basis functions
             "neighspe": (True, None, list, lambda inp, val: (
                 all(isinstance(i, str) for i in val)
-                and
-                all(i in inp["system"]["species"] for i in val)
+                # and
+                # all(i in inp["system"]["species"] for i in val)  # species might be a subset of neighspe in Andrea's application
             )),  # list of neighbor species
         }
         inp_template = {
