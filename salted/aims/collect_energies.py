@@ -3,9 +3,10 @@ import sys
 
 import numpy as np
 
-import inp
+from salted.sys_utils import ParseConfig
+inp = ParseConfig().parse_input()
 
-dn = os.path.join(inp.path2qm, inp.predict_data)
+dn = os.path.join(inp.qm.path2qm, inp.prediction.predict_data)
 l = os.listdir(os.path.join(dn, "geoms"))
 nfiles = len(l)
 testset = list(range(nfiles))

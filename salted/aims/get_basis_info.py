@@ -13,6 +13,7 @@ from salted.basis_client import (
 )
 
 from salted.get_basis_info import get_parser
+from salted.sys_utils import ParseConfig
 
 
 def build(dryrun: bool = False, force_overwrite: bool = False):
@@ -20,11 +21,11 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     update the basis_data dict,
     and write to the database when all species are recorded.
     """
-    assert inp.qmcode.lower() == "aims", f"{inp.qmcode=}, but expected 'aims'"
+    assert inp.qm.qmcode.lower() == "aims", f"{inp.qm.qmcode=}, but expected 'aims'"
 
-    spe_set = set(inp.species)
-    geoms_list = read(inp.filename, ":")
-    qmdata_dpath = os.path.join(inp.path2qm, "data")
+    spe_set = set(inp.system.species)
+    geoms_list = read(inp.system.filename, ":")
+    qmdata_dpath = os.path.join(inp.qm.path2qm, "data")
     basis_data: Dict[str, SpeciesBasisData] = {}  # hold all species basis data
 
     for iconf, geom in enumerate(geoms_list):
@@ -68,7 +69,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
         print("Dryrun mode, not writing to the database")
         print(f"{basis_data=}")
     else:
-        BasisClient().write(inp.dfbasis, basis_data, force_overwrite)
+        BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
 def parse_file_basis_info(basis_info_fpath: str) -> List[SpeciesBasisData]:

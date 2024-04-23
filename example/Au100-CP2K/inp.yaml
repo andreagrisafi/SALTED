@@ -1,0 +1,53 @@
+# workflow label and root directory
+salted:
+  saltedname: rc8.0_rho-sg0.5_V-sg0.5_alan_branch
+  saltedpath: ./
+
+# system general parameters
+system:
+  filename: ./coords_1k.xyz
+  species: [Au,]
+  parallel: False
+  average: False
+  field: True
+
+# quantum mechanical info
+qm:
+  path2qm: ./
+  qmcode: cp2k
+  dfbasis: RI_AUTO_OPT-ccGRB
+  coeffile: Au-RI_DENSITY_COEFFS.dat
+  ovlpfile: Au-RI_2C_INTS.fm
+  pseudocharge: 11.0
+  periodic: 2D
+
+# prediction data
+prediction:
+  filename_pred: ./coords_1k.xyz
+  predname: N_33-40
+
+# atomic environment parameters (for rascaline)
+descriptor:
+  rep1:
+    type: rho
+    rcut: 8.0
+    sig: 0.5
+    nrad: 6
+    nang: 6
+    neighspe: [Au,]
+  rep2:
+    type: rho
+    rcut: 8.0
+    sig: 0.5
+    nrad: 6
+    nang: 6
+    neighspe: [Au,]
+
+# Gaussian process regression variables
+gpr:
+  z: 2.0
+  Menv: 50
+  Ntrain: 32
+  trainfrac: 1.0
+  trainsel: sequential
+  blocksize: 100

@@ -1,0 +1,48 @@
+# workflow label and root directory
+salted:
+  saltedname: test
+  saltedpath: ./
+
+# system general parameters
+system:
+  filename: ./water_monomers_100.xyz
+  species: [H, O]
+  parallel: False
+
+# quantum mechanical info
+qm:
+  path2qm: ./
+  qmcode: aims
+  dfbasis: FHI-aims-clusters
+
+# prediction data
+prediction:
+  filename_pred: ./water_dimers_10.xyz
+  predname: prediction
+  predict_data: ./aims_pred_data
+
+# atomic environment parameters (for rascaline)
+descriptor:
+  rep1:
+    type: rho
+    rcut: 4.0
+    sig: 0.3
+    nrad: 8
+    nang: 6
+    neighspe: [H, O]
+  rep2:
+    type: rho
+    rcut: 4.0
+    sig: 0.3
+    nrad: 8
+    nang: 6
+    neighspe: [H, O]
+
+# Gaussian process regression variables
+gpr:
+  z: 2.0
+  Menv: 100
+  Ntrain: 40
+  trainfrac: 1.0
+  blocksize: 10
+  trainsel: "random"

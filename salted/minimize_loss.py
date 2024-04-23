@@ -11,16 +11,25 @@ import os.path as osp
 
 import numpy as np
 from scipy import sparse
-from salted.sys_utils import read_system, get_atom_idx, get_conf_range
+
+from salted import get_averages
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
 
 def build():
 
-    sys.path.insert(0, './')
-    import inp
-    paral = inp.parallel
+    inp = ParseConfig().parse_input()
+    (saltedname, saltedpath,
+    filename, species, average, field, parallel,
+    path2qm, qmcode, qmbasis, dfbasis,
+    filename_pred, predname, predict_data,
+    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+    sparsify, nsamples, ncut,
+    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
+    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
     # MPI information
-    if paral:
+    if parallel:
         from mpi4py import MPI
         comm = MPI.COMM_WORLD
         size = comm.Get_size()
@@ -30,53 +39,52 @@ def build():
         rank=0
         size=1
 
-    if inp.field:
-        fdir = f"rkhs-vectors_{inp.saltedname}_field"
-        rdir = f"regrdir_{inp.saltedname}_field"
+    if field:
+        fdir = f"rkhs-vectors_{saltedname}_field"
+        rdir = f"regrdir_{saltedname}_field"
     else:
-        fdir = f"rkhs-vectors_{inp.saltedname}"
-        rdir = f"regrdir_{inp.saltedname}"
+        fdir = f"rkhs-vectors_{saltedname}"
+        rdir = f"regrdir_{saltedname}"
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
-
-    # sparse-GPR parameters
-    M = inp.Menv
-    zeta = inp.z
-    reg = inp.regul
 
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     # load average density coefficients if needed
-    if inp.average:
+    if average:
+        # compute average density coefficients
+        if rank==0: get_averages.build()
+        if parallel: comm.Barrier()
+        # load average density coefficients
         av_coefs = {}
         for spe in species:
-            av_coefs[spe] = np.load(f"averages_{spe}.npy")
+            av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
 
-    dirpath = os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}")
+    dirpath = os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}")
     if rank==0:
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
     if size > 1: comm.Barrier()
 
     # define training set at random
-    if (inp.Ntrain > ndata):
+    if (Ntrain > ndata):
         if rank == 0:
-            raise ValueError(f"More training structures {inp.Ntrain=} have been requested than are present in the input data {ndata=}.")
+            raise ValueError(f"More training structures {Ntrain=} have been requested than are present in the input data {ndata=}.")
         else:
             exit()
     dataset = list(range(ndata))
     random.Random(3).shuffle(dataset)
-    trainrangetot = dataset[:inp.Ntrain]
+    trainrangetot = dataset[:Ntrain]
     if rank == 0:
         np.savetxt(osp.join(
-            inp.saltedpath, rdir, f"training_set_N{inp.Ntrain}.txt"
+            saltedpath, rdir, f"training_set_N{Ntrain}.txt"
         ), trainrangetot, fmt='%i')
     #trainrangetot = np.loadtxt("training_set.txt",int)
 
     # Distribute structures to tasks
-    ntraintot = int(inp.trainfrac*inp.Ntrain)
+    ntraintot = int(trainfrac * Ntrain)
 
-    if paral:
+    if parallel:
         if ntraintot < size:
             if rank == 0:
                 raise ValueError(f"More processes {size=} have been requested than training structures {ntraintot=}. Please reduce the number of processes.")
@@ -108,26 +116,26 @@ def build():
 
             # load reference QM data
             ref_projs = np.load(osp.join(
-                inp.saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
+                saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
             ))
             ref_coefs = np.load(osp.join(
-                inp.saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
+                saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
             ))
 
-            if inp.average:
+            if average:
                 Av_coeffs = np.zeros(ref_coefs.shape[0])
             i = 0
             for iat in range(natoms[trainrange[iconf]]):
                 spe = atomic_symbols[trainrange[iconf]][iat]
                 for l in range(lmax[spe]+1):
                     for n in range(nmax[(spe,l)]):
-                        if inp.average and l==0:
+                        if average and l==0:
                             Av_coeffs[i] = av_coefs[spe][n]
                         i += 2*l+1
 
             # rebuild predicted coefficients
             pred_coefs = sparse.csr_matrix.dot(psi_list[iconf],weights)
-            if inp.average:
+            if average:
                 pred_coefs += Av_coeffs
 
             # compute predicted density projections
@@ -140,7 +148,7 @@ def build():
         loss /= ntrain
 
         # add regularization term
-        loss += reg * np.dot(weights,weights)
+        loss += regul * np.dot(weights,weights)
 
         return loss
 
@@ -161,26 +169,26 @@ def build():
 
             # load reference QM data
             ref_projs = np.load(osp.join(
-                inp.saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
+                saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
             ))
             ref_coefs = np.load(osp.join(
-                inp.saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
+                saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
             ))
 
-            if inp.average:
+            if average:
                 Av_coeffs = np.zeros(ref_coefs.shape[0])
             i = 0
             for iat in range(natoms[trainrange[iconf]]):
                 spe = atomic_symbols[trainrange[iconf]][iat]
                 for l in range(lmax[spe]+1):
                     for n in range(nmax[(spe,l)]):
-                        if inp.average and l==0:
+                        if average and l==0:
                             Av_coeffs[i] = av_coefs[spe][n]
                         i += 2*l+1
 
             # rebuild predicted coefficients
             pred_coefs = sparse.csr_matrix.dot(psi_list[iconf],weights)
-            if inp.average:
+            if average:
                 pred_coefs += Av_coeffs
 
             # compute predicted density projections
@@ -233,11 +241,11 @@ def build():
     psi_list = []
     for iconf in trainrange:
         ovlp_list.append(np.load(osp.join(
-            inp.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+            saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
         )))
         # load feature vector as a scipy sparse object
         psi_list.append(sparse.load_npz(osp.join(
-            inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
         )))
 
     totsize = psi_list[0].shape[1]
@@ -247,62 +255,60 @@ def build():
 
     start = time.time()
 
-    tol = inp.gradtol
-
     # preconditioner
     P = np.ones(totsize)
 
-    reg_log10_intstr = str(int(np.log10(reg)))  # for consistency
+    reg_log10_intstr = str(int(np.log10(regul)))  # for consistency
 
-    if inp.restart == True:
+    if restart == True:
         w = np.load(osp.join(
-            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"weights_N{ntraintot}_reg{reg_log10_intstr}.npy"
+            saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"weights_N{ntraintot}_reg{reg_log10_intstr}.npy"
         ))
         d = np.load(osp.join(
-            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"dvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+            saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"dvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
         ))
         r = np.load(osp.join(
-            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+            saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
         ))
         s = np.multiply(P,r)
         delnew = np.dot(r,s)
     else:
         w = np.ones(totsize)*1e-04
         r = - grad_func(w,ovlp_list,psi_list)
-        if paral:
-            r = comm.allreduce(r)*norm  + 2.0 * reg * w
+        if parallel:
+            r = comm.allreduce(r)*norm  + 2.0 * regul * w
         else:
             r *= norm
-            r += 2.0*reg*w
+            r += 2.0*regul*w
         d = np.multiply(P,r)
         delnew = np.dot(r,d)
 
     if rank == 0: print("minimizing...")
     for i in range(100000):
         Ad = curv_func(d,ovlp_list,psi_list)
-        if paral:
-            Ad = comm.allreduce(Ad)*norm + 2.0 * reg * d
+        if parallel:
+            Ad = comm.allreduce(Ad)*norm + 2.0 * regul * d
         else:
             Ad *= norm
-            Ad += 2.0*reg*d
+            Ad += 2.0*regul*d
         curv = np.dot(d,Ad)
         alpha = delnew/curv
         w = w + alpha*d
         if (i+1)%50==0 and rank==0:
             np.save(osp.join(
-                inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"weights_N{ntraintot}_reg{reg_log10_intstr}.npy"
+                saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"weights_N{ntraintot}_reg{reg_log10_intstr}.npy"
             ), w)
             np.save(osp.join(
-                inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"dvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+                saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"dvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
             ), d)
             np.save(osp.join(
-                inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+                saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
             ), r)
         r -= alpha * Ad
         if rank == 0:
             # np.sqrt(np.sum((r**2))) == np.linalg.norm(r)
             print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
-        if np.linalg.norm(r) < tol:
+        if np.linalg.norm(r) < gradtol:
             break
         else:
             s = np.multiply(P,r)
@@ -313,13 +319,13 @@ def build():
 
     if rank == 0:
         np.save(osp.join(
-            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"weights_N{ntraintot}_reg{reg_log10_intstr}.npy"
+            saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"weights_N{ntraintot}_reg{reg_log10_intstr}.npy"
         ), w)
         np.save(osp.join(
-            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"dvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+            saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"dvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
         ), d)
         np.save(osp.join(
-            inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
+            saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy"
         ), r)
         print("minimization compleated succesfully!")
         print(f"minimization time: {((time.time()-start)/60):.2f} minutes")

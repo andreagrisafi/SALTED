@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import os.path as osp
+import time
 
 import numpy as np
 from pyscf import gto
@@ -9,9 +10,9 @@ from ase.io import read
 from scipy import special
 
 from salted import basis
+from salted.sys_utils import ParseConfig
 
-sys.path.insert(0, './')
-import inp
+inp = ParseConfig().parse_input()
 
 def add_command_line_arguments(parsetext):
     parser = argparse.ArgumentParser(description=parsetext,formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -26,7 +27,7 @@ def set_variable_values(args):
 args = add_command_line_arguments("")
 iconf = set_variable_values(args)
 
-xyzfile = read(inp.filename,":")
+xyzfile = read(inp.system.filename,":")
 ndata = len(xyzfile)
 
 if iconf != -1:
@@ -37,15 +38,15 @@ else:
     conf_list = range(ndata)
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.dfbasis)
+[lmax,nmax] = basis.basiset(inp.qm.dfbasis)
     
-dirpath = os.path.join(inp.path2qm, "coefficients")
+dirpath = os.path.join(inp.system.saltedpath, "coefficients")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2qm, "projections")
+dirpath = os.path.join(inp.system.saltedpath, "projections")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
-dirpath = os.path.join(inp.path2qm, "overlaps")
+dirpath = os.path.join(inp.system.saltedpath, "overlaps")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
@@ -55,6 +56,7 @@ print("Make sure to provide the density matrix following this convention!")
 print("---------------------------------------------------------------------------------")
 print("Reading geometry and basis sets...")
 
+start_time = time.time()
 for iconf in conf_list:
 
     # Initialize geometry
@@ -68,8 +70,8 @@ for iconf in conf_list:
         atoms.append([symb[i],(coord[0],coord[1],coord[2])])
     
     # Get PySCF objects for wave-function and density-fitted basis
-    mol = gto.M(atom=atoms,basis=inp.qmbasis)
-    ribasis = inp.qmbasis+" jkfit"
+    mol = gto.M(atom=atoms,basis=inp.qm.qmbasis)
+    ribasis = inp.qm.qmbasis+" jkfit"
     auxmol = gto.M(atom=atoms,basis=ribasis)
     pmol = mol + auxmol
     
@@ -91,7 +93,7 @@ for iconf in conf_list:
     eri3c = eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
     # Load 1-electron reduced density-matrix
     dm=np.load(osp.join(
-        inp.path2qm, "density_matrices", f"dm_conf{iconf+1}.npy"
+        inp.qm.path2qm, "density_matrices", f"dm_conf{iconf+1}.npy"
     ))
     # Compute density fitted coefficients
     rho = np.einsum('ijp,ij->p', eri3c, dm)
@@ -145,9 +147,9 @@ for iconf in conf_list:
     Proj = np.dot(Over,Coef)
     
     # Save projections and overlaps
-    np.save(osp.join(inp.path2qm, "coefficients", f"coefficients_conf{iconf}.npy"), Coef)
-    np.save(osp.join(inp.path2qm, "projections", f"projections_conf{iconf}.npy"), Proj)
-    np.save(osp.join(inp.path2qm, "overlaps", f"overlap_conf{iconf}.npy"), Over)
+    np.save(osp.join(inp.system.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), Coef)
+    np.save(osp.join(inp.system.saltedpath, "projections", f"projections_conf{iconf}.npy"), Proj)
+    np.save(osp.join(inp.system.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"), Over)
     
     # --------------------------------------------------
     
@@ -166,3 +168,6 @@ for iconf in conf_list:
     #f = open("external_energy.dat", 'a') 
     #print >> f, e_Ne
     #f.close()
+
+end_time = time.time()
+print(f"Calculation finished, time cost on density fitting: {end_time - start_time:.2f}s")

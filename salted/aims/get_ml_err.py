@@ -5,17 +5,16 @@ import os.path as osp
 
 import numpy as np
 
-from salted.sys_utils import sort_grid_data
+from salted.sys_utils import ParseConfig, sort_grid_data, read_system
 
-import inp
 
 def main():
-    from salted.sys_utils import read_system
+    inp = ParseConfig().parse_input()
     spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
     start_time = time.time()
 
-    dirname = osp.join(inp.path2qm, inp.predict_data)
+    dirname = osp.join(inp.qm.path2qm, inp.prediction.predict_data)
     av_err = 0
     errs = np.zeros(ndata)
     g = open('ml_maes', 'w+')

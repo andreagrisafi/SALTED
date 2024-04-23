@@ -7,14 +7,17 @@ import os.path as osp
 import numpy as np
 from scipy import sparse
 
-from salted.sys_utils import read_system,get_atom_idx,get_conf_range
+from salted import get_averages
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
 
 def build():
-    
-    sys.path.insert(0, './')
-    import inp
-    
-    if inp.parallel:
+
+    inp = ParseConfig().parse_input()
+
+    parallel = inp.system.parallel
+    saltedname, saltedpath = inp.salted.saltedname, inp.salted.saltedpath
+
+    if parallel:
         from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
@@ -24,42 +27,52 @@ def build():
     else:
         rank = 0
         size = 1
-    
+
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
-    
-    if inp.field:
-        rdir = f"regrdir_{inp.saltedname}_field"
+
+    if inp.system.field:
+        rdir = f"regrdir_{saltedname}_field"
     else:
-        rdir = f"regrdir_{inp.saltedname}"
+        rdir = f"regrdir_{saltedname}"
     
     # sparse-GPR parameters
-    M = inp.Menv
-    zeta = inp.z
+    Menv = inp.gpr.Menv
+    zeta = inp.gpr.z
     
     if rank == 0:    
-        dirpath = os.path.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}")
+        dirpath = os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}")
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
+
+    if inp.system.average:
+        # compute average density coefficients
+        if rank==0: get_averages.build()
+        if parallel: comm.Barrier()
+        # load average density coefficients
+        av_coefs = {}
+        for spe in species:
+            av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
+
     if size > 1: comm.Barrier()
 
     # define training set at random or sequentially
     dataset = list(range(ndata))
-    if inp.trainsel=="sequential":
-        trainrangetot = dataset[:inp.Ntrain]
-    elif inp.trainsel=="random":
+    if inp.gpr.trainsel=="sequential":
+        trainrangetot = dataset[:inp.gpr.Ntrain]
+    elif inp.gpr.trainsel=="random":
         random.Random(3).shuffle(dataset)
-        trainrangetot = dataset[:inp.Ntrain]
+        trainrangetot = dataset[:inp.gpr.Ntrain]
     else:
-        raise ValueError(f"training set selection {inp.trainsel=} not available!")
+        raise ValueError(f"training set selection {inp.gpr.trainsel=} not available!")
     np.savetxt(osp.join(
-        inp.saltedpath, rdir, f"training_set_N{inp.Ntrain}.txt"
+        saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
     ), trainrangetot, fmt='%i')
-    ntraintot = int(inp.trainfrac*inp.Ntrain)
+    ntraintot = int(inp.gpr.trainfrac*inp.gpr.Ntrain)
     trainrange = trainrangetot[:ntraintot]
     ntrain = len(trainrange)
 
     try:
-        blocksize = inp.blocksize
+        blocksize = inp.gpr.blocksize
         if blocksize > 0:
             blocks = True
         else:
@@ -69,57 +82,54 @@ def build():
         blocks = False
 
     if not blocks and size > 1:
-        print("Please run serially if computing a single matrix, or add inp.blocksize>0 to the input file to compute the matrix blockwise and in parallel.")
+        print("Please run serially if computing a single matrix, or add inp.gpr.blocksize>0 to the input file to compute the matrix blockwise and in parallel.")
         return
 
     if blocks:
         if ntrain%blocksize != 0:
-            print("Please choose a blocksize which is an exact divisor of inp.Ntrain*inp.fractrain")
+            print("Please choose a blocksize which is an exact divisor of inp.gpr.Ntrain*inp.gpr.trainfrac")
             return
         nblocks = int(ntrain/blocksize)
         j = 0
         for i in range(nblocks):
-            if rank==(i-j*size): matrices(i,trainrange[i*blocksize:(i+1)*blocksize],rank)
+            if rank==(i-j*size): matrices(i,trainrange[i*blocksize:(i+1)*blocksize],av_coefs,rank)
 #            print(rank,i,i+1,(j+1)*size,j)
             if i+1 == (j+1)*size: j += 1
 
     else:
-        matrices(-1,trainrange,rank)
-
-def matrices(block_idx,trainrange,rank):
+        matrices(-1,trainrange,av_coefs,rank)
     
-    sys.path.insert(0, './')
-    import inp
-    if inp.parallel: print("Task",rank,"handling structures:",trainrange)
+    if parallel: print("Task",rank,"handling structures:",trainrange)
 
-    if inp.field:
-        fdir = f"rkhs-vectors_{inp.saltedname}_field"
-        rdir = f"regrdir_{inp.saltedname}_field"
+
+def matrices(block_idx,trainrange,av_coefs,rank):
+    
+    inp = ParseConfig().parse_input()
+
+    saltedname, saltedpath = inp.salted.saltedname, inp.salted.saltedpath
+
+    if inp.system.field:
+        fdir = f"rkhs-vectors_{saltedname}_field"
+        rdir = f"regrdir_{saltedname}_field"
     else:
-        fdir = f"rkhs-vectors_{inp.saltedname}"
-        rdir = f"regrdir_{inp.saltedname}"
+        fdir = f"rkhs-vectors_{saltedname}"
+        rdir = f"regrdir_{saltedname}"
     
     # sparse-GPR parameters
-    M = inp.Menv
-    zeta = inp.z
+    Menv = inp.gpr.Menv
+    zeta = inp.gpr.z
     
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
     
     p = sparse.load_npz(osp.join(
-        inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf0.npz"
+        saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf0.npz"
     ))
     totsize = p.shape[-1]
     if rank == 0: print("problem dimensionality:", totsize,flush=True)
     if totsize>70000:
         raise ValueError(f"problem dimension too large ({totsize=}), minimize directly loss-function instead!")
     
-    if inp.average:
-        # load average density coefficients
-        av_coefs = {}
-        for spe in species:
-            av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
-   
     if rank == 0: print("computing regression matrices...")
     
     Avec = np.zeros(totsize)
@@ -130,17 +140,17 @@ def matrices(block_idx,trainrange,rank):
         start = time.time()
         # load reference QM data
         ref_coefs = np.load(osp.join(
-            inp.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+            saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
         ))
         over = np.load(osp.join(
-            inp.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+            saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
         ))
         psivec = sparse.load_npz(osp.join(
-            inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
         ))
         psi = psivec.toarray()
     
-        if inp.average:
+        if inp.system.average:
     
             # fill array of average spherical components
             Av_coeffs = np.zeros(ref_coefs.shape[0])
@@ -169,11 +179,11 @@ def matrices(block_idx,trainrange,rank):
     Bmat /= float(ntrain)
     
     if block_idx == -1:
-        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
-        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
+        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
+        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
     else:
-        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Avec_N{ntrain}_chunk{block_idx}.npy"), Avec)
-        np.save(osp.join(inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{block_idx}.npy"), Bmat)
+        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}_chunk{block_idx}.npy"), Avec)
+        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{block_idx}.npy"), Bmat)
 
     return
 
