@@ -308,6 +308,10 @@ class ParseConfig:
             - False -> optional, will fill in default value if not found
             - False + PLACEHOLDER -> optional in some cases, but required in others cases
             - (if the default value is $PLACEHOLDER, it means the key is optional for some cases, but required for others)
+
+        About PLACEHOLDER:
+            - If a key is optional in some cases, but required in others, the default value is set to PLACEHOLDER.
+            - The extra value checking should consider the PLACEHOLDER value!
         """
 
         rep_template = {
@@ -348,8 +352,8 @@ class ParseConfig:
                 "periodic": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),  # periodic boundary conditions, only for CP2K
             },
             "prediction": {
-                "filename_pred": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
-                "predname": (True, None, str, None),  # SALTED prediction identifier
+                "filename_pred": (False, PLACEHOLDER, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
+                "predname": (False, None, str, None),  # SALTED prediction identifier
                 #### below are optional, but required for some qmcode ####
                 "predict_data": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
             },
@@ -408,9 +412,10 @@ class ParseConfig:
                 elif isinstance(template, tuple):
                     val = _inp[key]
                     (required, val_default, val_type, extra_check_func) = _inp_template[key]
+                    """There are cases that a value is required for certain conditions, so we always need to run extra_check_func"""
                     if (not isinstance(val, val_type)) and (val != PLACEHOLDER):  # if is PLACEHOLDER, then don't check the type
                         raise ValueError(f"Value type error: key={_prev_key+key}, {val=}, current_type={type(val)}, expected_type={val_type}")
-                    if extra_check_func is not None:
+                    if extra_check_func is not None:  # always run extra_check_func if not None
                         if not extra_check_func(inp, val):
                             raise ValueError(f"Value check failed: key={_prev_key+key}, {val=}. Please check the required conditions.")
                 else:
@@ -457,7 +462,10 @@ def entry_with_qmcode(inp, val, qmcode:Union[str, List[str]]) -> bool:
 def check_path_exists(path:str) -> bool:
     """Check if the path exists, the path should be either absolute or relative to the current working directory"""
     # return True  # for testing only
-    return os.path.exists(path)
+    if path == PLACEHOLDER:
+        return True
+    else:
+        return os.path.exists(path)
 
 
 

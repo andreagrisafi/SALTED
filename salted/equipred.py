@@ -18,7 +18,13 @@ from salted.lib import equicombsparse
 
 from salted import sph_utils
 from salted import basis
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx,get_conf_range
+from salted.sys_utils import (
+    ParseConfig,
+    read_system,
+    get_atom_idx,
+    get_conf_range,
+    PLACEHOLDER,
+)
 
 
 def build():
@@ -33,6 +39,9 @@ def build():
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
+
+    if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
+        raise ValueError("No prediction file and name provided, please specify the entry named `prediction.filename_pred` and `prediction.predname` in the input file.")
 
     if parallel:
         from mpi4py import MPI
