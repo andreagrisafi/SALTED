@@ -328,7 +328,7 @@ class ParseConfig:
             },
             "prediction": {
                 "filename_pred": (False, PLACEHOLDER, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
-                "predname": (False, None, str, None),  # SALTED prediction identifier
+                "predname": (False, PLACEHOLDER, str, None),  # SALTED prediction identifier
                 #### below are optional, but required for some qmcode ####
                 "predict_data": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
             },
