@@ -48,20 +48,24 @@ def build():
 
     start = time.time()
 
-    if nsamples <= ndata:
-        ndata = nsamples
-    else:
-        print("ERROR: features cutoff ncut must be a positive integer!")
-        sys.exit(0)
-
     ndata_true = ndata
     print(f"The dataset contains {ndata_true} frames.")
 
     conf_range = list(range(ndata_true))
-    random.Random(3).shuffle(list(range(ndata_true)))
+    random.Random(3).shuffle(conf_range)
+
+    if nsamples <= ndata:
+        ndata = nsamples
+    else:
+        print("ERROR: nsamples cannot be greater than ndata!")
+        sys.exit(0)
+
     conf_range = conf_range[:ndata]
+    print(f"Selected {ndata} frames.")
 
     frames = read(filename,":")
+    frames = list( frames[i] for i in conf_range )
+    natoms = list( natoms[i] for i in conf_range )
     natoms_total = sum(natoms)
 
     def do_fps(x, d=0, initial=-1):
@@ -227,8 +231,8 @@ def build():
             pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
 
         j = 0
-        for i,iconf in enumerate(conf_range):
-            for iat in range(natoms[iconf]):
+        for i in range(ndata):
+            for iat in range(natoms[i]):
                 pvec[i,iat] = p[j]
                 j += 1
 
