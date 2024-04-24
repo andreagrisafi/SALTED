@@ -16,13 +16,23 @@ from salted.lib import equicombsparse
 
 from salted import sph_utils
 from salted import basis
+from salted.sys_utils import ParseConfig
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,structure):
 
-    sys.path.insert(0, './')
-    import inp
+    inp = ParseConfig().parse_input()
 
-    if inp.parallel:
+    (saltedname, saltedpath,
+    filename, species, average, field, parallel,
+    path2qm, qmcode, qmbasis, dfbasis,
+    filename_pred, predname, predict_data,
+    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+    sparsify, nsamples, ncut,
+    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
+    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
+
+    if parallel:
         from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
@@ -33,26 +43,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         rank = 0
         size = 1
 
-    saltedname = inp.saltedname
-    rep1 = inp.rep1 
-    rcut1 = inp.rcut1
-    sig1 = inp.sig1
-    nrad1 = inp.nrad1
-    nang1 = inp.nang1
-    neighspe1 = inp.neighspe1
-    rep2 = inp.rep2
-    rcut2 = inp.rcut2
-    sig2 = inp.sig2
-    nrad2 = inp.nrad2
-    nang2 = inp.nang2
-    neighspe2 = inp.neighspe2
-    ncut = inp.ncut
-    species = inp.species
-    M = inp.Menv
-    zeta = inp.z
-    reg = inp.regul
-    sparsify = inp.sparsify   
- 
     # read system
     ndata = len(structure)
     
@@ -202,7 +192,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         wigner3j = np.loadtxt(os.path.join(
-            inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
+            saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
         ))
         wigdim = wigner3j.size
       
@@ -267,10 +257,10 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     predstart = time.time()
     
     # Load spherical averages if required
-    if inp.average:
+    if average:
         av_coefs = {}
         for spe in species:
-            av_coefs[spe] = np.load(os.path.join(inp.saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
+            av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
     
     Tsize = 0
     for iat in range(natoms):
@@ -292,7 +282,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                 isize += Mcut
     
     # init averages array if asked
-    if inp.average:
+    if average:
         Av_coeffs = np.zeros(Tsize)
     
     # fill vector of predictions
@@ -303,17 +293,17 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
                 pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
-                if inp.average and l==0:
+                if average and l==0:
                     Av_coeffs[i] = av_coefs[spe][n]
                 i += 2*l+1
         ispe[spe] += 1
     
     # add back spherical averages if required
-    if inp.average:
+    if average:
         pred_coefs += Av_coeffs
     
    
-    if inp.qmcode=="cp2k":
+    if qmcode=="cp2k":
 
         # compute integral of predicted density
         iaux = 0
@@ -321,8 +311,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         nele = 0.0
         for iat in range(natoms):
             spe = atomic_symbols[iat]
-            if inp.average:
-                nele += inp.pseudocharge
+            if average:
+                nele += inp.qm.pseudocharge
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     if l==0:
@@ -340,7 +330,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                 for n in range(nmax[(spe,l)]):
                     for im in range(2*l+1):
                         if l==0 and im==0:
-                            if inp.average:
+                            if average:
                                 pred_coefs[iaux] *= nele/rho_int
                             else:
                                 if n==nmax[(spe,l)]-1:

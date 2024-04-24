@@ -1,3 +1,9 @@
+Last update: 2023-09-05
+There might be updates to the code since then,
+please read this README together with this
+`online instruction <https://fhi-aims-club.gitlab.io/tutorials/fhi-aims-with-salted/>`_
+
+
 #-------------------------------------------------------------------------------
 # GENERATE TRAINING DATA USING AIMS
 #-------------------------------------------------------------------------------

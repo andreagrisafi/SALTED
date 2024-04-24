@@ -9,10 +9,10 @@ import argparse
 import ctypes
 import time
 
-sys.path.insert(0, './')
-import inp
+from salted.sys_utils import ParseConfig
+inp = ParseConfig().parse_input()
 
-species = inp.species
+species = inp.system.species
 
 print("Reading AOs info...")
 laomax = {}
@@ -25,7 +25,7 @@ nmax = {}
 for spe in species:
     with open("BASIS_MOLOPT") as f:
          for line in f:
-             if line.rstrip().split()[0] == spe and line.rstrip().split()[1] == inp.qmbasis:
+             if line.rstrip().split()[0] == spe and line.rstrip().split()[1] == inp.qm.qmbasis:
                 line = list(islice(f, 2))[1]
                 laomax[spe] = int(line.split()[2])
                 npgf[spe] = int(line.split()[3])

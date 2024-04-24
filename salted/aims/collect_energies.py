@@ -3,9 +3,10 @@ import sys
 
 import numpy as np
 
-import inp
+from salted.sys_utils import ParseConfig
+inp = ParseConfig().parse_input()
 
-dn = os.path.join(inp.path2qm, inp.predict_data)
+dn = os.path.join(inp.qm.path2qm, inp.prediction.predict_data)
 l = os.listdir(os.path.join(dn, "geoms"))
 nfiles = len(l)
 testset = list(range(nfiles))
@@ -67,12 +68,9 @@ for i in range(2):
     xcs[:,i] /= n_atoms
     eles[:,i] /= n_atoms
 
-np.savetxt('predict_reference_electrostatic_energy.dat',eles[:,0])
-np.savetxt('predict_reference_xc_energy.dat',xcs[:,0])
-np.savetxt('predict_reference_total_energy.dat',es[:,0])
-np.savetxt('prediction_electrostatic_energy.dat',eles[:,1])
-np.savetxt('prediction_xc_energy.dat',xcs[:,1])
-np.savetxt('prediction_total_energy.dat',es[:,1])
+np.savetxt('predict_reference_electrostatic_energy.dat',np.vstack([eles[:,1],eles[:,0]]).T)
+np.savetxt('predict_reference_xc_energy.dat',np.vstack([xcs[:,1],xcs[:,0]]).T)
+np.savetxt('predict_reference_total_energy.dat',np.vstack([es[:,1],es[:,0]]).T)
 
 print('Mean absolute errors (eV/atom):')
 print('Electrostatic energy:',np.average(np.abs(eles[:,1]-eles[:,0])))
