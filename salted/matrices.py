@@ -44,12 +44,12 @@ def build():
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
 
+    av_coefs = {} # keep outside logical
     if inp.system.average:
         # compute average density coefficients
         if rank==0: get_averages.build()
         if parallel: comm.Barrier()
         # load average density coefficients
-        av_coefs = {}
         for spe in species:
             av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
 
