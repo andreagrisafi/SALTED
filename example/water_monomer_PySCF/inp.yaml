@@ -22,7 +22,7 @@ prediction:
   filename: ./water_dimers_10.xyz
   predname: dimer
 
-# atomic environment parameters (for rascaline)
+# descriptor parameters 
 descriptor:
   rep1:
     type: rho

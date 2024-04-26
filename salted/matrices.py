@@ -75,22 +75,22 @@ def build():
         blocks = False 
     else:
         if parallel==False:
-            print("Please activate parallel mode when using computing matrices in blocks")
+            print("Please activate parallel mode when using inp.gpr.blocksize to compute matrices in blocks!")
             return
         blocksize = inp.gpr.blocksize
         blocks = True
 
     if not blocks and size > 1:
-        print("Please run serially if computing a single matrix, or add inp.gpr.blocksize>0 to the input file to compute the matrix blockwise and in parallel.")
+        print("Please run serially if computing a single matrix, or add inp.gpr.blocksize>0 to the input file to compute the matrix blockwise and in parallel!")
         return
 
     if blocks:
         if ntrain%blocksize != 0:
-            print("Please choose a blocksize which is an exact divisor of inp.gpr.Ntrain*inp.gpr.trainfrac")
+            print("Please choose a blocksize which is an exact divisor of inp.gpr.Ntrain*inp.gpr.trainfrac!")
             return
         nblocks = int(ntrain/blocksize)
         if nblocks != size:
-            print(f"Please choose a number of MPI task consistent with the number of blocks {nblocks}.")
+            print(f"Please choose a number of MPI tasks consistent with the number of blocks {nblocks}!")
             return
         matrices(rank,trainrange[rank*blocksize:(rank+1)*blocksize],ntrain,av_coefs,rank)
 
