@@ -18,7 +18,7 @@ predict = args.predict
 
 if predict:
     datadir = inp.prediction.predict_data
-    fname = inp.prediction.filename_pred
+    fname = inp.prediction.filename
 else:
     datadir = "data/"
     fname = inp.system.filename

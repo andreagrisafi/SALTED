@@ -41,7 +41,7 @@ def build():
     gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
-        raise ValueError("No prediction file and name provided, please specify the entry named `prediction.filename_pred` and `prediction.predname` in the input file.")
+        raise ValueError("No prediction file and name provided, please specify the entry named `prediction.filename` and `prediction.predname` in the input file.")
 
     if parallel:
         from mpi4py import MPI
