@@ -33,11 +33,11 @@ def build():
     print("blocksize =",blocksize)
     print("number of blocks = ",nblocks)
     
-    Avec = np.load(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{blocksize}_chunk0.npy"))
-    Bmat = np.load(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{blocksize}_chunk0.npy"))
+    Avec = np.load(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}_chunk0.npy"))
+    Bmat = np.load(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}_chunk0.npy"))
     for iblock in range(1,nblocks):
-        Avec += np.load(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{blocksize}_chunk{iblock}.npy"))
-        Bmat += np.load(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{blocksize}_chunk{iblock}.npy"))
+        Avec += np.load(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}_chunk{iblock}.npy"))
+        Bmat += np.load(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{iblock}.npy"))
     
     np.save(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
     np.save(os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
