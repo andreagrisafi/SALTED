@@ -19,7 +19,7 @@ qm:
 
 # prediction data
 prediction:
-  filename_pred: ./water_dimers_10.xyz
+  filename: ./water_dimers_10.xyz
   predname: dimer
 
 # atomic environment parameters (for rascaline)

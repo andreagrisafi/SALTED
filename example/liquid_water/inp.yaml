@@ -17,7 +17,7 @@ qm:
 
 # prediction data
 prediction:
-  filename_pred: ./coords_1k.xyz
+  filename: ./coords_1k.xyz
   predname: prediction
   predict_data: ./aims_pred_data
 

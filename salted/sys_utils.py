@@ -234,7 +234,7 @@ class ParseConfig:
             inp.salted.saltedname, inp.salted.saltedpath,
             inp.system.filename, inp.system.species, inp.system.average, inp.system.field, inp.system.parallel,
             inp.qm.path2qm, inp.qm.qmcode, inp.qm.qmbasis, inp.qm.dfbasis,
-            inp.prediction.filename_pred, inp.prediction.predname, inp.prediction.predict_data,
+            inp.prediction.filename, inp.prediction.predname, inp.prediction.predict_data,
             inp.descriptor.rep1.type, inp.descriptor.rep1.rcut, inp.descriptor.rep1.sig,
             inp.descriptor.rep1.nrad, inp.descriptor.rep1.nang, inp.descriptor.rep1.neighspe,
             inp.descriptor.rep2.type, inp.descriptor.rep2.rcut, inp.descriptor.rep2.sig,
@@ -327,7 +327,7 @@ class ParseConfig:
                 "periodic": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),  # periodic boundary conditions, only for CP2K
             },
             "prediction": {
-                "filename_pred": (False, PLACEHOLDER, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
+                "filename": (False, PLACEHOLDER, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
                 "predname": (False, PLACEHOLDER, str, None),  # SALTED prediction identifier
                 #### below are optional, but required for some qmcode ####
                 "predict_data": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
