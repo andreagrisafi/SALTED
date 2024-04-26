@@ -67,19 +67,18 @@ def build():
     np.savetxt(osp.join(
         saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
     ), trainrangetot, fmt='%i')
-    ntraintot = int(inp.gpr.trainfrac*inp.gpr.Ntrain)
-    trainrange = trainrangetot[:ntraintot]
-    ntrain = len(trainrange)
+    ntrain = int(inp.gpr.trainfrac*inp.gpr.Ntrain)
+    trainrange = trainrangetot[:ntrain]
 
-    try:
+    if inp.gpr.blocksize==0:
+        blocksize = ntrain 
+        blocks = False 
+    else:
+        if parallel==False:
+            print("Please activate parallel mode when using computing matrices in blocks")
+            return
         blocksize = inp.gpr.blocksize
-        if blocksize > 0:
-            blocks = True
-        else:
-            blocks = False
-    except:
-        blocksize = ntrain
-        blocks = False
+        blocks = True
 
     if not blocks and size > 1:
         print("Please run serially if computing a single matrix, or add inp.gpr.blocksize>0 to the input file to compute the matrix blockwise and in parallel.")
@@ -90,19 +89,18 @@ def build():
             print("Please choose a blocksize which is an exact divisor of inp.gpr.Ntrain*inp.gpr.trainfrac")
             return
         nblocks = int(ntrain/blocksize)
-        j = 0
-        for i in range(nblocks):
-            if rank==(i-j*size): matrices(i,trainrange[i*blocksize:(i+1)*blocksize],av_coefs,rank)
-#            print(rank,i,i+1,(j+1)*size,j)
-            if i+1 == (j+1)*size: j += 1
+        if nblocks != size:
+            print(f"Please choose a number of MPI task consistent with the number of blocks {nblocks}.")
+            return
+        matrices(rank,trainrange[rank*blocksize:(rank+1)*blocksize],ntrain,av_coefs,rank)
 
     else:
-        matrices(-1,trainrange,av_coefs,rank)
+        matrices(-1,trainrange,ntrain,av_coefs,rank)
     
-    if parallel: print("Task",rank,"handling structures:",trainrange)
+    if parallel: print("Task",rank,"handling structures:",trainrange[rank*blocksize:(rank+1)*blocksize])
 
 
-def matrices(block_idx,trainrange,av_coefs,rank):
+def matrices(block_idx,trainrange,ntrain,av_coefs,rank):
     
     inp = ParseConfig().parse_input()
 
@@ -174,7 +172,6 @@ def matrices(block_idx,trainrange,av_coefs,rank):
     
         print("conf time =", time.time()-start)
    
-    ntrain = len(trainrange)
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
     

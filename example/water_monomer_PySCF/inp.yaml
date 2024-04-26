@@ -5,9 +5,9 @@ salted:
 
 # system general parameters
 system:
-  filename: ./water_monomers_1k.xyz
+  filename: ./water_total.xyz
   species: [H, O]
-  parallel: False
+  parallel: True 
 
 # quantum mechanical info
 qm:
@@ -46,5 +46,7 @@ descriptor:
 gpr:
   z: 1.0
   Menv: 100
-  Ntrain: 800
+  Ntrain: 1000
   trainfrac: 1.0
+  trainsel: sequential
+  blocksize: 250

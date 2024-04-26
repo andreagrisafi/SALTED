@@ -349,7 +349,7 @@ class ParseConfig:
                 "eigcut": (False, 1e-10, float, lambda inp, val: val > 0),  # eigenvalues cutoff
                 "gradtol": (False, 1e-5, float, lambda inp, val: val > 0),  # min gradient as stopping criterion for CG minimization
                 "restart": (False, False, bool, lambda inp, val: isinstance(val, bool)),  # if restart the minimization
-                "blocksize": (False, 100, int, lambda inp, val: val > 0),  # block size for matrix inversion
+                "blocksize": (False, 0, int, lambda inp, val: val >= 0),  # block size for matrix inversion
                 "trainsel": (False, 'random', str, lambda inp, val: val in ('random', 'sequential')),  # if shuffle the training set
             }
         }
