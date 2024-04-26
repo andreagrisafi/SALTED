@@ -74,18 +74,6 @@ def build():
         "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
     }
 
-    if rep1=="rho":
-        # get SPH expansion for atomic density
-        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
-
-    elif rep1=="V":
-        # get SPH expansion for atomic potential
-        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
-
-    else:
-        if rank == 0: print("Error: requested representation", rep1, "not provided")
-
-
     # Load training feature vectors and RKHS projection matrix
     vfps = {}
     for lam in range(lmax_max+1):
@@ -172,6 +160,17 @@ def build():
         # load reference QM data to total array size
         coefs = np.load(osp.join(saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"))
         Tsize = len(coefs)
+
+        if rep1=="rho":
+            # get SPH expansion for atomic density
+            calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
+
+        elif rep1=="V":
+            # get SPH expansion for atomic potential
+            calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
+
+        else:
+            if rank == 0: print("Error: requested representation", rep1, "not provided")
 
         nspe1 = len(neighspe1)
         keys_array = np.zeros(((nang1+1)*len(species)*nspe1,4),int)
