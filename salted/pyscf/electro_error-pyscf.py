@@ -29,7 +29,7 @@ nnmax = max(nlist)
 llmax = max(llist)
 
 # read system
-xyzfile = read(inp.prediction.filename_pred,":")
+xyzfile = read(inp.prediction.filename,":")
 ndata = len(xyzfile)
 
 hart2kcal = 627.5096080305927

@@ -17,7 +17,7 @@ qm:
 
 # prediction data
 prediction:
-  filename_pred: ./water_dimers_10.xyz
+  filename: ./water_dimers_10.xyz
   predname: prediction
   predict_data: ./aims_pred_data
 
