@@ -32,16 +32,16 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        rank = 0
-        size = 1
+#    if parallel:
+#        from mpi4py import MPI
+#        # MPI information
+#        comm = MPI.COMM_WORLD
+#        size = comm.Get_size()
+#        rank = comm.Get_rank()
+#    #    print('This is task',rank+1,'of',size)
+#    else:
+#        rank = 0
+#        size = 1
 
     # read system
     ndata = len(structure)
@@ -99,7 +99,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
     
     else:
-        if rank == 0: print("Error: requested representation", rep1, "not provided")
+        print("Error: requested representation", rep1, "not provided")
     
     descstart = time.time()
     
@@ -164,7 +164,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
 #    if rank == 0: print("coefficients time:", (time.time()-descstart))
     
-    if size > 1: comm.Barrier()
+    #if size > 1: comm.Barrier()
     
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
