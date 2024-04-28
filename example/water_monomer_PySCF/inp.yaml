@@ -5,7 +5,7 @@ salted:
 
 # system general parameters
 system:
-  filename: ./water_total.xyz
+  filename: ./water_monomers_1k.xyz
   species: [H, O]
   parallel: True 
 
