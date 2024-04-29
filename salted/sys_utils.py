@@ -234,7 +234,7 @@ class ParseConfig:
             inp.salted.saltedname, inp.salted.saltedpath,
             inp.system.filename, inp.system.species, inp.system.average, inp.system.field, inp.system.parallel,
             inp.qm.path2qm, inp.qm.qmcode, inp.qm.qmbasis, inp.qm.dfbasis,
-            inp.prediction.filename_pred, inp.prediction.predname, inp.prediction.predict_data,
+            inp.prediction.filename, inp.prediction.predname, inp.prediction.predict_data,
             inp.descriptor.rep1.type, inp.descriptor.rep1.rcut, inp.descriptor.rep1.sig,
             inp.descriptor.rep1.nrad, inp.descriptor.rep1.nang, inp.descriptor.rep1.neighspe,
             inp.descriptor.rep2.type, inp.descriptor.rep2.rcut, inp.descriptor.rep2.sig,
@@ -327,7 +327,7 @@ class ParseConfig:
                 "periodic": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),  # periodic boundary conditions, only for CP2K
             },
             "prediction": {
-                "filename_pred": (False, PLACEHOLDER, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
+                "filename": (False, PLACEHOLDER, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
                 "predname": (False, PLACEHOLDER, str, None),  # SALTED prediction identifier
                 #### below are optional, but required for some qmcode ####
                 "predict_data": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
@@ -349,7 +349,7 @@ class ParseConfig:
                 "eigcut": (False, 1e-10, float, lambda inp, val: val > 0),  # eigenvalues cutoff
                 "gradtol": (False, 1e-5, float, lambda inp, val: val > 0),  # min gradient as stopping criterion for CG minimization
                 "restart": (False, False, bool, lambda inp, val: isinstance(val, bool)),  # if restart the minimization
-                "blocksize": (False, 100, int, lambda inp, val: val > 0),  # block size for matrix inversion
+                "blocksize": (False, 0, int, lambda inp, val: val >= 0),  # block size for matrix inversion
                 "trainsel": (False, 'random', str, lambda inp, val: val in ('random', 'sequential')),  # if shuffle the training set
             }
         }

@@ -32,17 +32,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        rank = 0
-        size = 1
-
     # read system
     ndata = len(structure)
     
@@ -99,7 +88,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
     
     else:
-        if rank == 0: print("Error: requested representation", rep1, "not provided")
+        print("Error: requested representation", rep1, "not provided")
     
     descstart = time.time()
     
@@ -136,7 +125,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL) 
     
     else:
-        if rank == 0: print("Error: requested representation", rep2, "not provided")
+        print("Error: requested representation", rep2, "not provided")
     
     nspe2 = len(neighspe2)
     keys_array = np.zeros(((nang2+1)*len(species)*nspe2,4),int)
@@ -162,15 +151,15 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
         omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(o3_lambda=l).values)
 
-#    if rank == 0: print("coefficients time:", (time.time()-descstart))
+#    print("coefficients time:", (time.time()-descstart))
     
-    if size > 1: comm.Barrier()
+    #if size > 1: comm.Barrier()
     
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
     for lam in range(lmax_max+1):
     
-#        if rank == 0: print("lambda =", lam)
+#        print("lambda =", lam)
     
         equistart = time.time()
     
@@ -223,7 +212,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         else:
             pvec[lam] = p.reshape(natoms,2*lam+1,featsize)
         
-        #if rank == 0: print("equicomb time:", (time.time()-equistart))
+        # print("equicomb time:", (time.time()-equistart))
     
     rkhsstart = time.time()
  
@@ -251,7 +240,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                         kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[i1,i2]**(zeta-1)
                 psi_nm[(spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
 
-    #if rank == 0: print("rkhs time:", time.time()-rkhsstart,flush=True)
+    #if print("rkhs time:", time.time()-rkhsstart,flush=True)
  
     # Perform equivariant predictions
     predstart = time.time()
@@ -338,7 +327,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                         iaux += 1
 
  
-#    if rank == 0: print("pred time:", time.time()-predstart,flush=True)
+#    if print("pred time:", time.time()-predstart,flush=True)
     
     return pred_coefs
 

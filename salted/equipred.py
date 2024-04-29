@@ -41,7 +41,7 @@ def build():
     gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
-        raise ValueError("No prediction file and name provided, please specify the entry named `prediction.filename_pred` and `prediction.predname` in the input file.")
+        raise ValueError("No prediction file and name provided, please specify the entry named `prediction.filename` and `prediction.predname` in the input file.")
 
     if parallel:
         from mpi4py import MPI
@@ -470,12 +470,8 @@ def build():
             print(iconf+1,dipole,file=dfile)
             print(iconf+1,rho_int,charge,file=qfile)
 
-        if qmcode == "cp2k":
-            # save predicted coefficients in CP2K format
-            np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
-
-        # save predicted coefficients
-        np.save(osp.join(dirpath, f"prediction_conf{iconf}.npy"), pred_coefs)
+        # save predicted coefficients 
+        np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
 
 
     if qmcode=="cp2k":

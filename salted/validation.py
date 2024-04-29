@@ -273,17 +273,11 @@ def build():
             print(iconf+1,ref_dipole,dipole,file=dfile)
             print(iconf+1,ref_charge,rho_int,file=qfile)
 
-        # save predicted coefficients
-        np.save(osp.join(
-            saltedpath, vdir, f"M{Menv}_zeta{zeta}",
-            f"N{ntrain}_reg{reg_log10_intstr}", f"prediction_conf{iconf}.npy"
-        ), pred_coefs)
-
-        # save reference coefficients
-        np.savetxt(osp.join(
-            saltedpath, vdir, f"M{Menv}_zeta{zeta}",
-            f"N{ntrain}_reg{reg_log10_intstr}", f"RI-COEFFS-{iconf+1}.dat"
-        ), ref_coefs)
+        ## save reference coefficients
+        #np.savetxt(osp.join(
+        #    saltedpath, vdir, f"M{Menv}_zeta{zeta}",
+        #    f"N{ntrain}_reg{reg_log10_intstr}", f"RI-COEFFS-{iconf+1}.dat"
+        #), ref_coefs)
         # save predicted coefficients
         np.savetxt(osp.join(
             saltedpath, vdir, f"M{Menv}_zeta{zeta}",

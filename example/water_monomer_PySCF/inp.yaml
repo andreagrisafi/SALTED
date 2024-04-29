@@ -7,7 +7,7 @@ salted:
 system:
   filename: ./water_monomers_1k.xyz
   species: [H, O]
-  parallel: False
+  parallel: True 
 
 # quantum mechanical info
 qm:
@@ -19,10 +19,10 @@ qm:
 
 # prediction data
 prediction:
-  filename_pred: ./water_dimers_10.xyz
+  filename: ./water_dimers_10.xyz
   predname: dimer
 
-# atomic environment parameters (for rascaline)
+# descriptor parameters 
 descriptor:
   rep1:
     type: rho
@@ -46,5 +46,7 @@ descriptor:
 gpr:
   z: 1.0
   Menv: 100
-  Ntrain: 800
+  Ntrain: 1000
   trainfrac: 1.0
+  trainsel: sequential
+  blocksize: 250
