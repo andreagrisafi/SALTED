@@ -1,7 +1,10 @@
-site_name: Basic MkDocs Example Project
+site_name: "SALTED: Learning Electron Densities Equivariantly"
+
 theme:
   name: readthedocs
   highlightjs: true
+site_url: https://github.com/nqhq-lou/SALTED
+
 plugins:
   - search
   - mkdocstrings:
