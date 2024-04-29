@@ -3,7 +3,18 @@ site_name: "SALTED: Learning Electron Densities Equivariantly"
 theme:
   name: readthedocs
   highlightjs: true
+  logo: assets/SALTED_icon_vanilla_long.png
+  favicon: assets/SALTED_icon_vanilla_long.png
+
 site_url: https://github.com/nqhq-lou/SALTED
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Tutorial: tutorial.md
+  - API: api.md
+  - Examples: examples.md
+  - TestMKDocs: test_mkdocs.md
 
 plugins:
   - search
@@ -12,7 +23,10 @@ plugins:
         # See: https://mkdocstrings.github.io/python/usage/
         python:
           options:
-            docstring_style: sphinx
+            docstring_style: google
+            show_root_heading: true
+            show_source: false
+
 markdown_extensions:
   - markdown_include.include:
       base_path: .
