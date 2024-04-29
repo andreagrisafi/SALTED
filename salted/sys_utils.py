@@ -12,6 +12,26 @@ from salted import basis
 
 
 def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
+    """read a geometry file and return the formatted information
+
+    Args:
+        filename (str, optional): geometry file. Defaults to None.
+        spelist (List[str], optional): list of species. Defaults to None.
+        dfbasis (str, optional): density fitting basis. Defaults to None.
+
+    Returns:
+        speclist (List[str]): list of species
+        lmax (Dict[str, int]): maximum l for each species
+        nmax (Dict[Tuple[str, int], int]): maximum n for each species and l
+        llmax (int): maximum l in the system
+        nnmax (int): maximum n in the system
+        ndata (int): number of configurations
+        atomic_symbols (List[List[str]]): list of atomic symbols for each configuration
+
+    Notes:
+        By default, it reads the geometry file for training dataset.
+        If one wants to read other files, specify all the parameters (filename, spelist, dfbasis).
+    """
 
     if (filename is None) and (spelist is None) and (dfbasis is None):
         inp = ParseConfig().parse_input()
@@ -172,6 +192,9 @@ class AttrDict:
             return AttrDict(value)
         else:
             return value
+
+    def to_dict(self,):
+        return self._mydict
 
 
 PLACEHOLDER = "__PLACEHOLDER__"
@@ -394,7 +417,7 @@ class ParseConfig:
                         if not extra_check_func(inp, val):
                             raise ValueError(f"Value check failed: key={_prev_key+key}, {val=}. Please check the required conditions.")
                 else:
-                    raise ValueError(f"Invalid template value: {template}")
+                    raise ValueError(f"Invalid template type: {template} of type {type(template)}")
 
         inp = rec_apply_default_vals(inp, inp_template, "")  # now inp has all the keys as in inp_template in all levels
         rec_check_vals(inp, inp_template, "")
