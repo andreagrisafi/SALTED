@@ -52,17 +52,24 @@ def load_from_pyscf(species_list: List[str], qmbasis: str):
     spe_ribasis_info = {spe: basis.load(ribasis, spe) for spe in species_list}  # load with PySCF basis module
     """
     Each dict value is like:
-        format: [angular_momentum, [exponents, coefficients]]
-    [[0, [1113.9867719, 1.0]],
-     [0, [48.12711454, 1.0]],
-     [0, [2.50686566, 1.0]],
-     [0, [0.1918516, 1.0]],
-     [1, [102.99176249, 1.0]],
-     [1, [3.3490545, 1.0]],
-     [1, [0.20320063, 1.0]],
-     [2, [10.59406836, 1.0]],
-     [2, [0.51949765, 1.0]],
-     ...]
+        format: [angular_momentum, [exponents, coefficients], ...]
+        there might be multiple [exponents, coefficients] for one atomic orbital
+    [
+        [
+            0,
+            [883.9992943, 0.33024477],
+            [286.8428015, 0.80999791],
+        ],
+        [0, [48.12711454, 1.0]],
+        [0, [2.50686566, 1.0]],
+        [0, [0.1918516, 1.0]],
+        [1, [102.99176249, 1.0]],
+        [1, [3.3490545, 1.0]],
+        [1, [0.20320063, 1.0]],
+        [2, [10.59406836, 1.0]],
+        [2, [0.51949765, 1.0]],
+        ...
+    ]
 
     Extract the l numbers and compose the Dict[str, SpeciesBasisData] (species and basis data)
     """
@@ -75,10 +82,22 @@ def load_from_pyscf(species_list: List[str], qmbasis: str):
 def collect_l_nums(data: List) -> SpeciesBasisData:
     """collect l numbers for each species based on the data from PySCF
     input: above dict value,
-        e.g. [[0, [1113.9867719, 1.0]], [1, [102.99176249, 1.0]], ...]
+        e.g.
+        [
+            [
+                0,
+                [883.9992943, 0.33024477],
+                [286.8428015, 0.80999791],
+            ],
+            [0, [48.12711454, 1.0]],
+            [1, [102.99176249, 1.0]],
+            [2, [10.59406836, 1.0]],
+            ...
+        ]
+        there might be multiple [exponents, coefficients] for one atomic orbital
     output: max l number, and a list of counts of each l number
     """
-    l_nums = [d for d, _ in data]  # [0, 0, 0, 0, 1, 1, 1, 2, 2, ...]
+    l_nums = [d for d, *_ in data]  # [0, 0, 0, 0, 1, 1, 1, 2, 2, ...]
     l_max = max(l_nums)
     l_cnt = [0 for _ in range(l_max + 1)]  # [0, 0, 0, ...] to the max l number
     for l_num in l_nums:
