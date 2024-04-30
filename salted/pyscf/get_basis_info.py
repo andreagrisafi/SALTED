@@ -13,7 +13,6 @@ from salted.get_basis_info import get_parser
 from salted.sys_utils import ParseConfig
 
 
-
 def build(dryrun: bool = False, force_overwrite: bool = False):
     """Scheme: load density fitting basis from pyscf module,
     update the basis_data dict,
