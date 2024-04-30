@@ -1,7 +1,3 @@
-"""
-TODO: replace class arraylist by numpy.concatenate
-"""
-
 import os
 import sys
 import time
