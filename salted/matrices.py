@@ -25,6 +25,7 @@ def build():
         rank = comm.Get_rank()
     #    print('This is task',rank+1,'of',size)
     else:
+        comm = None
         rank = 0
         size = 1
 
@@ -83,8 +84,11 @@ def build():
     if not blocks and size > 1:
         print("Please run serially if computing a single matrix, or add inp.gpr.blocksize>0 to the input file to compute the matrix blockwise and in parallel!")
         return
+    
+    if parallel: print("Task",rank,"handling structures:",trainrange[rank*blocksize:(rank+1)*blocksize])
 
     if blocks:
+
         if ntrain%blocksize != 0:
             print("Please choose a blocksize which is an exact divisor of inp.gpr.Ntrain*inp.gpr.trainfrac!")
             return
@@ -92,15 +96,26 @@ def build():
         if nblocks != size:
             print(f"Please choose a number of MPI tasks consistent with the number of blocks {nblocks}!")
             return
-        matrices(rank,trainrange[rank*blocksize:(rank+1)*blocksize],ntrain,av_coefs,rank)
+        regr_matr = matrices(trainrange[rank*blocksize:(rank+1)*blocksize],ntrain,av_coefs,rank)
 
     else:
-        matrices(-1,trainrange,ntrain,av_coefs,rank)
-    
-    if parallel: print("Task",rank,"handling structures:",trainrange[rank*blocksize:(rank+1)*blocksize])
+
+        regr_matr = matrices(trainrange,ntrain,av_coefs,rank)   
+ 
+    if parallel:
+        comm.Barrier()
+        Avec = comm.allreduce(regr_matr[0])
+        Bmat = comm.allreduce(regr_matr[1])
+    else:
+        Avec = regr_matr[0]
+        Bmat = regr_matr[1]
+
+    if rank==0: 
+        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
+        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
 
 
-def matrices(block_idx,trainrange,ntrain,av_coefs,rank):
+def matrices(trainrange,ntrain,av_coefs,rank):
     
     inp = ParseConfig().parse_input()
 
@@ -175,14 +190,7 @@ def matrices(block_idx,trainrange,ntrain,av_coefs,rank):
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
     
-    if block_idx == -1:
-        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
-        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
-    else:
-        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}_chunk{block_idx}.npy"), Avec)
-        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{block_idx}.npy"), Bmat)
-
-    return
+    return [Avec,Bmat]
 
 if __name__ == "__main__":
     build()
