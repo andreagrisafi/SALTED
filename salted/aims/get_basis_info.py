@@ -11,7 +11,6 @@ from salted.basis_client import (
     SpeciesBasisData,
     compare_species_basis_data,
 )
-
 from salted.get_basis_info import get_parser
 from salted.sys_utils import ParseConfig
 
@@ -51,7 +50,8 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
             else:
                 if not compare_species_basis_data(basis_data[spe], spe_basis_data):
                     raise ValueError(
-                        f"Species {spe} has inconsistent basis data: {basis_data[spe]} and {spe_basis_data}, file: {basis_info_fpath}"
+                        f"Species {spe} has inconsistent basis data: {basis_data[spe]} and {spe_basis_data}, "
+                        f"file: {basis_info_fpath}"
                     )
 
         """check if all species are recorded"""
