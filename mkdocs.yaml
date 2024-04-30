@@ -3,18 +3,27 @@ site_name: "SALTED: Learning Electron Densities Equivariantly"
 theme:
   name: readthedocs
   highlightjs: true
-  logo: assets/SALTED_icon_vanilla_long.png
-  favicon: assets/SALTED_icon_vanilla_long.png
+  # logo: assets/SALTED_icon_vanilla_long.png
+  # favicon: assets/SALTED_icon_vanilla_long.png
 
-site_url: https://github.com/nqhq-lou/SALTED
+site_url: https://github.com/andreagrisafi/SALTED
 
 nav:
   - Home: index.md
   - Installation: installation.md
-  - Tutorial: tutorial.md
-  - API: api.md
-  - Examples: examples.md
-  - TestMKDocs: test_mkdocs.md
+  - Tutorial:
+    - Part 1 - Methods: tutorial/methods.md
+    - Part 2 - Workflow: tutorial/workflow.md
+    - Part 3 - Prepare Dataset: tutorial/dataset.md
+    - Part 4 - Learn the Density: tutorial/train.md
+    - Part 5 - Predict Properties: tutorial/predict.md
+  - Examples:
+    - Example 1 - Water & PySCF: examples/water_pyscf.md
+    - Example 2 - Water & FHI-aims: examples/water_aims.md
+    - Example 3 - (more examples): examples/what_cp2k.md
+  - Appendix:
+    - API: api.md
+    - Test mkdocs (for dev): test_mkdocs.md
 
 plugins:
   - search
