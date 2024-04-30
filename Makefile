@@ -1,31 +1,31 @@
 .PHONY: all clean f2py init
 
-all: f2py init 
+all: f2py init
 
 clean:
-	cd salted; rm -rf lib 
+	cd salted; rm -rf lib
 
-LIBDIR = salted/lib 
+LIBDIR = salted/lib
 dummy_build_folder := $(shell mkdir -p $(LIBDIR))
 
-F2PYEXE=$(shell which f2py3) 
+F2PYEXE := $(shell which f2py3 || which f2py)  # simple expansion, not recursive, won't be re-evaluated
 
-FCOMPILER='gfortran' 
-F90FLAGS='-fopenmp' 
+FCOMPILER='gfortran'
+F90FLAGS='-fopenmp'
 F2PYOPT='-O2'
 LIBS='-lgomp'
 CC=gcc
 
 # WITH INTEL COMPILERS
-#FCOMPILER='intelem' 
-#F90FLAGS='-qopenmp' 
+#FCOMPILER='intelem'
+#F90FLAGS='-qopenmp'
 #F2PYOPT='-O3 -unroll-aggressive -qopt-prefetch -qopt-reportr5'
 #LIBS='-liomp5 -lpthread' # omp libraries with ifort
 
 init:
 	cd salted/lib; touch __init__.py
 
-f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so salted/lib/equicombsparse.so 
+f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so salted/lib/equicombsparse.so
 #salted/lib/gausslegendre.so salted/lib/neighlist_ewald.so salted/lib/nearfield_ewald.so salted/lib/lebedev.so
 
 salted/lib/ovlp2c.so: src/ovlp2c.f90
