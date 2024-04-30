@@ -229,8 +229,8 @@ class BasisClient:
                 else:
                     raise ValueError(
                         f"Basis data for the duplicated species are different.\
-                        \n\rCurrent basis data:\n\t{basis_data}\
-                        \n\rBasis data in {self.data_fpath}:\n\t{basis_data_all[basis_name]}"
+                        \rCurrent basis data:\n\t{basis_data}\
+                        \rBasis data in {self.data_fpath}:\n\t{basis_data_all[basis_name]}"
                     )
         else:
             basis_data_all[basis_name] = basis_data

@@ -19,6 +19,10 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
         spelist (List[str], optional): list of species. Defaults to None.
         dfbasis (str, optional): density fitting basis. Defaults to None.
 
+    Notes:
+        By default (all parameters are None), it reads the geometry file for training dataset.
+        If one wants to read other files, please specify all the parameters (filename, spelist, dfbasis).
+
     Returns:
         speclist (List[str]): list of species
         lmax (Dict[str, int]): maximum l for each species
@@ -27,10 +31,6 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
         nnmax (int): maximum n in the system
         ndata (int): number of configurations
         atomic_symbols (List[List[str]]): list of atomic symbols for each configuration
-
-    Notes:
-        By default, it reads the geometry file for training dataset.
-        If one wants to read other files, specify all the parameters (filename, spelist, dfbasis).
     """
 
     if (filename is None) and (spelist is None) and (dfbasis is None):
@@ -41,7 +41,8 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
     elif (filename is not None) and (spelist is not None) and (dfbasis is not None):
         pass
     else:
-        raise ValueError("Invalid input, should be either all None or all not None")
+        raise ValueError("Invalid parameters, should be either all None or all not None, \
+            \r\tplease check the docstring for more details.")
 
     # read basis
     [lmax,nmax] = basis.basiset(dfbasis)
@@ -100,7 +101,13 @@ def get_conf_range(rank,size,ntest,testrangetot):
         testrange = [[] for _ in range(size)]
         blocksize = int(ntest/float(size))
 #       print(ntest,blocksize)
-        if type(testrangetot) is not list: testrangetot = testrangetot.tolist()
+        if isinstance(testrangetot, list):
+            pass
+        elif isinstance(testrangetot, np.ndarray):
+            testrangetot = testrangetot.tolist()
+        else:
+            raise ValueError(f"Invalid type for testrangetot, \
+                \r\tshould be list or numpy.ndarray, but got {type(testrangetot)}")
         for i in range(size):
             if i == (size-1):
                 rem = ntest - (i+1)*blocksize
@@ -144,7 +151,8 @@ def parse_index_str(index_str:Union[str, Literal["all"]]) -> Union[None, Tuple]:
             elif s.isdigit():
                 indexes.append(int(s))
             else:
-                raise ValueError(f"Invalid index format: {s}")
+                raise ValueError(f"Invalid index format: {s}, \
+                    \r\tshould be digits or ranges joined by comma, e.g. 1,3-5,7-10")
         return tuple(indexes)
 
 
@@ -196,6 +204,16 @@ class AttrDict:
 
     The attr trick only works for nested dicts.
     One just needs to wrap the dict in an AttrDict object.
+
+    Example:
+    ```python
+    d = {"a": 1, "b": {"c": 2, "d": {"e": 3}}}
+    d = AttrDict(d)
+    print(d.a)  # 1
+    print(d.b.c)  # 2
+    print(d.b.d.e)  # 3
+    print(d.to_dict()["b"]["d"]["e"])  # 3
+    ```
     """
     def __init__(self, d: dict):
         self._mydict = d
@@ -219,16 +237,19 @@ class AttrDict:
             return value
 
     def to_dict(self,):
+        """get the original dict"""
         return self._mydict
 
 
-PLACEHOLDER = "__PLACEHOLDER__"
+PLACEHOLDER = "__PLACEHOLDER__"  # a unique placeholder for optional keys
 
 class ParseConfig:
     """Input configuration file parser
 
     To use it, make sure an `inp.yaml` file exists in the current working directory,
     and simply run `ParseConfig().parse_input()`.
+
+    In our context, "input file" equals to "confiuration file", refers to the SALTED input file named `inp.yaml`.
     """
 
     def __init__(self, _dev_inp_fpath: Optional[str]=None):
@@ -242,7 +263,7 @@ class ParseConfig:
             self.inp_fpath = os.path.join(os.getcwd(), 'inp.yaml')
         else:
             self.inp_fpath = _dev_inp_fpath
-        assert os.path.exists(self.inp_fpath), f"Input file not found: {self.inp_fpath}"
+        assert os.path.exists(self.inp_fpath), f"Missing compulsory input file. Expected input file path: {self.inp_fpath}"
 
     def parse_input(self) -> AttrDict:
         """Parse input file
@@ -256,7 +277,7 @@ class ParseConfig:
         with open(self.inp_fpath) as file:
             inp = yaml.load(file, Loader=self.get_loader())
         if inp is None:
-            raise ValueError(f"Input file is empty: {self.inp_fpath}")
+            raise ValueError(f"Input file is empty, please check the input file at path {self.inp_fpath}")
         inp = self.check_input(inp)
         return AttrDict(inp)
 
@@ -408,23 +429,23 @@ class ParseConfig:
             """check if the keys in inp exist in inp_template"""
             for key, val in _inp.items():
                 if key not in _inp_template.keys():
-                    raise ValueError(f"Key not allowed: {_prev_key+key}")
+                    raise ValueError(f"Invalid input entry key: {_prev_key+key}. Please remove it from the input file.")
             """apply default values"""
             for key, val in _inp_template.items():
                 if isinstance(val, dict):
                     """we can ignore a section if it's not required"""
                     if key not in _inp.keys():
                         _inp[key] = dict()  # make it an empty dict
-                    _inp[key] = rec_apply_default_vals(_inp[key], _inp_template[key], _prev_key+key+".")
+                    _inp[key] = rec_apply_default_vals(_inp[key], _inp_template[key], _prev_key+key+".")  # and apply default values
                 elif isinstance(val, tuple):
                     (required, val_default, val_type, extra_check_func) = val
                     if key not in _inp.keys():
                         if required:
-                            raise ValueError(f"Required key not found: {_prev_key+key}")
+                            raise ValueError(f"Missing compulsory input entry: {_prev_key+key}")
                         else:
                             _inp[key] = val_default
                 else:
-                    raise ValueError(f"Invalid template value: {val}")
+                    raise ValueError(f"Invalid input template: {val}. Did you changed the template for parsing?")
             return _inp
 
         def rec_check_vals(_inp, _inp_template, _prev_key:str):
@@ -490,6 +511,14 @@ def check_path_exists(path:str) -> bool:
     else:
         return os.path.exists(path)
 
+def test_inp():
+    """test your `inp.yaml` file by trying to parse it"""
+    cwd = os.getcwd()
+    print(f"Current working directory: {cwd}")
+    print(f"Try to parse the input file: {os.path.join(cwd, 'inp.yaml')}")
+    inp = ParseConfig().parse_input()
+    print(inp)
+    print("Input file parsed successfully.")
 
 
 class Irreps(tuple):
