@@ -1,7 +1,8 @@
+# ruff: noqa: E501
 import os
 import re
 import sys
-from typing import Any, Callable, Dict, Optional, Tuple, Union, Literal, List
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import yaml
@@ -10,8 +11,27 @@ from ase.io import read
 from salted import basis
 
 
-
 def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
+    """read a geometry file and return the formatted information
+
+    Args:
+        filename (str, optional): geometry file. Defaults to None.
+        spelist (List[str], optional): list of species. Defaults to None.
+        dfbasis (str, optional): density fitting basis. Defaults to None.
+
+    Notes:
+        By default (all parameters are None), it reads the geometry file for training dataset.
+        If one wants to read other files, please specify all the parameters (filename, spelist, dfbasis).
+
+    Returns:
+        speclist (List[str]): list of species
+        lmax (Dict[str, int]): maximum l for each species
+        nmax (Dict[Tuple[str, int], int]): maximum n for each species and l
+        llmax (int): maximum l in the system
+        nnmax (int): maximum n in the system
+        ndata (int): number of configurations
+        atomic_symbols (List[List[str]]): list of atomic symbols for each configuration
+    """
 
     if (filename is None) and (spelist is None) and (dfbasis is None):
         inp = ParseConfig().parse_input()
@@ -21,7 +41,10 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
     elif (filename is not None) and (spelist is not None) and (dfbasis is not None):
         pass
     else:
-        raise ValueError("Invalid input, should be either all None or all not None")
+        raise ValueError(
+            "Invalid parameters, should be either all None or all not None, "
+            "please check the docstring for more details."
+        )
 
     # read basis
     [lmax,nmax] = basis.basiset(dfbasis)
@@ -80,7 +103,15 @@ def get_conf_range(rank,size,ntest,testrangetot):
         testrange = [[] for _ in range(size)]
         blocksize = int(ntest/float(size))
 #       print(ntest,blocksize)
-        if type(testrangetot) is not list: testrangetot = testrangetot.tolist()
+        if isinstance(testrangetot, list):
+            pass
+        elif isinstance(testrangetot, np.ndarray):
+            testrangetot = testrangetot.tolist()
+        else:
+            raise ValueError(
+                f"Invalid type for testrangetot, "
+                f"should be list or numpy.ndarray, but got {type(testrangetot)}"
+            )
         for i in range(size):
             if i == (size-1):
                 rem = ntest - (i+1)*blocksize
@@ -100,7 +131,8 @@ def get_conf_range(rank,size,ntest,testrangetot):
     return testrange
 
 
-ARGHELP_INDEX_STR = """Indexes to calculate, start from 0. Format: 1,3-5,7-10. Default is "all", which means all structures."""
+ARGHELP_INDEX_STR = """Indexes to calculate, start from 0. Format: 1,3-5,7-10. \
+Default is "all", which means all structures."""
 
 def parse_index_str(index_str:Union[str, Literal["all"]]) -> Union[None, Tuple]:
     """Parse index string, e.g. "1,3-5,7-10" -> (1,3,4,5,7,8,9,10)
@@ -124,7 +156,10 @@ def parse_index_str(index_str:Union[str, Literal["all"]]) -> Union[None, Tuple]:
             elif s.isdigit():
                 indexes.append(int(s))
             else:
-                raise ValueError(f"Invalid index format: {s}")
+                raise ValueError(
+                    f"Invalid index format: {s}, "
+                    f"should be digits or ranges joined by comma, e.g. 1,3-5,7-10"
+                )
         return tuple(indexes)
 
 
@@ -151,6 +186,16 @@ class AttrDict:
 
     The attr trick only works for nested dicts.
     One just needs to wrap the dict in an AttrDict object.
+
+    Example:
+    ```python
+    d = {"a": 1, "b": {"c": 2, "d": {"e": 3}}}
+    d = AttrDict(d)
+    print(d.a)  # 1
+    print(d.b.c)  # 2
+    print(d.b.d.e)  # 3
+    print(d.to_dict()["b"]["d"]["e"])  # 3
+    ```
     """
     def __init__(self, d: dict):
         self._mydict = d
@@ -173,14 +218,20 @@ class AttrDict:
         else:
             return value
 
+    def to_dict(self,):
+        """get the original dict"""
+        return self._mydict
 
-PLACEHOLDER = "__PLACEHOLDER__"
+
+PLACEHOLDER = "__PLACEHOLDER__"  # a unique placeholder for optional keys
 
 class ParseConfig:
     """Input configuration file parser
 
     To use it, make sure an `inp.yaml` file exists in the current working directory,
     and simply run `ParseConfig().parse_input()`.
+
+    In our context, "input file" equals to "confiuration file", refers to the SALTED input file named `inp.yaml`.
     """
 
     def __init__(self, _dev_inp_fpath: Optional[str]=None):
@@ -194,7 +245,10 @@ class ParseConfig:
             self.inp_fpath = os.path.join(os.getcwd(), 'inp.yaml')
         else:
             self.inp_fpath = _dev_inp_fpath
-        assert os.path.exists(self.inp_fpath), f"Input file not found: {self.inp_fpath}"
+        assert os.path.exists(self.inp_fpath), (
+            f"Missing compulsory input file. "
+            f"Expected input file path: {self.inp_fpath}"
+        )
 
     def parse_input(self) -> AttrDict:
         """Parse input file
@@ -208,7 +262,7 @@ class ParseConfig:
         with open(self.inp_fpath) as file:
             inp = yaml.load(file, Loader=self.get_loader())
         if inp is None:
-            raise ValueError(f"Input file is empty: {self.inp_fpath}")
+            raise ValueError(f"Input file is empty, please check the input file at path {self.inp_fpath}")
         inp = self.check_input(inp)
         return AttrDict(inp)
 
@@ -275,9 +329,9 @@ class ParseConfig:
     def check_input(self, inp:Dict):
         """Check keys (required, optional, not allowed), and value types and ranges
 
-        Just check keys and values one by one, silly err haha"""
 
-        """Format: (required, default value, value type, value extra check)
+        Format: (required, default value, value type, value extra check)
+
         About required:
             - True -> required
             - False -> optional, will fill in default value if not found
@@ -301,7 +355,7 @@ class ParseConfig:
                 # all(i in inp["system"]["species"] for i in val)  # species might be a subset of neighspe in Andrea's application
             )),  # list of neighbor species
         }
-        inp_template = {
+        inp_template = {  # NOQA
             "salted": {
                 "saltedname": (True, None, str, None),  # salted workflow identifier
                 "saltedpath": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to SALTED outputs / working directory
@@ -319,18 +373,18 @@ class ParseConfig:
                 "qmcode": (True, None, str, lambda inp, val: val.lower() in ('aims', 'pyscf', 'cp2k')),  # quantum mechanical code
                 "dfbasis": (True, None, str, None),  # density fitting basis
                 #### below are optional, but required for some qmcode ####
-                "qmbasis": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "pyscf")),  # quantum mechanical basis, only for PySCF
-                "functional": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "pyscf")),  # quantum mechanical functional, only for PySCF
-                "pseudocharge": (False, PLACEHOLDER, float, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),  # pseudo nuclear charge, only for CP2K
-                "coeffile": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),
-                "ovlpfile": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),
-                "periodic": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "cp2k")),  # periodic boundary conditions, only for CP2K
+                "qmbasis": (False, PLACEHOLDER, str, lambda inp, val: check_with_qmcode(inp, val, "pyscf")),  # quantum mechanical basis, only for PySCF
+                "functional": (False, PLACEHOLDER, str, lambda inp, val: check_with_qmcode(inp, val, "pyscf")),  # quantum mechanical functional, only for PySCF
+                "pseudocharge": (False, PLACEHOLDER, float, lambda inp, val: check_with_qmcode(inp, val, "cp2k")),  # pseudo nuclear charge, only for CP2K
+                "coeffile": (False, PLACEHOLDER, str, lambda inp, val: check_with_qmcode(inp, val, "cp2k")),
+                "ovlpfile": (False, PLACEHOLDER, str, lambda inp, val: check_with_qmcode(inp, val, "cp2k")),
+                "periodic": (False, PLACEHOLDER, str, lambda inp, val: check_with_qmcode(inp, val, "cp2k")),  # periodic boundary conditions, only for CP2K
             },
             "prediction": {
                 "filename": (False, PLACEHOLDER, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
                 "predname": (False, PLACEHOLDER, str, None),  # SALTED prediction identifier
                 #### below are optional, but required for some qmcode ####
-                "predict_data": (False, PLACEHOLDER, str, lambda inp, val: entry_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
+                "predict_data": (False, PLACEHOLDER, str, lambda inp, val: check_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
             },
             "descriptor": {
                 "rep1": rep_template,  # descriptor 1
@@ -354,32 +408,32 @@ class ParseConfig:
             }
         }
 
-        def rec_apply_default_vals(_inp, _inp_template, _prev_key:str):
+        def rec_apply_default_vals(_inp:Dict, _inp_template:Dict[str, Union[Dict, Tuple]], _prev_key:str):
             """apply default values if optional parameters are not found"""
 
             """check if the keys in inp exist in inp_template"""
             for key, val in _inp.items():
                 if key not in _inp_template.keys():
-                    raise ValueError(f"Key not allowed: {_prev_key+key}")
+                    raise ValueError(f"Invalid input key: {_prev_key+key}. Please remove it from the input file.")
             """apply default values"""
             for key, val in _inp_template.items():
                 if isinstance(val, dict):
                     """we can ignore a section if it's not required"""
                     if key not in _inp.keys():
                         _inp[key] = dict()  # make it an empty dict
-                    _inp[key] = rec_apply_default_vals(_inp[key], _inp_template[key], _prev_key+key+".")
+                    _inp[key] = rec_apply_default_vals(_inp[key], _inp_template[key], _prev_key+key+".")  # and apply default values
                 elif isinstance(val, tuple):
                     (required, val_default, val_type, extra_check_func) = val
                     if key not in _inp.keys():
                         if required:
-                            raise ValueError(f"Required key not found: {_prev_key+key}")
+                            raise ValueError(f"Missing compulsory input key: {_prev_key+key} in the input file.")
                         else:
                             _inp[key] = val_default
                 else:
-                    raise ValueError(f"Invalid template value: {val}")
+                    raise ValueError(f"Invalid input template: {val}. Did you changed the template for parsing?")
             return _inp
 
-        def rec_check_vals(_inp, _inp_template, _prev_key:str):
+        def rec_check_vals(_inp:Dict, _inp_template:Dict[str, Union[Dict, Tuple]], _prev_key:str):
             """check values' type and range"""
             for key, template in _inp_template.items():
                 if isinstance(template, dict):
@@ -387,14 +441,28 @@ class ParseConfig:
                 elif isinstance(template, tuple):
                     val = _inp[key]
                     (required, val_default, val_type, extra_check_func) = _inp_template[key]
-                    """There are cases that a value is required for certain conditions, so we always need to run extra_check_func"""
+                    """
+                    There are cases that a value is required for certain conditions,
+                    so we always need to run extra_check_func
+                    """
                     if (not isinstance(val, val_type)) and (val != PLACEHOLDER):  # if is PLACEHOLDER, then don't check the type
-                        raise ValueError(f"Value type error: key={_prev_key+key}, {val=}, current_type={type(val)}, expected_type={val_type}")
+                        raise ValueError(
+                            f"Incorrect input value type: key={_prev_key+key}, value={val}, "
+                            f"current value type is {type(val)}, but expected {val_type}"
+                        )
                     if extra_check_func is not None:  # always run extra_check_func if not None
                         if not extra_check_func(inp, val):
-                            raise ValueError(f"Value check failed: key={_prev_key+key}, {val=}. Please check the required conditions.")
+                            if hasattr(extra_check_func, "parse_error_msg"):
+                                parse_error_msg = extra_check_func.parse_error_msg
+                            else:
+                                parse_error_msg = ""
+                            raise ValueError(
+                                f"Input value failed its check: key={_prev_key+key}, value={val}. "
+                                f"{parse_error_msg}"
+                                f"Please check the required conditions."
+                            )
                 else:
-                    raise ValueError(f"Invalid template value: {template}")
+                    raise ValueError(f"Invalid input template type: {template} of type {type(template)}")
 
         inp = rec_apply_default_vals(inp, inp_template, "")  # now inp has all the keys as in inp_template in all levels
         rec_check_vals(inp, inp_template, "")
@@ -415,7 +483,7 @@ class ParseConfig:
 
         """for scientific notation, like 1e-4 -> float(1e-4)"""
         pattern = re.compile(r'^-?[0-9]+(\.[0-9]*)?[eEdD][-+]?[0-9]+$')
-        loader.add_implicit_resolver('!float_sci', pattern, list(u'-+0123456789'))
+        loader.add_implicit_resolver('!float_sci', pattern, list(u'-+0123456789'))  # NOQA
         def float_sci(loader, node):
             value = loader.construct_scalar(node)
             return float(value)
@@ -424,37 +492,58 @@ class ParseConfig:
 
 
 
-def entry_with_qmcode(inp, val, qmcode:Union[str, List[str]]) -> bool:
-    """This means the entry is required IF and ONLY IF when using a specific qmcode"""
+def check_with_qmcode(inp, val, qmcode:Union[str, List[str]]) -> bool:
+    """This means the entry is required IF and ONLY IF when using a / some specific qmcode(s)"""
     if isinstance(qmcode, str):
-        qmcode = [qmcode]
+        qmcode = [qmcode,]
     return (
         ((inp["qm"]["qmcode"].lower() not in qmcode) and (val == PLACEHOLDER))  # if not using this qmcode, do not specify it
         or
         ((inp["qm"]["qmcode"].lower() in qmcode) and (val != PLACEHOLDER))  # if using this qmcode, do specify it
     )
+check_with_qmcode.parse_error_msg = "Value imcompatible with the qm.qmcode."
 
 def check_path_exists(path:str) -> bool:
-    """Check if the path exists, the path should be either absolute or relative to the current working directory"""
-    # return True  # for testing only
+    """Check if the path exists, the path should be either absolute or relative to the current working directory
+    If the path is a placeholder, return True
+    """
     if path == PLACEHOLDER:
         return True
     else:
         return os.path.exists(path)
+check_path_exists.parse_error_msg = "Path (value) does not exist."
 
+def test_inp():
+    """test your `inp.yaml` file by trying to parse it"""
+    cwd = os.getcwd()
+    print(f"Current working directory: {cwd}")
+    print(f"Try to parse the input file: {os.path.join(cwd, 'inp.yaml')}")
+    inp = ParseConfig().parse_input()
+    print(inp)
+    print("Input file parsed successfully.")
 
 
 class Irreps(tuple):
     """Handle irreducible representation arrays, like slices, multiplicities, etc."""
 
     def __new__(cls, irreps:Union[str, List[int], Tuple[int]]) -> 'Irreps':
-        """
-        irreps:
-            - str, e.g. `1x0+2x1+3x2+3x3+2x4+1x5`
-            - Tuple[Tuple[int]], e.g. ((1, 0), (2, 1), (3, 2), (3, 3), (2, 4), (1, 5),)
-                - The super() tuple info
-            - Tuple[int], e.g. (0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5,)
-            - internal representation: the same as Tuple[Tuple[int]]
+        """Create an Irreps object
+
+        Args:
+            irreps (Union[str, List[int], Tuple[int]]): irreps info
+                - str, e.g. `1x0+2x1+3x2+3x3+2x4+1x5`
+                    - multiplicities and l values joined by `x`
+                - Tuple[Tuple[int]], e.g. ((1, 0), (2, 1), (3, 2), (3, 3), (2, 4), (1, 5),)
+                    - each tuple is (multiplicity, l)
+                - Tuple[int], e.g. (0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5,)
+                    - list of l values, the multiplicities are calculated automatically
+
+        Notes:
+            The internal representation is a tuple of tuples, each tuple is (multiplicity, l).
+            e.g. ((1, 0), (2, 1), (3, 2), (3, 3), (2, 4), (1, 5),)
+
+        Returns:
+            Irreps object
         """
         if isinstance(irreps, str):
             irreps_info_split = tuple(sec.strip() for sec in irreps.split("+") if len(sec) > 0)  # ("1x0", "2x1", ...)
@@ -473,7 +562,7 @@ class Irreps(tuple):
                 ), ValueError(f"Invalid irreps_info: {irreps}")
                 return super().__new__(cls, tuple(tuple(mul_l) for mul_l in irreps))
             elif isinstance(irreps[0], int):
-                assert all(isinstance(i, int) and i >= 0 for i in irreps), ValueError(f"Invalid irreps_info: {irreps}")
+                assert all(isinstance(i, int) and i >= 0 for i in irreps), ValueError(f"Invalid irreps format: {irreps}")
                 this_l_cnt, this_l = 1, irreps[0]
                 mul_l_list:List[Tuple[int]] = []
                 for l in irreps[1:]:
@@ -486,9 +575,9 @@ class Irreps(tuple):
                 print(mul_l_list)
                 return super().__new__(cls, tuple(mul_l_list))
             else:
-                raise ValueError(f"Invalid irreps_info: {irreps}")
+                raise ValueError(f"Invalid irreps format: {irreps}")
         else:
-            raise ValueError(f"Invalid irreps_info: {irreps}")
+            raise ValueError(f"Invalid irreps format: {irreps}")
 
     @property
     def dim(self):
@@ -537,11 +626,11 @@ class Irreps(tuple):
         return tuple(sl for _l, sl in zip(self.ls, self.slices()) if l == _l)
 
     def simplify(self) -> 'Irreps':
-        """sort by l and combine the same l"""
+        """sort by l, and combine the same l"""
         uniq_ls = tuple(set(self.ls))
         mul_ls = tuple((self.ls.count(l), l) for l in uniq_ls)
         return Irreps(mul_ls)
 
     def sort(self) -> 'Irreps':
-        """"""
+        """sort by l, return the sorted Irreps and the permutation"""
         raise NotImplementedError
