@@ -1,3 +1,0 @@
-# Tutorial
-
-To be developed...

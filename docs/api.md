@@ -1,5 +1,6 @@
 # API
 
+---
 
 ## Density fitting basis IO
 
@@ -9,6 +10,8 @@
 
 <br> <!-- larger space -->
 
+---
+
 ## Utility functions
 
 ::: salted.sys_utils.sort_grid_data
@@ -16,3 +19,5 @@
       show_root_heading: true
 
 <br> <!-- larger space -->
+
+---
