@@ -1,24 +1,29 @@
 import os
-import os.path as osp
 import sys
 import time
+import os.path as osp
 
 import h5py
 import numpy as np
+from scipy import special
 from ase.data import atomic_numbers
 from ase.io import read
-from metatensor import Labels
-from rascaline import LodeSphericalExpansion, SphericalExpansion
-from scipy import special
 
-from salted import basis, sph_utils
-from salted.lib import equicomb, equicombsparse
+from rascaline import SphericalExpansion
+from rascaline import LodeSphericalExpansion
+from metatensor import Labels
+
+from salted.lib import equicomb
+from salted.lib import equicombsparse
+
+from salted import sph_utils
+from salted import basis
 from salted.sys_utils import (
-    PLACEHOLDER,
     ParseConfig,
+    read_system,
     get_atom_idx,
     get_conf_range,
-    read_system,
+    PLACEHOLDER,
 )
 
 
@@ -36,10 +41,7 @@ def build():
     gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
-        raise ValueError(
-            "No prediction file and name provided, "
-            "please specify the entry named `prediction.filename` and `prediction.predname` in the input file."
-        )
+        raise ValueError("No prediction file and name provided, please specify the entry named `prediction.filename` and `prediction.predname` in the input file.")
 
     if parallel:
         from mpi4py import MPI

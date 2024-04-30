@@ -4,17 +4,16 @@ TODO:
 """
 
 import os
-import os.path as osp
 import random
 import sys
 import time
+import os.path as osp
 
 import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, read_system
-
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
 
 def build():
 
@@ -70,10 +69,7 @@ def build():
     # define training set at random
     if (Ntrain > ndata):
         if rank == 0:
-            raise ValueError(
-                f"More training structures {Ntrain=} have been requested "
-                f"than are present in the input data {ndata=}."
-            )
+            raise ValueError(f"More training structures {Ntrain=} have been requested than are present in the input data {ndata=}.")
         else:
             exit()
     dataset = list(range(ndata))
@@ -91,10 +87,7 @@ def build():
     if parallel:
         if ntraintot < size:
             if rank == 0:
-                raise ValueError(
-                    f"More processes {size=} have been requested than training structures {ntraintot=}. "
-                    f"Please reduce the number of processes."
-                )
+                raise ValueError(f"More processes {size=} have been requested than training structures {ntraintot=}. Please reduce the number of processes.")
             else:
                 exit()
         # if rank == 0 and ntraintot < size:
