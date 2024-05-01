@@ -97,13 +97,25 @@ def build():
         if nblocks != size:
             print(f"Please choose a number of MPI tasks consistent with the number of blocks {nblocks}!")
             return
-        regr_matr = matrices(trainrange[rank*blocksize:(rank+1)*blocksize],ntrain,av_coefs,rank)
+        [Avec,Bmat] = matrices(trainrange[rank*blocksize:(rank+1)*blocksize],ntrain,av_coefs,rank)
 
     else:
-        matrices(-1,trainrange,ntrain,av_coefs,rank)
 
-    if parallel: print("Task",rank,"handling structures:",trainrange[rank*blocksize:(rank+1)*blocksize])
+        [Avec,Bmat] = matrices(trainrange,ntrain,av_coefs,rank)   
 
+    if parallel:
+        comm.Barrier()
+        # reduce matrices in slices to avoid MPI overflows
+        nslices = int(np.ceil(float(len(Avec))/100.0))
+        for islice in range(nslices-1):
+            Avec[islice*100:(islice+1)*100] = comm.allreduce(Avec[islice*100:(islice+1)*100])
+            Bmat[islice*100:(islice+1)*100] = comm.allreduce(Bmat[islice*100:(islice+1)*100])
+        Avec[(nslices-1)*100:] = comm.allreduce(Avec[(nslices-1)*100:])
+        Bmat[(nslices-1)*100:] = comm.allreduce(Bmat[(nslices-1)*100:])
+
+    if rank==0: 
+        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
+        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
 
 def matrices(block_idx,trainrange,ntrain,av_coefs,rank):
 

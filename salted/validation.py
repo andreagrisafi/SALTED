@@ -105,13 +105,14 @@ def build():
 
 
     if qmcode=="cp2k":
+        bdir = osp.join(saltedpath,"basis")
         # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
         if rank == 0: print("Reading auxiliary basis info...")
         alphas = {}
         sigmas = {}
         for spe in species:
             for l in range(lmax[spe]+1):
-                avals = np.loadtxt(osp.join(f"{spe}-{dfbasis}-alphas-L{l}.dat"))
+                avals = np.loadtxt(osp.join(bdir,f"{spe}-{dfbasis}-alphas-L{l}.dat"))
                 if nmax[(spe,l)]==1:
                     alphas[(spe,l,0)] = float(avals)
                     sigmas[(spe,l,0)] = np.sqrt(0.5/alphas[(spe,l,0)]) # bohr
