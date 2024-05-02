@@ -35,11 +35,13 @@ SALTED input is provided in a :code:`inp.yaml` file, which is structured in the 
 
 - :code:`salted` (required): define root storage directory and workflow label 
 
-- :code:`qm` (required): provide quantum-mechanical input arguments
+- :code:`system` (required): define system parameters 
+
+- :code:`qm` (required): define quantum-mechanical information
 
 - :code:`descriptor` (required): define parameters of symmetry-adapted descriptors
 
-- :code:`gpr` (required): control Gaussian Process Regression parameters 
+- :code:`gpr` (required): define Gaussian Process Regression parameters 
 
 - :code:`prediction` (optional): manage predictions on unseen datasets  
 
