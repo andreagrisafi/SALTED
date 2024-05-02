@@ -79,7 +79,7 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.rkhs_vector` (MPI parallelizable)
 
-- Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structure. These can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`) from the entire dataset. The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning cruves). 
+- Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structure. These can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`) from the entire dataset. The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning curves). 
 
    :code:`python3 -m salted.matrices` (MPI parallelizable)
 
