@@ -1,6 +1,6 @@
 SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
 =========================================================================
-This repository contains an implementation of symmetry-adapted Gaussian Process Regression that is suitable to do machine learning of the three-dimensional electron density of a system, decomposed on an atom-centered spherical harmonics basis. 
+This repository contains an implementation of symmetry-adapted Gaussian Process Regression that is suitable to do machine learning of the electron density of a system, decomposed on an atom-centered spherical harmonics basis. 
 
 References
 ----------
