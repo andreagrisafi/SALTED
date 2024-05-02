@@ -53,9 +53,9 @@ The electronic-structure codes that are to date interfaced with SALTED are **FHI
 
 Usage
 -----
-The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or directly from command line. In what follows, we report an example of a basic command line workflow: 
+The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or directly from command line. When applicable, MPI parallelization over structures can be activated by setting :code:`inp.system.parallel=True`. In what follows, we report an example of a basic command line workflow: 
 
-- Initialize structural features associated with the symmetry-adapted descriptors:
+- Initialize structural features defined from 3-body symmetry-adapted descriptors, as computed following PRL 120, 036002 (2018):
 
    :code:`python3 -m salted.init_features`
 
@@ -64,6 +64,10 @@ The root directory used for storing SALTED data is specified in :code:`inp.salte
 - Find sparse set of :code:`inp.gpr.Menv` atomic environments in order to recast the SALTED problem on a low dimensional space. The non-linearity degree of the model must be defined at this stage by setting the variable :code:`inp.gpr.z` as a positive integer. :code:`z=1` corresponds to a linear model. 
 
    :code:`python3 -m salted.sparse_selection`
+
+- Compute sparse vectors of descriptors for each atomic type and angular momenta: 
+
+   :code:`python3 -m salted.sparse_vector` (MPI parallelizable)
 
 - Build equivariant kernels for each density channel and project them over the RKHS as described in Ref.(4).
 
