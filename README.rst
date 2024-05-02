@@ -61,23 +61,23 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.init_features`
 
-   An optional :code:`sparsify` subsection can be added to the :code:`inp.descriptor` section in order to reduce the feature space size down to :code:`ncut` sparse features selected using a "farthest point sampling" (FPS) algorithm. To facilitate this procedure, it is possible to perform the FPS selection over a subset of :code:`nsamples` configurations, selected at random from the entire training dataset.
+   An optional :code:`sparsify` subsection can be added to the :code:`inp.descriptor` input section in order to reduce the feature space size down to :code:`ncut` sparse features selected using a "farthest point sampling" (FPS) algorithm. To facilitate this procedure, it is possible to perform the FPS selection over a subset of :code:`nsamples` configurations, selected at random from the entire training dataset.
 
 - Find sparse set of :code:`inp.gpr.Menv` atomic environments in order to recast the SALTED problem on a low dimensional space. The non-linearity degree of the model must be defined at this stage by setting the variable :code:`inp.gpr.z` as a positive integer. :code:`z=1` corresponds to a linear model. 
 
    :code:`python3 -m salted.sparse_selection`
 
-- Compute sparse vectors of descriptors for each atomic type and angular momenta: 
+- Compute sparse vectors of descriptors for each atomic type and angular momentum: 
 
    :code:`python3 -m salted.sparse_vector` (MPI parallelizable)
 
-- Build equivariant kernels for each density channel and project them over the RKHS as described in Ref.(4).
+- Compute sparse equivariant kernels and find projector matrices over the Reproduing Kernel Hilbert Space (RKHS) as described in Ref.(4):
 
-:code:`rkhs.build()`
+   :code:`salted.rkhs_projector`
 
-- Build SALTED feature vectors for each structure in the training set.
+- Compute equivariant kernels and project them on the RKHS to obtain the final SALTED input vectors: 
 
-:code:`feature_vector.build()`
+   :code:`salted.rkhs_vector` (MPI parallelizable)
 
 - Build regression matrices over a maximum of :code:`Ntrain` training structure. These can be either selected at random :code:`trainsel="random"` or sequentially :code:`trainsel="sequential"` from the total dataset. The variable :code:`trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning cruves). 
 
