@@ -47,18 +47,14 @@ SALTED input is provided in a :code:`inp.yaml` file, which is structured in the 
 
 Input Dataset
 -------------
-Input structures are required in XYZ format; the corresponding filename must be specified in the :code:`inp.system.filename` input argument. 
-The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`.
-Training data consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. These coefficients are computed following density-fitting (DF), a.k.a. resolution of the identity, approximations, commonly applied in electronic-structure codes. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis functions, the 2-center electronic integral matrices associated with the given density-fitting approximation are also required as input. 
+Input structures are required in XYZ format; the corresponding filename must be specified in the :code:`inp.system.filename`. 
+The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. 
+Training data for the electron density consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. These coefficients are computed following density-fitting (DF), a.k.a. resolution of the identity, approximations, commonly applied in electronic-structure codes. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis functions, the 2-center electronic integral matrices associated with the given density-fitting approximation are also required as input. 
 The electronic-structure codes that are to date interfaced with SALTED are **FHI-aims**, **CP2K** and **PySCF**; we refer to the code-specific examples for how to produce the required quantum-mechanical data. The selected DF basis must be specified into the :code:`inp.qm.dfbasis` input argument, and then added to SALTED through the :code:`salted.get_basis_info` function.
 
 Usage
 -----
- In order to test different SALTED models, a :code:`saltedname` string must also be specified which will be appended to the name of the output folders that are automatically generated during the program execution. A general SALTED workflow reads as follows:
-
-- Import SALTED modules
-
-:code:`from salted import equirepr, sparsify, rkhs, feature_vector, matrices, regression, validation`
+Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or by command line. In what follows, we report an example of a command line workflow: 
 
 - Build symmetry-adapted representations of the atomic structure, one for each angular momentum used to expand the electron density. These are constructed as 3-body atom-centered descriptors that mirror spherical harmonics transformations in three dimensions, as described in PRL **120**, 036002 (2018). It is possible to sparsify the feature space by setting :code:`sparsify=True` together with the positive integer :code:`nc` in order to retain a corresponding number of features. The sparsification is performed with a "farthest point sampling" (FPS) algorithm using the full descriptor to define the Euclidean distance between the structural features. In order to reduce the computational burden of this procedure, it is possible to perform the FPS selection over a prescribed subset of samples :code:`nsamples` chosen at random from the entire training dataset.
 
