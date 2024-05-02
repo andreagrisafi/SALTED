@@ -53,7 +53,13 @@ The electronic-structure codes that are to date interfaced with SALTED are **FHI
 
 Usage
 -----
-The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or by command line. In what follows, we report an example of a command line workflow: 
+The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or directly from command line. In what follows, we report an example of a basic command line workflow: 
+
+- Initialize structural features used to build the symmetry-adapted descriptors:
+
+:code:`python3 -m salted.init_features`
+
+An optional `sparsify` subsection can be added to the `inp.descriptor` section in order to reduce the feature space size down to :code:`ncut` sparse features using a subset of :code:`nsamples` configurations.
 
 - Build symmetry-adapted representations of the atomic structure, one for each angular momentum used to expand the electron density. These are constructed as 3-body atom-centered descriptors that mirror spherical harmonics transformations in three dimensions, as described in PRL **120**, 036002 (2018). It is possible to sparsify the feature space by setting :code:`sparsify=True` together with the positive integer :code:`nc` in order to retain a corresponding number of features. The sparsification is performed with a "farthest point sampling" (FPS) algorithm using the full descriptor to define the Euclidean distance between the structural features. In order to reduce the computational burden of this procedure, it is possible to perform the FPS selection over a prescribed subset of samples :code:`nsamples` chosen at random from the entire training dataset.
 
