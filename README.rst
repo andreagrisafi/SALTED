@@ -55,15 +55,15 @@ Usage
 -----
 The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or directly from command line. In what follows, we report an example of a basic command line workflow: 
 
-- Initialize structural features used to build the symmetry-adapted descriptors:
+- Initialize structural features asspciated with the symmetry-adapted descriptors:
 
    :code:`python3 -m salted.init_features`
 
    An optional :code:`sparsify` subsection can be added to the :code:`inp.descriptor` section in order to reduce the feature space size down to :code:`ncut` sparse features selected using a "farthest point sampling" (FPS) algorithm. To facilitate this procedure, it is possible to perform the FPS selection over a prescribed subset of :code:`nsamples` configurations, chosen at random from the entire training dataset.
 
-- Sparsify training set by selecting a subset :code:`Menv` of atomic environments in order to compute sparse kernels and truncated RKHS projectors as described in Ref.(4). The non-linearity degree of the model must be defined at this stage by setting the variable :code:`z` as a positive integer. :code:`z=1` corresponds to a linear model. The truncation of small and negative eigenvalues when computing the RKHS projector can be modulated by the threshold :code:`eigcut` (default value $10^{-10}$).
+- Find sparse set of :code:`inp.gpr.Menv` atomic environments in order to recast the learning problem on a low dimensional space. The non-linearity degree of the model must be defined at this stage by setting the variable :code:`inp.gpr.zeta` as a positive integer. :code:`zeta=1` corresponds to a linear model. 
 
-:code:`sparsify.build()`
+:code:`python3 -m salted.sparse_selection`
 
 - Build equivariant kernels for each density channel and project them over the RKHS as described in Ref.(4).
 
