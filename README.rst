@@ -18,6 +18,7 @@ In the SALTED directory, simply run :code:`make`, followed by :code:`pip install
    
 Dependencies
 ------------
+
 - **rascaline**: rascaline installation requires a RUST compiler. To install a RUST compiler, run:
 :code:`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
 rascaline can then be installed using
