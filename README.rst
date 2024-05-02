@@ -73,31 +73,31 @@ In what follows, we report an example of a general command line workflow:
 
 - Compute sparse equivariant kernels and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS) as described in Ref.(4):
 
-   :code:`salted.rkhs_projector`
+   :code:`python3 -m salted.rkhs_projector`
 
 - Compute equivariant kernels and project them on the RKHS to obtain the final SALTED input vectors: 
 
-   :code:`salted.rkhs_vector` (MPI parallelizable)
+   :code:`python3 -m salted.rkhs_vector` (MPI parallelizable)
 
 - Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structure. These can be either selected at random (:code:`inp.gpr.trainsel="random")` or sequentially (:code:`inp.gpr.trainsel="sequential"`) from the entire dataset. The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning cruves). 
 
-   :code:`salted.matrices` (MPI parallelizable)
+   :code:`python3 -m salted.matrices` (MPI parallelizable)
 
 - Perform regression with a given regularization parameter :code:`inp.gpr.regul`. 
 
-   :code:`salted.regression`
+   :code:`python3 -m salted.regression`
 
 - When the dimensionality of the learning problem exceeds $10^5$, it is recommended to perform an explicit minimization of the SALTED loss function:
 
-   :code:`salted.minimize_loss` (MPI parallelizable)
+   :code:`python3 -m salted.minimize_loss` (MPI parallelizable)
 
 - Validate predictions over the structures that have not been retained for training by computing the root mean square error in agreement to the definition of the SALTED loss function.
 
-   :code:`salted.validation` (MPI parallelizable)
+   :code:`python3 -m salted.validation` (MPI parallelizable)
 
 Once the SALTED model has been trained and validated, SALTED predictions for a new unseen dataset can be handled according to the :code:`inp.prediction` section. For that, a :code:`inp.prediction.filename` must be specified in XYZ format, while a :code:`inp.prediction.predname` string can be defined to label the prediction directories. Equivariant predictions over a given thataset can then be run as follows:
 
-   :code:`salted.equipred` (MPI parallelizable) 
+   :code:`python3 -m salted.equipred` (MPI parallelizable) 
 
 Contact
 -------
