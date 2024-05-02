@@ -63,7 +63,7 @@ The root directory used for storing SALTED data is specified in :code:`inp.salte
 
 - Find sparse set of :code:`inp.gpr.Menv` atomic environments in order to recast the learning problem on a low dimensional space. The non-linearity degree of the model must be defined at this stage by setting the variable :code:`inp.gpr.zeta` as a positive integer. :code:`zeta=1` corresponds to a linear model. 
 
-:code:`python3 -m salted.sparse_selection`
+   :code:`python3 -m salted.sparse_selection`
 
 - Build equivariant kernels for each density channel and project them over the RKHS as described in Ref.(4).
 
