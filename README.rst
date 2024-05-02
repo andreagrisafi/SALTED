@@ -55,7 +55,7 @@ Usage
 -----
 The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or directly from command line. In what follows, we report an example of a basic command line workflow: 
 
-- Initialize structural features asspciated with the symmetry-adapted descriptors:
+- Initialize structural features associated with the symmetry-adapted descriptors:
 
    :code:`python3 -m salted.init_features`
 
