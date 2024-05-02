@@ -53,7 +53,7 @@ The electronic-structure codes that are to date interfaced with SALTED are **FHI
 
 Usage
 -----
-The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or directly from command line. MPI parallelization can be activated by setting :code:`inp.system.parallel=True`, and can be used, whenever applicable, to parellelize the calculation of SALTED functions over training data. In what follows, we report an example of a basic command line workflow: 
+The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or directly from command line. MPI parallelization can be activated by setting :code:`inp.system.parallel` as :code:`True`, and can be used, whenever applicable, to parallelize the calculation of SALTED functions over training data. In what follows, we report an example of a general command line workflow: 
 
 - Initialize structural features defined from 3-body symmetry-adapted descriptors, as computed following PRL 120, 036002 (2018):
 
