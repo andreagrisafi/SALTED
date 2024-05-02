@@ -59,7 +59,7 @@ The root directory used for storing SALTED data is specified in :code:`inp.salte
 
    :code:`python3 -m salted.init_features`
 
-   An optional :code:`sparsify` subsection can be added to the :code:`inp.descriptor` section in order to reduce the feature space size down to :code:`ncut` sparse features selected using a "farthest point sampling" (FPS) algorithm. To facilitate this procedure, it is possible to perform the FPS selection over a prescribed subset of :code:`nsamples` configurations, chosen at random from the entire training dataset.
+   An optional :code:`sparsify` subsection can be added to the :code:`inp.descriptor` section in order to reduce the feature space size down to :code:`ncut` sparse features selected using a "farthest point sampling" (FPS) algorithm. To facilitate this procedure, it is possible to perform the FPS selection over a subset of :code:`nsamples` configurations, selected at random from the entire training dataset.
 
 - Find sparse set of :code:`inp.gpr.Menv` atomic environments in order to recast the SALTED problem on a low dimensional space. The non-linearity degree of the model must be defined at this stage by setting the variable :code:`inp.gpr.z` as a positive integer. :code:`z=1` corresponds to a linear model. 
 
