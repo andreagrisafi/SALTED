@@ -95,7 +95,7 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.validation` (MPI parallelizable)
 
-Once the SALTED model has been trained and validated, SALTED predictions for a new unseen dataset can be handled according to the :code:`inp.prediction` section. For that, a :code:`inp.prediction.filename` must be specified in XYZ format, while a :code:`inp.prediction.predname` string can be defined to label the prediction directories. Equivariant predictions over a given thataset can then be run as follows:
+Once the SALTED model has been trained and validated, SALTED predictions for a new unseen dataset can be handled according to the :code:`inp.prediction` section. For that, a :code:`inp.prediction.filename` must be specified in XYZ format, while a :code:`inp.prediction.predname` string can be defined to label the prediction directories. Equivariant predictions can then be run as follows:
 
    :code:`python3 -m salted.equipred` (MPI parallelizable) 
 
