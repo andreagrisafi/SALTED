@@ -71,7 +71,7 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.sparse_vector` (MPI parallelizable)
 
-- Compute sparse equivariant kernels and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS) as described in Ref.(4):
+- Compute sparse equivariant kernels and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS):
 
    :code:`python3 -m salted.rkhs_projector`
 
