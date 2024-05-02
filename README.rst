@@ -71,7 +71,7 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.sparse_vector` (MPI parallelizable)
 
-- Compute sparse equivariant kernels and find projector matrices over the Reproduing Kernel Hilbert Space (RKHS) as described in Ref.(4):
+- Compute sparse equivariant kernels and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS) as described in Ref.(4):
 
    :code:`salted.rkhs_projector`
 
@@ -79,27 +79,26 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`salted.rkhs_vector` (MPI parallelizable)
 
-- Build regression matrices over a maximum of :code:`Ntrain` training structure. These can be either selected at random :code:`trainsel="random"` or sequentially :code:`trainsel="sequential"` from the total dataset. The variable :code:`trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning cruves). 
+- Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structure. These can be either selected at random (:code:`inp.gpr.trainsel="random")` or sequentially (:code:`inp.gpr.trainsel="sequential"`) from the entire dataset. The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning cruves). 
 
-:code:`matrices.build()`
+   :code:`salted.matrices` (MPI parallelizable)
 
-- Perform regression with a given regularization parameter :code:`regul`. NB: An explicit minimization of the loss function is recommended when the dimensionality of the problem exceeds $10^5$; see the MPI examples for how to run SALTED in this case.
+- Perform regression with a given regularization parameter :code:`inp.gpr.regul`. 
 
-:code:`regression.build()`
+   :code:`salted.regression`
 
-- Validate predictions over the structures that have not been retained for training by estimating the density error as reported in Ref.(4).
+- When the dimensionality of the learning problem exceeds $10^5$, it is recommended to perform an explicit minimization of the SALTED loss function:
 
-:code:`validation.build()`
+   :code:`salted.minimize_loss` (MPI parallelizable)
 
-Once the SALTED model has been trained and validated, SALTED predictions for a new dataset can be performed as follows:
+- Validate predictions over the structures that have not been retained for training by computing the root mean square error in agreement to the definition of the SALTED loss function.
 
-- Import prediction module
+   :code:`salted.validation` (MPI parallelizable)
 
-:code:`from salted import equipred`
+Once the SALTED model has been trained and validated, SALTED predictions for a new unseen dataset can be handled according to the :code:`inp.prediction` section. For that, a :code:`inp.prediction.filename` must be specified in XYZ format, while a :code:`inp.prediction.predname` string can be defined to label the prediction directories. Equivariant predictions over a given thataset can then be run as follows:
 
-- Perform equivariant predictions and save prediction outputs in dedicated folders located in :code:`saltedpath` by making use of a :code:`predname` string that is appended to the name of the prediction directories.
+   :code:`salted.equipred` (MPI parallelizable)
 
-:code:`equipred.build()`
 
 Contact
 -------
