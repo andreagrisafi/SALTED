@@ -37,7 +37,7 @@ SALTED input is provided in a :code:`inp.yaml` file, which is structured in the 
 
 - :code:`system` (required): define system parameters 
 
-- :code:`qm` (required): define quantum-mechanical information
+- :code:`qm` (required): define information about quantum-mechanical reference
 
 - :code:`descriptor` (required): define parameters of symmetry-adapted descriptors
 
