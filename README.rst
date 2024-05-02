@@ -30,17 +30,28 @@ provided HDF5 has been compiled with MPI support.
 
 Input file
 ----------
-SALTED input is provided in a :code:`inp.yaml` file. 
+SALTED input is provided in a :code:`inp.yaml` file, which is structured in the following sections:
+
+- :code:`salted` (required): define root storage directory and workflow label 
+
+- :code:`qm` (required): provide quantum-mechanical input arguments
+
+- :code:`descriptor` (required): define parameters of symmetry-adapted descriptors
+
+- :code:`gpr` (required): control Gaussian Process Regression parameters 
+
+- :code:`prediction` (optional): manage predictions on unseen datasets  
 
 Input Dataset
 -------------
 Input structures are required in XYZ format; the corresponding filename must be specified in the :code:`inp.system.filename` input argument. 
+The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`.
 Training data consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. These coefficients are computed following density-fitting (DF), a.k.a. resolution of the identity, approximations, commonly applied in electronic-structure codes. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis functions, the 2-center electronic integral matrices associated with the given density-fitting approximation are also required as input. 
 The electronic-structure codes that are to date interfaced with SALTED are **FHI-aims**, **CP2K** and **PySCF**; we refer to the code-specific examples for how to produce the required quantum-mechanical data. The selected DF basis must be specified into the :code:`inp.qm.dfbasis` input argument, and then added to SALTED through the :code:`salted.get_basis_info` function.
 
 Usage
 -----
-SALTED input and output folders are saved in the directory specified by the input variable :code:`saltedpath`. In order to test different SALTED models, a :code:`saltedname` string must also be specified which will be appended to the name of the output folders that are automatically generated during the program execution. A general SALTED workflow reads as follows:
+ In order to test different SALTED models, a :code:`saltedname` string must also be specified which will be appended to the name of the output folders that are automatically generated during the program execution. A general SALTED workflow reads as follows:
 
 - Import SALTED modules
 
