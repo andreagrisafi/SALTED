@@ -16,8 +16,7 @@ Installation
 ------------
 In the SALTED directory, simply run :code:`make`, followed by :code:`pip install .`
    
-Dependencies
-------------
+Dependencies:
 
 - **rascaline**: rascaline installation requires a RUST compiler. To install a RUST compiler, run:
 :code:`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
@@ -79,7 +78,7 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.rkhs_vector` (MPI parallelizable)
 
-6. Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structure selected from the entire dataset; these can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`). The remaining structures will be automatically retained for validation.  The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used: this can go from 0 to 1 in order to make learning curves while keeping the validation set fixed. 
+6. Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structures selected from the entire dataset; these can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`). The remaining structures will be automatically retained for validation.  The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used: this can go from 0 to 1 in order to make learning curves while keeping the validation set fixed. 
 
    :code:`python3 -m salted.matrices` (MPI parallelizable)
 
