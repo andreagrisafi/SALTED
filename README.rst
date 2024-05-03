@@ -71,15 +71,15 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.sparse_vector` (MPI parallelizable)
 
-- Compute sparse equivariant kernels and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS):
+- Compute sparse equivariant kernels $k^L_MM$ and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS):
 
    :code:`python3 -m salted.rkhs_projector`
 
-- Compute equivariant kernels and project them on the RKHS to obtain the final SALTED input vectors: 
+- Compute equivariant kernels $k^L_NM$ over the entire dataset and project them on the RKHS to obtain the final SALTED input vectors: 
 
    :code:`python3 -m salted.rkhs_vector` (MPI parallelizable)
 
-- Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structure. These can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`) from the entire dataset. The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used (useful for making learning curves). 
+- Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structure among the the entire dataset. The remaining structures will be automatically retained for validation. The training set can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`) from the entire dataset. The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used; this can go from 0 to 1 in order to make learning curves while keeping the validation set fixed. 
 
    :code:`python3 -m salted.matrices` (MPI parallelizable)
 
