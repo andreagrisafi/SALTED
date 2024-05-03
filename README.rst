@@ -67,7 +67,7 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.sparse_selection`
 
-3. Compute sparse vectors of descriptors for each atomic type and angular momentum: 
+3. Compute sparse vectors of descriptors $P^L_M$ for each atomic type and angular momentum: 
 
    :code:`python3 -m salted.sparse_vector` (MPI parallelizable)
 
