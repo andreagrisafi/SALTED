@@ -57,41 +57,41 @@ The root directory used for storing SALTED data is specified in :code:`inp.salte
 MPI parallelization can be activated by setting :code:`inp.system.parallel` as :code:`True`, and can be used, whenever applicable, to parallelize the calculation of SALTED functions over training data. 
 In what follows, we report an example of a general command line workflow: 
 
-- Initialize structural features defined from 3-body symmetry-adapted descriptors, $P^L$, as computed following PRL 120, 036002 (2018):
+1. Initialize structural features defined from 3-body symmetry-adapted descriptors, $P^L$, as computed following PRL 120, 036002 (2018):
 
    :code:`python3 -m salted.init_features`
 
    An optional :code:`sparsify` subsection can be added to the :code:`inp.descriptor` input section in order to reduce the feature space size down to :code:`ncut` sparse features selected using a "farthest point sampling" (FPS) algorithm. To facilitate this procedure, it is possible to perform the FPS selection over a subset of :code:`nsamples` configurations, selected at random from the entire training dataset.
 
-- Find sparse set of :code:`inp.gpr.Menv` atomic environments in order to recast the SALTED problem on a low dimensional space. The non-linearity degree of the model must be defined at this stage by setting the variable :code:`inp.gpr.z` as a positive integer. :code:`z=1` corresponds to a linear model. 
+2. Find sparse set of :code:`inp.gpr.Menv` atomic environments in order to recast the SALTED problem on a low dimensional space. The non-linearity degree of the model must be defined at this stage by setting the variable :code:`inp.gpr.z` as a positive integer. :code:`z=1` corresponds to a linear model. 
 
    :code:`python3 -m salted.sparse_selection`
 
-- Compute sparse vectors of descriptors for each atomic type and angular momentum: 
+3. Compute sparse vectors of descriptors for each atomic type and angular momentum: 
 
    :code:`python3 -m salted.sparse_vector` (MPI parallelizable)
 
-- Compute sparse equivariant kernels $k^L_{MM}$ and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS):
+4. Compute sparse equivariant kernels $k^L_{MM}$ and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS):
 
    :code:`python3 -m salted.rkhs_projector`
 
-- Compute equivariant kernels $k^L_{NM}$ over the entire dataset and project them on the RKHS to obtain the final SALTED input vectors: 
+5. Compute equivariant kernels $k^L_{NM}$ over the entire dataset and project them on the RKHS to obtain the final SALTED input vectors: 
 
    :code:`python3 -m salted.rkhs_vector` (MPI parallelizable)
 
-- Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structure among the the entire dataset. The remaining structures will be automatically retained for validation. The training set can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`) from the entire dataset. The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used; this can go from 0 to 1 in order to make learning curves while keeping the validation set fixed. 
+6. Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structure among the the entire dataset. The remaining structures will be automatically retained for validation. The training set can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`) from the entire dataset. The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used; this can go from 0 to 1 in order to make learning curves while keeping the validation set fixed. 
 
    :code:`python3 -m salted.matrices` (MPI parallelizable)
 
-- Perform regression with a given regularization parameter :code:`inp.gpr.regul`. 
+7. Perform regression with a given regularization parameter :code:`inp.gpr.regul`. 
 
    :code:`python3 -m salted.regression`
 
-- When the dimensionality of the learning problem exceeds $10^5$, it is recommended to perform an explicit minimization of the SALTED loss function:
+   NB: when the dimensionality of the learning problem exceeds $10^5$, it is recommended to perform an explicit minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7):
 
    :code:`python3 -m salted.minimize_loss` (MPI parallelizable)
 
-- Validate predictions over the structures that have not been retained for training by computing the root mean square error in agreement to the definition of the SALTED loss function.
+8. Validate predictions over the structures that have not been retained for training by computing the root mean square error in agreement to the definition of the SALTED loss function.
 
    :code:`python3 -m salted.validation` (MPI parallelizable)
 
