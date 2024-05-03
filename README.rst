@@ -57,7 +57,7 @@ The root directory used for storing SALTED data is specified in :code:`inp.salte
 MPI parallelization can be activated by setting :code:`inp.system.parallel` as :code:`True`, and can be used, whenever applicable, to parallelize the calculation of SALTED functions over training data. 
 In what follows, we report an example of a general command line workflow: 
 
-- Initialize structural features defined from 3-body symmetry-adapted descriptors, as computed following PRL 120, 036002 (2018):
+- Initialize structural features defined from 3-body symmetry-adapted descriptors, $P^L$, as computed following PRL 120, 036002 (2018):
 
    :code:`python3 -m salted.init_features`
 
@@ -71,11 +71,11 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.sparse_vector` (MPI parallelizable)
 
-- Compute sparse equivariant kernels $k^L_MM$ and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS):
+- Compute sparse equivariant kernels $k^L_{MM}$ and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS):
 
    :code:`python3 -m salted.rkhs_projector`
 
-- Compute equivariant kernels $k^L_NM$ over the entire dataset and project them on the RKHS to obtain the final SALTED input vectors: 
+- Compute equivariant kernels $k^L_{NM}$ over the entire dataset and project them on the RKHS to obtain the final SALTED input vectors: 
 
    :code:`python3 -m salted.rkhs_vector` (MPI parallelizable)
 
