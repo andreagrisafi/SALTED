@@ -19,6 +19,7 @@ from salted.sys_utils import (
     get_atom_idx,
     get_conf_range,
     read_system,
+    get_feats_projs
 )
 
 

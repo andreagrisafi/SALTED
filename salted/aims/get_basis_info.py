@@ -3,7 +3,6 @@
 import os
 from typing import Dict, List
 
-import inp
 from ase.io import read
 
 from salted.basis_client import (
@@ -20,6 +19,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     update the basis_data dict,
     and write to the database when all species are recorded.
     """
+    inp = ParseConfig().parse_input()
     assert inp.qm.qmcode.lower() == "aims", f"{inp.qm.qmcode=}, but expected 'aims'"
 
     spe_set = set(inp.system.species)

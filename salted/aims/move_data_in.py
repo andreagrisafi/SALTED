@@ -20,7 +20,7 @@ def build():
         rank = 0
         size = 1
     
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename=inp.prediction.filename,spelist = inp.system.species, dfbasis = inp.qm.dfbasis)
     
     pdir = f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}"
     
@@ -35,10 +35,10 @@ def build():
     
     for i in conf_range:
         print(f"processing {i+1}/{ndata} frame")
-        t = np.load(os.path.join(
+        t = np.loadtxt(os.path.join(
             inp.salted.saltedpath, pdir,
             f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
-            f"prediction_conf{i}.npy",
+            f"COEFFS-{i+1}.dat",
         ))
         n = len(t)
     

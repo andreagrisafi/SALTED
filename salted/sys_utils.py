@@ -182,12 +182,13 @@ def sort_grid_data(data:np.ndarray) -> np.ndarray:
 def get_feats_projs(species,lmax):
     import h5py
     import os.path as osp
+    inp = ParseConfig().parse_input()
     Vmat = {}
     Mspe = {}
     power_env_sparse = {}
-    sdir = osp.join(inp.saltedpath, f"equirepr_{inp.saltedname}")
-    features = h5py.File(osp.join(sdir,f"FEAT_M-{inp.Menv}.h5"),'r')
-    projectors = h5py.File(osp.join(sdir,f"projector_M{inp.Menv}_zeta{inp.z}.h5"),'r')
+    sdir = osp.join(inp.salted.saltedpath, f"equirepr_{inp.salted.saltedname}")
+    features = h5py.File(osp.join(sdir,f"FEAT_M-{inp.gpr.Menv}.h5"),'r')
+    projectors = h5py.File(osp.join(sdir,f"projector_M{inp.gpr.Menv}_zeta{inp.gpr.z}.h5"),'r')
     for spe in species:
         for lam in range(lmax[spe]+1):
              # load RKHS projectors
@@ -197,7 +198,7 @@ def get_feats_projs(species,lmax):
              if lam == 0:
                  Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
              # precompute projection on RKHS if linear model
-             if inp.z==1:
+             if inp.gpr.z==1:
                  power_env_sparse[(lam,spe)] = np.dot(
                      Vmat[(lam,spe)].T, power_env_sparse[(lam,spe)]
                  )
