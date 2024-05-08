@@ -48,12 +48,6 @@ def build():
 
     start = time.time()
 
-    if nsamples <= ndata:
-        ndata = nsamples
-    else:
-        print("ERROR: features cutoff ncut must be a positive integer!")
-        sys.exit(0)
-
     ndata_true = ndata
     print(f"The dataset contains {ndata_true} frames.")
 

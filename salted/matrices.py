@@ -117,7 +117,8 @@ def build():
         np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
         np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
 
-def matrices(block_idx,trainrange,ntrain,av_coefs,rank):
+
+def matrices(trainrange,ntrain,av_coefs,rank):
 
     inp = ParseConfig().parse_input()
 
@@ -191,20 +192,8 @@ def matrices(block_idx,trainrange,ntrain,av_coefs,rank):
 
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
-<<<<<<< HEAD
     
     return [Avec,Bmat]
-=======
-
-    if block_idx == -1:
-        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
-        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
-    else:
-        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}_chunk{block_idx}.npy"), Avec)
-        np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}_chunk{block_idx}.npy"), Bmat)
-
-    return
->>>>>>> d576e14 (consistent error messages, remove trailing spaces)
 
 if __name__ == "__main__":
     build()

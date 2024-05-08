@@ -1,5 +1,6 @@
 from salted.basis_client import BasisClient
 
+
 def basiset(basis: str):
     """read basis data and return as the old format
 
