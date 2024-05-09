@@ -60,6 +60,8 @@ def build():
         Mspe = power_env_sparse.shape[0]
         kernel0_mm = np.dot(power_env_sparse,power_env_sparse.T)
         eva, eve = np.linalg.eigh(kernel0_mm**zeta)
+        print(eva)
+        print(eva>eigcut)
         eva = eva[eva>eigcut]
         eve = eve[:,-len(eva):]
         V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))

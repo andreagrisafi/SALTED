@@ -1,8 +1,6 @@
 """Translate basis info from FHI-aims calculation to SALTED basis info"""
-
 import os
 from typing import Dict, List
-
 from ase.io import read
 
 from salted.basis_client import (
