@@ -322,10 +322,10 @@ def build():
                 pvec[lam][i,iat] = p[j]
                 j += 1
 
-    if parallel:
-        comm.Barrier()
-        for lam in range(lmax_max+1):
-            pvec[lam] = comm.allreduce(pvec[lam])
+#    if parallel:
+#        comm.Barrier()
+#        for lam in range(lmax_max+1):
+#            pvec[lam] = comm.allreduce(pvec[lam])
 
     psi_nm = {}
     for i,iconf in enumerate(conf_range):

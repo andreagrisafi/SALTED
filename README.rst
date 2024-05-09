@@ -69,7 +69,7 @@ In what follows, we report an example of a general command line workflow:
 
 3. Compute sparse vectors of descriptors $P^L_M$ for each atomic type and angular momentum: 
 
-   :code:`python3 -m salted.sparse_vector` (MPI parallelizable)
+   :code:`python3 -m salted.get_sparse_features` (MPI parallelizable)
 
 4. Compute sparse equivariant kernels $k^L_{MM}$ and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS):
 
