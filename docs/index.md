@@ -1,5 +1,7 @@
 # Welcome to SALTED's documentation!
 
+## Introduction
+
 Ab initio electronic structure methods, such as density functional theory, are computationally costly, rendering them impractical for large systems.
 In contrast, data-driven machine learning methods represent a good alternative for predicting the electornic structure at a low computational cost,
 allowing for "ab initio accuracy" in large systems.
@@ -18,7 +20,7 @@ Check out [installation](installation) to install the project, and you can find 
 
 
 
-## How to locally setup the MkDocs website
+## Setup the MkDocs website locally (not necessary)
 
 Please install `mkdocs` and packages in `docs/requirements.txt`:
 
@@ -36,7 +38,7 @@ mkdocs serve
 Mkdocs now builds the website and makes it available under localhost:8000 (you can just enter this in your browser). The port might be a different on your platform, but mkdocs tells you where to find the website like this:
 
 ```text
-Serving on http://127.0.0.1:8000/tutorials/fhi-aims-with-salted/
+Serving on http://127.0.0.1:[port]/tutorials/fhi-aims-with-salted/
 ```
 
 Mkdocs now watches your changes and rebuilds whenever you change something in the files (you need to save your changes). So you can watch your changes live in the browser.

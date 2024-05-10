@@ -10,7 +10,7 @@ site_url: https://github.com/andreagrisafi/SALTED
 
 nav:
   - Home: index.md
-  - Installation: installation.md
+  - Preparations: preparations.md
   - Tutorial:
     - Part 1 - Methods: tutorial/methods.md
     - Part 2 - Workflow: tutorial/workflow.md
@@ -20,7 +20,7 @@ nav:
   - Examples:
     - Example 1 - Water & PySCF: examples/water_pyscf.md
     - Example 2 - Water & FHI-aims: examples/water_aims.md
-    - Example 3 - (more examples): examples/what_cp2k.md
+    - Example 3 - Au slab & CP2K: examples/au_cp2k.md
   - Appendix:
     - API: api.md
     - Test mkdocs (for dev): test_mkdocs.md
@@ -40,3 +40,10 @@ markdown_extensions:
   - markdown_include.include:
       base_path: .
   - admonition
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js  # mathjax support
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js

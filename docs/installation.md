@@ -1,3 +1,0 @@
-# Installation
-
-To be developed...

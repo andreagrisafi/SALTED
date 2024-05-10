@@ -1,5 +1,7 @@
 # ~ Test MKDocs (playground)
 
+This page is for testing MKDocs functions, please see the [official documentation](https://docs.readthedocs.io/en/stable/tutorial/index.html) for more details.
+
 ## Installation
 
 To use SALTED, first install it using pip:
