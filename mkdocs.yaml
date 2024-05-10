@@ -42,6 +42,14 @@ markdown_extensions:
   - admonition
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.superfences
+  - attr_list
+  - footnotes
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.snippets
+
+
 
 extra_javascript:
   - javascripts/mathjax.js  # mathjax support
