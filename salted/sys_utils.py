@@ -179,7 +179,33 @@ def sort_grid_data(data:np.ndarray) -> np.ndarray:
     data = data[np.lexsort((data[:,2], data[:,1], data[:,0]))]  # last key is primary
     return data
 
+def get_feats_projs(species,lmax):
+    import h5py
+    import os.path as osp
+    inp = ParseConfig().parse_input()
+    Vmat = {}
+    Mspe = {}
+    power_env_sparse = {}
+    sdir = osp.join(inp.salted.saltedpath, f"equirepr_{inp.salted.saltedname}")
+    features = h5py.File(osp.join(sdir,f"FEAT_M-{inp.gpr.Menv}.h5"),'r')
+    projectors = h5py.File(osp.join(sdir,f"projector_M{inp.gpr.Menv}_zeta{inp.gpr.z}.h5"),'r')
+    for spe in species:
+        for lam in range(lmax[spe]+1):
+             # load RKHS projectors
+             Vmat[(lam,spe)] = projectors["projectors"][spe][str(lam)][:]
+             # load sparse equivariant descriptors
+             power_env_sparse[(lam,spe)] = features["sparse_descriptors"][spe][str(lam)][:]
+             if lam == 0:
+                 Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
+             # precompute projection on RKHS if linear model
+             if inp.gpr.z==1:
+                 power_env_sparse[(lam,spe)] = np.dot(
+                     Vmat[(lam,spe)].T, power_env_sparse[(lam,spe)]
+                 )
+    features.close()
+    projectors.close()
 
+    return Vmat,Mspe,power_env_sparse
 
 class AttrDict:
     """Access dict keys as attributes

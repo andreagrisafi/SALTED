@@ -13,7 +13,7 @@ import numpy as np
 from scipy import sparse
 from ase.data import atomic_numbers
 
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range,get_feats_projs
 
 from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
@@ -108,32 +108,7 @@ def build():
             ))
 
     # Load training feature vectors and RKHS projection matrix
-    Vmat = {}
-    Mspe = {}
-    power_env_sparse = {}
-    for spe in species:
-        for lam in range(lmax[spe]+1):
-             # load RKHS projectors
-             Vmat[(lam,spe)] = np.load(osp.join(
-                 saltedpath,
-                 f"equirepr_{saltedname}",
-                 f"spe{spe}_l{lam}",
-                 f"projector_M{Menv}_zeta{zeta}.npy",
-             ))
-             # load sparse equivariant descriptors
-             power_env_sparse[(lam,spe)] = h5py.File(osp.join(
-                 saltedpath,
-                 f"equirepr_{saltedname}",
-                 f"spe{spe}_l{lam}",
-                 f"FEAT_M-{Menv}.h5"
-             ), 'r')['sparse_descriptor'][:]
-             if lam == 0:
-                 Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
-             # precompute projection on RKHS if linear model
-             if zeta==1:
-                 power_env_sparse[(lam,spe)] = np.dot(
-                     Vmat[(lam,spe)].T, power_env_sparse[(lam,spe)]
-                 )
+    Vmat,Mspe,power_env_sparse = get_feats_projs(species,lmax)
 
     # compute the weight-vector size
     cuml_Mcut = {}

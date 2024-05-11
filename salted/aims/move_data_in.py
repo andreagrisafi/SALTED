@@ -7,8 +7,6 @@ from salted.sys_utils import ParseConfig, read_system, get_conf_range
 def build():
     inp = ParseConfig().parse_input()
 
-    print("WARNING! This script assumes you will use an AIMS version >= 240403 to read the predicted RI coefficients. If this is not true, please use move_data_in_reorder instead.")
-
     if inp.system.parallel:
         from mpi4py import MPI
         # MPI information
@@ -20,7 +18,9 @@ def build():
         rank = 0
         size = 1
     
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    if rank == 0: print("WARNING! This script assumes you will use an AIMS version >= 240403 to read the predicted RI coefficients. If this is not true, please use move_data_in_reorder instead.")
+
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename=inp.prediction.filename,spelist = inp.system.species, dfbasis = inp.qm.dfbasis)
     
     pdir = f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}"
     
@@ -35,10 +35,10 @@ def build():
     
     for i in conf_range:
         print(f"processing {i+1}/{ndata} frame")
-        t = np.load(os.path.join(
+        t = np.loadtxt(os.path.join(
             inp.salted.saltedpath, pdir,
             f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
-            f"prediction_conf{i}.npy",
+            f"COEFFS-{i+1}.dat",
         ))
         n = len(t)
     

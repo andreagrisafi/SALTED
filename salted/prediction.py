@@ -19,6 +19,7 @@ from salted.sys_utils import (
     get_atom_idx,
     get_conf_range,
     read_system,
+    get_feats_projs
 )
 
 
@@ -109,32 +110,7 @@ def build():
             ))
 
     # Load training feature vectors and RKHS projection matrix
-    Vmat = {}
-    Mspe = {}
-    power_env_sparse = {}
-    for spe in species:
-        for lam in range(lmax[spe]+1):
-            # load RKHS projectors
-            Vmat[(lam,spe)] = np.load(osp.join(
-                saltedpath,
-                f"equirepr_{saltedname}",
-                f"spe{spe}_l{lam}",
-                f"projector_M{Menv}_zeta{zeta}.npy",
-            ))
-            # load sparse equivariant descriptors
-            power_env_sparse[(lam,spe)] = h5py.File(osp.join(
-                saltedpath,
-                f"equirepr_{saltedname}",
-                f"spe{spe}_l{lam}",
-                f"FEAT_M-{Menv}.h5"
-            ), 'r')['sparse_descriptor'][:]
-            if lam == 0:
-                Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
-            # precompute projection on RKHS if linear model
-            if zeta==1:
-                power_env_sparse[(lam,spe)] = np.dot(
-                    Vmat[(lam,spe)].T, power_env_sparse[(lam,spe)]
-                )
+    Vmat,Mspe,power_env_sparse = get_feats_projs(species,lmax)
 
     reg_log10_intstr = str(int(np.log10(regul)))  # for consistency
 
@@ -346,10 +322,10 @@ def build():
                 pvec[lam][i,iat] = p[j]
                 j += 1
 
-    if parallel:
-        comm.Barrier()
-        for lam in range(lmax_max+1):
-            pvec[lam] = comm.allreduce(pvec[lam])
+#    if parallel:
+#        comm.Barrier()
+#        for lam in range(lmax_max+1):
+#            pvec[lam] = comm.allreduce(pvec[lam])
 
     psi_nm = {}
     for i,iconf in enumerate(conf_range):
@@ -478,10 +454,10 @@ def build():
         if parallel and rank == 0:
             d_fpath = osp.join(dirpath, "dipoles.dat")
             dips = np.loadtxt(d_fpath)
-            np.savetxt(d_fpath, dips[dips[:,0].argsort()], fmt='%i %f')
+            np.savetxt(d_fpath, dips[dips[:,0].argsort()], fmt='%f')
             q_fpath = osp.join(dirpath, "charges.dat")
             qs = np.loadtxt(q_fpath)
-            np.savetxt(q_fpath, qs[qs[:,0].argsort()],fmt='%i %f')
+            np.savetxt(q_fpath, qs[qs[:,0].argsort()],fmt='%f')
 
     if rank == 0: print(f"\ntotal time: {(time.time()-start):.2f} s")
 
