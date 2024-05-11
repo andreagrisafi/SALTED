@@ -6,6 +6,7 @@ In what follows we describe how to generate the training electron density data u
 1. The following input arguments must be added to the :code:`inp.qm` section:
     
     :code:`qmbasis`: define the wave function basis set for the Kohn-Sham calculation (example: :code:`cc-pvqz`)
+
     :code:`functional`: define the functional for the Kohn-Sham calculation (example: :code:`b3lyp`)
 
 2. Run PySCF to compute the Kohn-Sham density matrices: 
