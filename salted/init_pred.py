@@ -8,7 +8,7 @@ import numpy as np
 from scipy import special
 
 from salted import basis
-from salted.sys_utils import ParseConfig
+from salted.sys_utils import ParseConfig, get_feats_projs
 
 def build():
 

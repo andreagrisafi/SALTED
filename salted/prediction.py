@@ -454,10 +454,10 @@ def build():
         if parallel and rank == 0:
             d_fpath = osp.join(dirpath, "dipoles.dat")
             dips = np.loadtxt(d_fpath)
-            np.savetxt(d_fpath, dips[dips[:,0].argsort()], fmt='%i %f')
+            np.savetxt(d_fpath, dips[dips[:,0].argsort()], fmt='%f')
             q_fpath = osp.join(dirpath, "charges.dat")
             qs = np.loadtxt(q_fpath)
-            np.savetxt(q_fpath, qs[qs[:,0].argsort()],fmt='%i %f')
+            np.savetxt(q_fpath, qs[qs[:,0].argsort()],fmt='%f')
 
     if rank == 0: print(f"\ntotal time: {(time.time()-start):.2f} s")
 
