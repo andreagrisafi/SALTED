@@ -44,7 +44,7 @@ descriptor:
 
 # Gaussian process regression variables
 gpr:
-  z: 1.0
+  z: 2.0
   Menv: 100
   Ntrain: 1000
   trainfrac: 1.0

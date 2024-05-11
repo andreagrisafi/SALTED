@@ -1,5 +1,6 @@
 import os
 import sys
+import os.path as osp
 
 import numpy as np
 from pyscf import gto
@@ -29,7 +30,7 @@ nnmax = max(nlist)
 llmax = max(llist)
 
 # read system
-xyzfile = read(inp.prediction.filename,":")
+xyzfile = read(inp.system.filename,":")
 ndata = len(xyzfile)
 
 hart2kcal = 627.5096080305927
@@ -45,19 +46,21 @@ for i in range(len(xyzfile)):
 natmax = max(natoms)
 
 # load predicted coefficients for test structures
-trainrangetot = np.loadtxt("training_set.txt",int)
+rdir = osp.join(inp.salted.saltedpath, f"regrdir_{inp.salted.saltedname}")
+trainrangetot = np.loadtxt(osp.join(rdir,f"training_set_N{inp.gpr.Ntrain}.txt"),int)
 testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
+print(ntest)
 natoms_test = natoms[testrange]
 
 M = inp.gpr.Menv
 eigcut = inp.gpr.eigcut
 ntrain = int(inp.gpr.Ntrain*inp.gpr.trainfrac)
 reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))  # for consistency
-pdir = os.path.join(
+vdir = os.path.join(
     inp.salted.saltedpath,
-    f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}",
-    f"M{inp.gpr.Menv}_zeta{inp.gpr.zeta}",
+    f"validations_{inp.salted.saltedname}",
+    f"M{inp.gpr.Menv}_zeta{inp.gpr.z}",
     f"N{ntrain}_reg{reg_log10_intstr}",
 )
 
@@ -109,9 +112,6 @@ def radint2(lval,alp,d):
     rint2 = 0.5*np.exp(-alp*d**2)/alp
     return rint2/np.sqrt(inner)
 
-# coeffs = np.load(pdir, f"prediction_conf{iconf}.npy")
-# coeffs = np.load("pred_coeffs.npy")
-
 electro_ref = np.loadtxt("electrostatic_energy.dat")
 electro_pre = np.zeros(len(testrange))
 f = open("predicted_electrostatic_energies.dat","w")
@@ -124,8 +124,7 @@ for iconf in testrange:
     nele = np.sum(valences)
     natoms = len(atoms)
     # Load projections and overlaps
-#    projs = np.load(inp.qm.path2qm+"projections/projections_conf"+str(iconf)+".npy")
-    rcoeffs = np.load(os.path.join(pdir, f"prediction_conf{iconf}.npy"))
+    rcoeffs = np.loadtxt(os.path.join(vdir, f"COEFFS-{iconf+1}.dat"))
     ref_coeffs = np.zeros((natoms,llmax+1,nnmax,llmax*2+1))
     ref_rho = np.zeros(rcoeffs.shape,float)
     icoeff = 0
