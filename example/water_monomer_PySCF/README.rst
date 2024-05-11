@@ -25,7 +25,7 @@ Indirect prediction of electrostatic energies
 
 From the predicted density coefficients, it is possible to validate the model computing the electrostatic energy and compare it against the reference PySCF values. 
 
-1. Calculate the reference energies of the water molecules used in validation, using
+1. Calculate the reference energies of the water molecules used for validation, by running:
 
     :code:`python3 salted.pyscf.electro_energy`
 
