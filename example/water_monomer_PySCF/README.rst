@@ -28,8 +28,8 @@ From the predicted density coefficients, it is possible to validate the model co
 
 1. Calculate the reference energies of the water molecules used for validation, by running:
 
-    :code:`python3 salted.pyscf.electro_energy`
+    :code:`python3 -m salted.pyscf.electro_energy`
 
 2. Calculate the energies derived from the predicted densities on the validation set and evaluate the error in kcal/mol, by running:
 
-    :code:`python3 salted.pyscf.electro_error`
+    :code:`python3 -m salted.pyscf.electro_error`
