@@ -2,7 +2,15 @@ Generate QM/MM training data using CP2K
 ---------------------------------------
 In what follows, we describe how to generate QM/MM training electron densities of a dataset made of Au(100) slabs that interact with a classical Gaussian charge, using the CP2K simulation program.
 
-1. First, set the input argument :code:`inp.qm.qmcode` as :code:`cp2k` and define the path where the CP2K     calculations are going to be perfomed in :code:`inp.qm.path2qm`. Set the periodicity of the system in    :code:`inp.qm.periodic`, choosing among :code:`0D,2D,3D`. Then, initialize the systems used for the CP2K calculation by running:
+1. The following input arguments must be added to the :code:`inp.qm` section:
+
+    - :code:`inp.qm.qmcode`: define quantum-mechanical code as :code:`cp2k`
+
+    - :code:`inp.qm.path2qm`: set the path where the CP2K calculations are going to be perfomed 
+
+    - :code:`inp.qm.periodic`: set the periodicity of the system (:code:`0D,2D,3D`)
+
+2. Initialize the systems used for the CP2K calculation by running:
 
     :code:`python3 -m salted.cp2k.xyz2sys`
 
