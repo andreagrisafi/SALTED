@@ -4,6 +4,7 @@ In what follows, we describe how to generate training electron densities of a da
 
 1. The following input arguments must be added to the :code:`inp.qm` section:
 
+
    - :code:`qmcode`: define quantum-mechanical code as :code:`cp2k`
 
    - :code:`path2qm`: set the path where the CP2K calculations are going to be perfomed 
@@ -32,7 +33,7 @@ In what follows, we describe how to generate training electron densities of a da
 
    :code:`python3 -m salted.get_basis_info`
 
-5. Run the CP2K calculations using the selected auxiliary basis and print out the training data made of reference RI coefficients and 2-center auxialiary integrals. An example of a CP2K input file can be found in :code:`cp2k-inputs/qmmm_RI-print.inp`. 
+5. Run the CP2K calculations using the selected auxiliary basis and print out the training data made of reference RI coefficients and 2-center auxiliary integrals. An example of a CP2K input file can be found in :code:`cp2k-inputs/qmmm_RI-print.inp`. 
 
 6. Convert the training data previously generated to SALTED format by running:
 
