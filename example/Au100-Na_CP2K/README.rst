@@ -5,15 +5,15 @@ In what follows, we describe how to generate training electron densities of a da
 1. The following input arguments must be added to the :code:`inp.qm` section:
 
 
-   - :code:`qmcode`: define quantum-mechanical code as :code:`cp2k`
+   :code:`qmcode`: define quantum-mechanical code as :code:`cp2k`
 
-   - :code:`path2qm`: set the path where the CP2K calculations are going to be perfomed 
+   :code:`path2qm`: set the path where the CP2K calculations are going to be perfomed 
 
-   - :code:`inp.qm.periodic`: set the periodicity of the system (:code:`0D,2D,3D`)
+   :code:`inp.qm.periodic`: set the periodicity of the system (:code:`0D,2D,3D`)
 
-   - :code:`coeffile`: filename of RI density coefficients as printed by CP2K
+   :code:`coeffile`: filename of RI density coefficients as printed by CP2K
 
-   - :code:`ovlpfile`: filename of 2-center auxiliary integrals as printed by CP2K
+   :code:`ovlpfile`: filename of 2-center auxiliary integrals as printed by CP2K
 
 2. Initialize the systems used for the CP2K calculation by running:
 
