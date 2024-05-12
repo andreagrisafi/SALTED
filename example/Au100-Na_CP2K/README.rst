@@ -1,6 +1,6 @@
 Generate QM/MM training data using CP2K
 ---------------------------------------
-In what follows, we describe how to generate QM/MM training electron densities of a dataset made of Au(100) slabs that interact with a classical Gaussian charge, using the CP2K simulation program. NB: this is made possible through to the official development version of CP2K (https://github.com/cp2k/cp2k).
+In what follows, we describe how to generate training electron densities of a dataset made of Au(100) slabs that interact with a classical Gaussian charge, using the CP2K simulation program. NB: this is made possible through to the official development version of CP2K (https://github.com/cp2k/cp2k).
 
 1. The following input arguments must be added to the :code:`inp.qm` section:
 
