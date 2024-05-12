@@ -63,7 +63,7 @@ In what follows, we report an example of a general command line workflow:
 
    An optional :code:`sparsify` subsection can be added to the :code:`inp.descriptor` input section in order to reduce the feature space size down to :code:`ncut` sparse features selected using a "farthest point sampling" (FPS) algorithm. To facilitate this procedure, it is possible to perform the FPS selection over a subset of :code:`nsamples` configurations, selected at random from the entire training dataset.
 
-2. Find sparse set of :code:`inp.gpr.Menv` atomic environments in order to recast the SALTED problem on a low dimensional space. The non-linearity degree of the model must be defined at this stage by setting the variable :code:`inp.gpr.z` as a positive integer. :code:`z=1` corresponds to a linear model. 
+2. Find sparse set of :code:`inp.gpr.Menv` atomic environments in order to recast the SALTED problem into a low dimensional space. The non-linearity degree of the model must be defined at this stage by setting the variable :code:`inp.gpr.z` as a positive integer. :code:`z=1` corresponds to a linear model. 
 
    :code:`python3 -m salted.sparse_selection`
 
@@ -79,15 +79,15 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.rkhs_vector` (MPI parallelizable)
 
-6. Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structures selected from the entire dataset; these can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`). The remaining structures will be automatically retained for validation.  The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used: this can go from 0 to 1 in order to make learning curves while keeping the validation set fixed. 
+6. Build the Hessian matrix of the quadratic RKHS problem over a maximum of :code:`inp.gpr.Ntrain` training structures selected from the entire dataset; these can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`). The remaining structures will be automatically retained for validation.  The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used: this can go from 0 to 1 in order to make learning curves while keeping the validation set fixed. 
 
    :code:`python3 -m salted.hessian_matrix` (MPI parallelizable)
 
-7. Perform regression with a given regularization parameter :code:`inp.gpr.regul`. 
+7. Solve the regression problem with a given regularization parameter :code:`inp.gpr.regul`. 
 
    :code:`python3 -m salted.solve_regression`
 
-   NB: when the dimensionality of the learning problem exceeds $10^5$, it is recommended to perform a direct minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7). This can be run as follows:
+   NB: when the dimensionality exceeds $10^5$, it is recommended to perform a direct minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7). This can be run as follows:
 
    :code:`python3 -m salted.minimize_loss` (MPI parallelizable)
 
