@@ -5,9 +5,9 @@ In what follows, we describe how to generate the training electron density data 
 
 1. The following input arguments must be added to the :code:`inp.qm` section:
 
-   - :code:`qmcode: pyscf`: define the quantum-mechanical code as PySCF
+   - :code:`qmcode:`: define the quantum-mechanical code as :code:`pyscf`
 
-   - :code:`path2qm`: set the path where the CP2K calculations are going to be perfomed 
+   - :code:`path2qm`: set the path where the PySCF calculations are going to be perfomed 
     
    - :code:`qmbasis`: define the wave function basis set for the Kohn-Sham calculation (example: :code:`cc-pvqz`)
 
