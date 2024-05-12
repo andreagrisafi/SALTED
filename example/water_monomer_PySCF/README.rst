@@ -1,9 +1,11 @@
 Generate training data using PySCF
 ----------------------------------
 
-In what follows we describe how to generate the training electron density data using the PySCF quantum-chemistry program.
+In what follows, we describe how to generate the training electron density data using the PySCF quantum-chemistry program.
 
 1. The following input arguments must be added to the :code:`inp.qm` section:
+
+    :code:`qmcode: pyscf`: define the quantum-mechanical code as PySCF
     
     :code:`qmbasis`: define the wave function basis set for the Kohn-Sham calculation (example: :code:`cc-pvqz`)
 
