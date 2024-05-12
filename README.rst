@@ -51,9 +51,9 @@ Input structures are required in XYZ format; the corresponding filename must be 
 Electron density training data consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. These coefficients are computed following density-fitting (DF), a.k.a. resolution of the identity, approximations, commonly applied in electronic-structure codes. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis functions, the 2-center electronic integral matrices associated with the given density-fitting approximation are also required as input. 
 The electronic-structure codes that are to date interfaced with SALTED are:
     
-    - **FHI-aims**
-    - **CP2K** 
-    - **PySCF** 
+   - **FHI-aims**
+   - **CP2K** 
+   - **PySCF** 
 
 We refer to the code-specific examples for how to produce the required quantum-mechanical data. 
 
