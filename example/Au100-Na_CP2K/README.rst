@@ -1,6 +1,6 @@
 Generate QM/MM training data using CP2K
 ---------------------------------------
-In what follows, we describe how to generate QM/MM training electron densities of a dataset made of Au(100) slabs that interact with a classical Gaussian charge, using the CP2K simulation program.
+In what follows, we describe how to generate QM/MM training electron densities of a dataset made of Au(100) slabs that interact with a classical Gaussian charge, using the CP2K simulation program. NB: this is made possible through to the official development version of CP2K (https://github.com/cp2k/cp2k).
 
 1. The following input arguments must be added to the :code:`inp.qm` section:
 
@@ -9,6 +9,10 @@ In what follows, we describe how to generate QM/MM training electron densities o
     - :code:`inp.qm.path2qm`: set the path where the CP2K calculations are going to be perfomed 
 
     - :code:`inp.qm.periodic`: set the periodicity of the system (:code:`0D,2D,3D`)
+
+    - :code:`coeffile`: filename of RI density coefficients as printed by CP2K
+
+    - :code:`ovlpfile`: filename of 2-center auxiliary integrals as printed by CP2K
 
 2. Initialize the systems used for the CP2K calculation by running:
 
@@ -28,5 +32,9 @@ In what follows, we describe how to generate QM/MM training electron densities o
 
     :code:`python3 -m salted.get_basis_info`
 
-5. Run the CP2K calculations and print out the training data made of reference RI coefficients and 2-center auxialiary integrals. An example of a CP2K input file can be found in :code:`cp2k-inputs/qmmm_RI-print.inp`. 
+5. Run the CP2K calculations using the selected auxiliary basis and print out the training data made of reference RI coefficients and 2-center auxialiary integrals. An example of a CP2K input file can be found in :code:`cp2k-inputs/qmmm_RI-print.inp`. 
+
+6. Convert the training data previously generated to SALTED format by running:
+
+   :code:`python3 -m salted.cp2k.cp2k2salted` 
 
