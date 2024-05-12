@@ -9,7 +9,7 @@ In what follows, we describe how to generate training electron densities of a da
 
    :code:`path2qm`: set the path where the CP2K calculations are going to be perfomed 
 
-   :code:`inp.qm.periodic`: set the periodicity of the system (:code:`0D,2D,3D`)
+   :code:`periodic`: set the periodicity of the system (:code:`0D,2D,3D`)
 
    :code:`coeffile`: filename of RI density coefficients as printed by CP2K
 
