@@ -5,11 +5,11 @@ salted:
 
 # system general parameters
 system:
-  filename: ./coords.xyz
-  species: [Au,]
+  filename: ./coords-qmmm.xyz
+  species: [Au]
   parallel: False
   average: False
-  field: True
+  field: False 
 
 # quantum mechanical info
 qm:
@@ -21,7 +21,7 @@ qm:
   pseudocharge: 11.0
   periodic: 2D
 
-# atomic environment parameters (for rascaline)
+# descriptor parameters 
 descriptor:
   rep1:
     type: rho
