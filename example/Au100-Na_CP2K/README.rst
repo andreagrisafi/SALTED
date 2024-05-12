@@ -4,9 +4,9 @@ In what follows, we describe how to generate training electron densities of a da
 
 1. The following input arguments must be added to the :code:`inp.qm` section:
 
-   - :code:`inp.qm.qmcode`: define quantum-mechanical code as :code:`cp2k`
+   - :code:`qmcode`: define quantum-mechanical code as :code:`cp2k`
 
-   - :code:`inp.qm.path2qm`: set the path where the CP2K calculations are going to be perfomed 
+   - :code:`path2qm`: set the path where the CP2K calculations are going to be perfomed 
 
    - :code:`inp.qm.periodic`: set the periodicity of the system (:code:`0D,2D,3D`)
 
