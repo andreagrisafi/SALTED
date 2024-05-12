@@ -49,7 +49,7 @@ Input Dataset
 -------------
 Input structures are required in XYZ format; the corresponding filename must be specified in the :code:`inp.system.filename`. 
 Electron density training data consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. These coefficients are computed following density-fitting (DF), a.k.a. resolution of the identity, approximations, commonly applied in electronic-structure codes. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis functions, the 2-center electronic integral matrices associated with the given density-fitting approximation are also required as input. 
-The electronic-structure codes that are to date interfaced with SALTED are **FHI-aims**, **CP2K** and **PySCF**; we refer to the code-specific examples for how to produce the required quantum-mechanical data. The selected DF basis must be specified into the :code:`inp.qm.dfbasis` input argument, and then added to SALTED through the :code:`salted.get_basis_info` function.
+The electronic-structure codes that are to date interfaced with SALTED are **FHI-aims**, **CP2K** and **PySCF**; we refer to the code-specific examples for how to produce the required quantum-mechanical data. In all cases, the selected DF basis must be specified into the :code:`inp.qm.dfbasis` input argument, and then added to SALTED through the :code:`salted.get_basis_info` function.
 
 Usage
 -----
@@ -59,7 +59,7 @@ In what follows, we report an example of a general command line workflow:
 
 1. Initialize structural features defined from 3-body symmetry-adapted descriptors, $P^L$, as computed following PRL 120, 036002 (2018):
 
-   :code:`python3 -m salted.init_features`
+   :code:`python3 -m salted.initialize`
 
    An optional :code:`sparsify` subsection can be added to the :code:`inp.descriptor` input section in order to reduce the feature space size down to :code:`ncut` sparse features selected using a "farthest point sampling" (FPS) algorithm. To facilitate this procedure, it is possible to perform the FPS selection over a subset of :code:`nsamples` configurations, selected at random from the entire training dataset.
 
@@ -69,7 +69,7 @@ In what follows, we report an example of a general command line workflow:
 
 3. Compute sparse vectors of descriptors $P^L_M$ for each atomic type and angular momentum: 
 
-   :code:`python3 -m salted.sparse_descriptors` (MPI parallelizable)
+   :code:`python3 -m salted.sparse_descriptor` (MPI parallelizable)
 
 4. Compute sparse equivariant kernels $k^L_{MM}$ and find projector matrices over the Reproducing Kernel Hilbert Space (RKHS):
 
@@ -81,11 +81,11 @@ In what follows, we report an example of a general command line workflow:
 
 6. Build regression matrices over a maximum of :code:`inp.gpr.Ntrain` training structures selected from the entire dataset; these can be either selected at random (:code:`inp.gpr.trainsel: random`) or sequentially (:code:`inp.gpr.trainsel: sequential`). The remaining structures will be automatically retained for validation.  The variable :code:`inp.gpr.trainfrac` can be used to define the fraction of the total training data to be used: this can go from 0 to 1 in order to make learning curves while keeping the validation set fixed. 
 
-   :code:`python3 -m salted.matrices` (MPI parallelizable)
+   :code:`python3 -m salted.hessian_matrix` (MPI parallelizable)
 
 7. Perform regression with a given regularization parameter :code:`inp.gpr.regul`. 
 
-   :code:`python3 -m salted.regression`
+   :code:`python3 -m salted.solve_regression`
 
    NB: when the dimensionality of the learning problem exceeds $10^5$, it is recommended to perform a direct minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7). This can be run as follows:
 
