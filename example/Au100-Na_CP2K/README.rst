@@ -10,4 +10,6 @@ In what follows, we describe how to generate QM/MM training electron densities o
 
 3. An uncontracted version of this basis can be produced to increase the efficiency of the RI printing workflow, by running:
 
-  :code:`python3 -m salted.cp2k.uncontract_ri_basis contracted_basis_file uncontracted_basis_file`
+    :code:`python3 -m salted.cp2k.uncontract_ri_basis contracted_basis_file uncontracted_basis_file`
+
+    Then, copy :code:`uncontracted_basis_file` to the :code:`cp2k/data/` folder in order to use this basis set to produce the reference density-fitting data, and use the corresponding filename as the SALTED :code:`inp.qm.dfbasis` input variable.
