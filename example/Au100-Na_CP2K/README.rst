@@ -15,6 +15,8 @@ In what follows, we describe how to generate training electron densities of a da
 
    :code:`ovlpfile`: filename of 2-center auxiliary integrals as printed by CP2K
 
+   :code:`dfbasis`: define auxiliary basis for the electron density expansion
+
 2. Initialize the systems used for the CP2K calculation by running:
 
    :code:`python3 -m salted.cp2k.xyz2sys`
@@ -35,7 +37,7 @@ In what follows, we describe how to generate training electron densities of a da
 
 5. Run the CP2K calculations using the selected auxiliary basis and print out the training data made of reference RI coefficients and 2-center auxiliary integrals. An example of a CP2K input file can be found in :code:`cp2k-inputs/qmmm_RI-print.inp`. 
 
-6. Convert the training data previously generated to SALTED format by running:
+6. Set the generated training data into the :code:`inp.qm.coeffile`: and :code:`inp.qm.ovlpfile` variables and convert them to SALTED format by running:
 
    :code:`python3 -m salted.cp2k.cp2k2salted` 
 
