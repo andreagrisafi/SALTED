@@ -5,13 +5,13 @@ In what follows, we describe how to generate the training electron density data 
 
 1. The following input arguments must be added to the :code:`inp.qm` section:
 
-   - :code:`qmcode:`: define the quantum-mechanical code as :code:`pyscf`
+   :code:`qmcode:`: define the quantum-mechanical code as :code:`pyscf`
 
-   - :code:`path2qm`: set the path where the PySCF calculations are going to be perfomed 
+   :code:`path2qm`: set the path where the PySCF calculations are going to be perfomed 
     
-   - :code:`qmbasis`: define the wave function basis set for the Kohn-Sham calculation (example: :code:`cc-pvqz`)
+   :code:`qmbasis`: define the wave function basis set for the Kohn-Sham calculation (example: :code:`cc-pvqz`)
 
-   - :code:`functional`: define the functional for the Kohn-Sham calculation (example: :code:`b3lyp`)
+   :code:`functional`: define the functional for the Kohn-Sham calculation (example: :code:`b3lyp`)
 
 2. Define the auxiliary basis set using the input variable :code:`dfbasis`, as provided in the :code:`inp.qm` section. This must be chosen consistently with the wave function basis set (example: :code:`RI-cc-pvqz`). Then, add this basis set information to SALTED by running:
 
