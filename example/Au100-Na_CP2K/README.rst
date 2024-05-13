@@ -6,7 +6,7 @@ In what follows, we describe how to generate training electron densities of a da
 
    :code:`qmcode`: define quantum-mechanical code as :code:`cp2k`
 
-   :code:`path2qm`: set the path where the CP2K calculations are going to be perfomed 
+   :code:`path2qm`: set the path where the CP2K data are going to be saved
 
    :code:`periodic`: set the periodicity of the system (:code:`0D,2D,3D`)
 
