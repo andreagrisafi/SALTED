@@ -3,16 +3,12 @@
 This part of the tutorial contains no hands-on instructions. Instead, it is meant as a primer of the theoretical background and workflow of SALTED, for users to get familiarized with the methods before doing the exercise.
 
 
-## Methods in SALTED
-
-SALTED uses symmetry-adapted Gaussian process regression (SAGPR) to learn the density fitting coefficients.
-
 ### Symmetry-adapted descriptor
 
 <!--Different from the general GPR formalism, the atomic environment descriptor strategy is introduced to represent the atomic environment quantitatively,
 and the kernel function is defined by the outer product of two (sets of) descriptor's power spectrums.-->
 
-$\lambda$-SOAP is a modified version of the SOAP descriptor, which builds rotational equivariance into the kernel function and the descriptor's power spectrum.
+SALTED uses symmetry-adapted Gaussian process regression (SAGPR) to learn the density fitting coefficients. This employs $\lambda$-SOAP descriptors, modified versions of the SOAP descriptors which builds rotational equivariance into the kernel function and the descriptor's power spectrum.
 For details, please check [this paper](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002  ).
 
 

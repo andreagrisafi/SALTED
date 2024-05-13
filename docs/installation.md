@@ -8,10 +8,6 @@ The density fitting coefficients are learned from a set of small reference struc
 SALTED has been applied to large molecular datasets by enhancing model optimization methods, as detailed in [10.1021/acs.jctc.2c00850  ](https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00850).
 This tutorial is based on the improved SALTED model presented in this paper.
 
-Additionally, the Symmetry-Adapted Learning of Three-dimensional Electron Responses (SALTER) model is derived from SALTED with a small, yet crucial, change to the descriptor.
-This adaptation enables the prediction of vector fields, like the electronic density response to external electric field.
-For more details, refer to [10.1063/5.0154710  ](https://pubs.aip.org/aip/jcp/article/159/1/014103/2900715/Predicting-the-electronic-density-response-of).
-
 !!! warning "Linux only 🐧"
     FHI-aims and SALTED are only available on Linux OS. For Windows users, please use WSL or virtual machines.
 
@@ -36,14 +32,14 @@ especially the [dependencies](https://github.com/andreagrisafi/SALTED#dependenci
 
 ## Install an Ab Initio software
 
-SALTED should be installed along with an ab initio software (one of CP2K, PySCF, and FHI-aims).
+SALTED should be installed along with an ab initio software (one of CP2K, PySCF, and FHI-aims). If you develop a different code and would like to use it with SALTED, please contact one of the developers for SALTED.
 
 ### PySCF
 
 To install PySCF, you can follow the instructions [here](https://pyscf.org/install.html).
 
 Please note that PySCF works well with small systems like molecules and clusters, but it lacks the scalability to handle periodic systems like crystals.
-So we suggest using CP2K or FHI-aims for application, see below.
+So we suggest using CP2K or FHI-aims for these applications.
 
 
 ### FHI-aims
@@ -60,6 +56,6 @@ Especially, you can find an FHI-aims focused tutorial on SALTED [here in FHI-aim
 
 ### CP2K
 
-[CP2K website](https://www.cp2k.org/)
+CP2K can be installed from the [CP2K website](https://www.cp2k.org/).
 
 

@@ -17,30 +17,3 @@ Check out [installation](installation) to install the project, and you can find 
 
     This project is under active development.
 
-
-
-
-## Setup the MkDocs website locally (not necessary)
-
-Please install `mkdocs` and packages in `docs/requirements.txt`:
-
-```bash
-python -m pip install mkdocs
-python -m pip install -r ${PROJECT_ROOT}/docs/requirements.txt
-```
-
-Then, you can run the following command to build the website:
-
-```bash
-mkdocs serve
-```
-
-Mkdocs now builds the website and makes it available under localhost:8000 (you can just enter this in your browser). The port might be a different on your platform, but mkdocs tells you where to find the website like this:
-
-```text
-Serving on http://127.0.0.1:[port]/tutorials/fhi-aims-with-salted/
-```
-
-Mkdocs now watches your changes and rebuilds whenever you change something in the files (you need to save your changes). So you can watch your changes live in the browser.
-
-

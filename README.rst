@@ -2,6 +2,10 @@ SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
 =========================================================================
 This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant predictions of the electron density of both molecular and condensed-phase systems, as decomposed on an atom-centered spherical harmonics basis.
 
+Documentation
+-------------
+A quick-start guide is provided below; `full documentation is also available <https://salted.readthedocs.io/en/>`_.
+
 References
 ----------
 1. Andrea Grisafi, Alberto Fabrizio, David M. Wilkins, Benjamin A. R. Meyer, Clemence Corminboeuf, Michele Ceriotti, "Transferable Machine-Learning Model of the Electron Density", *ACS Central Science* **5**, 57 (2019) [https://pubs.acs.org/doi/10.1021/acscentsci.8b00551]
