@@ -27,14 +27,15 @@
 
 ### RUN YOUR CODE:
 
-srun -n 16 python -m salted.equirepr
-python -m salted.sparsify
+python -m salted.get_basis_info
+python -m salted.initialize
+python -m salted.sparse_selection
+srun -n 16 python -m salted.sparse_descriptor
 
-srun -n 16 python -m salted.rkhs
-srun -n 16 python -m salted.feature_vector
+python -m salted.rkhs_projector
+srun -n 16 python -m salted.rkhs_vector
 
-srun -n 16 python -m salted.matrices
-python -m salted.collect_matrices
-python -m salted.regression
+srun -n 16 python -m salted.hessian_matrix
+python -m salted.solve_regression
 srun -n 16 python -m salted.validation > validation.out
 

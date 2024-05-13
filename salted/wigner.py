@@ -29,7 +29,7 @@ def build(field):
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     for lam in range(lmax_max+1):
 
-        print(f"lambda = {lam}")
+        print(f"wigners: lambda = {lam}")
 
         # External field?
         if field:
