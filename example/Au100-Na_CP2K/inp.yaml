@@ -8,18 +8,16 @@ system:
   filename: ./coords-qmmm.xyz
   species: [Au]
   parallel: False
-  average: False
-  field: False 
 
 # quantum mechanical info
 qm:
   path2qm: ./
   qmcode: cp2k
+  periodic: 2D
   dfbasis: RI_AUTO_OPT-ccGRB-small
   coeffile: Au-RI_DENSITY_COEFFS.dat
   ovlpfile: Au-RI_2C_INTS.fm
   pseudocharge: 11.0
-  periodic: 2D
 
 # descriptor parameters 
 descriptor:
