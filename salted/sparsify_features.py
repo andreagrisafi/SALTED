@@ -41,8 +41,8 @@ def build():
 
     if not sparsify:
         print(
-            "ERROR: features cutoff ncut must be a positive integer!\n"
-            "To sparsify descriptor by sparsify_features.py, please make sure inp.descriptor.sparsify.ncut >= 0.\n",
+            "ERROR: inp parameter sparsify=False. "
+            "Make sure to include a sparsify section with ncut>0 if you want to sparsify the descriptor\n",
             file=sys.stderr
         )
         sys.exit(1)
