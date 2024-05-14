@@ -297,6 +297,10 @@ class ParseConfig:
     def get_all_params(self) -> Tuple:
         """return all parameters with a tuple
 
+        About `sparsify` in the return tuple:
+            - If ncut <=0, sparsify = False.
+            - If ncut > 0, sparsify = True.
+
         Please copy & paste:
         ```python
         (saltedname, saltedpath,
@@ -311,7 +315,7 @@ class ParseConfig:
         ```
         """
         inp = self.parse_input()
-        sparsify = False if inp.descriptor.sparsify.ncut == 0 else True
+        sparsify = False if inp.descriptor.sparsify.ncut <= 0 else True  # determine if sparsify by ncut
         return (
             inp.salted.saltedname, inp.salted.saltedpath,
             inp.system.filename, inp.system.species, inp.system.average, inp.system.field, inp.system.parallel,
@@ -369,6 +373,9 @@ class ParseConfig:
         About PLACEHOLDER:
             - If a key is optional in some cases, but required in others, the default value is set to PLACEHOLDER.
             - The extra value checking should consider the PLACEHOLDER value!
+
+        About sparsify:
+            - The config doesn't explicitly require the sparsify section, and ncut is 0 by default (don't sparsify).
         """
 
         rep_template = {
