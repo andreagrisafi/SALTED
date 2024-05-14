@@ -39,9 +39,13 @@ def build():
     if not osp.exists(sdir):
         os.mkdir(sdir)
 
-    if ncut <= 0:
-        print("ERROR: features cutoff ncut must be a positive integer!")
-        sys.exit(0)
+    if not sparsify:
+        print(
+            "ERROR: features cutoff ncut must be a positive integer!\n"
+            "To sparsify descriptor by sparsify_features.py, please make sure inp.descriptor.sparsify.ncut >= 0.\n",
+            file=sys.stderr
+        )
+        sys.exit(1)
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
@@ -58,7 +62,7 @@ def build():
         ndata = nsamples
     else:
         print("ERROR: nsamples cannot be greater than ndata!")
-        sys.exit(0)
+        sys.exit(1)
 
     conf_range = conf_range[:ndata]
     print(f"Selected {ndata} frames.")
