@@ -31,6 +31,8 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
         nnmax (int): maximum n in the system
         ndata (int): number of configurations
         atomic_symbols (List[List[str]]): list of atomic symbols for each configuration
+        natoms (numpy.ndarray): number of atoms for each configuration, shape (ndata,)
+        natmax (int): maximum number of atoms in the system
     """
 
     if (filename is None) and (spelist is None) and (dfbasis is None):
