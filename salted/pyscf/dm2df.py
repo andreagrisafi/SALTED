@@ -179,6 +179,16 @@ def cal_df_coeffs(
 def main(geom_indexes: Union[List[int], None], num_threads: int = None):
     # global reorder_time, pyscf_time
     inp = ParseConfig().parse_input()
+    
+    """check if all subdirectories exist, if not create them"""
+    sub_dirs = [
+        osp.join(inp.salted.saltedpath, d)
+        for d in ("overlaps", "coefficients", "projections")
+    ]
+    for sub_dir in sub_dirs:
+        if not osp.exists(sub_dir):
+            os.mkdir(sub_dir)
+
     geoms_all = read(inp.system.filename, ":")
     if geom_indexes is None:
         geom_indexes = list(range(len(geoms_all)))

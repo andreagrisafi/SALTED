@@ -10,20 +10,20 @@ site_url: https://github.com/andreagrisafi/SALTED
 
 nav:
   - Home: index.md
-  - Preparations: preparations.md
+  - Installation: installation.md
   - Tutorial:
     - Part 1 - Methods: tutorial/methods.md
     - Part 2 - Workflow: tutorial/workflow.md
     - Part 3 - Prepare Dataset: tutorial/dataset.md
     - Part 4 - Learn the Density: tutorial/train.md
-    - Part 5 - Predict Properties: tutorial/predict.md
-  - Examples:
-    - Example 1 - Water & PySCF: examples/water_pyscf.md
-    - Example 2 - Water & FHI-aims: examples/water_aims.md
-    - Example 3 - Au slab & CP2K: examples/au_cp2k.md
+      #    - Part 5 - Predict Properties: tutorial/predict.md
+      #  - Examples:
+      #    - Example 1 - Water & PySCF: examples/water_pyscf.md
+      #    - Example 2 - Water & FHI-aims: examples/water_aims.md
+      #    - Example 3 - Au slab & CP2K: examples/au_cp2k.md
   - Appendix:
     - API: api.md
-    - Test mkdocs (for dev): test_mkdocs.md
+      #    - Test mkdocs (for dev): test_mkdocs.md
 
 plugins:
   - search
