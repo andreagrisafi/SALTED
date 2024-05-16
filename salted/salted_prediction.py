@@ -1,7 +1,3 @@
-"""
-WARNING: many variables are referenced before defined
-"""
-
 import os
 import sys
 import time
@@ -16,47 +12,26 @@ from rascaline import LodeSphericalExpansion
 from metatensor import Labels
 
 from salted.lib import equicomb 
-from salted.lib import equicombfield 
+from salted.lib import equicombsparse
 
 from salted import sph_utils
 from salted import basis
-from salted import efield
+from salted.sys_utils import ParseConfig
 
-def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals,structure):
+def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,structure):
 
-    sys.path.insert(0, './')
-    import inp
+    inp = ParseConfig().parse_input()
 
-    if inp.parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        rank = 0
-        size = 1
+    (saltedname, saltedpath,
+    filename, species, average, field, parallel,
+    path2qm, qmcode, qmbasis, dfbasis,
+    filename_pred, predname, predict_data,
+    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+    sparsify, nsamples, ncut,
+    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
+    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
-    saltedname = inp.saltedname
-    rep1 = inp.rep1 
-    rcut1 = inp.rcut1
-    sig1 = inp.sig1
-    nrad1 = inp.nrad1
-    nang1 = inp.nang1
-    neighspe1 = inp.neighspe1
-    rep2 = inp.rep2
-    rcut2 = inp.rcut2
-    sig2 = inp.sig2
-    nrad2 = inp.nrad2
-    nang2 = inp.nang2
-    neighspe2 = inp.neighspe2
-    ncut = inp.ncut
-    species = inp.species
-    M = inp.Menv
-    zeta = inp.z
-    reg = inp.regul
-    
     # read system
     ndata = len(structure)
     
@@ -113,33 +88,33 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
         calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
     
     else:
-        if rank == 0: print("Error: requested representation", rep1, "not provided")
+        print("Error: requested representation", rep1, "not provided")
     
     descstart = time.time()
     
     nspe1 = len(neighspe1)
-    keys_array = np.zeros(((nang1+1)*len(species)*nspe1,3),int)
+    keys_array = np.zeros(((nang1+1)*len(species)*nspe1,4),int)
     i = 0
     for l in range(nang1+1):
         for specen in species:
             for speneigh in neighspe1:
-                keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
                 i += 1
     
     keys_selection = Labels(
-        names=["spherical_harmonics_l","species_center","species_neighbor"],
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
         values=keys_array
     )
     
     spx = calculator.compute(structure, selected_keys=keys_selection)
-    spx = spx.keys_to_properties("species_neighbor")
-    spx = spx.keys_to_samples("species_center")
+    spx = spx.keys_to_properties("neighbor_type")
+    spx = spx.keys_to_samples("center_type")
     
     # Get 1st set of coefficients as a complex numpy array
     omega1 = np.zeros((nang1+1,natoms,2*nang1+1,nspe1*nrad1),complex)
     for l in range(nang1+1):
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
-        omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(spherical_harmonics_l=l).values)
+        omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
     
     if rep2=="rho":
         # get SPH expansion for atomic density    
@@ -150,48 +125,41 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
         calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL) 
     
     else:
-        if rank == 0: print("Error: requested representation", rep2, "not provided")
+        print("Error: requested representation", rep2, "not provided")
     
     nspe2 = len(neighspe2)
-    keys_array = np.zeros(((nang2+1)*len(species)*nspe2,3),int)
+    keys_array = np.zeros(((nang2+1)*len(species)*nspe2,4),int)
     i = 0
     for l in range(nang2+1):
         for specen in species:
             for speneigh in neighspe2:
-                keys_array[i] = np.array([l,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
                 i += 1
     
     keys_selection = Labels(
-        names=["spherical_harmonics_l","species_center","species_neighbor"],
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
         values=keys_array
     )
     
     spx_pot = calculator.compute(structure, selected_keys=keys_selection)
-    spx_pot = spx_pot.keys_to_properties("species_neighbor")
-    spx_pot = spx_pot.keys_to_samples("species_center")
+    spx_pot = spx_pot.keys_to_properties("neighbor_type")
+    spx_pot = spx_pot.keys_to_samples("center_type")
     
     # Get 2nd set of coefficients as a complex numpy array 
     omega2 = np.zeros((nang2+1,natoms,2*nang2+1,nspe2*nrad2),complex)
     for l in range(nang2+1):
         c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
-        omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(spherical_harmonics_l=l).values)
+        omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(o3_lambda=l).values)
 
-    if inp.field:
-    # get SPH expansion for a uniform and constant external field aligned along Z 
-        omega_field = np.zeros((natoms,nrad2),complex)
-        for iat in range(natoms):
-            omega_field[iat] = efield.get_efield_sph(nrad2,rcut2)
+#    print("coefficients time:", (time.time()-descstart))
     
-#    if rank == 0: print("coefficients time:", (time.time()-descstart))
-#    if rank == 0: print("")
-    
-    if size > 1: comm.Barrier()
+    #if size > 1: comm.Barrier()
     
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
-    psi_nm = {}
+    pvec = {}
     for lam in range(lmax_max+1):
     
-#        if rank == 0: print("lambda =", lam)
+#        print("lambda =", lam)
     
         equistart = time.time()
     
@@ -213,7 +181,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
         
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         wigner3j = np.loadtxt(os.path.join(
-            inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
+            saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
         ))
         wigdim = wigner3j.size
       
@@ -225,154 +193,63 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
         c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
     
         # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
-        p = equicomb.equicomb(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
-    
-        # Define feature space and reshape equivariant descriptor
-        featsize = nspe1*nspe2*nrad1*nrad2*llmax
-        p = np.transpose(p,(4,0,1,2,3)).reshape(natoms,2*lam+1,featsize)
-     
-#        if rank == 0: print("equivariant time:", (time.time()-equistart))
-        
-        normstart = time.time()
-        
-        # Normalize equivariant descriptor  
-        inner = np.einsum('ab,ab->a', p.reshape(natoms,(2*lam+1)*featsize),p.reshape(natoms,(2*lam+1)*featsize))
-        p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
-        
-#        if rank == 0: print("norm time:", (time.time()-normstart))
-    
-        sparsestart = time.time()
-        
-        if ncut > 0:
-            p = p.reshape(natoms*(2*lam+1),featsize)
-            p = p.T[vfps[lam]].T
-            featsize = inp.ncut
-        
-#        if rank == 0: print("sparse time:", (time.time()-sparsestart))
-        
-        fillstart = time.time()
-    
-        # Fill vector of equivariant descriptor 
-        if lam==0:
-            pvec = p.reshape(natoms,featsize)
+        if sparsify:
+
+            featsize = nspe1*nspe2*nrad1*nrad2*llmax
+            nfps = len(vfps[lam])
+            p = equicombsparse.equicombsparse(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+            p = np.transpose(p,(2,0,1))
+            featsize = ncut
+
         else:
-            pvec = p.reshape(natoms,2*lam+1,featsize)
-    
-#        if rank == 0: print("fill vector time:", (time.time()-fillstart))
-    
-        if inp.field:
-             #########################################################
-             #                 START E-FIELD HERE
-             #########################################################
-          
-             # Select relevant angular components for equivariant descriptor calculation
-             llmax = 0
-             lvalues = {}
-             for l1 in range(nang1+1):
-                 # keep only even combination to enforce inversion symmetry
-                 if (lam+l1+1)%2==0 :
-                     if abs(1-lam) <= l1 and l1 <= (1+lam) :
-                         lvalues[llmax] = [l1,1]
-                         llmax+=1
-             # Fill dense array from dictionary
-             llvec = np.zeros((llmax,2),int)
-             for il in range(llmax):
-                 llvec[il,0] = lvalues[il][0]
-                 llvec[il,1] = lvalues[il][1]
-    
-             # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-             wigner3j = np.loadtxt(os.path.join(
-                 inp.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_field.dat"
-             ))
-             wigdim = wigner3j.size
-          
-             # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
-             v2 = omega_field.T
-             p = equicombfield.equicombfield(natoms,nang1,nspe1*nrad1,nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r)
-     
-             # Define feature space and reshape equivariant descriptor
-             featsizefield = nspe1*nrad1*nrad2*llmax
-             p = np.transpose(p,(4,0,1,2,3)).reshape(natoms,2*lam+1,featsizefield)
-           
-#             if rank == 0: print("field equivariant time:", (time.time()-equistart))
-              
-             normstart = time.time()
-     
-             # Normalize equivariant descriptor  
-             inner = np.einsum('ab,ab->a', p.reshape(natoms,(2*lam+1)*featsizefield),p.reshape(natoms,(2*lam+1)*featsizefield))
-             p = np.einsum('abc,a->abc', p,1.0/np.sqrt(inner))
+
+            featsize = nspe1*nspe2*nrad1*nrad2*llmax
+            p = equicomb.equicomb(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+            p = np.transpose(p,(2,0,1))
+
+        if lam==0: 
+            pvec[lam] = p.reshape(natoms,featsize)
+        else:
+            pvec[lam] = p.reshape(natoms,2*lam+1,featsize)
         
-#             if rank == 0: print("field norm time:", (time.time()-normstart))
+        # print("equicomb time:", (time.time()-equistart))
     
-             if ncut > 0:
-                 p = p.reshape(natoms*(2*lam+1),featsizefield)
-                 p = p.T[vfps_field[lam]].T
-                 featsizefield = inp.ncut 
-    
-             fillstart = time.time()
-     
-             # Fill vector of equivariant descriptor 
-             if lam==0:
-                 pvec = p.reshape(natoms,featsizefield)
-             else:
-                 pvec = p.reshape(natoms,2*lam+1,featsizefield)
-    
-        rkhsstart = time.time()
+    rkhsstart = time.time()
  
-        if lam==0:
-    
-            if zeta==1: 
-                 # Compute scalar kernels
-                 kernel0_nm = {}
-                 for spe in species:
-                     if inp.field: 
-                         psi_nm[(spe,lam)] = np.dot(pvec_field[atom_idx[spe]],power_env_sparse_field[(lam,spe)].T) 
-                     else:
-                         psi_nm[(spe,lam)] = np.dot(pvec[atom_idx[spe]],power_env_sparse[(lam,spe)].T)
+    psi_nm = {}
+    for spe in species:
+
+        # lam = 0
+        if zeta==1:
+            psi_nm[(spe,0)] = np.dot(pvec[0][atom_idx[spe]],power_env_sparse[(0,spe)].T)
+        else:
+            kernel0_nm = np.dot(pvec[0][atom_idx[spe]],power_env_sparse[(0,spe)].T)
+            kernel_nm = kernel0_nm**zeta
+            psi_nm[(spe,0)] = np.dot(kernel_nm,Vmat[(0,spe)])
+
+        # lam > 0
+        for lam in range(1,lmax[spe]+1):
+
+            featsize = pvec[lam].shape[-1]
+            if zeta==1:
+                psi_nm[(spe,lam)] = np.dot(pvec[lam][atom_idx[spe]].reshape(natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
             else:
-                 # Compute scalar kernels
-                 kernel0_nm = {}
-                 for spe in species:
-                     kernel0_nm[spe] = np.dot(pvec[atom_idx[spe]],power_env_sparse[(lam,spe)].T)
-                     if inp.field:
-                         kernel_nm = np.dot(pvec_field[atom_idx[spe]],power_env_sparse_field[(lam,spe)].T) * kernel0_nm[spe]**(zeta-1)
-                     else:
-                         kernel_nm = kernel0_nm[spe]**zeta
-                     # Project on RKHS
-                     psi_nm[(spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])    
+                kernel_nm = np.dot(pvec[lam][atom_idx[spe]].reshape(natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                for i1 in range(natom_dict[spe]):
+                    for i2 in range(Mspe[spe]):
+                        kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[i1,i2]**(zeta-1)
+                psi_nm[(spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
+
+    #if print("rkhs time:", time.time()-rkhsstart,flush=True)
  
-        else:
-  
-            if zeta==1: 
-                # Compute covariant kernels
-                for spe in species:
-                    if inp.field: 
-                        psi_nm[(spe,lam)] = np.dot(pvec_field[atom_idx[spe]].reshape(natom_dict[spe]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
-                    else:
-                        psi_nm[(spe,lam)] = np.dot(pvec[atom_idx[spe]].reshape(natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
-            else: 
-                # Compute covariant kernels
-                for spe in species:
-                    if inp.field:
-                        kernel_nm = np.dot(pvec_field[atom_idx[spe]].reshape(natom_dict[spe]*(2*lam+1),pvec_field.shape[-1]),power_env_sparse_field[(lam,spe)].T)
-                    else:
-                        kernel_nm = np.dot(pvec[atom_idx[spe]].reshape(natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
-                    for i1 in range(natom_dict[spe]):
-                        for i2 in range(Mspe[spe]):
-                            kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[spe][i1,i2]**(zeta-1)
-                    # Project on RKHS
-                    psi_nm[(spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
-    
-#        if rank == 0: print("rkhs time:", time.time()-rkhsstart,flush=True)
-    
     # Perform equivariant predictions
     predstart = time.time()
     
     # Load spherical averages if required
-    if inp.average:
+    if average:
         av_coefs = {}
         for spe in species:
-            av_coefs[spe] = np.load("averages_"+str(spe)+".npy")
+            av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
     
     Tsize = 0
     for iat in range(natoms):
@@ -394,7 +271,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
                 isize += Mcut
     
     # init averages array if asked
-    if inp.average:
+    if average:
         Av_coeffs = np.zeros(Tsize)
     
     # fill vector of predictions
@@ -405,17 +282,17 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
                 pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
-                if inp.average and l==0:
+                if average and l==0:
                     Av_coeffs[i] = av_coefs[spe][n]
                 i += 2*l+1
         ispe[spe] += 1
     
     # add back spherical averages if required
-    if inp.average:
+    if average:
         pred_coefs += Av_coeffs
     
    
-    if inp.qmcode=="cp2k":
+    if qmcode=="cp2k":
 
         # compute integral of predicted density
         iaux = 0
@@ -423,8 +300,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
         nele = 0.0
         for iat in range(natoms):
             spe = atomic_symbols[iat]
-            if inp.average:
-                nele += inp.pseudocharge
+            if average:
+                nele += inp.qm.pseudocharge
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     if l==0:
@@ -442,7 +319,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
                 for n in range(nmax[(spe,l)]):
                     for im in range(2*l+1):
                         if l==0 and im==0:
-                            if inp.average:
+                            if average:
                                 pred_coefs[iaux] *= nele/rho_int
                             else:
                                 if n==nmax[(spe,l)]-1:
@@ -450,7 +327,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Vmat,vfps,charge_integrals
                         iaux += 1
 
  
-#    if rank == 0: print("pred time:", time.time()-predstart,flush=True)
+#    if print("pred time:", time.time()-predstart,flush=True)
     
     return pred_coefs
 

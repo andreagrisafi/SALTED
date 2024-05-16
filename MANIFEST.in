@@ -1,4 +1,5 @@
 include salted/lib/equicomb.so 
+include salted/lib/equicombsparse.so 
 include salted/lib/equicombfield.so 
 include salted/lib/ovlp2cnonperiodic.so 
 include salted/lib/ovlp2c.so 

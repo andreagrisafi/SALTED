@@ -12,14 +12,22 @@ from scipy import sparse
 #from sympy import lambdify
 
 from salted import basis
-from salted.sys_utils import read_system, get_atom_idx, get_conf_range
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
 
 def build():
 
-    sys.path.insert(0, './')
-    import inp
+    inp = ParseConfig().parse_input()
+    (saltedname, saltedpath,
+    filename, species, average, field, parallel,
+    path2qm, qmcode, qmbasis, dfbasis,
+    filename_pred, predname, predict_data,
+    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
+    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
+    sparsify, nsamples, ncut,
+    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
+    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
 
-    if inp.parallel:
+    if parallel:
         from mpi4py import MPI
         # MPI information
         comm = MPI.COMM_WORLD
@@ -35,22 +43,15 @@ def build():
 
     bohr2angs = 0.529177210670
 
-    if inp.field:
-        vdir = f"validations_{inp.saltedname}_field"
-        rdir = f"regrdir_{inp.saltedname}_field"
-        fdir = f"rkhs-vectors_{inp.saltedname}_field"
+    if field:
+        vdir = f"validations_{saltedname}_field"
+        rdir = f"regrdir_{saltedname}_field"
+        fdir = f"rkhs-vectors_{saltedname}_field"
     else:
-        vdir = f"validations_{inp.saltedname}"
-        rdir = f"regrdir_{inp.saltedname}"
-        fdir = f"rkhs-vectors_{inp.saltedname}"
+        vdir = f"validations_{saltedname}"
+        rdir = f"regrdir_{saltedname}"
+        fdir = f"rkhs-vectors_{saltedname}"
 
-    # read basis
-
-    # number of sparse environments
-    M = inp.Menv
-    eigcut = inp.eigcut
-    reg = inp.regul
-    zeta = inp.z
 
     for iconf in range(ndata):
         # Define relevant species
@@ -77,40 +78,41 @@ def build():
 
     # define test set
     trainrangetot = np.loadtxt(osp.join(
-        inp.saltedpath, rdir, f"training_set_N{inp.Ntrain}.txt"
+        saltedpath, rdir, f"training_set_N{Ntrain}.txt"
     ), int)
-    ntrain = round(inp.trainfrac*len(trainrangetot))
+    ntrain = round(trainfrac*len(trainrangetot))
     testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
     # Distribute structures to tasks
     ntest = len(testrange)
-    if inp.parallel:
+    if parallel:
         testrange = get_conf_range(rank,size,ntest,testrange)
         testrange = comm.scatter(testrange,root=0)
         print(f"Task {rank+1} handles the following structures: {testrange}", flush=True)
 
-    reg_log10_intstr = str(int(np.log10(reg)))
+    reg_log10_intstr = str(int(np.log10(regul)))
 
     # load regression weights
     weights = np.load(osp.join(
-        inp.saltedpath, rdir, f"M{M}_zeta{zeta}", f"weights_N{ntrain}_reg{reg_log10_intstr}.npy"
+        saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{reg_log10_intstr}.npy"
     ))
 
-    dirpath = os.path.join(inp.saltedpath, vdir, f"M{M}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}")
+    dirpath = os.path.join(saltedpath, vdir, f"M{Menv}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}")
     if rank == 0:
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
     if size > 1: comm.Barrier()
 
 
-    if inp.qmcode=="cp2k":
+    if qmcode=="cp2k":
+        bdir = osp.join(saltedpath,"basis")
         # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
         if rank == 0: print("Reading auxiliary basis info...")
         alphas = {}
         sigmas = {}
         for spe in species:
             for l in range(lmax[spe]+1):
-                avals = np.loadtxt(osp.join(f"{spe}-{inp.dfbasis}-alphas-L{l}.dat"))
+                avals = np.loadtxt(osp.join(bdir,f"{spe}-{dfbasis}-alphas-L{l}.dat"))
                 if nmax[(spe,l)]==1:
                     alphas[(spe,l,0)] = float(avals)
                     sigmas[(spe,l,0)] = np.sqrt(0.5/alphas[(spe,l,0)]) # bohr
@@ -134,8 +136,8 @@ def build():
                     dipole_integrals[(spe,l,n)] = dipole_radint * np.sqrt(4.0*np.pi/3.0) / np.sqrt(inner)
 
     # If total charge density is asked, read in the GTH pseudo-charge and return a radial numpy function
-    #if inp.totcharge:
-    #    pseudof = open(inp.pseudochargefile,"r")
+    #if inp.qm.totcharge:
+    #    pseudof = open(inp.qm.pseudochargefile,"r")
     #    pseudochargedensity = mathematica.mathematica(pseudof.readlines()[0],{'Erf[x]':'erf(x)'})
     #    pseudof.close()
     #    rpseudo = symbols('r')
@@ -151,31 +153,31 @@ def build():
     #    print("Integrated pseudo-charge =", pseudocharge)
 
     # Load spherical averages if required
-    if inp.average:
+    if average:
         av_coefs = {}
-        for spe in inp.species:
-            av_coefs[spe] = np.load(f"averages_{spe}.npy")
+        for spe in species:
+            av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
 
     # compute error over test set
 
     efname = osp.join(
-        inp.saltedpath, vdir, f"M{M}_zeta{zeta}",
+        saltedpath, vdir, f"M{Menv}_zeta{zeta}",
         f"N{ntrain}_reg{reg_log10_intstr}", f"errors.dat"
     )
     if rank == 0 and os.path.exists(efname):
         os.remove(efname)
-    if inp.qmcode == "cp2k":
+    if qmcode == "cp2k":
         dfname = osp.join(
-            inp.saltedpath, vdir, f"M{M}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}", f"dipoles.dat"
+            saltedpath, vdir, f"M{Menv}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}", f"dipoles.dat"
         )
         qfname = osp.join(
-            inp.saltedpath, vdir, f"M{M}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}", f"charges.dat"
+            saltedpath, vdir, f"M{Menv}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}", f"charges.dat"
         )
         if rank == 0 and os.path.exists(dfname): os.remove(dfname)
         if rank == 0 and os.path.exists(qfname): os.remove(qfname)
-    if inp.parallel: comm.Barrier()
+    if parallel: comm.Barrier()
     efile = open(efname,"a")
-    if inp.qmcode=="cp2k":
+    if qmcode=="cp2k":
         dfile = open(dfname,"a")
         qfile = open(qfname,"a")
 
@@ -185,23 +187,23 @@ def build():
 
         # load reference
         ref_coefs = np.load(osp.join(
-            inp.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+            saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
         ))
         overl = np.load(osp.join(
-            inp.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+            saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
         ))
         ref_projs = np.dot(overl,ref_coefs)
         Tsize = len(ref_coefs)
 
         psivec = sparse.load_npz(osp.join(
-            inp.saltedpath, fdir, f"M{M}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
         ))
         psi = psivec.toarray()
 
         pred_coefs = np.dot(psi,weights)
 
         # Compute vector of isotropic average coefficients
-        if inp.average:
+        if average:
             Av_coeffs = np.zeros(Tsize)
             i = 0
             for iat in range(natoms[iconf]):
@@ -214,10 +216,10 @@ def build():
             # add back spherical averages if required
             pred_coefs += Av_coeffs
 
-        if inp.qmcode=="cp2k":
+        if qmcode=="cp2k":
 
             from ase.io import read
-            xyzfile = read(inp.filename, ":")
+            xyzfile = read(filename, ":")
             geom = xyzfile[iconf]
             geom.wrap()
             coords = geom.get_positions()/bohr2angs
@@ -231,7 +233,7 @@ def build():
             ref_rho_int = 0.0
             for iat in range(natoms[iconf]):
                 spe = atomic_symbols[iconf][iat]
-                nele += inp.pseudocharge
+                nele += inp.qm.pseudocharge
                 for l in range(lmax[spe]+1):
                     for n in range(nmax[(spe,l)]):
                         if l==0:
@@ -248,15 +250,15 @@ def build():
             for iat in range(all_natoms):
                 spe = all_symbols[iat]
                 if spe in species:
-                    if inp.average:
-                        dipole += inp.pseudocharge * coords[iat,2]
-                        ref_dipole += inp.pseudocharge * coords[iat,2]
+                    if average:
+                        dipole += inp.qm.pseudocharge * coords[iat,2]
+                        ref_dipole += inp.qm.pseudocharge * coords[iat,2]
                     for l in range(lmax[spe]+1):
                         for n in range(nmax[(spe,l)]):
                             for im in range(2*l+1):
                                 if l==0 and im==0:
                                     # rescale spherical coefficients to conserve the electronic charge
-                                    if inp.average:
+                                    if average:
                                         pred_coefs[iaux] *= nele/rho_int
                                     else:
                                        if n==nmax[(spe,l)]-1:
@@ -272,20 +274,14 @@ def build():
             print(iconf+1,ref_dipole,dipole,file=dfile)
             print(iconf+1,ref_charge,rho_int,file=qfile)
 
-        # save predicted coefficients
-        np.save(osp.join(
-            inp.saltedpath, vdir, f"M{M}_zeta{zeta}",
-            f"N{ntrain}_reg{reg_log10_intstr}", f"prediction_conf{iconf}.npy"
-        ), pred_coefs)
-
-        # save reference coefficients
-        np.savetxt(osp.join(
-            inp.saltedpath, vdir, f"M{M}_zeta{zeta}",
-            f"N{ntrain}_reg{reg_log10_intstr}", f"RI-COEFFS-{iconf+1}.dat"
-        ), ref_coefs)
+        ## save reference coefficients
+        #np.savetxt(osp.join(
+        #    saltedpath, vdir, f"M{Menv}_zeta{zeta}",
+        #    f"N{ntrain}_reg{reg_log10_intstr}", f"RI-COEFFS-{iconf+1}.dat"
+        #), ref_coefs)
         # save predicted coefficients
         np.savetxt(osp.join(
-            inp.saltedpath, vdir, f"M{M}_zeta{zeta}",
+            saltedpath, vdir, f"M{Menv}_zeta{zeta}",
             f"N{ntrain}_reg{reg_log10_intstr}", f"COEFFS-{iconf+1}.dat"
         ), pred_coefs)
 
@@ -295,7 +291,7 @@ def build():
         # compute error
         error = np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
         error_density += error
-        if inp.average:
+        if average:
             ref_projs -= np.dot(overl,Av_coeffs)
             ref_coefs -= Av_coeffs
         var = np.dot(ref_coefs,ref_projs)
@@ -319,17 +315,17 @@ def build():
     #                    iaux += 1
 
     efile.close()
-    if inp.qmcode == "cp2k":
+    if qmcode == "cp2k":
         dfile.close()
         qfile.close()
 
-    if inp.parallel:
+    if parallel:
         error_density = comm.allreduce(error_density)
         variance = comm.allreduce(variance)
         if rank == 0:
             errs = np.loadtxt(efname)
             np.savetxt(efname, errs[errs[:,0].argsort()])
-            if inp.qmcode == "cp2k":
+            if qmcode == "cp2k":
                 dips = np.loadtxt(dfname)
                 np.savetxt(dfname, dips[dips[:,0].argsort()])
                 qs = np.loadtxt(qfname)

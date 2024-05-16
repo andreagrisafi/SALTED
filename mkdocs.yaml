@@ -1,0 +1,56 @@
+site_name: "SALTED: Learning Electron Densities Equivariantly"
+
+theme:
+  name: readthedocs
+  highlightjs: true
+  # logo: assets/SALTED_icon_vanilla_long.png
+  # favicon: assets/SALTED_icon_vanilla_long.png
+
+site_url: https://github.com/andreagrisafi/SALTED
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Tutorial:
+    - Part 1 - Methods: tutorial/methods.md
+    - Part 2 - Workflow: tutorial/workflow.md
+    - Part 3 - Prepare Dataset: tutorial/dataset.md
+    - Part 4 - Learn the Density: tutorial/train.md
+      #    - Part 5 - Predict Properties: tutorial/predict.md
+      #  - Examples:
+      #    - Example 1 - Water & PySCF: examples/water_pyscf.md
+      #    - Example 2 - Water & FHI-aims: examples/water_aims.md
+      #    - Example 3 - Au slab & CP2K: examples/au_cp2k.md
+  - Appendix:
+    - API: api.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        # See: https://mkdocstrings.github.io/python/usage/
+        python:
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_source: false
+
+markdown_extensions:
+  - markdown_include.include:
+      base_path: .
+  - admonition
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.superfences
+  - attr_list
+  - footnotes
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.snippets
+
+
+
+extra_javascript:
+  - javascripts/mathjax.js  # mathjax support
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js

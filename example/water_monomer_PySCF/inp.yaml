@@ -1,0 +1,52 @@
+# workflow label and root directory
+salted:
+  saltedname: test
+  saltedpath: ./
+
+# system general parameters
+system:
+  filename: ./water_monomers_1k.xyz
+  species: [H, O]
+  parallel: True 
+
+# quantum mechanical info
+qm:
+  path2qm: ./
+  qmcode: pyscf
+  dfbasis: RI-cc-pvqz
+  qmbasis: cc-pvqz
+  functional: b3lyp
+
+# prediction data
+prediction:
+  filename: ./water_dimers_10.xyz
+  predname: dimer
+
+# descriptor parameters 
+descriptor:
+  rep1:
+    type: rho
+    rcut: 4.0
+    sig: 0.3
+    nrad: 8
+    nang: 6
+    neighspe: [H, O]
+  rep2:
+    type: rho
+    rcut: 4.0
+    sig: 0.3
+    nrad: 8
+    nang: 6
+    neighspe: [H, O]
+  sparsify:
+    nsamples: 100
+    ncut: 1000
+
+# Gaussian process regression variables
+gpr:
+  z: 2.0
+  Menv: 100
+  Ntrain: 1000
+  trainfrac: 1.0
+  trainsel: sequential
+  blocksize: 250
