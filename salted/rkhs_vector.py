@@ -1,30 +1,24 @@
 """
-Calculate RKHS vectors for the given structures
+Calculate RKHS vectors
 """
 
 import os
+import os.path as osp
 import sys
 import time
-import os.path as osp
-from ase.io import read
+
 import h5py
-
 import numpy as np
-from scipy import sparse
 from ase.data import atomic_numbers
-
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range,get_feats_projs
-
-from rascaline import SphericalExpansion
-from rascaline import LodeSphericalExpansion
+from ase.io import read
 from metatensor import Labels
+from rascaline import LodeSphericalExpansion, SphericalExpansion
+from scipy import sparse
 
-from salted import wigner
-from salted import sph_utils
-from salted import basis
+from salted import basis, sph_utils, wigner
+from salted.lib import equicomb, equicombsparse
+from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, get_feats_projs, read_system
 
-from salted.lib import equicomb
-from salted.lib import equicombsparse
 
 def build():
 

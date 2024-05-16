@@ -3,13 +3,14 @@ Compare the density from DF and from SCF, output the real space electron density
 TODO: parallelize the comparison code
 """
 
-import time
-import sys
 import os.path as osp
+import sys
+import time
 
 import numpy as np
 
 from salted.sys_utils import ParseConfig, read_system, sort_grid_data
+
 
 def main():
     inp = ParseConfig().parse_input()
