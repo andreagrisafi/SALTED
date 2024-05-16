@@ -8,7 +8,7 @@ import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, read_system
+from salted.sys_utils import ParseConfig, get_atom_idx, read_system
 
 
 def build():
@@ -55,7 +55,8 @@ def build():
         for spe in species:
             av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
 
-    if size > 1: comm.Barrier()
+    if parallel:
+        comm.Barrier()
 
     # define training set at random or sequentially
     dataset = list(range(ndata))
@@ -72,38 +73,27 @@ def build():
     ntrain = int(inp.gpr.trainfrac*inp.gpr.Ntrain)
     trainrange = trainrangetot[:ntrain]
 
-    if inp.gpr.blocksize==0:
-        blocksize = ntrain
-        blocks = False
-    else:
-        if parallel==False:
-            print("Please activate parallel mode when using inp.gpr.blocksize to compute matrices in blocks!")
-            return
-        blocksize = inp.gpr.blocksize
-        blocks = True
-
-    if not blocks and size > 1:
-        print("Please run serially if computing a single matrix, or add inp.gpr.blocksize>0 to the input file to compute the matrix blockwise and in parallel!")
-        return
-    
-    if parallel: print("Task",rank,"handling structures:",trainrange[rank*blocksize:(rank+1)*blocksize])
-
-    if blocks:
-
-        if ntrain%blocksize != 0:
-            print("Please choose a blocksize which is an exact divisor of inp.gpr.Ntrain*inp.gpr.trainfrac!")
-            return
-        nblocks = int(ntrain/blocksize)
-        if nblocks != size:
-            print(f"Please choose a number of MPI tasks consistent with the number of blocks {nblocks}!")
-            return
-        [Avec,Bmat] = matrices(trainrange[rank*blocksize:(rank+1)*blocksize],ntrain,av_coefs,rank)
-
-    else:
-
-        [Avec,Bmat] = matrices(trainrange,ntrain,av_coefs,rank)   
+    """
+    Calculate regression matrices in parallel or serial mode.
+    """
 
     if parallel:
+        """ parallel mode """
+        """ check partitioning """
+        assert size > 1, "Please run in serial mode if using a single MPI task"
+        assert inp.gpr.blocksize > 0, "Please set inp.gpr.blocksize > 0 when running in parallel mode"
+        assert isinstance(inp.gpr.blocksize, int), "Please set inp.gpr.blocksize as an integer"
+        blocksize = inp.gpr.blocksize
+        assert ntrain % blocksize == 0, \
+            "Please choose a blocksize which is an exact divisor of inp.gpr.Ntrain * inp.gpr.trainfrac!"
+        nblocks = int(ntrain/blocksize)
+        assert nblocks == size, \
+            f"Please choose a number of MPI tasks (current ntasks={size}) consistent with " \
+            f"the number of blocks {nblocks} = inp.gpr.Ntrain * inp.gpr.trainfrac / inp.gpr.blocksize!"
+        this_task_trainrange = trainrange[rank*blocksize:(rank+1)*blocksize]
+        """ calculate and gather """
+        print("Task",rank,"handling structures:", this_task_trainrange)
+        [Avec, Bmat] = matrices(this_task_trainrange, ntrain,av_coefs,rank)
         comm.Barrier()
         # reduce matrices in slices to avoid MPI overflows
         nslices = int(np.ceil(float(len(Avec))/100.0))
@@ -112,8 +102,12 @@ def build():
             Bmat[islice*100:(islice+1)*100] = comm.allreduce(Bmat[islice*100:(islice+1)*100])
         Avec[(nslices-1)*100:] = comm.allreduce(Avec[(nslices-1)*100:])
         Bmat[(nslices-1)*100:] = comm.allreduce(Bmat[(nslices-1)*100:])
+    else:
+        """ serial mode """
+        assert inp.gpr.blocksize == 0, "Please set inp.gpr.blocksize = 0 when running in serial mode"
+        [Avec, Bmat] = matrices(trainrange,ntrain,av_coefs,rank)
 
-    if rank==0: 
+    if rank==0:
         np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
         np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
 
@@ -192,7 +186,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
-    
+
     return [Avec,Bmat]
 
 if __name__ == "__main__":
