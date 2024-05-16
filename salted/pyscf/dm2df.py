@@ -197,11 +197,6 @@ def main(geom_indexes: Union[List[int], None], num_threads: int = None):
     print(f"Calculate density fitting coefficients for these structures: {geom_indexes}")
     geoms = [geoms_all[i] for i in geom_indexes]
 
-    """ prepare directories to store data """
-    for data_dname in ("coefficients", "projections", "overlaps"):
-        if not osp.exists(dpath := osp.join(inp.qm.path2qm, data_dname)):
-            os.mkdir(dpath)
-
     """ set pyscf.lib.num_threads """
     if num_threads is not None:
         lib.num_threads(num_threads)
