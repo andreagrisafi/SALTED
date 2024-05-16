@@ -97,7 +97,7 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.solve_regression`
 
-   NB: when the dimensionality exceeds $10^5$, it is recommended to perform a direct minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7). If the dimensionality exceeds $7\times10*5$, the loss function must be minimized directly. This can be run as follows:
+   NB: when the dimensionality exceeds $10^5$, it is recommended to perform a direct minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7). If the dimensionality exceeds $70000$, the loss function must be minimized directly. This can be run as follows:
 
    :code:`python3 -m salted.minimize_loss` (MPI parallelizable)
 
