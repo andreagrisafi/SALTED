@@ -1,5 +1,5 @@
 """
-TODO: replace class arraylist by numpy.concatenate
+Calculate RKHS vectors for the given structures
 """
 
 import os
@@ -54,6 +54,7 @@ def build():
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     #   define a numpy equivalent to an appendable list
+    # TODO: replace class arraylist by numpy.concatenate
     class arraylist:
         def __init__(self):
             self.data = np.zeros((100000,))

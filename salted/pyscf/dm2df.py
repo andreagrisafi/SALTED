@@ -179,7 +179,7 @@ def cal_df_coeffs(
 def main(geom_indexes: Union[List[int], None], num_threads: int = None):
     # global reorder_time, pyscf_time
     inp = ParseConfig().parse_input()
-    
+
     """check if all subdirectories exist, if not create them"""
     sub_dirs = [
         osp.join(inp.salted.saltedpath, d)
@@ -245,7 +245,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-c", "--cpu", type=int, default=None,
-        help="Number of CPU cores to use. Default is None (for do nothing)."
+        help="Number of CPU cores to use. Default is None (for default setting, see pyscf docs)."
     )
     args = parser.parse_args()
 

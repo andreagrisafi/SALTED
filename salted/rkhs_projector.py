@@ -1,25 +1,21 @@
 """
-TODO: replace class arraylist by numpy.concatenate
+Calculate RKHS projection matrix
 """
 
 import os
+import os.path as osp
 import sys
 import time
-import os.path as osp
-from ase.io import read
+
 import h5py
-
 import numpy as np
-from scipy import sparse
 from ase.data import atomic_numbers
+from ase.io import read
+from scipy import sparse
 
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
-
-from salted import wigner
-from salted import sph_utils
-from salted import basis
-
+from salted import basis, sph_utils, wigner
 from salted.lib import equicomb
+from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, read_system
 
 
 def build():
@@ -35,17 +31,6 @@ def build():
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
-
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        rank=0
-        size=1
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)

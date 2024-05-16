@@ -4,6 +4,7 @@ import re
 import sys
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
+import h5py
 import numpy as np
 import yaml
 from ase.io import read
@@ -141,6 +142,7 @@ def parse_index_str(index_str:Union[str, Literal["all"]]) -> Union[None, Tuple]:
 
     If index_str is "all", return None. (indicating all structures)
     If index_str is "1,3-5,7-10", return (1,3,4,5,7,8,9,10)
+    If index_str cannot be parsed, raise ValueError.
     """
 
     if index_str == "all":
@@ -160,7 +162,7 @@ def parse_index_str(index_str:Union[str, Literal["all"]]) -> Union[None, Tuple]:
             else:
                 raise ValueError(
                     f"Invalid index format: {s}, "
-                    f"should be digits or ranges joined by comma, e.g. 1,3-5,7-10"
+                    f"should be literal 'all' or digits or ranges joined by comma, e.g. 1,3-5,7-10"
                 )
         return tuple(indexes)
 
@@ -182,15 +184,15 @@ def sort_grid_data(data:np.ndarray) -> np.ndarray:
     return data
 
 def get_feats_projs(species,lmax):
-    import h5py
-    import os.path as osp
+    """Load training feature vectors and RKHS projection matrix
+    """
     inp = ParseConfig().parse_input()
     Vmat = {}
     Mspe = {}
     power_env_sparse = {}
-    sdir = osp.join(inp.salted.saltedpath, f"equirepr_{inp.salted.saltedname}")
-    features = h5py.File(osp.join(sdir,f"FEAT_M-{inp.gpr.Menv}.h5"),'r')
-    projectors = h5py.File(osp.join(sdir,f"projector_M{inp.gpr.Menv}_zeta{inp.gpr.z}.h5"),'r')
+    sdir = os.path.join(inp.salted.saltedpath, f"equirepr_{inp.salted.saltedname}")
+    features = h5py.File(os.path.join(sdir,f"FEAT_M-{inp.gpr.Menv}.h5"),'r')
+    projectors = h5py.File(os.path.join(sdir,f"projector_M{inp.gpr.Menv}_zeta{inp.gpr.z}.h5"),'r')
     for spe in species:
         for lam in range(lmax[spe]+1):
              # load RKHS projectors
