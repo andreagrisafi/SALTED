@@ -23,7 +23,6 @@ nav:
       #    - Example 3 - Au slab & CP2K: examples/au_cp2k.md
   - Appendix:
     - API: api.md
-      #    - Test mkdocs (for dev): test_mkdocs.md
 
 plugins:
   - search

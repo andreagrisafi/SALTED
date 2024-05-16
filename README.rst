@@ -51,7 +51,7 @@ SALTED input is provided in a :code:`inp.yaml` file, which is structured in the 
 
 Input Dataset
 -------------
-Input structures are required in XYZ format; the corresponding filename must be specified in the :code:`inp.system.filename`. 
+Input structures are required in extXYZ format; the corresponding filename must be specified in the :code:`inp.system.filename`. 
 Electron density training data consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. These coefficients are computed following density-fitting (DF), a.k.a. resolution of the identity, approximations, commonly applied in electronic-structure codes. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis functions, the 2-center electronic integral matrices associated with the given density-fitting approximation are also required as input. 
 The electronic-structure codes that are to date interfaced with SALTED are:
     
@@ -97,7 +97,7 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.solve_regression`
 
-   NB: when the dimensionality exceeds $10^5$, it is recommended to perform a direct minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7). This can be run as follows:
+   NB: when the dimensionality exceeds $10^5$, it is recommended to perform a direct minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7). If the dimensionality exceeds $7\times10*5$, the loss function must be minimized directly. This can be run as follows:
 
    :code:`python3 -m salted.minimize_loss` (MPI parallelizable)
 
