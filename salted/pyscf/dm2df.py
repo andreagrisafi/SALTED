@@ -1,19 +1,16 @@
 import argparse
 import os
-import sys
 import os.path as osp
-from typing import List, Tuple, Union, Dict
 import time
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
-from pyscf import gto, df, lib
-from pyscf.gto import basis
 from ase.io import read
-from scipy import special
+from pyscf import df, gto, lib
+from pyscf.gto import basis
 
-from salted.basis_client import BasisClient, SpeciesBasisData
-from salted.sys_utils import ParseConfig, parse_index_str, ARGHELP_INDEX_STR, Irreps
-
+from salted.basis_client import BasisClient
+from salted.sys_utils import ARGHELP_INDEX_STR, Irreps, ParseConfig, parse_index_str
 
 __doc__ = """
 PySCF orders all angular momentum components for L>1 as -L,...,0,...,+L,
@@ -245,7 +242,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-c", "--cpu", type=int, default=None,
-        help="Number of CPU cores to use. Default is None (for do nothing)."
+        help="Number of CPU cores to use. Default is None (use pyscf default settings).",
     )
     args = parser.parse_args()
 
