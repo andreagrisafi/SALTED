@@ -1,30 +1,22 @@
 """
-TODO: replace class arraylist by numpy.concatenate
+Calculate RKHS vectors
 """
 
 import os
-import sys
-import time
 import os.path as osp
-from ase.io import read
-import h5py
+import time
 
 import numpy as np
-from scipy import sparse
 from ase.data import atomic_numbers
-
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range,get_feats_projs
-
-from rascaline import SphericalExpansion
-from rascaline import LodeSphericalExpansion
+from ase.io import read
 from metatensor import Labels
+from rascaline import LodeSphericalExpansion, SphericalExpansion
+from scipy import sparse
 
-from salted import wigner
 from salted import sph_utils
-from salted import basis
+from salted.lib import equicomb, equicombsparse
+from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, get_feats_projs, read_system
 
-from salted.lib import equicomb
-from salted.lib import equicombsparse
 
 def build():
 
@@ -53,7 +45,8 @@ def build():
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-    #   define a numpy equivalent to an appendable list
+    # TODO: replace class arraylist with numpy.concatenate
+    # define a numpy equivalent to an appendable list
     class arraylist:
         def __init__(self):
             self.data = np.zeros((100000,))

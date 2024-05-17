@@ -1,15 +1,14 @@
 import argparse
 import os
 import sys
-from typing import List, Tuple, Union
 import time
+from typing import List, Tuple, Union
 
 import numpy as np
 from ase.io import read
-from pyscf import gto, dft, lib
+from pyscf import dft, gto, lib
 
-from salted.sys_utils import ParseConfig, parse_index_str, ARGHELP_INDEX_STR
-
+from salted.sys_utils import ARGHELP_INDEX_STR, ParseConfig, parse_index_str
 
 
 def run_pyscf(
@@ -53,7 +52,7 @@ def main(geom_indexes: Union[List[int], None], num_threads: int = None):
         dm = run_pyscf(atoms, inp.qm.qmbasis, inp.qm.functional)
         np.save(os.path.join(dirpath, f"dm_conf{geom_idx+1}.npy"), dm)
     end_time = time.time()
-    print(f"Calculation finished, time cost on DFT: {end_time - start_time:.2f}s")
+    print(f"Calculation finished, wall time cost on DFT: {end_time - start_time:.2f}s")
 
 
 if __name__ == "__main__":
