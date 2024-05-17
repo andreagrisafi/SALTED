@@ -78,7 +78,7 @@ def build():
     """
 
     if parallel:
-        """ parallel mode """
+        print("Running in parallel mode")
         """ check partitioning """
         assert size > 1, "Please run in serial mode if using a single MPI task"
         assert inp.gpr.blocksize > 0, "Please set inp.gpr.blocksize > 0 when running in parallel mode"
@@ -92,19 +92,19 @@ def build():
             f"the number of blocks {nblocks} = inp.gpr.Ntrain * inp.gpr.trainfrac / inp.gpr.blocksize!"
         this_task_trainrange = trainrange[rank*blocksize:(rank+1)*blocksize]
         """ calculate and gather """
-        print("Task",rank,"handling structures:", this_task_trainrange)
+        print(f"Task {rank} handling structures: {this_task_trainrange}")
         [Avec, Bmat] = matrices(this_task_trainrange, ntrain,av_coefs,rank)
         comm.Barrier()
-        # reduce matrices in slices to avoid MPI overflows
-        nslices = int(np.ceil(float(len(Avec))/100.0))
+        """ reduce matrices in slices to avoid MPI overflows """
+        nslices = int(np.ceil(len(Avec) / 100.0))
         for islice in range(nslices-1):
             Avec[islice*100:(islice+1)*100] = comm.allreduce(Avec[islice*100:(islice+1)*100])
             Bmat[islice*100:(islice+1)*100] = comm.allreduce(Bmat[islice*100:(islice+1)*100])
         Avec[(nslices-1)*100:] = comm.allreduce(Avec[(nslices-1)*100:])
         Bmat[(nslices-1)*100:] = comm.allreduce(Bmat[(nslices-1)*100:])
     else:
-        """ serial mode """
-        assert inp.gpr.blocksize == 0, "Please set inp.gpr.blocksize = 0 when running in serial mode"
+        print("Running in serial mode")
+        assert inp.gpr.blocksize == 0, "Please DON'T provide inp.gpr.blocksize in inp.yaml when running in serial mode"
         [Avec, Bmat] = matrices(trainrange,ntrain,av_coefs,rank)
 
     if rank==0:
