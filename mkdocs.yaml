@@ -22,6 +22,7 @@ nav:
       #    - Example 2 - Water & FHI-aims: examples/water_aims.md
       #    - Example 3 - Au slab & CP2K: examples/au_cp2k.md
   - Appendix:
+    - Input Configuration: input.md
     - API: api.md
 
 plugins:
@@ -48,9 +49,10 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.snippets
 
-
-
 extra_javascript:
   - javascripts/mathjax.js  # mathjax support
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css

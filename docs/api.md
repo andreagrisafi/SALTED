@@ -22,12 +22,3 @@
 
 ---
 
-## Input file IO
-
-::: salted.sys_utils.ParseConfig
-
-
-<br> <!-- larger space -->
-
----
-
