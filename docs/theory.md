@@ -2,16 +2,13 @@
 
 ### Symmetry-adapted descriptor
 
-<!--Different from the general GPR formalism, the atomic environment descriptor strategy is introduced to represent the atomic environment quantitatively,
-and the kernel function is defined by the outer product of two (sets of) descriptor's power spectrums.-->
-
-SALTED uses symmetry-adapted Gaussian process regression (SAGPR) to predict the density coefficients. The calculation of covariant kernel functions follows what presented in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). In particular, these are defined as inner products between three-body spherical equivariants of order $\lambda\mu$ built from a given representation $\Chi$ of the local environmnet of atom $i$:
+SALTED uses symmetry-adapted Gaussian process regression (SAGPR) to predict the density coefficients. The calculation of covariant kernel functions follows what presented in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). In particular, these are defined as inner products between three-body spherical equivariants of order $\lambda\mu$ built from a given representation $X$ of the local environmnet of atom $i$. In abstract Dirac notation, this is given by
 
 $$
-P_{i}^{\lambda\mu} = \int d\hat{R} \hat{R}\ket{\Chi_{i}} \otimes \hat{R}\ket{\Chi_{i}'} \otimes \hat{R}\ket{\lambda\mu}
+\ket{P_{i}^{\lambda\mu}} = \int d\hat{R} \left(\hat{R}\ket{X_{i}} \otimes \hat{R}\ket{X_{i}'} \otimes \hat{R}\ket{\lambda\mu}\right)
 $$
 
-In SALTED, $\Chi$ and $\Chi'$ can independently be chosen as density-like or potential-like representations. When the former choice is adopted for both representations, the descriptor reduces to the $\lambda$-SOAP power spectrum, as introduced in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). When the latter choice is made for at least one of the two representations, the model will possess long-range information following the LODE method as presented in [Chem. Sci. 12, 2078-2090 (2021)](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc04934d). In practice, the expansion coefficients of both density-like and potential-like representations are computed on a basis of spherical harmonics using the [rascaline package](https://github.com/Luthaf/rascaline), and used in SALTED to compute the three-body spherical equivariants.
+In SALTED, $X$ and $X'$ can independently be chosen as density-like or potential-like representations. When the former choice is adopted for both representations, the descriptor reduces to the $\lambda$-SOAP power spectrum, as introduced in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). When the latter choice is made for at least one of the two representations, the model will possess long-range information following the LODE method as presented in [Chem. Sci. 12, 2078-2090 (2021)](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc04934d). In practice, the expansion coefficients of both density-like and potential-like representations are computed on a basis of spherical harmonics using the [rascaline package](https://github.com/Luthaf/rascaline), and used in SALTED to compute the three-body spherical equivariants.
 
 ### Density fitting method
 
