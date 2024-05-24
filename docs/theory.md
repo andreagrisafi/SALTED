@@ -1,7 +1,4 @@
-# Methods
-
-This part of the tutorial contains no hands-on instructions. Instead, it is meant as a primer of the theoretical background and workflow of SALTED, for users to get familiarized with the methods before doing the exercise.
-
+# Theory 
 
 ### Symmetry-adapted descriptor
 
