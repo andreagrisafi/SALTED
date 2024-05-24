@@ -12,8 +12,8 @@ nav:
   - Home: index.md
   - Installation: installation.md
   - Theory: theory.md
+  - Workflow: workflow.md
   - Tutorial:
-    - General workflow: tutorial/workflow.md
     - Part 1 - Dataset: tutorial/dataset.md
     - Part 2 - Training: tutorial/training.md
       #    - Part 3 - Predict Properties: tutorial/predict.md
