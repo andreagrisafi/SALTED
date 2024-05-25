@@ -78,7 +78,7 @@ $$
 Non-linear kernels can then be constructed by moltiplying them by their scalar ($\lambda=0$) counterpart, elavated to a positive integer $z>0$:
 
 $$
-\tilde{k}_{\mu\mu'}^{\lambda}(i,j) = k_{\mu\mu'}^{\lambda}(i,j) \times \left(k_{\mu\mu'}^{0}(i,j)\right)^{z-1} 
+\tilde{\boldsymbol{k}}^{\lambda}(i,j) = \boldsymbol{k}^{\lambda}(i,j) \times \left(k^{0}(i,j)\right)^{z-1} 
 $$
 
 ### Symmetry-adapted prediction
