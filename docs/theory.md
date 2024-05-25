@@ -21,7 +21,50 @@ $$
 \ket{P_{i}^{\lambda\mu}} = \int d\hat{R} \left(\hat{R}\ket{X_{i}} \otimes \hat{R}\ket{X_{i}'} \otimes \hat{R}\ket{\lambda\mu}\right)
 $$
 
-In SALTED, $X$ and $X'$ can independently be chosen as density-like or potential-like representations. When the former choice is adopted for both representations, the descriptor reduces to the $\lambda$-SOAP power spectrum, as introduced in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). When the latter choice is made for at least one of the two representations, the model will possess long-range information following the LODE method as presented in [Chem. Sci. 12, 2078-2090 (2021)](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc04934d). In practice, the expansion coefficients $X_{i}^{nlm}$ of both density-like and potential-like representations are computed on a basis of orthogonal radial functions spherical harmonics using the [rascaline package](https://github.com/Luthaf/rascaline), and used in SALTED to compute the three-body spherical equivariants following the prescription reported in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002).
+In SALTED, $X$ and $X'$ can independently be chosen as density-like or potential-like representations. When the former choice is adopted for both representations, the descriptor reduces to the $\lambda$-SOAP power spectrum, as introduced in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). When the latter choice is made for at least one of the two representations, the model will possess long-range information following the LODE method as presented in [Chem. Sci. 12, 2078-2090 (2021)](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc04934d). In practice, the expansion coefficients $X_{i}^{nlm}$ of both density-like and potential-like representations are computed on a basis of orthogonal radial functions spherical harmonics using the [rascaline package](https://github.com/Luthaf/rascaline), and used in SALTED to compute the three-body spherical equivariants following the prescription reported in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002), i.e.,
+
+$$
+ P_{i}^{\lambda \mu}(nn'll') = (-1)^{\lambda-l'} \sum_{m}\  X_{i}^{nlm}\ (X_{i}^{n'l'(m-\mu)}\right)^\star (-1)^m \begin{pmatrix}
+   \lambda & l' & l \\
+   \mu & (m-\mu) & -m 
+  \end{pmatrix}
+$$
+
+Since the electron density is expanded on a basis of real spherical harmonics, the complex to real transformation matrix:
+
+$$
+\mathbf{C}^\lambda = \frac{1}{\sqrt{2}}\left( 
+\begin{matrix}
+i & 0 & ...& 0 & ... & 0 & -i(-1)^\lambda\\
+0 & i & ... & 0 & ... & -i(-1)^{\lambda-1} & 0 \\
+... & ... & ... & ...& ...& ...& ...\\
+0 & 0 & .. & \sqrt{2} & .. & 0 & 0\\
+&... &... &... &... &... &...\\
+0 & 1 & ... & 0 & ... & (-1)^{\lambda-1} & 0\\
+1 & 0 & ... & 0 & ... & 0 & (-1)^\lambda 
+\end{matrix},
+\right)
+$$
+
+is applied to the equivariant descriptor: 
+
+
+$$
+\boldsymbol{D_{i}}^{\lambda} = \mathbf{C}^\lambda \cdot \boldsymbol{P_{i}}^{\lambda}
+$$ 
+
+Importantly, the descriptor so computed will still have an imaginary part. At this point, we can enforce inversion symmetry to make the descriptor equivariant in O(3) by only retaining the components for which $l+l'+\lambda$ is even. Upon the complex to real transformation previously performed, this implies that we can in fact discard the imaginary part of $\boldsymbol{D_{i}}^{\lambda}$, obtaining 
+
+$$
+\boldsymbol{D_{i}}^{\lambda,O(3)} = Real[\boldsymbol{D_{i}}^{\lambda}] 
+$$
+
+Finally, we apply the following normalization
+
+$$
+\boldsymbol{\tilde{D}}_{i}^{\lambda,O(3)} = \boldsymbol{D}_{i}^{\lambda,O(3)}/\sqrt{\boldsymbol{D}_{i}^{\lambda,O(3)}\cdot \left(\boldsymbol{D}_{i}^{\lambda,O(3)}\right)^T} 
+$$
+
 
 ### Symmetry-adapted kernel
 
