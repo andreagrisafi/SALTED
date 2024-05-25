@@ -50,19 +50,19 @@ is applied to the equivariant descriptor:
 
 
 $$
-\boldsymbol{D_{i}}^{\lambda} = \mathbf{C}^\lambda \cdot \boldsymbol{P_{i}}^{\lambda}
+\boldsymbol{\mathcal{P}_{i}}^{\lambda} = \mathbf{C}^\lambda \cdot \boldsymbol{P_{i}}^{\lambda}
 $$ 
 
-Importantly, the descriptor so computed will still have an imaginary part. At this point, we can enforce inversion symmetry to make the descriptor equivariant in O(3) by only retaining the components for which $l+l'+\lambda$ is even. Upon the complex to real transformation previously performed, this implies that we can in fact discard the imaginary part of $\boldsymbol{D_{i}}^{\lambda}$, obtaining 
+Importantly, the descriptor so computed will still have an imaginary part. At this point, we can enforce inversion symmetry to make the descriptor equivariant in O(3) by only retaining the components for which $l+l'+\lambda$ is even. Upon the complex to real transformation previously performed, this implies that we can in fact discard the imaginary part of $\boldsymbol{\mathcal{P}}^{\lambda}$, obtaining 
 
 $$
-\boldsymbol{D}^{\lambda,O(3)} = Real[\boldsymbol{D}^{\lambda}] 
+\boldsymbol{\mathcal{P}}^{\lambda,O(3)} = Real[\boldsymbol{\mathcal{P}}^{\lambda}] 
 $$
 
 Finally, we apply the following normalization
 
 $$
-\boldsymbol{\tilde{D}}^{\lambda,O(3)} = \boldsymbol{D}^{\lambda,O(3)}/\sqrt{\boldsymbol{D}^{\lambda,O(3)}\cdot \left(\boldsymbol{D}^{\lambda,O(3)}\right)^T} 
+\boldsymbol{\tilde{\mathcal{P}}}^{\lambda,O(3)} = \boldsymbol{\mathcal{P}}^{\lambda,O(3)}/\sqrt{\boldsymbol{\mathcal{P}}^{\lambda,O(3)}\cdot \left(\boldsymbol{\mathcal{P}}^{\lambda,O(3)}\right)^T} 
 $$
 
 
