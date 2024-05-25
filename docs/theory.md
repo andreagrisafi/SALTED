@@ -2,16 +2,14 @@
 
 ### Density fitting method
 
-The representation of the electron density follows the density fitting (DF), or resolution of the identity (RI), method commonly used in quantum chemistry. This implies approximating the electron density $n_{e}$ as a linear expansion over atom-centered radial functions $R_{n\lambda}$ and spherical harmonics Y_{\mu}^{\lambda}:
+The representation of the electron density follows the density fitting (DF), or resolution of the identity (RI), method commonly used in quantum chemistry. This implies approximating the electron density $n_{e}$ as a linear expansion over atom-centered radial functions $R_{n\lambda}$ and spherical harmonics $Y_{\mu}^{\lambda}$:
 
 $$
-\begin{aligned}
-n_{e}(\boldsymbol{r}) \approx \sum_{inlm} c_{i}^{nlm} \sum_{\boldsymbol{u}} \phi_{n\lambda\mu}\left(\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right) \\ 
-&=  \sum_{inlm} c_{i}^{nlm} \sum_{\boldsymbol{u}} R_{n\lambda}(\left|\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right|)Y_{\mu}^{\lambda}(\widehat{\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}})\\ 
-\end{aligned}
+n_{e}(\boldsymbol{r}) \approx \sum_{inlm} c_{i}^{nlm} \sum_{\boldsymbol{u}} \phi_{n\lambda\mu}\left(\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right)  
+=  \sum_{inlm} c_{i}^{nlm} \sum_{\boldsymbol{u}} R_{n\lambda}(\left|\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right|)Y_{\mu}^{\lambda}(\widehat{\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}}) 
 $$
 
-where $\phi$ are the auxiliary function, $i$ indicates the atomic index, $\boldsymbol{u}$ to the cell translation vector (assuming the system is periodic) and $c_{i}^{nlm}$ are the expansion coefficients. Several metrics can be chosen to perform density fitting, e.g., overlap, Coulomb, ..., depending on the target application. This metric  will be similarly used in the SALTED loss function. 
+where $\phi$ are the auxiliary function, $i$ indicates the atomic index, $\boldsymbol{u}$ to the cell translation vector (assuming the system is periodic) and $c_{i}^{nlm}$ are the expansion coefficients. Several metrics can be chosen to perform density fitting, e.g., overlap, Coulomb, ... This metric  will be similarly used in the SALTED loss function. 
 
 Because of the non-orthogonal nature of the basis functions, the 2-center auxiliary integrals of the form $\bra{\phi}\hat{O}\ket{\phi'}$ are needed to train the model, in addition to the expansion coefficients. The operator $\hat{O}$ is defined to be the identity when the overlap metric is adopted, and the Coulomb operator $1/|\boldsymbol{r}-\boldsymbol{r'}|$ when a Coulomb metric is adopted. 
 
