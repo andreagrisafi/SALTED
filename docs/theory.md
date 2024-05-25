@@ -2,16 +2,16 @@
 
 ### Density fitting method
 
-The representation of the electron density follows the density fitting (DF), or resolution of the identity (RI), method commonly used in quantum chemistry. This implies approximating the electron density $n_{e}$ as a linear expansion over atom-centered radial functions $R_{n\lambda}$ and spherical harmonics $Y_{\mu}^{\lambda}$:
+The representation of the electron density follows the density fitting (DF), or resolution of the identity (RI), method commonly used in quantum chemistry. This implies approximating the self-consistent electron density $n_{e}$, as computed by the selected electronic-strucutre code, through a linear expansion over atom-centered radial functions $R_{n\lambda}$ and spherical harmonics $Y_{\mu}^{\lambda}$:
 
 $$
-n_{e}(\boldsymbol{r}) \approx \sum_{inlm} c_{i}^{nlm} \sum_{\boldsymbol{u}} \phi_{n\lambda\mu}\left(\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right)  
-=  \sum_{inlm} c_{i}^{nlm} \sum_{\boldsymbol{u}} R_{n\lambda}(\left|\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right|)Y_{\mu}^{\lambda}(\widehat{\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}}) 
+n_{e}(\boldsymbol{r}) \approx \sum_{in\lambda\mu} c_{i}^{n\lambda\mu} \sum_{\boldsymbol{u}} \phi_{n\lambda\mu}\left(\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right)  
+=  \sum_{in\lambda\mu} c_{i}^{n\lambda\mu} \sum_{\boldsymbol{u}} R_{n\lambda}(\left|\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right|)Y_{\mu}^{\lambda}(\widehat{\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}}) 
 $$
 
-where $\phi$ are the auxiliary function, $i$ indicates the atomic index, $\boldsymbol{u}$ to the cell translation vector (assuming the system is periodic) and $c_{i}^{nlm}$ are the expansion coefficients. Several metrics can be chosen to perform density fitting, e.g., overlap, Coulomb, ... This metric  will be similarly used in the SALTED loss function. 
+where $\phi$ is a compact symbol for the auxiliary functions of indexes $n\lambda\mu$, $i$ indicates the atomic index in the unit cell, $\boldsymbol{u}$ is the cell translation vector (assuming the system is periodic), and $c_{i}^{nlm}$ are the density-fitting expansion coefficients. 
 
-Because of the non-orthogonal nature of the basis functions, the 2-center auxiliary integrals of the form $\bra{\phi}\hat{O}\ket{\phi'}$ are needed to train the model, in addition to the expansion coefficients. The operator $\hat{O}$ is defined to be the identity when the overlap metric is adopted, and the Coulomb operator $1/|\boldsymbol{r}-\boldsymbol{r'}|$ when a Coulomb metric is adopted. 
+Different metrics can be chosen to perform the density fitting from the reference self-consistent density, e.g., overlap, Coulomb, ..., depending on the target application, as well as on the options provided by the selected electronic-structure code. This metric will be similarly used in the SALTED loss function. In fact, because of the non-orthogonal nature of the basis functions, the 2-center auxiliary integrals of the form $\bra{\phi}\hat{O}\ket{\phi'}$ are needed to couple the expansion coefficients together. When the overlap metric is adopted, the operator $\hat{O}$ is defined to be the identity. Conversely, the integral operator $\hat{O} = \int d\boldsymbol{r'} 1/|\boldsymbol{r}-\boldsymbol{r'}|$ is applied when using the Coulomb metric. Note that, in practice, the Coulomb potential must be truncated when considering a periodic system, so that a truncated Coulomb metric is typically adopted in this case.  
 
 ### Symmetry-adapted descriptor
 
@@ -69,6 +69,17 @@ $$
 
 ### Symmetry-adapted kernel
 
+From the normalized symmetry-adapted descriptors $\boldsymbol{\tilde{\mathcal{P}}}^{\lambda,O(3)}$, symmetry-adapted kernel functions that couple two given atomic environments $i$ and $j$ are computed as follows:
+
+$$
+k_{\mu\mu'}^{\lambda}(i,j) = \boldsymbol{\tilde{\mathcal{P}}}^{\lambda\mu,O(3)}(i) \cdot \left(\boldsymbol{\tilde{\mathcal{P}}}^{\lambda\mu',O(3)}(j)\right)^T     
+$$
+
+Non-linear kernels can then be constructed by moltiplying them by their scalar ($\lambda=0$) counterpart, elavated to a positive integer $z>0$:
+
+$$
+\tilde{k}_{\mu\mu'}^{\lambda}(i,j) = k_{\mu\mu'}^{\lambda}(i,j) \times \left(k_{\mu\mu'}^{0}(i,j)\right)^{z-1} 
+$$
 
 ### Symmetry-adapted prediction
 
