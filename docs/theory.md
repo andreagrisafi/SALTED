@@ -50,7 +50,7 @@ is applied to the equivariant descriptor:
 
 
 $$
-\boldsymbol{\mathcal{P}_{i}}^{\lambda} = \mathbf{C}^\lambda \cdot \boldsymbol{P_{i}}^{\lambda}
+\boldsymbol{\mathcal{P}}^{\lambda} = \mathbf{C}^\lambda \cdot \boldsymbol{P}^{\lambda}
 $$ 
 
 Importantly, the descriptor so computed will still have an imaginary part. At this point, we can enforce inversion symmetry to make the descriptor equivariant in O(3) by only retaining the components for which $l+l'+\lambda$ is even. Upon the complex to real transformation previously performed, this implies that we can in fact discard the imaginary part of $\boldsymbol{\mathcal{P}}^{\lambda}$, obtaining 
