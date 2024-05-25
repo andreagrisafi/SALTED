@@ -1,31 +1,34 @@
 # Theory 
 
+### Density fitting method
+
+The representation of the electron density follows the density fitting (DF), or resolution of the identity (RI), method commonly used in quantum chemistry. This implies approximating the electron density $n_{e}$ as a linear expansion over atom-centered radial functions $R_{n\lambda}$ and spherical harmonics Y_{\mu}^{\lambda}:
+
+$$
+\begin{aligned}
+n_{e}(\boldsymbol{r}) \approx \sum_{inlm} c_{i}^{nlm} \sum_{\boldsymbol{u}} \phi_{n\lambda\mu}\left(\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right) \\ 
+&=  \sum_{inlm} c_{i}^{nlm} \sum_{\boldsymbol{u}} R_{n\lambda}(\left|\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right|)Y_{\mu}^{\lambda}(\widehat{\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}})\\ 
+\end{aligned}
+$$
+
+where $\phi$ are the auxiliary function, $i$ indicates the atomic index, $\boldsymbol{u}$ to the cell translation vector (assuming the system is periodic) and $c_{i}^{nlm}$ are the expansion coefficients. Several metrics can be chosen to perform density fitting, e.g., overlap, Coulomb, ..., depending on the target application. This metric  will be similarly used in the SALTED loss function. 
+
+Because of the non-orthogonal nature of the basis functions, the 2-center auxiliary integrals of the form $\bra{\phi}\hat{O}\ket{\phi'}$ are needed to train the model, in addition to the expansion coefficients. The operator $\hat{O}$ is defined to be the identity when the overlap metric is adopted, and the Coulomb operator $1/|\boldsymbol{r}-\boldsymbol{r'}|$ when a Coulomb metric is adopted. 
+
 ### Symmetry-adapted descriptor
 
-SALTED uses symmetry-adapted Gaussian process regression (SAGPR) to predict the density coefficients. The calculation of covariant kernel functions follows what presented in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). In particular, these are defined as inner products between three-body spherical equivariants of order $\lambda\mu$ built from a given representation $X$ of the local environmnet of atom $i$. In abstract Dirac notation, this is given by
+SALTED uses symmetry-adapted Gaussian process regression (SAGPR) to predict the density coefficients. The calculation of covariant kernel functions for each angular momentum $\lambda$ used to expand the electron density follows what presented in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). In particular, these are defined as inner products between three-body spherical equivariants of order $\lambda\mu$ built from a given representation $X$ of the local environmnet of atom $i$. In abstract Dirac notation, this is given by
 
 $$
 \ket{P_{i}^{\lambda\mu}} = \int d\hat{R} \left(\hat{R}\ket{X_{i}} \otimes \hat{R}\ket{X_{i}'} \otimes \hat{R}\ket{\lambda\mu}\right)
 $$
 
-In SALTED, $X$ and $X'$ can independently be chosen as density-like or potential-like representations. When the former choice is adopted for both representations, the descriptor reduces to the $\lambda$-SOAP power spectrum, as introduced in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). When the latter choice is made for at least one of the two representations, the model will possess long-range information following the LODE method as presented in [Chem. Sci. 12, 2078-2090 (2021)](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc04934d). In practice, the expansion coefficients of both density-like and potential-like representations are computed on a basis of spherical harmonics using the [rascaline package](https://github.com/Luthaf/rascaline), and used in SALTED to compute the three-body spherical equivariants.
+In SALTED, $X$ and $X'$ can independently be chosen as density-like or potential-like representations. When the former choice is adopted for both representations, the descriptor reduces to the $\lambda$-SOAP power spectrum, as introduced in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002). When the latter choice is made for at least one of the two representations, the model will possess long-range information following the LODE method as presented in [Chem. Sci. 12, 2078-2090 (2021)](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc04934d). In practice, the expansion coefficients $X_{i}^{nlm}$ of both density-like and potential-like representations are computed on a basis of orthogonal radial functions spherical harmonics using the [rascaline package](https://github.com/Luthaf/rascaline), and used in SALTED to compute the three-body spherical equivariants following the prescription reported in [PRL 120, 036002 (2018)](https://link.aps.org/doi/10.1103/PhysRevLett.120.036002).
 
-### Density fitting method
+### Symmetry-adapted kernel
 
-The density fitting (DF) method or resolution of the identity (RI) ansatz, are commonly used in quantum chemistry. Several metrics can be chosen to perform this fitting.
-It assumes that the electron density $\rho(\mathbf{r})$ could be expanded as a linear combination of products of atomic orbitals (AO) in a given metric. Here we use the Coulomb
-metric and numeric AOs, which are also used in all hybrid-functional and Hartree-Fock calculations in FHI-aims.
 
-$$
-\begin{aligned}
-\rho(\mathbf{r}) \approx \tilde{\rho}(\mathbf{r})
-&= \sum\limits_{i,\sigma,\mathbf{U}} c_{i,\sigma} \phi_{i,\sigma} (\mathbf{r} - \mathbf{R}_{i} + \mathbf{T}(\mathbf{U})) \\
-&= \sum\limits_{i,\sigma,\mathbf{U}} c_{i,\sigma} \left\langle\mathbf{r} \middle| \phi_{i,\sigma}(\mathbf{U}) \right\rangle \\
-\end{aligned}
-$$
-
-where $i$ indicates the index of the center atom of the product basis, $\sigma = n \lambda \mu$ is a composite index with $n$ corresponding to the principal quantum number and $\lambda \mu$ corresponding to the spherical harmonics $Y_{\lambda}^{\mu}$.
-The density fitting coefficients are also written as $\mathbf{c}^{DF}$ for distinction.
+### Symmetry-adapted prediction
 
 Within the GPR formalism, the density coefficients $c_{i, n\lambda\mu}$ are expressed as a linear combination of the kernel functions
 
@@ -39,12 +42,6 @@ $A_{i}$ is the atomic environment of atom $i$,
 $M_{j}$ is the subsampled atomic environment of atom $j$ in the training dataset (described in the [next section](#farthest-point-sampling)),
 $k_{\mu\mu'}^{\lambda}(A_{i},M_{j})$ is the kernel function between atom $i$ and atom $j$ and indexed by $\mu\mu'$,
 and $\delta_{a_{i}, a_{j}}$ is the Kronecker delta function that makes sure the atomic species of atom $i$ and atom $j$ are the same. Note that the kernel functions are built over a sparse (and diverse) set of atomic environments, which is obtained by farthest point sampling (FPS).
-
-<!-- So far, the training dataset consists of *ab initio* calculations, density fitting coefficients ($\mathbf{c}^{DF}$), and atomic environment kernel functions $\mathbf{K}$. -->
-
-<!--The most important term $b_{n\lambda\mu'} (M_{j})$ is the GPR weights we wish to determine by the training dataset,
-while the atomic environments $M_{j}$ in the training dataset might lead to a huge kernel matrix $\mathbf{K}_{MM}$ ($M$ samples in training dataset). Proper subsampling or sparsification is necessary to reduce the computational cost, and the farthest point sampling (FPS) method is used in SALTED. -->
-
 
 ### Farthest point sampling
 
