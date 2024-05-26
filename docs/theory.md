@@ -163,7 +163,7 @@ $$
 
 where $\textbf{c}_N^{\text{DF}}$ is the vector of reference density-fitting coefficients associated with $N$ training configurations, while $\eta$ is a regularization parameters which acts as a penalty to high-norm weights. 
 
-## Explicit solution
+- Explicit solution
 
 The problem can be analytically solved by explicit differentiation of the loss function with respect to the regression weights, obtaining
 
@@ -171,7 +171,7 @@ $$
 \tilde{\mathbf{b}}_D = \left(\mathbf{\Psi}_{ND}^T \cdot \mathbf{S}_{NN} \cdot \mathbf{\Psi}_{ND} + \eta \mathbf{\Psi}_{DD} \right)^{-1} \left(\mathbf{\Psi}_{ND}^T \cdot \textbf{c}_N^{\text{DF}}\right)   
 $$
 
-## Conjugate gradients minimization
+- Conjugate gradients minimization
 
 When the problem dimensionality $D$ is too large, it is more convenient to numerically minimize the loss function directly. In SALTED, we apply the conjugate gradient (CG) method to solve the optimization problem.
 This is discussed in [this paper](https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00850).
