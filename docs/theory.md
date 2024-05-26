@@ -111,27 +111,27 @@ Note tha a Kronecker delta function $\delta_{a_{i}, a_{j}}$ is introduced to mak
 
 ### Reproducing kernel Hilbert space (RKHS)
 
-Even though the sparsification simplifies the kernel matrix, it still involves calculating  $\mathbf{K}_{MM}^{-1}$, which can be both expensive and ill-conditioned.
+In order to numerically stabilize the learning procedure, it is convenient to recast the sparse-GPR problem into the features space that underlies the contruction of the (non-linear) kernel functions. 
+Following the [representer theorem](https://en.wikipedia.org/wiki/Representer_theorem), 
+it is in fact possible to find a Hilbert space with elements $\mathbf{\Psi}$ whose inner product reproduces the kernels. This is commonly referred to as the reproducing kernel Hilbert space (RKHS).  
 
-Following the [representer theorem](https://en.wikipedia.org/wiki/Representer_theorem) and assuming we have a positive-definite kernel (which is the case, also after sparsification), 
-we are guaranteed to find a Hilbert space with elements $\mathbf{\Psi}$ whose dot product reproduces the kernel. This is called the reproducing kernel Hilbert space (RKHS).  
-
-We use the RKHS here to avoid the numerical hurdles which could be introduced by calculating  $\mathbf{K}_{MM}^{-1}$. First, we perform an SVD decomposition of $\mathbf{K}_{MM}^{an\lambda}$ (in channel $an\lambda$). We then keep only the non-negligible
-eigenvalues $\lambda$ (larger than a cutoff threshold $\epsilon$) and their respective eigenvectors  $\mathbf{v}$. We then approximate $\mathbf{K}_{NN}^{an\lambda}$ by
+For each channel $an\lambda$, we first perform an SVD decomposition of $\left(\mathbf{K}_{MM}^{an\lambda}\right)^{-1}$ by keeping only the non-negligible eigenvalues $\lambda_{d}$ (above a given threshold $\epsilon$) and their respective eigenvectors  $\mathbf{v}_{d}$. Following the SoR approximation, we then write 
 
 
 $$
 \mathbf{K}_{NN}^{an\lambda} \approx \mathbf{K}_{NM}^{an\lambda} \sum_d^{D^{an\lambda}} \frac{\mathbf{v}_d^M (\mathbf{v}_d^M)^T}{\lambda_d}  \mathbf{K}_{MN}^{an\lambda}
 $$
 
+where we assumed
+
 $$
-\mathbf{K}_{MM}^{an\lambda}
+\left(\mathbf{K}_{MM}^{an\lambda})^{-1}
 \approx \sum\limits_{d}^{D^{an\lambda}} \mathbf{v}_{M}^{d} \lambda_{d}^{-1} (\mathbf{v}_{M}^{d})^{\top}
 = \mathbf{V}_{MD}^{an\lambda} (\mathbf{\Lambda}_{DD}^{an\lambda})^{-1} (\mathbf{V}_{MD}^{an\lambda})^{\top}
 $$
 
 where $D^{an\lambda}$ is the final truncated dimension, $\mathbf{\Lambda}_{DD}^{an\lambda}$ is the diagonal matrix of selected eigenvalues, and the $\mathbf{V}_{MD}^{an\lambda}$ is the batched selected eigenvectors.
-With this expression, we can define the RKHS of  $\mathbf{K}_{NN}^{an\lambda}$ spanned by the feature vectors $\mathbf{\Psi}_{ND}^{an\lambda}$
+With this expression, we can define the RKHS of $\mathbf{K}_{NN}^{an\lambda}$ as the space spanned by the following feature vectors 
 
 $$
 \begin{aligned}
@@ -145,37 +145,16 @@ $$
 \mathbf{K}_{NN}^{an\lambda} \approx \mathbf{\Psi}_{ND}^{an\lambda} (\mathbf{\Psi}_{ND}^{an\lambda})^{\top}
 $$
 
-With the RKHS reformulation above, we can reformulate the density-learning problem as a linear regression task parametrized according to the feature vectors $\mathbf{\Psi}_{ND}^{an\lambda}$.
-Predicting density coefficients $c_{an\lambda\mu} (A_i)$ in the [previous section](#density-fitting-method) is rewritten as
+With the RKHS reformulation above, we can finally reformulate the density-learning problem as a linear regression task parametrized according to the feature vectors $\mathbf{\Psi}_{ND}^{an\lambda}$.
+In particular, the prediction of the density coefficients is rewritten as follows
 
 $$
-\begin{aligned}
-c_{an\lambda\mu} (A_i)
-& \approx \sum\limits_{j \in N} \sum\limits_{|\mu'| \le \lambda}
-b_{n\lambda\mu'} (M_{j}) k_{\mu\mu'}^{\lambda}(A_{i},M_{j}) \delta_{a_{i}, a_{j}} \\
-& = \mathbf{K}_{1M}^{an\lambda} (A_i,an\lambda\mu) \mathbf{b}_{M}^{an\lambda} \\
-& \approx [\mathbf{K}_{1M}^{an\lambda} (A_i,an\lambda\mu) \mathbf{V}_{MD}^{an\lambda} (\mathbf{\Lambda}_{DD}^{an\lambda})^{-1/2}]
-[(\mathbf{\Lambda}_{DD}^{an\lambda})^{1/2} (\mathbf{V}_{MD}^{an\lambda})^{\top} \mathbf{b}_{M}^{an\lambda}] \\
-% & = \sum\limits_{d}^{D^{an\lambda}} \tilde{b}_{d}^{an\lambda} \psi_{d}^{an\lambda} (A_{i}; an\lambda\mu) \\
-& \equiv \mathbf{\Psi}_{1D} (A_{i}; an\lambda\mu) \tilde{\mathbf{b}}_{D}^{an\lambda}
-\end{aligned}
+c_{i}^{n\lambda\mu} 
+\approx \mathbf{\Psi}_{D}^{an\lambda\mu}(i) \tilde{\mathbf{b}}_{D}^{an\lambda}
 $$
-
 
 
 ### GPR optimization
-
-#### Direct inversion
-
-In the [initial SALTED paper](https://pubs.acs.org/doi/10.1021/acs.jctc.1c00576  ), optimized regression weights $\mathbf{b}$ are obtained by direct inversion (without RKHS reformulation)
-
-$$
-\mathbf{b}_{M} = \left(\mathbf{K}_{NM}^{\top} \mathbf{S}_{NN} \mathbf{K}_{NM}
-+ \eta \mathbf{K}_{MM} \right)^{-1} \mathbf{K}_{NM}^{\top} \mathbf{w}_{N}
-$$
-
-This method is no longer suggested in SALTED, since it leads to unavoidable instabilities.
-
 
 #### Conjugate gradient method
 
@@ -184,12 +163,12 @@ and we can apply the conjugate gradient (CG) method to solve the optimization pr
 This is discussed in [this paper](https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00850  ),
 and details of the CG algorithm can be found at [Wikipedia](https://en.wikipedia.org/wiki/Conjugate_gradient_method).
 
-The loss function we minimize by CG in this case is
+Assuming an overlap metric, the loss function we minimize by CG in this case is
 
 $$
-l(\tilde{\mathbf{b}}_{D}) = (\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{df}})^{T}\mathbf{S}_{NN}(\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{df}}) + \eta \tilde{\mathbf{b}}_{D}^{T} \tilde{\mathbf{b}}_{D}
+l(\tilde{\mathbf{b}}_{D}) = (\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{DF}})^{T}\mathbf{S}_{NN}(\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{DF}}) + \eta \tilde{\mathbf{b}}_{D}^{T} \tilde{\mathbf{b}}_{D}
 $$
 
-where $\textbf{c}_N^{\text{df}}$  are the known fitted RI/density-fitting coefficients. Note the need of the overlap matrix $\mathbf{S}_{NN}$ in each case -- a consequence of a non-orthogonal basis --  which will be discussed further on.
+where $\textbf{c}_N^{\text{DF}}$  are the reference density-fitting coefficients. 
 
 
