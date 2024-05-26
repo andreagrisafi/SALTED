@@ -153,22 +153,25 @@ c_{i}^{n\lambda\mu}
 \approx \mathbf{\Psi}_{D}^{an\lambda\mu}(i) \tilde{\mathbf{b}}_{D}^{an\lambda}
 $$
 
+### SALTED loss function and solution 
 
-### GPR optimization
-
-#### Conjugate gradient method
-
-With the RKHS reformulation, the regression loss function is a quadratic function of the GPR weights,
-and we can apply the conjugate gradient (CG) method to solve the optimization problem.
-This is discussed in [this paper](https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00850  ),
-and details of the CG algorithm can be found at [Wikipedia](https://en.wikipedia.org/wiki/Conjugate_gradient_method).
-
-Assuming an overlap metric, the loss function we minimize by CG in this case is
+Within the RKHS reformulation, the SALTED loss function is written as a quadratic form of the regression weights. Assuming an overlap metric, this is given by:  
 
 $$
-l(\tilde{\mathbf{b}}_{D}) = (\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{DF}})^{T}\mathbf{S}_{NN}(\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{DF}}) + \eta \tilde{\mathbf{b}}_{D}^{T} \tilde{\mathbf{b}}_{D}
+\mathcal{L}(\tilde{\mathbf{b}}_{D}) = (\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{DF}})^{T}\mathbf{S}_{NN}(\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{DF}}) + \eta \tilde{\mathbf{b}}_{D}^{T} \tilde{\mathbf{b}}_{D}
 $$
 
-where $\textbf{c}_N^{\text{DF}}$  are the reference density-fitting coefficients. 
+where $\textbf{c}_N^{\text{DF}}$ is the vector of reference density-fitting coefficients associated with $N$ training configurations, while $\eta$ is a regularization parameters which acts as a penalty to high-norm weights. 
 
+## Explicit solution
 
+The problem can be analytically solved by explicit differentiation of the loss function with respect to the regression weights, obtaining
+
+$$
+\tilde{\mathbf{b}}_D = \left(\mathbf{\Psi}_{ND}^T \cdot \mathbf{S}_{NN} \cdot \mathbf{\Psi}_{ND} + \eta \mathbf{\Psi}_{DD} \right)^{-1} \left(\mathbf{\Psi}_{ND}^T \cdot \textbf{c}_N^{\text{DF}}\right)   
+$$
+
+## Conjugate gradients minimization
+
+When the problem dimensionality $D$ is too large, it is more convenient to numerically minimize the loss function directly. In SALTED, we apply the conjugate gradient (CG) method to solve the optimization problem.
+This is discussed in [this paper](https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00850).
