@@ -81,37 +81,33 @@ $$
 \tilde{\boldsymbol{k}}^{\lambda}(i,j) = \boldsymbol{k}^{\lambda}(i,j) \times \left(k^{0}(i,j)\right)^{z-1} 
 $$
 
-### Symmetry-adapted prediction
 
-Within the GPR formalism, the density coefficients $c_{i, n\lambda\mu}$ are expressed as a linear combination of the kernel functions
+### Subset of regressors approximation
+
+In order to reduce the dimensionality of the regression problem, we adopt the subset of regressors approach (SoR). For each $\lambda$, in particular, we approximate the full kernel matrix between the $\mathcal{N}$ atoms of the training set using a subset of $M<\mathcal{N}$ atomic environments, such that
 
 $$
-c_{i, n\lambda\mu} = c_{n\lambda\mu} (A_{i}) \approx \sum\limits_{j \in M} \sum\limits_{|\mu'| \le \lambda}
-b_{n\lambda\mu'} (M_{j}) k_{\mu\mu'}^{\lambda}(A_{i},M_{j}) \delta_{a_{i}, a_{j}}
+K_{\mathcal{N}\mathcal{N}} \approx K_{\mathcal{N}M} K_{MM}^{-1} K_{M\mathcal{N}}
 $$
 
-where $b_{n\lambda\mu'}$ are the new unknown coefficients,
-$A_{i}$ is the atomic environment of atom $i$,
-$M_{j}$ is the subsampled atomic environment of atom $j$ in the training dataset (described in the [next section](#farthest-point-sampling)),
-$k_{\mu\mu'}^{\lambda}(A_{i},M_{j})$ is the kernel function between atom $i$ and atom $j$ and indexed by $\mu\mu'$,
-and $\delta_{a_{i}, a_{j}}$ is the Kronecker delta function that makes sure the atomic species of atom $i$ and atom $j$ are the same. Note that the kernel functions are built over a sparse (and diverse) set of atomic environments, which is obtained by farthest point sampling (FPS).
+In SALTED, $M$ is selected using the Farhest Point Sampling algorithm (see the FPS section). In practice, $K_{MM}$ is most of the time found to be low rank, so that a suitable strategy must be adopt to numerically stabilize the problem (see the RKHS section).
 
 ### Farthest point sampling
 
 FPS is a (simple but useful) greedy algorithm to select a diverse subset of points from a given set.
-Please check, e.g., this [blog](https://minibatchai.com/2021/08/07/FPS.html) for details.
+Please check, e.g., this [blog](https://minibatchai.com/2021/08/07/FPS.html) for details. In SALTED, the FPS algorithm is used to (i) sparsify the features space of each spherical equivariant of order $\lambda$, and (ii) to select the most representative atomic environments $M$ based on the scalar kernel metric.
 
-In SALTED, the FPS algorithm is used to sparsify the atomic environments in two ways: (i) It is used on the feature vector dimension ($\lambda$-SOAP) itself, to select representative entries of the feature vector, and (ii) on the atomic environments, to select representative but diverse atomic environments, based on their pre-sparsified feature vector.
-The theory behind FPS is the subset of regressors approach (SoR),
-i.e. approximating the full kernel matrix ($N$ samples) by a subset of kernel matrix ($M$ samples, $M < N$)
+### Symmetry-adapted prediction
+
+Within the sparse-GPR formalism, the density coefficients $c_{i}^{n\lambda\mu}$ of a given atom $i$ are predicted as a linear combination of the kernel functions
 
 $$
-K_{NN} \approx K_{NM} K_{MM}^{-1} K_{MN}
+c_{i}^{n\lambda\mu} \approx \sum\limits_{j \in M} \sum\limits_{|\mu'| \le \lambda}
+b_{n\lambda\mu'}(j) k_{\mu\mu'}^{\lambda}(i,j) \delta_{a_{i}, a_{j}}
 $$
 
-
-It is worth noting that the FPS is performed within each $an\lambda$ channel based on the $\lambda$-SOAP descriptor formalism, where $a$ is the atomic species, $n$ is the radial basis index, and $\lambda$ is the angular momentum.
-
+where $b_{n\lambda\mu'}(j)$ are the regression weights and j runs over the sparse selection of $M$ atom. 
+Note tha a Kronecker delta function $\delta_{a_{i}, a_{j}}$ is introduced to make sure the atomic species of atom $i$ and atom $j$ are the same. 
 
 ### Reproducing kernel Hilbert space (RKHS)
 
