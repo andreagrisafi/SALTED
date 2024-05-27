@@ -20,7 +20,6 @@ from salted.sys_utils import (
     get_atom_idx,
     get_conf_range,
     get_feats_projs,
-    get_natmax_in_range,
     read_system,
 )
 
@@ -499,10 +498,10 @@ def save_pred_descriptor(data:Dict[int, np.ndarray], config_range:List[int], nat
 
     """ cut natmax to the number of atoms in the structure """
     for idx, idx_in_full_dataset in enumerate(config_range):
-        this_data = {}
+        this_data:Dict[int, np.ndarray] = dict()
         this_natoms = natoms[idx]
         for lam, data_this_lam in data.items():
-            this_data[lam] = data_this_lam[idx, :this_natoms]  # shape (natom, [2*lambda+1,] featsize)
+            this_data[f"lam{lam}"] = data_this_lam[idx, :this_natoms]  # shape (natom, [2*lambda+1,] featsize)
         with open(osp.join(dpath, f"descriptor_{idx_in_full_dataset+1}.npz"), "wb") as f:  # index starts from 1
             np.savez(f, **this_data)
 
