@@ -1,0 +1,17 @@
+/* Maximum space for text block
+see https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/#content-area-width
+*/
+.md-grid {
+    max-width: 100%; /* 100%, if you want to stretch to full-width */
+}
+
+/* wrapping lines in tables instead of adding horizontal scroll bars
+see https://github.com/mkdocs/mkdocs/discussions/3035
+*/
+.wy-table-responsive table td, .wy-table-responsive table th {
+    white-space: normal !important;
+}
+
+.wy-table-responsive {
+    overflow : visible !important;
+}
