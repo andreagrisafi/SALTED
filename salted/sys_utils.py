@@ -6,6 +6,7 @@ from typing import Dict, List, Literal, Optional, Tuple, Union
 import h5py
 import numpy as np
 import yaml
+from ase import Atoms
 from ase.io import read
 
 from salted import basis
@@ -100,7 +101,7 @@ def get_atom_idx(ndata,natoms,spelist,atomic_symbols):
 
     return atom_idx,natom_dict
 
-def get_conf_range(rank,size,ntest,testrangetot):
+def get_conf_range(rank,size,ntest,testrangetot) -> List[List[int]]:
     if rank == 0:
         testrange = [[] for _ in range(size)]
         blocksize = int(ntest/float(size))
@@ -419,6 +420,7 @@ class ParseConfig:
                 "filename": (False, PLACEHOLDER, str, lambda inp, val: check_path_exists(val)),  # path to the prediction file
                 "predname": (False, PLACEHOLDER, str, None),  # SALTED prediction identifier
                 #### below are optional, but required for some qmcode ####
+                "save_descriptor": (False, False, bool, None),  # whether saving the descriptor
                 "predict_data": (False, PLACEHOLDER, str, lambda inp, val: check_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
             },
             "descriptor": {

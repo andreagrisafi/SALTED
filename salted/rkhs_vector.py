@@ -5,6 +5,7 @@ Calculate RKHS vectors
 import os
 import os.path as osp
 import time
+from typing import Dict, List, Tuple
 
 import numpy as np
 from ase.data import atomic_numbers
@@ -266,7 +267,7 @@ def build():
                 power[lam] = p.reshape(natoms[iconf],2*lam+1,featsize)
 
         # Compute kernels and projected RKHS features
-        Psi = {}
+        Psi:Dict[Tuple[int, str], np.ndarray] = {}
         ispe = {}
         for spe in species:
             ispe[spe] = 0
@@ -307,19 +308,26 @@ def build():
         srows = arraylist()
         scols = arraylist()
         psi_nonzero = arraylist()
+        # srows:List[np.ndarray] = []
+        # scols:List[np.ndarray] = []
+        # psi_nonzero:List[np.ndarray] = []
         i = 0
         for iat in range(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
             for l in range(lmax[spe]+1):
                 i1 = ispe[spe]*(2*l+1)
-                i2 = ispe[spe]*(2*l+1)+2*l+1
-                x = Psi[(spe,l)][i1:i2]
-                nz = np.nonzero(x)
-                vals = x[x!=0]
+                i2 = ispe[spe]*(2*l+1) + 2*l+1
+                x = Psi[(spe,l)][i1:i2]  # 2d array
+                nz = np.nonzero(x)  # rwo 0: non-zero row indices, row 1: non-zero column indices
+                # vals = x[x!=0]
+                vals = x[nz]  # 1d array
                 for n in range(nmax[(spe,l)]):
                     psi_nonzero.update(vals)
                     srows.update(nz[0]+i)
                     scols.update(nz[1]+cuml_Mcut[(spe,l,n)])
+                    # psi_nonzero.append(vals)
+                    # srows.append(nz[0] + i)
+                    # scols.append(nz[1] + cuml_Mcut[(spe,l,n)])
                     i += 2*l+1
             ispe[spe] += 1
 
@@ -327,6 +335,11 @@ def build():
         srows = srows.finalize()
         scols = scols.finalize()
         ij = np.vstack((srows,scols))
+        # psi_nonzero = np.concatenate(psi_nonzero, axis=0)
+        # ij = np.vstack((
+        #     np.concatenate(srows, axis=0),
+        #     np.concatenate(scols, axis=0)
+        # ))
 
         del srows
         del scols
