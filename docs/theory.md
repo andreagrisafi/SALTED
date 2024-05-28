@@ -2,7 +2,7 @@
 
 ### Density fitting method
 
-The representation of the electron density follows the density fitting (DF), or resolution of the identity (RI), method commonly used in quantum chemistry. This implies approximating the self-consistent electron density $n_{e}$, as computed by the selected electronic-strucutre code, through a linear expansion over atom-centered radial functions $R_{n\lambda}$ and spherical harmonics $Y_{\mu}^{\lambda}$:
+The representation of the electron density follows the density fitting (DF), or resolution of the identity (RI), method commonly used in quantum chemistry. This implies approximating the self-consistent electron density $n_{e}$, as computed by the selected electronic-structure code, through a linear expansion over atom-centered radial functions $R_{n\lambda}$ and spherical harmonics $Y_{\mu}^{\lambda}$:
 
 $$
 n_{e}(\boldsymbol{r}) \approx \sum_{in\lambda\mu} c_{i}^{n\lambda\mu} \sum_{\boldsymbol{u}} \phi_{n\lambda\mu}\left(\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right)  
@@ -54,7 +54,7 @@ $$
 \boldsymbol{\mathcal{P}}^{\lambda} = \mathbf{C}^\lambda \cdot \boldsymbol{P}^{\lambda}
 $$ 
 
-Importantly, the descriptor so computed will still have an imaginary part. At this point, we can enforce inversion symmetry to make the descriptor equivariant in O(3) by only retaining the components for which $l+l'+\lambda$ is even. Upon the complex to real transformation previously performed, this implies that we can in fact discard the imaginary part of $\boldsymbol{\mathcal{P}}^{\lambda}$, obtaining 
+Importantly, the descriptor so computed will still have an imaginary part. At this point, we can enforce inversion symmetry to make the descriptor equivariant in O(3) by only retaining the components for which $l+l'+\lambda$ is even. Upon the complex to real transformation previously performed, one can prove that enforcing inversion symmetry then implies that we can in fact discard the imaginary part of $\boldsymbol{\mathcal{P}}^{\lambda}$, obtaining 
 
 $$
 \boldsymbol{\mathcal{P}}^{\lambda,O(3)} = Real[\boldsymbol{\mathcal{P}}^{\lambda}] 
@@ -75,10 +75,10 @@ $$
 k_{\mu\mu'}^{\lambda}(i,j) = \boldsymbol{\tilde{\mathcal{P}}}^{\lambda\mu,O(3)}(i) \cdot \left(\boldsymbol{\tilde{\mathcal{P}}}^{\lambda\mu',O(3)}(j)\right)^T     
 $$
 
-Non-linear kernels can then be constructed by moltiplying them by their scalar ($\lambda=0$) counterpart, elavated to a positive integer $z>0$:
+Non-linear kernels can then be constructed by moltiplying them by their scalar ($\lambda=0$) counterpart, elevated to a positive integer $\zeta>0$:
 
 $$
-\tilde{\boldsymbol{k}}^{\lambda}(i,j) = \boldsymbol{k}^{\lambda}(i,j) \times \left(k^{0}(i,j)\right)^{z-1} 
+\tilde{\boldsymbol{k}}^{\lambda}(i,j) = \boldsymbol{k}^{\lambda}(i,j) \times \left(k^{0}(i,j)\right)^{\zeta-1} 
 $$
 
 
@@ -90,7 +90,7 @@ $$
 K_{\mathcal{N}\mathcal{N}} \approx K_{\mathcal{N}M} K_{MM}^{-1} K_{M\mathcal{N}}
 $$
 
-In SALTED, $M$ is selected using the Farhest Point Sampling algorithm (see the FPS section). In practice, $K_{MM}$ is most of the time found to be low rank, so that a suitable strategy must be adopt to numerically stabilize the problem (see the RKHS section).
+In SALTED, $M$ is selected using the Farthest Point Sampling algorithm (see the FPS section). In practice, $K_{MM}$ is most of the time found to be low rank, so that a suitable strategy must be adopt to numerically stabilize the problem (see the RKHS section).
 
 ### Farthest point sampling
 
@@ -168,7 +168,7 @@ where $\textbf{c}_N^{\text{DF}}$ is the vector of reference density-fitting coef
 The problem can be analytically solved by explicit differentiation of the loss function with respect to the regression weights, obtaining
 
 $$
-\tilde{\mathbf{b}}_D = \left(\mathbf{\Psi}_{ND}^T \cdot \mathbf{S}_{NN} \cdot \mathbf{\Psi}_{ND} + \eta \mathbf{\Psi}_{DD} \right)^{-1} \left(\mathbf{\Psi}_{ND}^T \cdot \textbf{c}_N^{\text{DF}}\right)   
+\tilde{\mathbf{b}}_D = \left(\mathbf{\Psi}_{ND}^T \cdot \mathbf{S}_{NN} \cdot \mathbf{\Psi}_{ND} + \eta \mathbf{1}_{DD} \right)^{-1} \left(\mathbf{\Psi}_{ND}^T \cdot \textbf{c}_N^{\text{DF}}\right)   
 $$
 
 - Conjugate gradients minimization
