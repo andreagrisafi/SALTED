@@ -77,8 +77,13 @@ def build():
         else:
             exit()
     dataset = list(range(ndata))
-    random.Random(3).shuffle(dataset)
-    trainrangetot = dataset[:Ntrain]
+    if trainsel=="sequential":
+        trainrangetot = dataset[:Ntrain]
+    elif trainsel=="random":
+        random.Random(3).shuffle(dataset)
+        trainrangetot = dataset[:Ntrain]
+    else:
+        raise ValueError(f"training set selection {trainsel=} not available!")
     if rank == 0:
         np.savetxt(osp.join(
             saltedpath, rdir, f"training_set_N{Ntrain}.txt"

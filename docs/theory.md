@@ -115,7 +115,7 @@ In order to numerically stabilize the learning procedure, it is convenient to re
 Following the [representer theorem](https://en.wikipedia.org/wiki/Representer_theorem), 
 it is in fact possible to find a Hilbert space with elements $\mathbf{\Psi}$ whose inner product reproduces the kernels. This is commonly referred to as the reproducing kernel Hilbert space (RKHS).  
 
-For each channel $an\lambda$, we first perform an SVD decomposition of $\left(\mathbf{K}_{MM}^{an\lambda}\right)^{-1}$ by keeping only the non-negligible eigenvalues $\lambda_{d}$ (above a given threshold $\epsilon$) and their respective eigenvectors  $\mathbf{v}_{d}$. Following the SoR approximation, we then write 
+For each channel $an\lambda$, we first perform an eigenvalue decomposition of $\mathbf{K}_{MM}^{an\lambda}$ by keeping only the non-negligible eigenvalues $\lambda_{d}$ (above a given threshold $\epsilon$) and their respective eigenvectors  $\mathbf{v}_{d}$. Following the SoR approximation, we then write 
 
 
 $$
@@ -125,7 +125,7 @@ $$
 where we assumed
 
 $$
-\left(\mathbf{K}_{MM}^{an\lambda})^{-1}
+\left(\mathbf{K}_{MM}^{an\lambda}\right)^{-1}
 \approx \sum\limits_{d}^{D^{an\lambda}} \mathbf{v}_{M}^{d} \lambda_{d}^{-1} (\mathbf{v}_{M}^{d})^{\top}
 = \mathbf{V}_{MD}^{an\lambda} (\mathbf{\Lambda}_{DD}^{an\lambda})^{-1} (\mathbf{V}_{MD}^{an\lambda})^{\top}
 $$
@@ -173,5 +173,4 @@ $$
 
 - Conjugate gradients minimization
 
-When the problem dimensionality $D$ is too large, it is more convenient to numerically minimize the loss function directly. In SALTED, we apply the conjugate gradient (CG) method to solve the optimization problem.
-This is discussed in [this paper](https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00850).
+When the problem dimensionality $D$ is too large, it is more convenient to numerically minimize the loss function directly. In SALTED, we apply the conjugate gradient (CG) method to solve the optimization problem. This is discussed in [this paper](https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c00850).
