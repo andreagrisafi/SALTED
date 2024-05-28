@@ -161,7 +161,7 @@ $$
 \mathcal{L}(\tilde{\mathbf{b}}_{D}) = (\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{DF}})^{T}\mathbf{S}_{NN}(\mathbf{\Psi}_{ND} \tilde{\mathbf{b}}_D - \textbf{c}_N^{\text{DF}}) + \eta \tilde{\mathbf{b}}_{D}^{T} \tilde{\mathbf{b}}_{D}
 $$
 
-where $\textbf{c}_N^{\text{DF}}$ is the vector of reference density-fitting coefficients associated with $N$ training configurations, $\mathbf{S}_{NN}$ a block diagonal matrix in the training structures containing the 2-center overlap integrals between the auxiliary functions, while $\eta$ is a regularization parameters which acts as a penalty to high-norm weights. When a different metric is adopted, it is enough to replace $\mathbf{S}_{NN}$ with the matrix built from the corresponding 2-center integrals. 
+where $\textbf{c}_N^{\text{DF}}$ is the vector of reference density-fitting coefficients associated with $N$ training configurations, $\mathbf{S}_{NN}$ a block diagonal matrix in the training structures containing the 2-center overlap integrals between the auxiliary functions, while $\eta$ is a regularization parameter which acts as a penalty to high-norm weights. When a different metric is adopted, it is enough to replace $\mathbf{S}_{NN}$ with the matrix built from the corresponding 2-center integrals. 
 
 - Explicit solution
 
