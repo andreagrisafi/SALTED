@@ -25,7 +25,7 @@ For all the path-related variables, the path can be either a relative path or an
 | -:| :-: | :-: | :- |
 | `filename` | `str` | **Required** | An extended-XYZ file consisting of input structures. |
 | `species` | `List[str]` | **Required** | List of element species considered in the electron density expansion. |
-| `average` | `bool` | `True` | Whether we use averaged coefficients to set an offset. Normally this should be true, unless a density difference is learned. |
+| `average` | `bool` | `True` | Whether we use averaged coefficients to set a baseline for the density. Normally this should be true, unless a density difference is learned. |
 | `parallel` | `bool` | `False` | Whether to use MPI parallelization. |
 | `field` | `bool` | `False` | Option for using external field. For predicting densities without external fields, set to False. |
 

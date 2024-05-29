@@ -6,7 +6,7 @@ The representation of the electron density follows the density fitting (DF), or 
 
 $$
 n_{e}(\boldsymbol{r}) \approx \sum_{in\lambda\mu} c_{i}^{n\lambda\mu} \sum_{\boldsymbol{u}} \phi_{n\lambda\mu}\left(\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right)  
-=  \sum_{in\lambda\mu} c_{i}^{n\lambda\mu} \sum_{\boldsymbol{u}} R_{n\lambda}(\left|\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right|)Y_{\mu}^{\lambda}(\widehat{\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}}) 
+=  \sum_{in\lambda\mu} c_{i}^{n\lambda\mu} \sum_{\boldsymbol{u}} R_{n\lambda}(\left|\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right|)Y_{\mu}^{\lambda}\left(\frac{\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}}{|\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}|}\right) 
 $$
 
 where $\phi$ is a compact symbol for the auxiliary functions of indexes $n\lambda\mu$, $i$ indicates the atomic index in the unit cell, $\boldsymbol{u}$ is the cell translation vector (assuming the system is periodic), and $c_{i}^{nlm}$ are the density-fitting expansion coefficients. 
