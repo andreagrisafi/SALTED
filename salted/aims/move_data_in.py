@@ -2,7 +2,9 @@ import os
 import sys
 
 import numpy as np
-from salted.sys_utils import ParseConfig, read_system, get_conf_range
+
+from salted.sys_utils import ParseConfig, get_conf_range, read_system
+
 
 def build():
     inp = ParseConfig().parse_input()
@@ -43,6 +45,8 @@ def build():
         n = len(t)
     
         dirpath = os.path.join(inp.qm.path2qm, inp.prediction.predict_data, f"{i+1}")
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath)
     
         np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted.out"), t)
 
