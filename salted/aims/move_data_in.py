@@ -46,7 +46,7 @@ def build():
     
         dirpath = os.path.join(inp.qm.path2qm, inp.prediction.predict_data, f"{i+1}")
         if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
+            os.makedirs(dirpath, exist_ok=True)
     
         np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted.out"), t)
 
