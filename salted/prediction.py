@@ -2,6 +2,7 @@ import os
 import os.path as osp
 import sys
 import time
+from typing import Dict, List
 
 import h5py
 import numpy as np
@@ -18,8 +19,8 @@ from salted.sys_utils import (
     ParseConfig,
     get_atom_idx,
     get_conf_range,
+    get_feats_projs,
     read_system,
-    get_feats_projs
 )
 
 
@@ -62,8 +63,9 @@ def build():
     ndata_true = ndata
     if parallel:
         conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
-        conf_range = comm.scatter(conf_range,root=0)
+        conf_range = comm.scatter(conf_range,root=0)  # List[int]
         ndata = len(conf_range)
+        natmax = max(natoms[conf_range])
         print(f"Task {rank+1} handles the following structures: {conf_range}", flush=True)
     else:
         conf_range = list(range(ndata))
@@ -322,6 +324,12 @@ def build():
                 pvec[lam][i,iat] = p[j]
                 j += 1
 
+    """ save descriptor of the prediction dataset """
+    if inp.prediction.save_descriptor:
+        if rank == 0:
+            print(f"Saving descriptor of the prediction dataset to dir {dirpath}")
+        save_pred_descriptor(pvec, conf_range, list(natoms[conf_range]), dirpath)
+
 #    if parallel:
 #        comm.Barrier()
 #        for lam in range(lmax_max+1):
@@ -461,6 +469,41 @@ def build():
 
     if rank == 0: print(f"\ntotal time: {(time.time()-start):.2f} s")
 
+
+def save_pred_descriptor(data:Dict[int, np.ndarray], config_range:List[int], natoms:List[int], dpath:str):
+    """Save the descriptor data of the prediction dataset.
+
+    Args:
+        data (Dict[int, np.ndarray]): the descriptor data to be saved.
+            int -> lambda value,
+            np.ndarray -> descriptor data, shape (ndata, natmax, [2*lambda+1,] featsize)
+                natmax should be cut to the number of atoms in the structure (natoms[i])
+                2*lambda+1 is only for lambda > 0.
+        config_range (List[int]): the indices of the structures in the full dataset.
+        natoms (List[int]): the number of atoms in each structure. Should be the same length as config_range.
+        dpath (str): the directory to save the descriptor data.
+
+    Output:
+        The descriptor data of each structure is saved in a separate npz file in the directory dpath named as
+        "descriptor_{i}.npz", where i starts from 1.
+        Format: npz file with keys as lambda values and values as the descriptor data.
+            Values have shape (natom, [2*lambda+1,] featsize). 2*lambda+1 is only for lambda > 0.
+    """
+    assert len(config_range) == len(natoms), f"The length of config_range and natoms should be the same, " \
+        f"but get {config_range=} and {natoms=}."
+    for lam, data_this_lam in data.items():
+        assert data_this_lam.shape[0] == len(config_range), \
+            f"The first dimension of the descriptor data should be the same as the length of config_range, " \
+            f"but at {lam=} get {data_this_lam.shape[0]=} and {len(config_range)=}."
+
+    """ cut natmax to the number of atoms in the structure """
+    for idx, idx_in_full_dataset in enumerate(config_range):
+        this_data:Dict[int, np.ndarray] = dict()
+        this_natoms = natoms[idx]
+        for lam, data_this_lam in data.items():
+            this_data[f"lam{lam}"] = data_this_lam[idx, :this_natoms]  # shape (natom, [2*lambda+1,] featsize)
+        with open(osp.join(dpath, f"descriptor_{idx_in_full_dataset+1}.npz"), "wb") as f:  # index starts from 1
+            np.savez(f, **this_data)
 
 
 if __name__ == "__main__":
