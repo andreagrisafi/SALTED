@@ -1,4 +1,4 @@
-site_name: "SALTED: Learning Electron Densities Equivariantly"
+site_name: "SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities"
 
 theme:
   name: readthedocs
@@ -11,19 +11,18 @@ site_url: https://github.com/andreagrisafi/SALTED
 nav:
   - Home: index.md
   - Installation: installation.md
+  - Theory: theory.md
+  - Workflow: workflow.md
+  - Input: input.md
   - Tutorial:
-    - Part 1 - Methods: tutorial/methods.md
-    - Part 2 - Workflow: tutorial/workflow.md
-    - Part 3 - Prepare Dataset: tutorial/dataset.md
-    - Part 4 - Learn the Density: tutorial/train.md
-      #    - Part 5 - Predict Properties: tutorial/predict.md
+    - Part 1 - Dataset: tutorial/dataset.md
+    - Part 2 - Training: tutorial/training.md
+      #    - Part 3 - Predict Properties: tutorial/predict.md
       #  - Examples:
       #    - Example 1 - Water & PySCF: examples/water_pyscf.md
       #    - Example 2 - Water & FHI-aims: examples/water_aims.md
       #    - Example 3 - Au slab & CP2K: examples/au_cp2k.md
-  - Appendix:
-    - Input Configuration: input.md
-    - API: api.md
+  - API: api.md
 
 plugins:
   - search

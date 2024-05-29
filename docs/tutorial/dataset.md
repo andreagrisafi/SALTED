@@ -35,7 +35,7 @@ Whichever code is used, the result should be the generation of new directories n
 
 ### FHI-aims
 
-A detailed description of how to generate the training data for SALTED using FHI-aims can be found at [the dedicated SALTED/FHI-aims tutorial](https://gitlab.com/FHI-aims-club/tutorials/fhi-aims-with-salted/-/blob/optimization/Tutorial/Tutorial-2/README.md?ref_type=heads&plain=1>).
+A detailed description of how to generate the training data for SALTED using FHI-aims can be found at [the dedicated SALTED/FHI-aims tutorial](https://fhi-aims-club.gitlab.io/tutorials/fhi-aims-with-salted/Tutorial-2/).
 
 
 ### CP2K

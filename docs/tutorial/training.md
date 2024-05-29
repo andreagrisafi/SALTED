@@ -12,8 +12,8 @@
     | `overlaps/*` | Overlap matrix |
 
 !!! abstract "We are going to"
-    1. Sparsify the symmetry-adapted descriptors using a subset of training set (optional but often necessary for larger scale applications).
-    1. Sparsify the atomic environments. 
+    1. Sparsify the symmetry-adapted descriptors using a subset of training set (optional but often necessary for most applications).
+    1. Sparsify the atomic environments to recast the learning problem in a low dimensional space. 
     1. Calculate the sparse descriptors for each reference atomic environment.
     1. Optimize GPR weights by direct inversion or conjugate gradient method.
     1. Validate the SALTED model.
@@ -27,7 +27,7 @@ To conduct the GPR, we need to generate $\lambda$-SOAP power spectra (which can 
 This is achieved in three steps. We first run
 
 ```bash
-mpirun -np $ntasks python -m salted.initialize
+python -m salted.initialize
 ```
 The following files are generated:
 
