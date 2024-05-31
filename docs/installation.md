@@ -8,7 +8,7 @@
 You can find the SALTED program on [GitHub](https://github.com/andreagrisafi/SALTED). In the SALTED directory, simply run `make`, followed by `pip install .`
 
 ??? note "Editable python package"
-    If you want to modify the `SALTED` code, you can install `SALTED` with the following command:
+    If you want to modify the code, you can install SALTED with the following command:
 
     ```bash
     python -m pip install -e .
@@ -26,7 +26,7 @@ You can find the SALTED program on [GitHub](https://github.com/andreagrisafi/SAL
 
 ## Install electronic-structure codes 
 
-SALTED is to date interfaces with the following electronic-structure codes: CP2K, PySCF, and FHI-aims. If you are interested in using SALTED in combination with other codes, please contact one of the developers.
+SALTED is to date interfaced with the following electronic-structure codes: *CP2K*, *PySCF*, and *FHI-aims*. If you are interested in using SALTED in combination with other codes, please contact one of the developers.
 
 ### PySCF
 
