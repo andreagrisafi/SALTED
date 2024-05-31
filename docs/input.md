@@ -84,7 +84,7 @@ Remember to set `inp.predict` if one wants to predict densities.
 | `gradtol` | `float` | `1e-5` | Minimum gradient norm tolerance for CG minimization. |
 | `restart` | `bool` | `False` | Whether to restart from previous minimization checkpoint. |
 | `blocksize` | `int` | `0` | Divide dataset into blocks with blocksize for MPI matrix inversion. |
-| `trainsel` | `Union[Literal["sequential"], Literal["random"]]` | `"random"` | Train at random or sequentially for matrix inversion. |
+| `trainsel` | `Union[Literal["sequential"], Literal["random"]]` | `"random"` | Select the training set at random or sequentially from the entire dataset. |
 
 ---
 
