@@ -9,7 +9,7 @@ n_{e}(\boldsymbol{r}) \approx \sum_{in\lambda\mu} c_{i}^{n\lambda\mu} \sum_{\bol
 =  \sum_{in\lambda\mu} c_{i}^{n\lambda\mu} \sum_{\boldsymbol{u}} R_{n\lambda}(\left|\boldsymbol{r}-\boldsymbol{r_{i}} -\boldsymbol{u}\right|)Y_{\mu}^{\lambda}\left(\frac{\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}}{|\boldsymbol{r}-\boldsymbol{r_{i}}-\boldsymbol{u}|}\right) 
 $$
 
-where $\phi$ is a compact symbol for the auxiliary functions of indexes $n\lambda\mu$, $i$ indicates the atomic index in the unit cell, $\boldsymbol{u}$ is the cell translation vector (assuming the system is periodic), and $c_{i}^{nlm}$ are the density-fitting expansion coefficients. 
+where $\phi$ is a compact symbol for the auxiliary functions of indexes $n\lambda\mu$, $i$ indicates the atomic index in the unit cell, $\boldsymbol{u}$ is the cell translation vector (assuming the system is periodic), and $c_{i}^{nlm}$ are the density-fitting expansion coefficients. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions.  
 
 Different metrics can be chosen to perform the density fitting from the reference self-consistent density, e.g., overlap, Coulomb, ..., depending on the target application, as well as on the options provided by the selected electronic-structure code. This metric will be similarly used in the SALTED loss function. In fact, because of the non-orthogonal nature of the basis functions, the 2-center auxiliary integrals of the form $\bra{\phi}\hat{O}\ket{\phi'}$ are needed to couple the expansion coefficients together. When the overlap metric is adopted, the operator $\hat{O}$ is defined to be the identity. Conversely, the integral operator $\hat{O} = \int d\boldsymbol{r'} 1/|\boldsymbol{r}-\boldsymbol{r'}|$ is applied when using the Coulomb metric. Note that, in practice, the Coulomb potential must be truncated when considering a periodic system, so that a truncated Coulomb metric is typically adopted in this case.  
 
@@ -106,8 +106,8 @@ c_{i}^{n\lambda\mu} \approx \sum\limits_{j \in M} \sum\limits_{|\mu'| \le \lambd
 b_{n\lambda\mu'}(j) k_{\mu\mu'}^{\lambda}(i,j) \delta_{a_{i}, a_{j}}
 $$
 
-where $b_{n\lambda\mu'}(j)$ are the regression weights and j runs over the sparse selection of $M$ atom. 
-Note tha a Kronecker delta function $\delta_{a_{i}, a_{j}}$ is introduced to make sure the atomic species of atom $i$ and atom $j$ are the same. 
+where $b_{n\lambda\mu'}(j)$ are the regression weights and j runs over the sparse selection of $M$ atoms. 
+Note that a Kronecker delta function $\delta_{a_{i}, a_{j}}$ is introduced to make sure the atomic species of atom $i$ and atom $j$ are the same. 
 
 ### Reproducing kernel Hilbert space (RKHS)
 
