@@ -395,6 +395,7 @@ class ParseConfig:
             "salted": {
                 "saltedname": (True, None, str, None),  # salted workflow identifier
                 "saltedpath": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to SALTED outputs / working directory
+                "saltedtype": (False, 'density', str, lambda inp, val: val in ('density', 'tensor', 'density-response')),  # salted target 
             },
             "system": {
                 "filename": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to geometry file (training set)
