@@ -304,7 +304,7 @@ class ParseConfig:
 
         Please copy & paste:
         ```python
-        (saltedname, saltedpath,
+        (saltedname, saltedpath, saltedtype,
          filename, species, average, field, parallel,
          path2qm, qmcode, qmbasis, dfbasis,
          filename_pred, predname, predict_data,
@@ -318,7 +318,7 @@ class ParseConfig:
         inp = self.parse_input()
         sparsify = False if inp.descriptor.sparsify.ncut <= 0 else True  # determine if sparsify by ncut
         return (
-            inp.salted.saltedname, inp.salted.saltedpath,
+            inp.salted.saltedname, inp.salted.saltedpath, inp.salted.saltedtype,
             inp.system.filename, inp.system.species, inp.system.average, inp.system.field, inp.system.parallel,
             inp.qm.path2qm, inp.qm.qmcode, inp.qm.qmbasis, inp.qm.dfbasis,
             inp.prediction.filename, inp.prediction.predname, inp.prediction.predict_data,
@@ -395,6 +395,7 @@ class ParseConfig:
             "salted": {
                 "saltedname": (True, None, str, None),  # salted workflow identifier
                 "saltedpath": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to SALTED outputs / working directory
+                "saltedtype": (False, 'density', str, lambda inp, val: val in ('density', 'tensor', 'density-response')),  # salted target 
             },
             "system": {
                 "filename": (True, None, str, lambda inp, val: check_path_exists(val)),  # path to geometry file (training set)

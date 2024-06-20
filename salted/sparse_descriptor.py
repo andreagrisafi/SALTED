@@ -23,10 +23,11 @@ from salted.lib import equicomb
 from salted.lib import equicombsparse
 
 def build():
+
     inp = ParseConfig().parse_input()
 
     # salted parameters
-    (saltedname, saltedpath,
+    (saltedname, saltedpath, saltedtype,
     filename, species, average, field, parallel,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data,
@@ -121,15 +122,9 @@ def build():
             if sparsify:
                 featsize = ncut
             else:
-                llmax = 0
-                for l1 in range(nang1+1):
-                    for l2 in range(nang2+1):
-                        # keep only even combination to enforce inversion symmetry
-                        if (lam+l1+l2)%2==0 :
-                            if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
-                                llmax+=1
                 nspe1 = len(neighspe1)
                 nspe2 = len(neighspe2)
+                [llmax,llvec] = sph_utils.get_angular_indexes(lam,nang1,nang2,saltedtype)
                 featsize = nspe1*nspe2*nrad1*nrad2*llmax
             if lam==0:
                 power_env_sparse[(spe,lam)] = np.zeros((Mspe[spe],featsize))
@@ -218,21 +213,7 @@ def build():
         # Compute equivariant features for the given structure
         for lam in range(lmax_max+1):
 
-            # Select relevant angular components for equivariant descriptor calculation
-            llmax = 0
-            lvalues = {}
-            for l1 in range(nang1+1):
-                for l2 in range(nang2+1):
-                    # keep only even combination to enforce inversion symmetry
-                    if (lam+l1+l2)%2==0 :
-                        if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
-                            lvalues[llmax] = [l1,l2]
-                            llmax+=1
-            # Fill dense array from dictionary
-            llvec = np.zeros((llmax,2),int)
-            for il in range(llmax):
-                llvec[il,0] = lvalues[il][0]
-                llvec[il,1] = lvalues[il][1]
+            [llmax,llvec] = sph_utils.get_angular_indexes(lam,nang1,nang2,saltedtype)
 
             # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
             wigner3j = np.loadtxt(os.path.join(

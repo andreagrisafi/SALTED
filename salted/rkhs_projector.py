@@ -14,7 +14,7 @@ def build():
     # inp = ParseConfig().parse_input()  # not used for now
 
     # salted parameters
-    (saltedname, saltedpath,
+    (saltedname, saltedpath, saltedtype,
     filename, species, average, field, parallel,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data,

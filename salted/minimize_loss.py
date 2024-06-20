@@ -19,7 +19,7 @@ from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, read_sys
 def build():
 
     inp = ParseConfig().parse_input()
-    (saltedname, saltedpath,
+    (saltedname, saltedpath, saltedtype,
     filename, species, average, field, parallel,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data,
