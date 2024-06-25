@@ -15,7 +15,6 @@ from rascaline import SphericalExpansion
 from rascaline import LodeSphericalExpansion
 from metatensor import Labels
 
-from salted import wigner
 from salted import sph_utils
 from salted import basis
 from salted.sys_utils import ParseConfig
@@ -94,10 +93,7 @@ def build():
     conf_range = range(ndata)
 
     lam = 0
-    [llmax,llvec] = sph_utils.get_angular_indexes(lam,nang1,nang2,saltedtype)
-
-    if sparsify==False:
-        wigner.build(False)
+    [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
 
     # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
     wigner3j = np.loadtxt(os.path.join(

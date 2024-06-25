@@ -81,27 +81,16 @@ def complex_to_real_transformation(sizes):
 
     return matrices
 
-def get_angular_indexes(lam,nang1,nang2,saltedtype):
+def get_angular_indexes_symmetric(lam,nang1,nang2):
     """Select relevant angular indexes for equivariant descriptor calculation"""
 
     llmax = 0
     lvalues = {}
 
-    if saltedtype=='density':
-
-        for l1 in range(nang1+1):
-            for l2 in range(nang2+1):
-                # keep only even combination to enforce inversion symmetry
-                if (lam+l1+l2)%2==0 :
-                    # enforce triangular inequality 
-                    if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
-                        lvalues[llmax] = [l1,l2]
-                        llmax+=1
-
-    if saltedtype=='density-response':
-
-        for l1 in range(nang1+1):
-            for l2 in range(nang2+1):
+    for l1 in range(nang1+1):
+        for l2 in range(nang2+1):
+            # keep only even combination to enforce inversion symmetry
+            if (lam+l1+l2)%2==0 :
                 # enforce triangular inequality 
                 if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
                     lvalues[llmax] = [l1,l2]
@@ -114,3 +103,27 @@ def get_angular_indexes(lam,nang1,nang2,saltedtype):
         llvec[il,1] = lvalues[il][1]
 
     return [llmax,llvec]
+
+def get_angular_indexes_antisymmetric(lam,nang1,nang2):
+    """Select relevant angular indexes for equivariant descriptor calculation, antisymmetric with respect to inversion operations"""
+
+    llmax = 0
+    lvalues = {}
+
+    for l1 in range(nang1+1):
+        for l2 in range(nang2+1):
+            # keep only even combination to enforce inversion symmetry
+            if (lam+l1+l2)%2!=0 :
+                # enforce triangular inequality 
+                if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
+                    lvalues[llmax] = [l1,l2]
+                    llmax+=1
+
+    # Fill dense array from dictionary
+    llvec = np.zeros((llmax,2),int)
+    for il in range(llmax):
+        llvec[il,0] = lvalues[il][0]
+        llvec[il,1] = lvalues[il][1]
+
+    return [llmax,llvec]
+

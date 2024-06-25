@@ -60,6 +60,9 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
     nnmax = max(nlist)
     llmax = max(llist)
 
+    if inp.salted.saltedtype=="density-response":
+        llmax += 1
+
     # read system
     xyzfile = read(filename, ":", parallel=False)
     ndata = len(xyzfile)

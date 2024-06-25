@@ -124,7 +124,7 @@ def build():
             else:
                 nspe1 = len(neighspe1)
                 nspe2 = len(neighspe2)
-                [llmax,llvec] = sph_utils.get_angular_indexes(lam,nang1,nang2,saltedtype)
+                [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
                 featsize = nspe1*nspe2*nrad1*nrad2*llmax
             if lam==0:
                 power_env_sparse[(spe,lam)] = np.zeros((Mspe[spe],featsize))
@@ -210,20 +210,20 @@ def build():
             c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
             omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(o3_lambda=l).values)
 
+        # Reshape arrays of expansion coefficients for optimal Fortran indexing
+        v1 = np.transpose(omega1,(2,0,3,1))
+        v2 = np.transpose(omega2,(2,0,3,1))
+
         # Compute equivariant features for the given structure
         for lam in range(lmax_max+1):
 
-            [llmax,llvec] = sph_utils.get_angular_indexes(lam,nang1,nang2,saltedtype)
+            [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
 
             # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
             wigner3j = np.loadtxt(os.path.join(
                 saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
             ))
             wigdim = wigner3j.size
-
-            # Reshape arrays of expansion coefficients for optimal Fortran indexing
-            v1 = np.transpose(omega1,(2,0,3,1))
-            v2 = np.transpose(omega2,(2,0,3,1))
 
             # Compute complex to real transformation matrix for the given lambda value
             c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
