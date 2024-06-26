@@ -36,8 +36,9 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
         natmax (int): maximum number of atoms in the system
     """
 
+    inp = ParseConfig().parse_input()
+
     if (filename is None) and (spelist is None) and (dfbasis is None):
-        inp = ParseConfig().parse_input()
         filename = inp.system.filename
         spelist = inp.system.species
         dfbasis = inp.qm.dfbasis

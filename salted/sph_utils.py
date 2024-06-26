@@ -2,6 +2,11 @@ import sys
 import math
 import numpy as np
 from scipy import special
+from ase.data import atomic_numbers
+
+from rascaline import SphericalExpansion
+from rascaline import LodeSphericalExpansion
+from metatensor import Labels
 
 def cartesian_to_spherical_transformation(l):
         """Compute Cartesian to spherical transformation matrices sorting the spherical components as {-l,..,0,..,+l} 
@@ -126,4 +131,44 @@ def get_angular_indexes_antisymmetric(lam,nang1,nang2):
         llvec[il,1] = lvalues[il][1]
 
     return [llmax,llvec]
+
+def get_representation_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,natoms):
+    """Compute spherical harmonics expansion coefficients of the given structural representation."""
+
+    if rep=="rho":
+        # get SPH expansion for atomic density
+        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
+
+    elif rep=="V":
+        # get SPH expansion for atomic potential
+        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
+
+    else:
+        if rank == 0: print("Error: requested representation", rep, "not provided")
+
+    nspe = len(neighspe)
+    keys_array = np.zeros(((nang+1)*len(species)*nspe,4),int)
+    i = 0
+    for l in range(nang+1):
+        for specen in species:
+            for speneigh in neighspe:
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                i += 1
+
+    keys_selection = Labels(
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
+        values=keys_array
+    )
+
+    spx = calculator.compute(structure, selected_keys=keys_selection)
+    spx = spx.keys_to_properties("neighbor_type")
+    spx = spx.keys_to_samples("center_type")
+
+    # Get 1st set of coefficients as a complex numpy array
+    omega = np.zeros((nang+1,natoms,2*nang+1,nspe*nrad),complex)
+    for l in range(nang+1):
+        c2r = complex_to_real_transformation([2*l+1])[0]
+        omega[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
+
+    return omega
 
