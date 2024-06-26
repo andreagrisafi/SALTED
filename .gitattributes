@@ -1,0 +1,2 @@
+example/water_monomer_PySCF/coefficients/ filter=lfs diff=lfs merge=lfs -text
+example/water_monomer_PySCF/overlaps/ filter=lfs diff=lfs merge=lfs -text
