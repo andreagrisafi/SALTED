@@ -31,10 +31,7 @@ def build():
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
-
-    nspe1 = len(neighspe1)
-    nspe2 = len(neighspe2)
+    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
     if parallel:
         from mpi4py import MPI
@@ -51,26 +48,6 @@ def build():
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
     
     frames = read(filename,":")
-
-    HYPER_PARAMETERS_DENSITY = {
-        "cutoff": rcut1,
-        "max_radial": nrad1,
-        "max_angular": nang1,
-        "atomic_gaussian_width": sig1,
-        "center_atom_weight": 1.0,
-        "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
-        "cutoff_function": {"ShiftedCosine": {"width": 0.1}},
-    }
-
-    HYPER_PARAMETERS_POTENTIAL = {
-        "potential_exponent": 1,
-        "cutoff": rcut2,
-        "max_radial": nrad2,
-        "max_angular": nang2,
-        "atomic_gaussian_width": sig2,
-        "center_atom_weight": 1.0,
-        "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
-    }
 
     sdir = osp.join(saltedpath, f"equirepr_{saltedname}")
 
