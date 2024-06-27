@@ -4,7 +4,7 @@ import h5py
 import os
 import os.path as osp
 
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, do_fps
 
 def build():
     inp = ParseConfig().parse_input()
@@ -16,21 +16,6 @@ def build():
     # number of sparse environments
     M, zeta, eigcut = inp.gpr.Menv, inp.gpr.z, inp.gpr.eigcut
     sdir = osp.join(inp.salted.saltedpath, f"equirepr_{inp.salted.saltedname}")
-
-    def do_fps(x, d=0):
-        # FPS code from Giulio Imbalzano
-        if d == 0 : d = len(x)
-        n = len(x)
-        iy = np.zeros(d,int)
-        iy[0] = 0
-        # Faster evaluation of Euclidean distance
-        n2 = np.sum((x*np.conj(x)),axis=1)
-        dl = n2 + n2[iy[0]] - 2*np.real(np.dot(x,np.conj(x[iy[0]])))
-        for i in range(1,d):
-            iy[i] = np.argmax(dl)
-            nd = n2 + n2[iy[i]] - 2*np.real(np.dot(x,np.conj(x[iy[i]])))
-            dl = np.minimum(dl,nd)
-        return iy
 
     # compute number of atomic environments for each species
     ispe = 0
