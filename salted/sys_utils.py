@@ -36,8 +36,9 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
         natmax (int): maximum number of atoms in the system
     """
 
+    inp = ParseConfig().parse_input()
+
     if (filename is None) and (spelist is None) and (dfbasis is None):
-        inp = ParseConfig().parse_input()
         filename = inp.system.filename
         spelist = inp.system.species
         dfbasis = inp.qm.dfbasis
@@ -59,6 +60,9 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
             nlist.append(nmax[(spe,l)])
     nnmax = max(nlist)
     llmax = max(llist)
+
+    if inp.salted.saltedtype=="density-response":
+        llmax += 1
 
     # read system
     xyzfile = read(filename, ":", parallel=False)
@@ -133,6 +137,21 @@ def get_conf_range(rank,size,ntest,testrangetot) -> List[List[int]]:
 
     return testrange
 
+def do_fps(x, d=0):
+    """Perform Farthest Point Sampling selection"""
+    if d == 0 : d = len(x)
+    n = len(x)
+    iy = np.zeros(d,int)
+    iy[0] = 0
+    # Faster evaluation of Euclidean distance
+    n2 = np.sum((x*np.conj(x)),axis=1)
+    dl = n2 + n2[iy[0]] - 2*np.real(np.dot(x,np.conj(x[iy[0]])))
+    for i in range(1,d):
+        print("Doing ",i," of ",d," dist = ",max(dl))
+        iy[i] = np.argmax(dl)
+        nd = n2 + n2[iy[i]] - 2*np.real(np.dot(x,np.conj(x[iy[i]])))
+        dl = np.minimum(dl,nd)
+    return iy
 
 ARGHELP_INDEX_STR = """Indexes to calculate, start from 0. Format: 1,3-5,7-10. \
 Default is "all", which means all structures."""
@@ -317,6 +336,30 @@ class ParseConfig:
         """
         inp = self.parse_input()
         sparsify = False if inp.descriptor.sparsify.ncut <= 0 else True  # determine if sparsify by ncut
+        nspe1 = len(inp.descriptor.rep1.neighspe)
+        nspe2 = len(inp.descriptor.rep2.neighspe)
+
+        HYPER_PARAMETERS_DENSITY = {
+            "cutoff": inp.descriptor.rep1.rcut,
+            "max_radial": inp.descriptor.rep1.nrad,
+            "max_angular": inp.descriptor.rep1.nang,
+            "atomic_gaussian_width": inp.descriptor.rep1.sig,
+            "center_atom_weight": 1.0,
+            "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
+            "cutoff_function": {"ShiftedCosine": {"width": 0.1}},
+        }
+    
+        HYPER_PARAMETERS_POTENTIAL = {
+            "potential_exponent": 1,
+            "cutoff": inp.descriptor.rep2.rcut,
+            "max_radial": inp.descriptor.rep2.nrad,
+            "max_angular": inp.descriptor.rep2.nang,
+            "atomic_gaussian_width": inp.descriptor.rep2.sig,
+            "center_atom_weight": 1.0,
+            "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
+        }
+
+
         return (
             inp.salted.saltedname, inp.salted.saltedpath, inp.salted.saltedtype,
             inp.system.filename, inp.system.species, inp.system.average, inp.system.field, inp.system.parallel,
@@ -328,7 +371,7 @@ class ParseConfig:
             inp.descriptor.rep2.nrad, inp.descriptor.rep2.nang, inp.descriptor.rep2.neighspe,
             sparsify, inp.descriptor.sparsify.nsamples, inp.descriptor.sparsify.ncut,
             inp.gpr.z, inp.gpr.Menv, inp.gpr.Ntrain, inp.gpr.trainfrac, inp.gpr.regul, inp.gpr.eigcut,
-            inp.gpr.gradtol, inp.gpr.restart, inp.gpr.blocksize, inp.gpr.trainsel
+            inp.gpr.gradtol, inp.gpr.restart, inp.gpr.blocksize, inp.gpr.trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL
         )
 
     def get_all_params_simple1(self) -> Tuple:

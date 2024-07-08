@@ -2,6 +2,11 @@ import sys
 import math
 import numpy as np
 from scipy import special
+from ase.data import atomic_numbers
+
+from rascaline import SphericalExpansion
+from rascaline import LodeSphericalExpansion
+from metatensor import Labels
 
 def cartesian_to_spherical_transformation(l):
         """Compute Cartesian to spherical transformation matrices sorting the spherical components as {-l,..,0,..,+l} 
@@ -81,27 +86,16 @@ def complex_to_real_transformation(sizes):
 
     return matrices
 
-def get_angular_indexes(lam,nang1,nang2,saltedtype):
+def get_angular_indexes_symmetric(lam,nang1,nang2):
     """Select relevant angular indexes for equivariant descriptor calculation"""
 
     llmax = 0
     lvalues = {}
 
-    if saltedtype=='density':
-
-        for l1 in range(nang1+1):
-            for l2 in range(nang2+1):
-                # keep only even combination to enforce inversion symmetry
-                if (lam+l1+l2)%2==0 :
-                    # enforce triangular inequality 
-                    if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
-                        lvalues[llmax] = [l1,l2]
-                        llmax+=1
-
-    if saltedtype=='density-response':
-
-        for l1 in range(nang1+1):
-            for l2 in range(nang2+1):
+    for l1 in range(nang1+1):
+        for l2 in range(nang2+1):
+            # keep only even combination to enforce inversion symmetry
+            if (lam+l1+l2)%2==0 :
                 # enforce triangular inequality 
                 if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
                     lvalues[llmax] = [l1,l2]
@@ -114,3 +108,67 @@ def get_angular_indexes(lam,nang1,nang2,saltedtype):
         llvec[il,1] = lvalues[il][1]
 
     return [llmax,llvec]
+
+def get_angular_indexes_antisymmetric(lam,nang1,nang2):
+    """Select relevant angular indexes for equivariant descriptor calculation, antisymmetric with respect to inversion operations"""
+
+    llmax = 0
+    lvalues = {}
+
+    for l1 in range(nang1+1):
+        for l2 in range(nang2+1):
+            # keep only even combination to enforce inversion symmetry
+            if (lam+l1+l2)%2!=0 :
+                # enforce triangular inequality 
+                if abs(l2-lam) <= l1 and l1 <= (l2+lam) :
+                    lvalues[llmax] = [l1,l2]
+                    llmax+=1
+
+    # Fill dense array from dictionary
+    llvec = np.zeros((llmax,2),int)
+    for il in range(llmax):
+        llvec[il,0] = lvalues[il][0]
+        llvec[il,1] = lvalues[il][1]
+
+    return [llmax,llvec]
+
+def get_representation_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,natoms):
+    """Compute spherical harmonics expansion coefficients of the given structural representation."""
+
+    if rep=="rho":
+        # get SPH expansion for atomic density
+        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
+
+    elif rep=="V":
+        # get SPH expansion for atomic potential
+        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
+
+    else:
+        if rank == 0: print("Error: requested representation", rep, "not provided")
+
+    nspe = len(neighspe)
+    keys_array = np.zeros(((nang+1)*len(species)*nspe,4),int)
+    i = 0
+    for l in range(nang+1):
+        for specen in species:
+            for speneigh in neighspe:
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                i += 1
+
+    keys_selection = Labels(
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
+        values=keys_array
+    )
+
+    spx = calculator.compute(structure, selected_keys=keys_selection)
+    spx = spx.keys_to_properties("neighbor_type")
+    spx = spx.keys_to_samples("center_type")
+
+    # Get 1st set of coefficients as a complex numpy array
+    omega = np.zeros((nang+1,natoms,2*nang+1,nspe*nrad),complex)
+    for l in range(nang+1):
+        c2r = complex_to_real_transformation([2*l+1])[0]
+        omega[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
+
+    return omega
+

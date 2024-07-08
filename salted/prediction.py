@@ -8,8 +8,6 @@ import h5py
 import numpy as np
 from ase.data import atomic_numbers
 from ase.io import read
-from metatensor import Labels
-from rascaline import LodeSphericalExpansion, SphericalExpansion
 from scipy import special
 
 from salted import basis, sph_utils
@@ -35,7 +33,7 @@ def build():
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
+    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
         raise ValueError(
@@ -127,106 +125,13 @@ def build():
 
     start = time.time()
 
-    HYPER_PARAMETERS_DENSITY = {
-        "cutoff": rcut1,
-        "max_radial": nrad1,
-        "max_angular": nang1,
-        "atomic_gaussian_width": sig1,
-        "center_atom_weight": 1.0,
-        "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
-        "cutoff_function": {"ShiftedCosine": {"width": 0.1}},
-    }
-
-    HYPER_PARAMETERS_POTENTIAL = {
-        "potential_exponent": 1,
-        "cutoff": rcut2,
-        "max_radial": nrad2,
-        "max_angular": nang2,
-        "atomic_gaussian_width": sig2,
-        "center_atom_weight": 1.0,
-        "radial_basis": {"Gto": {"spline_accuracy": 1e-6}}
-    }
-
     frames = read(filename_pred,":")
     frames = [frames[i] for i in conf_range]
 
     if rank == 0: print(f"The dataset contains {ndata_true} frames.")
 
-    if rep1=="rho":
-        # get SPH expansion for atomic density
-        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
-
-    elif rep1=="V":
-        # get SPH expansion for atomic potential
-        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
-
-    else:
-        if rank == 0:
-            raise ValueError(f"Unknown representation {rep1=}, expected 'rho' or 'V'")
-        else:
-            exit()
-
-    nspe1 = len(neighspe1)
-    keys_array = np.zeros(((nang1+1)*len(species)*nspe1,4),int)
-    i = 0
-    for l in range(nang1+1):
-        for specen in species:
-            for speneigh in neighspe1:
-                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
-                i += 1
-
-    keys_selection = Labels(
-        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
-        values=keys_array
-    )
-
-    spx = calculator.compute(frames, selected_keys=keys_selection)
-    spx = spx.keys_to_properties("neighbor_type")
-    spx = spx.keys_to_samples("center_type")
-
-    # Get 1st set of coefficients as a complex numpy array
-    omega1 = np.zeros((nang1+1,natoms_total,2*nang1+1,nspe1*nrad1),complex)
-    for l in range(nang1+1):
-        c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
-        omega1[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
-
-    if rep2=="rho":
-        # get SPH expansion for atomic density
-        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
-
-    elif rep2=="V":
-        # get SPH expansion for atomic potential
-        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
-
-    else:
-        if rank == 0:
-            raise ValueError(f"Unknown representation {rep2=}, expected 'rho' or 'V'")
-        else:
-            exit()
-
-    nspe2 = len(neighspe2)
-    keys_array = np.zeros(((nang2+1)*len(species)*nspe2,4),int)
-    i = 0
-    for l in range(nang2+1):
-        for specen in species:
-            for speneigh in neighspe2:
-                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
-                i += 1
-
-    keys_selection = Labels(
-        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
-        values=keys_array
-    )
-
-    spx_pot = calculator.compute(frames, selected_keys=keys_selection)
-    spx_pot = spx_pot.keys_to_properties("neighbor_type")
-    spx_pot = spx_pot.keys_to_samples("center_type")
-
-    # Get 2nd set of coefficients as a complex numpy array
-    omega2 = np.zeros((nang2+1,natoms_total,2*nang2+1,nspe2*nrad2),complex)
-    for l in range(nang2+1):
-        c2r = sph_utils.complex_to_real_transformation([2*l+1])[0]
-        omega2[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx_pot.block(o3_lambda=l).values)
+    omega1 = sph_utils.get_representation_coeffs(frames,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms_total)
+    omega2 = sph_utils.get_representation_coeffs(frames,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe2,species,nang2,nrad2,natoms_total)
 
     # Reshape arrays of expansion coefficients for optimal Fortran indexing
     v1 = np.transpose(omega1,(2,0,3,1))
@@ -271,7 +176,7 @@ def build():
 
         if rank == 0: print(f"lambda = {lam}")
 
-        [llmax,llvec] = sph_utils.get_angular_indexes(lam,nang1,nang2,saltedtype)
+        [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
 
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         wigner3j = np.loadtxt(osp.join(
