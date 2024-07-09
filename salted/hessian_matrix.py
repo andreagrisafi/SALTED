@@ -32,10 +32,7 @@ def build():
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
-    if inp.system.field:
-        rdir = f"regrdir_{saltedname}_field"
-    else:
-        rdir = f"regrdir_{saltedname}"
+    rdir = f"regrdir_{saltedname}"
 
     # sparse-GPR parameters
     Menv = inp.gpr.Menv
@@ -117,24 +114,23 @@ def matrices(trainrange,ntrain,av_coefs,rank):
     inp = ParseConfig().parse_input()
 
     saltedname, saltedpath = inp.salted.saltedname, inp.salted.saltedpath
-
-    if inp.system.field:
-        fdir = f"rkhs-vectors_{saltedname}_field"
-        rdir = f"regrdir_{saltedname}_field"
-    else:
-        fdir = f"rkhs-vectors_{saltedname}"
-        rdir = f"regrdir_{saltedname}"
-
     # sparse-GPR parameters
     Menv = inp.gpr.Menv
     zeta = inp.gpr.z
+    fdir = f"rkhs-vectors_{saltedname}"
+
+    if inp.salted.saltedtype=="density-response":
+        p = sparse.load_npz(osp.join(
+            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf0_x.npz"
+        ))
+    else:
+        p = sparse.load_npz(osp.join(
+            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf0.npz"
+        ))
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-    p = sparse.load_npz(osp.join(
-        saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf0.npz"
-    ))
     totsize = p.shape[-1]
     if rank == 0: print("problem dimensionality:", totsize,flush=True)
     if totsize>70000:
@@ -148,39 +144,64 @@ def matrices(trainrange,ntrain,av_coefs,rank):
         print("conf:", iconf+1,flush=True)
 
         start = time.time()
-        # load reference QM data
-        ref_coefs = np.load(osp.join(
-            saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
-        ))
-        over = np.load(osp.join(
-            saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
-        ))
-        psivec = sparse.load_npz(osp.join(
-            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
-        ))
-        psi = psivec.toarray()
 
-        if inp.system.average:
+        if inp.salted.saltedtype=="density":
 
-            # fill array of average spherical components
-            Av_coeffs = np.zeros(ref_coefs.shape[0])
-            i = 0
-            for iat in range(natoms[iconf]):
-                spe = atomic_symbols[iconf][iat]
-                if spe in species:
-                    for l in range(lmax[spe]+1):
-                        for n in range(nmax[(spe,l)]):
-                            if l==0:
-                               Av_coeffs[i] = av_coefs[spe][n]
-                            i += 2*l+1
+            # load reference QM data
+            ref_coefs = np.load(osp.join(
+                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+            ))
+            over = np.load(osp.join(
+                saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+            ))
+            psivec = sparse.load_npz(osp.join(
+                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+            ))
+            psi = psivec.toarray()
 
-            # subtract average
-            ref_coefs -= Av_coeffs
+            if inp.system.average:
 
-        ref_projs = np.dot(over,ref_coefs)
+                # fill array of average spherical components
+                Av_coeffs = np.zeros(ref_coefs.shape[0])
+                i = 0
+                for iat in range(natoms[iconf]):
+                    spe = atomic_symbols[iconf][iat]
+                    if spe in species:
+                        for l in range(lmax[spe]+1):
+                            for n in range(nmax[(spe,l)]):
+                                if l==0:
+                                   Av_coeffs[i] = av_coefs[spe][n]
+                                i += 2*l+1
 
-        Avec += np.dot(psi.T,ref_projs)
-        Bmat += np.dot(psi.T,np.dot(over,psi))
+                # subtract average
+                ref_coefs -= Av_coeffs
+
+            ref_projs = np.dot(over,ref_coefs)
+
+            Avec += np.dot(psi.T,ref_projs)
+            Bmat += np.dot(psi.T,np.dot(over,psi))
+
+
+        elif inp.salted.saltedtype=="density-response":
+
+            over = np.load(osp.join(
+                saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+            ))
+
+            for icart in ["x","y","z"]:
+
+                ref_coefs = np.load(osp.join(
+                    saltedpath, "coefficients", f"{icart}/coefficients_conf{iconf}.npy"
+                ))
+                psivec = sparse.load_npz(osp.join(
+                    saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
+                ))
+                psi = psivec.toarray()
+
+                ref_projs = np.dot(over,ref_coefs)
+
+                Avec += np.dot(psi.T,ref_projs)
+                Bmat += np.dot(psi.T,np.dot(over,psi))
 
         print("conf time =", time.time()-start)
 

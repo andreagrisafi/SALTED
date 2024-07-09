@@ -6,8 +6,10 @@ import os
 
 import h5py
 import numpy as np
+from sympy.physics.wigner import wigner_3j
 
-from salted.sys_utils import ParseConfig, get_atom_idx, read_system
+from salted import sph_utils
+from salted.sys_utils import ParseConfig, get_atom_idx, read_system, rkhs_proj
 
 
 def build():
@@ -29,31 +31,147 @@ def build():
 
     sdir = os.path.join(saltedpath, f"equirepr_{saltedname}")
 
-    # compute rkhs projector and save
-    features = h5py.File(os.path.join(sdir,f"FEAT_M-{Menv}.h5"),'r')
-    h5f = h5py.File(os.path.join(sdir,  f"projector_M{Menv}_zeta{zeta}.h5"), 'w')
-    for spe in species:
-        power_env_sparse = features['sparse_descriptors'][spe]['0'][:]
-        Mspe = power_env_sparse.shape[0]
-        kernel0_mm = np.dot(power_env_sparse,power_env_sparse.T)
-        eva, eve = np.linalg.eigh(kernel0_mm**zeta)
-        eva = eva[eva>eigcut]
-        eve = eve[:,-len(eva):]
-        V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-        h5f.create_dataset(f"projectors/{spe}/0",data=V)
-        for lam in range(1,lmax[spe]+1):
-            power_env_sparse = features['sparse_descriptors'][spe][str(lam)][:]
-            kernel_mm = np.dot(power_env_sparse,power_env_sparse.T)
-            for i1 in range(Mspe):
-                for i2 in range(Mspe):
-                    kernel_mm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_mm[i1,i2]**(zeta-1)
-            eva, eve = np.linalg.eigh(kernel_mm)
-            eva = eva[eva>eigcut]
-            eve = eve[:,-len(eva):]
-            V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
-            h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
-    h5f.close()
-    features.close()
+    if saltedtype == "density":
+
+        # compute rkhs projector and save
+        features = h5py.File(os.path.join(sdir,f"FEAT_M-{Menv}.h5"),'r')
+        h5f = h5py.File(os.path.join(sdir,  f"projector_M{Menv}_zeta{zeta}.h5"), 'w')
+        for spe in species:
+            power_env_sparse = features['sparse_descriptors'][spe]['0'][:]
+            Mspe = power_env_sparse.shape[0]
+            kernel0_mm = np.dot(power_env_sparse,power_env_sparse.T)
+            k0 = kernel0_mm**zeta
+            V = rkhs_proj(k0)
+            h5f.create_dataset(f"projectors/{spe}/0",data=V)
+            for lam in range(1,lmax[spe]+1):
+                power_env_sparse = features['sparse_descriptors'][spe][str(lam)][:]
+                kernel_mm = np.dot(power_env_sparse,power_env_sparse.T)
+                for i1 in range(Mspe):
+                    for i2 in range(Mspe):
+                        kernel_mm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_mm[i1,i2]**(zeta-1)
+                V = rkhs_proj(kernel_mm)
+                h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
+        h5f.close()
+        features.close()
+
+    elif saltedtype == "density-response":
+
+        # compute rkhs projector and save
+        features = h5py.File(os.path.join(sdir,f"FEAT_M-{Menv}.h5"),'r')
+        features_antisymm = h5py.File(os.path.join(sdir,f"FEAT_M-{Menv}_antisymm.h5"),'r')
+        h5f = h5py.File(os.path.join(sdir,  f"projector-response_M{Menv}_zeta{zeta}.h5"), 'w')
+
+        for spe in species:
+
+            print("spe =", spe)
+
+            power_env_sparse = features['sparse_descriptors'][spe]['0'][:]
+            Mspe = power_env_sparse.shape[0]
+            kernel0_mm = np.dot(power_env_sparse,power_env_sparse.T)
+
+            for lam in range(lmax[spe]+1):
+
+                print("lam =", lam)
+
+                if lam==0:
+
+                    L = 1
+                    print("L=", L)
+                    power_env_sparse = features['sparse_descriptors'][spe][str(L)][:]
+                    kernel_mm = np.dot(power_env_sparse,power_env_sparse.T)
+                    for i1 in range(Mspe):
+                        for i2 in range(Mspe):
+                            kernel_mm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_mm[i1,i2]**(zeta-1)
+                    V = rkhs_proj(kernel_mm)
+                    h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
+
+                else:
+
+                    Msize =  Mspe*3*(2*lam+1)
+                    kernel_mm = np.zeros((Msize,Msize),complex)                   
+
+                    # Perform CG combination
+                    for L in [lam-1,lam,lam+1]:
+
+                        if L==lam:
+                            pimag = features_antisymm['sparse_descriptors'][spe][str(L)][:]
+                            featsize = pimag.shape[-1]
+                            pimag = pimag.reshape(Mspe,2*L+1,featsize)
+                            pimag = np.transpose(pimag,(1,0,2)).reshape(2*L+1,Mspe*featsize)
+                            preal = np.zeros_like(pimag)
+                        else:
+                            preal = features['sparse_descriptors'][spe][str(L)][:]
+                            featsize = preal.shape[-1]
+                            preal = preal.reshape(Mspe,2*L+1,featsize)
+                            preal = np.transpose(preal,(1,0,2)).reshape(2*L+1,Mspe*featsize)
+                            pimag = np.zeros_like(preal)
+                        
+                        ptemp = preal + 1j * pimag
+                        c2r = sph_utils.complex_to_real_transformation([2*L+1])[0]
+                        pcmplx = np.dot(np.conj(c2r.T),ptemp).reshape(2*L+1,Mspe,featsize)
+                        pcmplx = np.transpose(pcmplx,(1,0,2)).reshape(Mspe*(2*L+1),featsize)
+                        kmm = np.dot(pcmplx,np.conj(pcmplx).T)
+
+                        print("L=", L)
+                        # Load the relevant CG coefficients 
+                        cgcoefs = np.loadtxt(os.path.join(saltedpath, "wigners", f"cg_response_lam-{lam}_L-{L}.dat"))
+
+                        iM1 = 0
+                        idx1 = 0
+                        for i1 in range(Mspe):
+                            icg1 = 0
+                            for imu1 in range(2*lam+1):
+                                mu1 = imu1-lam 
+                                for ik1 in range(3):
+                                    k1 = ik1-1
+                                    M1 = mu1+k1
+                                    if abs(M1)<=L:
+                                        j1 = M1+L 
+                                        cg1 = cgcoefs[icg1]
+                                        iM2 = 0
+                                        idx2 = 0
+                                        for i2 in range(Mspe):
+                                            icg2 = 0
+                                            for imu2 in range(2*lam+1):
+                                                mu2 = imu2-lam 
+                                                for ik2 in range(3):
+                                                    k2 = ik2-1
+                                                    M2 = mu2+k2
+                                                    if abs(M2)<=L:
+                                                        j2 = M2+L 
+                                                        cg2 = cgcoefs[icg2]
+                                                        kernel_mm[iM1,iM2] += cg1 * cg2 * kmm[idx1+j1,idx2+j2] * kernel0_mm[i1,i2]**(zeta-1)
+                                                        icg2 +=1  
+                                                    iM2 += 1
+                                            idx2 += 2*L+1
+                                        icg1+=1 
+                                    iM1 += 1
+                            idx1 += 2*L+1
+                   
+                    A = sph_utils.complex_to_real_transformation([2*lam+1])[0]
+                    B = sph_utils.complex_to_real_transformation([3])[0]
+
+                    c2r = np.zeros((3*(2*lam+1),3*(2*lam+1)),complex) 
+                    j1 = 0
+                    for i1 in range(2*lam+1):
+                        j2 = 0
+                        for i2 in range(2*lam+1):
+                            c2r[j1:j1+3,j2:j2+3] = A[i1,i2] * B
+                            j2 += 3 
+                        j1 += 3
+
+                    ktemp1 = np.dot(c2r,np.transpose(kernel_mm.reshape(Mspe,3*(2*lam+1),Msize),(1,0,2)).reshape(3*(2*lam+1),Mspe*Msize))
+                    ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),Mspe,Msize),(1,0,2)).reshape(Msize,Msize) 
+                    kernel_mm = np.dot(ktemp2.reshape(Msize,Mspe,3*(2*lam+1)).reshape(Msize*Mspe,3*(2*lam+1)),np.conj(c2r).T).reshape(Msize,Mspe,3*(2*lam+1)).reshape(Msize,Msize)
+                    #print(np.linalg.norm(np.real(kernel_mm)))
+                    #print(np.linalg.norm(np.imag(kernel_mm)))
+
+                    V = rkhs_proj(np.real(kernel_mm))
+                    h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
+
+        h5f.close()
+        features.close()
+        features_antisymm.close()
 
 if __name__ == "__main__":
     build()

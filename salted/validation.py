@@ -43,15 +43,9 @@ def build():
 
     bohr2angs = 0.529177210670
 
-    if field:
-        vdir = f"validations_{saltedname}_field"
-        rdir = f"regrdir_{saltedname}_field"
-        fdir = f"rkhs-vectors_{saltedname}_field"
-    else:
-        vdir = f"validations_{saltedname}"
-        rdir = f"regrdir_{saltedname}"
-        fdir = f"rkhs-vectors_{saltedname}"
-
+    vdir = f"validations_{saltedname}"
+    rdir = f"regrdir_{saltedname}"
+    fdir = f"rkhs-vectors_{saltedname}"
 
     for iconf in range(ndata):
         # Define relevant species
@@ -185,36 +179,70 @@ def build():
     variance = 0
     for iconf in testrange:
 
-        # load reference
-        ref_coefs = np.load(osp.join(
-            saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
-        ))
-        overl = np.load(osp.join(
-            saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
-        ))
-        ref_projs = np.dot(overl,ref_coefs)
-        Tsize = len(ref_coefs)
+        if saltedtype=="density":
 
-        psivec = sparse.load_npz(osp.join(
-            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
-        ))
-        psi = psivec.toarray()
+            # load reference
+            ref_coefs = np.load(osp.join(
+                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+            ))
+            overl = np.load(osp.join(
+                saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+            ))
+            ref_projs = np.dot(overl,ref_coefs)
+            Tsize = len(ref_coefs)
 
-        pred_coefs = np.dot(psi,weights)
+            psivec = sparse.load_npz(osp.join(
+                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+            ))
+            psi = psivec.toarray()
 
-        # Compute vector of isotropic average coefficients
-        if average:
-            Av_coeffs = np.zeros(Tsize)
-            i = 0
-            for iat in range(natoms[iconf]):
-                spe = atomic_symbols[iconf][iat]
-                for l in range(lmax[spe]+1):
-                    for n in range(nmax[(spe,l)]):
-                        if l==0:
-                            Av_coeffs[i] = av_coefs[spe][n]
-                        i += 2*l+1
-            # add back spherical averages if required
-            pred_coefs += Av_coeffs
+            pred_coefs = np.dot(psi,weights)
+
+            # Compute vector of isotropic average coefficients
+            if average:
+                Av_coeffs = np.zeros(Tsize)
+                i = 0
+                for iat in range(natoms[iconf]):
+                    spe = atomic_symbols[iconf][iat]
+                    for l in range(lmax[spe]+1):
+                        for n in range(nmax[(spe,l)]):
+                            if l==0:
+                                Av_coeffs[i] = av_coefs[spe][n]
+                            i += 2*l+1
+                # add back spherical averages if required
+                pred_coefs += Av_coeffs
+
+        if saltedtype=="density-response":
+
+            overl = np.load(osp.join(
+                saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+            ))
+
+            cart = ["x","y","z"]
+            
+            ref_coefs = {}
+            ref_projs = {}
+            pred_coefs = {}
+            pred_projs = {}
+            for icart in cart:
+
+                # load reference
+                ref_coefs[icart] = np.load(osp.join(
+                    saltedpath, "coefficients", f"{icart}/coefficients_conf{iconf}.npy"
+                ))
+                ref_projs[icart] = np.dot(overl,ref_coefs[icart])
+                Tsize = len(ref_coefs[icart])
+
+                psivec = sparse.load_npz(osp.join(
+                    saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
+                ))
+                psi = psivec.toarray()
+
+                pred_coefs[icart] = np.dot(psi,weights)
+                
+                # compute predicted density projections <phi|rho>
+                pred_projs[icart] = np.dot(overl,pred_coefs[icart])
+
 
         if qmcode=="cp2k":
 
@@ -280,24 +308,47 @@ def build():
         #    f"N{ntrain}_reg{reg_log10_intstr}", f"RI-COEFFS-{iconf+1}.dat"
         #), ref_coefs)
         # save predicted coefficients
-        np.savetxt(osp.join(
-            saltedpath, vdir, f"M{Menv}_zeta{zeta}",
-            f"N{ntrain}_reg{reg_log10_intstr}", f"COEFFS-{iconf+1}.dat"
-        ), pred_coefs)
 
-        # compute predicted density projections <phi|rho>
-        pred_projs = np.dot(overl,pred_coefs)
+        if saltedtype=="density":        
 
-        # compute error
-        error = np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
-        error_density += error
-        if average:
-            ref_projs -= np.dot(overl,Av_coeffs)
-            ref_coefs -= Av_coeffs
-        var = np.dot(ref_coefs,ref_projs)
-        variance += var
-        print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
-        print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
+            np.savetxt(osp.join(
+                saltedpath, vdir, f"M{Menv}_zeta{zeta}",
+                f"N{ntrain}_reg{reg_log10_intstr}", f"COEFFS-{iconf+1}.dat"
+            ), pred_coefs)
+
+            # compute predicted density projections <phi|rho>
+            pred_projs = np.dot(overl,pred_coefs)
+
+            # compute error
+            error = np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
+            error_density += error
+            if average:
+                ref_projs -= np.dot(overl,Av_coeffs)
+                ref_coefs -= Av_coeffs
+            var = np.dot(ref_coefs,ref_projs)
+            variance += var
+            print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
+            print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
+
+        elif saltedtype=="density-response":
+
+            error = 0
+            var = 0
+            for icart in cart:
+                np.savetxt(osp.join(
+                    saltedpath, vdir, f"M{Menv}_zeta{zeta}",
+                    f"N{ntrain}_reg{reg_log10_intstr}", f"COEFFS-{icart}_{iconf+1}.dat"
+                ), pred_coefs[icart])
+
+                # compute error
+                error += np.dot(pred_coefs[icart]-ref_coefs[icart],pred_projs[icart]-ref_projs[icart])
+                var += np.dot(ref_coefs[icart],ref_projs[icart])
+
+            error_density += error
+            variance += var
+            print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
+            print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)    
+
         #print(iconf+1, ":", "rho integral =", rho_int, "normalized rho integral =", charge, "ref_dipole =", ref_dipole, "dipole =",dipole, ", error =", np.sqrt(error/var)*100, "% RMSE", flush=True)
 
         # UNCOMMENT TO CHECK PREDICTIONS OF <phi|rho-rho_0>

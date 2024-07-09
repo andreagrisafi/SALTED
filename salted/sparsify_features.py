@@ -73,10 +73,13 @@ def build():
     v1 = np.transpose(omega1,(2,0,3,1))
     v2 = np.transpose(omega2,(2,0,3,1))
 
+    if saltedtype=="density-response":
+        lmax_max += 1
+        for spe in species:
+            lmax[spe] += 1
+
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     for lam in range(lmax_max+1):
-
-        print("lambda =", lam)
 
         [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
 
@@ -92,7 +95,7 @@ def build():
         p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
         p = np.transpose(p,(2,0,1))
 
-        print(f"feature space size = {featsize}")
+        print(f"lambda = {lam}, feature space size = {featsize}")
 
         #TODO modify SALTED to directly deal with compact natoms_total dimension
         if lam==0:
@@ -110,14 +113,18 @@ def build():
 
         # Do feature selection with FPS sparsification
         if ncut >= featsize:
-            ncut = featsize
+            print("ERROR: requested number of sparse features larger than total feature space size! Please get rid of the inp.descriptor.sparsify section.")
+            sys.exit(1)
+
 
         print("fps...")
         pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
         vfps = do_fps(pvec.T,ncut)
         np.save(osp.join(sdir, f"fps{ncut}-{lam}.npy"), vfps)
 
-        if saltedtype=="density-response" and lam>0 and lam<lmax_max:
+    if saltedtype=="density-response": 
+
+        for lam in range(1,lmax_max):
 
             [llmax,llvec] = sph_utils.get_angular_indexes_antisymmetric(lam,nang1,nang2)
 
@@ -146,14 +153,15 @@ def build():
 
             # Do feature selection with FPS sparsification
             if ncut >= featsize:
-                ncut = featsize
+                print("ERROR: requested number of sparse features larger than total feature space size! Please get rid of the inp.descriptor.sparsify section.")
+                sys.exit(1)
 
-            print("fps...")
+            # Do FPS 
             pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
-            vfps = do_fps(pvec.T,ncut,0)
+            vfps = do_fps(pvec.T,ncut)
             np.save(osp.join(sdir, f"fps{ncut}-{lam}_antisymm.npy"), vfps)
 
-    print(f"time: {(time.time()-start):.2f}")
+    #print(f"time: {(time.time()-start):.2f}")
 
 
 if __name__ == "__main__":

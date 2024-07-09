@@ -18,14 +18,8 @@ def build():
     regul = inp.gpr.regul
     zeta = inp.gpr.z
 
-    if inp.system.field:
-        kdir = f"kernels_{saltedname}_field"
-        fdir = f"rkhs-vectors_{saltedname}_field"
-        rdir = f"regrdir_{saltedname}_field"
-    else:
-        kdir = f"kernels_{saltedname}"
-        fdir = f"rkhs-vectors_{saltedname}"
-        rdir = f"regrdir_{saltedname}"
+    fdir = f"rkhs-vectors_{saltedname}"
+    rdir = f"regrdir_{saltedname}"
 
     # define training set size
     ntrain = round(inp.gpr.trainfrac*inp.gpr.Ntrain)
