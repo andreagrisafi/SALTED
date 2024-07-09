@@ -61,9 +61,6 @@ def read_system(filename:str=None, spelist:List[str]=None, dfbasis:str=None):
     nnmax = max(nlist)
     llmax = max(llist)
 
-    if inp.salted.saltedtype=="density-response":
-        llmax += 1
-
     # read system
     xyzfile = read(filename, ":", parallel=False)
     ndata = len(xyzfile)
@@ -153,6 +150,18 @@ def do_fps(x, d=0):
         dl = np.minimum(dl,nd)
     return iy
 
+def rkhs_proj(kernel):
+    "Compute RKHS projector from the given kernel function"
+
+    inp = ParseConfig().parse_input()
+
+    eva, eve = np.linalg.eigh(kernel)
+    eva = eva[eva>inp.gpr.eigcut]
+    eve = eve[:,-len(eva):]
+    V = np.dot(eve,np.diag(1.0/np.sqrt(eva)))
+    return V
+
+
 ARGHELP_INDEX_STR = """Indexes to calculate, start from 0. Format: 1,3-5,7-10. \
 Default is "all", which means all structures."""
 
@@ -228,6 +237,40 @@ def get_feats_projs(species,lmax):
     projectors.close()
 
     return Vmat,Mspe,power_env_sparse
+
+def get_feats_projs_response(species,lmax):
+    """Load training features vectors and RKHS projection matrices needed for the density response
+    """
+    inp = ParseConfig().parse_input()
+
+    Vmat = {}
+    Mspe = {}
+
+    sdir = os.path.join(inp.salted.saltedpath, f"equirepr_{inp.salted.saltedname}")
+
+    projectors = h5py.File(os.path.join(sdir,f"projector-response_M{inp.gpr.Menv}_zeta{inp.gpr.z}.h5"),'r')
+    for spe in species:
+        for lam in range(lmax[spe]+1):
+             # load RKHS projectors
+             Vmat[(lam,spe)] = projectors["projectors"][spe][str(lam)][:]
+    projectors.close()
+
+    power_env_sparse = {}
+    power_env_sparse_antisymm = {}
+    features = h5py.File(os.path.join(sdir,f"FEAT_M-{inp.gpr.Menv}.h5"),'r')
+    features_antisymm = h5py.File(os.path.join(sdir,f"FEAT_M-{inp.gpr.Menv}_antisymm.h5"),'r')
+    for spe in species:
+        lmaxx = lmax[spe]+1
+        for lam in range(lmaxx+1):
+             power_env_sparse[(lam,spe)] = features["sparse_descriptors"][spe][str(lam)][:]
+             if lam == 0:
+                 Mspe[spe] = power_env_sparse[(lam,spe)].shape[0]
+        for lam in range(1,lmaxx):
+             power_env_sparse_antisymm[(lam,spe)] = features_antisymm["sparse_descriptors"][spe][str(lam)][:]
+    features.close()
+
+    return Vmat,Mspe,power_env_sparse,power_env_sparse_antisymm
+
 
 class AttrDict:
     """Access dict keys as attributes

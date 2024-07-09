@@ -1,5 +1,5 @@
-SUBROUTINE antiequicomb(natoms,nang1,nang2,nrad1,nrad2,v1,v2,&
-                        wigdim,w3j,llmax,llvec,lam,c2r,featsize,p)
+SUBROUTINE equicombnonorm(natoms,nang1,nang2,nrad1,nrad2,v1,v2,&
+                    wigdim,w3j,llmax,llvec,lam,c2r,featsize,p)
 
 !use omp_lib
 IMPLICIT NONE
@@ -7,14 +7,13 @@ INTEGER:: natoms,nang1,nang2,nrad1,nrad2,llmax,lam,wigdim,ifeat
 INTEGER:: iat,n1,n2,iwig,l1,l2,il,imu,im1,im2,mu,m1,m2,featsize
 INTEGER, DIMENSION(2,llmax):: llvec
 REAL*8, DIMENSION(wigdim):: w3j
-REAL*8, DIMENSION(2*lam+1):: pimag
+REAL*8, DIMENSION(2*lam+1):: preal
 COMPLEX*16, DIMENSION(2*lam+1):: pcmplx 
 COMPLEX*16, DIMENSION(2*lam+1,2*lam+1):: c2r
 COMPLEX*16, DIMENSION(2*nang1+1,nang1+1,nrad1,natoms):: v1 
 COMPLEX*16, DIMENSION(2*nang2+1,nang2+1,nrad2,natoms):: v2 
 REAL*8, DIMENSION(2*lam+1,featsize):: ptemp 
 REAL*8, DIMENSION(2*lam+1,featsize,natoms):: p 
-REAL*8:: inner, normfact
 
 !f2py intent(in) natoms,nang1,nang2,nrad1,nrad2,v1,v2,wigdim,w3j,llmax,llvec,lam,c2r
 !f2py intent(in) featsize
@@ -36,7 +35,6 @@ p = 0.d0
 !$OMP SHARED(p,v1,v2)
 !$OMP DO SCHEDULE(dynamic)
 do iat=1,natoms
-   inner = 0.0
    ptemp = 0.0
    ifeat = 1
    do n1=1,nrad1
@@ -59,19 +57,17 @@ do iat=1,natoms
                   endif
                enddo
             enddo
-            pimag = dimag(matmul(c2r,pcmplx))
-            do imu=1,2*lam+1
-               inner = inner + pimag(imu)**2
-               ptemp(imu,ifeat) = pimag(imu)
+            preal = dreal(matmul(c2r,pcmplx))
+            do imu=1,2*lam+1 
+               ptemp(imu,ifeat) = preal(imu)
             enddo
             ifeat = ifeat + 1
          enddo
       enddo
    enddo
-   normfact = dsqrt(inner)
    do ifeat=1,featsize
       do imu=1,2*lam+1 
-         p(imu,ifeat,iat) = ptemp(imu,ifeat) !/ normfact
+         p(imu,ifeat,iat) = ptemp(imu,ifeat) 
       enddo
    enddo
 enddo

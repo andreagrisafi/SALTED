@@ -9,7 +9,7 @@ def build():
 
     inp = ParseConfig().parse_input()
 
-    # Precompute and save the required Wigner-3j symbols, depending on SALTED target
+    # Precompute and save the required Wigner-3j symbols and Clebsch-Gordan, depending on SALTED target
     wigner.build()
 
     # Sparsify the feature space of symmetry-adapted descriptors?
