@@ -8,6 +8,7 @@ import h5py
 import numpy as np
 from sympy.physics.wigner import wigner_3j
 
+from salted.lib import kernelequicomb
 from salted import sph_utils
 from salted.sys_utils import ParseConfig, get_atom_idx, read_system, rkhs_proj
 
@@ -116,37 +117,9 @@ def build():
                         # Load the relevant CG coefficients 
                         cgcoefs = np.loadtxt(os.path.join(saltedpath, "wigners", f"cg_response_lam-{lam}_L-{L}.dat"))
 
-                        iM1 = 0
-                        idx1 = 0
-                        for i1 in range(Mspe):
-                            icg1 = 0
-                            for imu1 in range(2*lam+1):
-                                mu1 = imu1-lam 
-                                for ik1 in range(3):
-                                    k1 = ik1-1
-                                    M1 = mu1+k1
-                                    if abs(M1)<=L:
-                                        j1 = M1+L 
-                                        cg1 = cgcoefs[icg1]
-                                        iM2 = 0
-                                        idx2 = 0
-                                        for i2 in range(Mspe):
-                                            icg2 = 0
-                                            for imu2 in range(2*lam+1):
-                                                mu2 = imu2-lam 
-                                                for ik2 in range(3):
-                                                    k2 = ik2-1
-                                                    M2 = mu2+k2
-                                                    if abs(M2)<=L:
-                                                        j2 = M2+L 
-                                                        cg2 = cgcoefs[icg2]
-                                                        kernel_mm[iM1,iM2] += cg1 * cg2 * kmm[idx1+j1,idx2+j2] * kernel0_mm[i1,i2]**(zeta-1)
-                                                        icg2 +=1  
-                                                    iM2 += 1
-                                            idx2 += 2*L+1
-                                        icg1+=1 
-                                    iM1 += 1
-                            idx1 += 2*L+1
+                        k0 = kernel0_mm**(zeta-1)
+                        cgkernel = kernelequicomb.kernelequicomb(Mspe,Mspe,lam,1,L,Msize,Msize,len(cgcoefs),cgcoefs,kmm.T,k0.T)
+                        kernel_mm += cgkernel.T
                    
                     A = sph_utils.complex_to_real_transformation([2*lam+1])[0]
                     B = sph_utils.complex_to_real_transformation([3])[0]

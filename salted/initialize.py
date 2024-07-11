@@ -15,6 +15,10 @@ def build():
     # Sparsify the feature space of symmetry-adapted descriptors?
     if inp.descriptor.sparsify.ncut > 0:
 
+        if inp.salted.saltedtype=="density-response":
+            print("ERROR: feature space sparsification not allowed with inp.salted.saltedtype: density-response!")
+            sys.exit(0)
+
         # Precompute and save the feature space sparsification details 
         sparsify_features.build()
 
