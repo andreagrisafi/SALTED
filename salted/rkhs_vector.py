@@ -353,6 +353,12 @@ def build():
                     for i2 in range(Mspe[spe]):
                         kernel_nm[i1*3:i1*3+3][:,i2*3:i2*3+3] *= kernel0_nm[i1,i2]**(zeta-1)
                 Psi[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
+               
+                # normalize RKHS descriptor
+                psi = Psi[(spe,0)].reshape(natom_dict[(iconf,spe)],3,Vmat[(0,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)],3*Vmat[(0,spe)].shape[-1])
+                inner = np.diagonal(np.dot(psi,psi.T))
+                Psi[(spe,0)] = np.einsum('a,ab->ab',1.0/np.sqrt(inner),psi).reshape(natom_dict[(iconf,spe)],3,Vmat[(0,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)]*3,Vmat[(0,spe)].shape[-1])
+
                 Tsize += natom_dict[(iconf,spe)]*nmax[(spe,0)]
 
                 #TODO uncomment for covariance test
@@ -454,6 +460,12 @@ def build():
 
                     # project kernel on the RKHS
                     Psi[(spe,lam)] = np.real(np.dot(np.real(kernel_nm),Vmat[(lam,spe)]))
+
+                    # normalize RKHS descriptor
+                    psi = Psi[(spe,lam)].reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Vmat[(lam,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)],3*(2*lam+1)*Vmat[(lam,spe)].shape[-1])
+                    inner = np.diagonal(np.dot(psi,psi.T))
+                    Psi[(spe,lam)] = np.einsum('a,ab->ab',1.0/np.sqrt(inner),psi).reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Vmat[(lam,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)]*3*(2*lam+1),Vmat[(lam,spe)].shape[-1])
+
                     Tsize += natom_dict[(iconf,spe)]*(2*lam+1)*nmax[(spe,lam)]
 
                     #TODO uncomment for covariance test
