@@ -305,29 +305,28 @@ def build():
                 else:
                     power[lam] = p.reshape(natoms[iconf],2*lam+1,featsize)
 
+            # Compute antisymmetric equivariant features for the given structure
+            power_antisymm = {}
+            for lam in range(1,lmax_max):
 
-                # Compute antisymmetric equivariant features for the given structure
-                power_antisymm = {}
-                for lam in range(1,lmax_max):
+                [llmax,llvec] = sph_utils.get_angular_indexes_antisymmetric(lam,nang1,nang2)
 
-                    [llmax,llvec] = sph_utils.get_angular_indexes_antisymmetric(lam,nang1,nang2)
+                # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
+                wigner3j = np.loadtxt(os.path.join(
+                    saltedpath, "wigners", f"wigner_antisymm_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
+                ))
+                wigdim = wigner3j.size
 
-                    # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
-                    wigner3j = np.loadtxt(os.path.join(
-                        saltedpath, "wigners", f"wigner_antisymm_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
-                    ))
-                    wigdim = wigner3j.size
+                # Compute complex to real transformation matrix for the given lambda value
+                c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
 
-                    # Compute complex to real transformation matrix for the given lambda value
-                    c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
+                # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
+                featsize = nspe1*nspe2*nrad1*nrad2*llmax
+                p = antiequicombnonorm.antiequicombnonorm(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+                p = np.transpose(p,(2,0,1))
 
-                    # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
-                    featsize = nspe1*nspe2*nrad1*nrad2*llmax
-                    p = antiequicombnonorm.antiequicombnonorm(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-                    p = np.transpose(p,(2,0,1))
-
-                    # Fill vector of equivariant descriptor
-                    power_antisymm[lam] = p.reshape(natoms[iconf],2*lam+1,featsize)
+                # Fill vector of equivariant descriptor
+                power_antisymm[lam] = p.reshape(natoms[iconf],2*lam+1,featsize)
 
   
             # Compute kernels and RKHS descriptors
