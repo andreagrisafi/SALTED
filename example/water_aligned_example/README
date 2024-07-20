@@ -1,0 +1,9 @@
+The full SALTED workflow can be run in two steps: run-aims.sbatch, which generates the training data, and run-ml.sbatch, which generates and validates a SALTER model.
+
+To specify the axis along which the field is applied, the relevant cartesian coordinate should be selected for the coefdir and projdir in inp.py, and the corresponding descriptors should be calculated by passing the correct argument to the -d flag of `run-tensoap.py` in `run-ml.sbatch` - 1 = x, 2 = y, 3 = z.
+
+The script run-aims.sbatch assumes an up-to-date version of AIMS (at least May 2024).
+
+The SALTED commands in script run-ml.sbatch are available through the SALTER branch of the SALTED github.
+
+The run-ml.sbatch also uses a modified version of the TENSOAP software, available from https://github.com/alanmlewis/TENSOAP. It should be installed by running `make` in the soapfast directory.
