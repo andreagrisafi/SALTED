@@ -60,7 +60,7 @@ for i in conf_range:
     #ovlp = ovlp[idx,:]
     #ovlp = ovlp[:,idx]
     np.save(inp.path2qm+inp.ovlpdir+'overlap_conf'+str(i)+'.npy',ovlp)
-    np.save(inp.path2qm+'projections'+'projections_conf'+str(i)+'.npy',o)
-    np.save(inp.path2qm+'coefficients/'+'coefficients_conf'+str(i)+'.npy',t)
+    np.save(inp.path2qm+'projections/projections_conf'+str(i)+'.npy',o)
+    np.save(inp.path2qm+'coefficients/coefficients_conf'+str(i)+'.npy',t)
     os.remove(dirpath+'ri_ovlp.out')
     os.remove(dirpath+'ri_projections.out')

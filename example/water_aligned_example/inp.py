@@ -7,8 +7,8 @@ parallel = True
 
 # path to data
 # ------------
-path2ml = "/ada/ptmp/mpsd/alewis/water_aligned/qmdata/" 
-path2qm = "/ada/ptmp/mpsd/alewis/water_aligned/qmdata" 
+path2ml = "/ada/ptmp/mpsd/alewis/water_aligned/mldata/" 
+path2qm = "/ada/ptmp/mpsd/alewis/water_aligned/qmdata/" 
 
 soapdir = "soaps_x/"
 featdir = "feat_vecs_x/"
@@ -33,7 +33,7 @@ overcut = 1e-08
 # ML variables  
 # ------------
 z = 2.0           # kernel exponent 
-Menv = 3000        # number of FPS environments
+Menv = 300        # number of FPS environments
 Ntrain = 400      # number of training structures
 trainfrac = 1.0
 

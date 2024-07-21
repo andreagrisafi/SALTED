@@ -30,10 +30,6 @@ export OMP_NUM_THREADS=1
 
 ### RUN YOUR CODE:
 
-module purge
-module load intel Python
-export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi2.so
-
 source ~/TENSOAP/env.sh
 source ~/SALTED/env.sh
 export PYTHONPATH=$PWD
