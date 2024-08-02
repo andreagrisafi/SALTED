@@ -47,10 +47,10 @@ print("problem dimensionality:", totsize)
 dirpath = os.path.join(inp.path2ml,fdir)
 if (rank == 0):
     if not os.path.exists(dirpath):
-        os.mkdir(dirpath)
+        os.makedirs(dirpath, exist_ok=True)
     dirpath = os.path.join(inp.path2ml+fdir, "M"+str(M)+"_eigcut"+str(int(np.log10(eigcut))))
     if not os.path.exists(dirpath):
-        os.mkdir(dirpath)
+        os.makedirs(dirpath, exist_ok=True)
 
 # Distribute structures to tasks
 if inp.parallel:
