@@ -78,7 +78,7 @@ def build():
 
         print("lambda =", lam)
 
-        [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
+        llmax, llvec = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
 
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         wigner3j = np.loadtxt(osp.join(saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"))
@@ -119,7 +119,7 @@ def build():
 
         if saltedtype=="density-response" and lam>0 and lam<lmax_max:
 
-            [llmax,llvec] = sph_utils.get_angular_indexes_antisymmetric(lam,nang1,nang2)
+            llmax, llvec = sph_utils.get_angular_indexes_antisymmetric(lam,nang1,nang2)
 
             # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
             wigner3j = np.loadtxt(osp.join(saltedpath, "wigners", f"wigner_antisymm_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"))

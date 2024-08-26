@@ -176,7 +176,7 @@ def build():
 
         if rank == 0: print(f"lambda = {lam}")
 
-        [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
+        llmax, llvec = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
 
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         wigner3j = np.loadtxt(osp.join(

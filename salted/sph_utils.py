@@ -1,5 +1,7 @@
 import sys
 import math
+from typing import Tuple
+
 import numpy as np
 from scipy import special
 from ase.data import atomic_numbers
@@ -86,7 +88,7 @@ def complex_to_real_transformation(sizes):
 
     return matrices
 
-def get_angular_indexes_symmetric(lam,nang1,nang2):
+def get_angular_indexes_symmetric(lam,nang1,nang2) -> Tuple[int, np.ndarray]:
     """Select relevant angular indexes for equivariant descriptor calculation"""
 
     llmax = 0
@@ -107,9 +109,9 @@ def get_angular_indexes_symmetric(lam,nang1,nang2):
         llvec[il,0] = lvalues[il][0]
         llvec[il,1] = lvalues[il][1]
 
-    return [llmax,llvec]
+    return llmax, llvec
 
-def get_angular_indexes_antisymmetric(lam,nang1,nang2):
+def get_angular_indexes_antisymmetric(lam,nang1,nang2) -> Tuple[int, np.ndarray]:
     """Select relevant angular indexes for equivariant descriptor calculation, antisymmetric with respect to inversion operations"""
 
     llmax = 0
@@ -130,7 +132,7 @@ def get_angular_indexes_antisymmetric(lam,nang1,nang2):
         llvec[il,0] = lvalues[il][0]
         llvec[il,1] = lvalues[il][1]
 
-    return [llmax,llvec]
+    return llmax, llvec
 
 def get_representation_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,natoms):
     """Compute spherical harmonics expansion coefficients of the given structural representation."""

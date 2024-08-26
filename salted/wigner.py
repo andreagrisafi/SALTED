@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import os.path as osp
+import io
 
 import ase
 import numpy as np
@@ -24,12 +25,12 @@ def build():
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
 
-    def get_wigner3j(llmax,llvec,lam,wig):
+    def get_wigner3j(llmax:int, llvec:np.ndarray, lam:int, wig:io.TextIOWrapper):
         """Compute and save Wigner-3J symbols needed for symmetry-adapted combination"""
 
         for il in range(llmax):
-            l1 = llvec[il,0]
-            l2 = llvec[il,1]
+            l1 = int(llvec[il,0])
+            l2 = int(llvec[il,1])
             for imu in range(2*lam+1):
                 mu = imu-lam
                 for im1 in range(2*l1+1):
@@ -37,14 +38,15 @@ def build():
                     m2 = m1-mu
                     if abs(m2) <= l2:
                         im2 = m2+l2
+                        # for wigner_3j, all the parameters should be integers or half-integers
                         w3j = wigner_3j(lam,l2,l1,mu,m2,-m1) * (-1.0)**(m1)
-                        print(float(w3j),file=wig) 
-    
+                        print(float(w3j),file=wig)
+
     for lam in range(lmax_max+1):
 
         print(f"wigners: lambda = {lam}")
 
-        [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
+        llmax, llvec = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
 
         wig = open(osp.join(
             inp.salted.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
@@ -54,7 +56,7 @@ def build():
 
         if inp.salted.saltedtype=="density-response" and lam>0 and lam<lmax_max:
 
-            [llmax,llvec] = sph_utils.get_angular_indexes_antisymmetric(lam,nang1,nang2)
+            llmax, llvec = sph_utils.get_angular_indexes_antisymmetric(lam,nang1,nang2)
 
             wig = open(osp.join(
                 inp.salted.saltedpath, "wigners", f"wigner_antisymm_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"

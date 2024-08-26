@@ -70,7 +70,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     
         equistart = time.time()
     
-        [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
+        llmax, llvec = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
  
         # Load the relevant Wigner-3J symbols associated with the given triplet (lam, lmax1, lmax2)
         wigner3j = np.loadtxt(os.path.join(
