@@ -148,7 +148,7 @@ def build():
     # Create directory for predictions
     if rank == 0:
         if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
+            os.makedirs(dirpath, exist_ok=True)
     if size > 1:  comm.Barrier()
 
     if qmcode=="cp2k":

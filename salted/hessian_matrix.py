@@ -44,7 +44,7 @@ def build():
     if rank == 0:
         dirpath = os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}")
         if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
+            os.makedirs(dirpath, exist_ok=True)
 
     av_coefs = {} # keep outside logical
     if inp.system.average:

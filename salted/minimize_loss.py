@@ -110,7 +110,7 @@ def build():
     dirpath = os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}")
     if rank == 0:
         if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
+            os.makedirs(dirpath, exist_ok=True)
     if size > 1:
         comm.Barrier()
 
