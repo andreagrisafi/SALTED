@@ -861,11 +861,6 @@ class ParseConfig:
         inp = rec_apply_default_vals(
             inp, inp_template, ""
         )  # now inp has all the keys as in inp_template in all levels
-        # check for destructive interactions
-        if inp.system.average == True and inp.salted.saltedtype == "density-response":
-            raise ValueError(
-                "Invalid configuration: 'average' cannot be True when 'saltedtype' is 'density-response'. Please change your input settings."
-            )
         rec_check_vals(inp, inp_template, "")
 
         return inp

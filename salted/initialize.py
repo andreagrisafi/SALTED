@@ -8,6 +8,11 @@ from salted.sys_utils import ParseConfig
 def build():
 
     inp = ParseConfig().parse_input()
+    # check for destructive interactions
+    if inp.system.average == True and inp.salted.saltedtype == "density-response":
+        raise ValueError(
+            "Invalid configuration: 'average' cannot be True when 'saltedtype' is 'density-response'. Please change your input settings."
+        )
 
     # Precompute and save the required Wigner-3j symbols and Clebsch-Gordan, depending on SALTED target
     wigner.build()
