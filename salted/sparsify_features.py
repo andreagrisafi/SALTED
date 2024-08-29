@@ -12,7 +12,7 @@ from ase.io import read
 from salted import sph_utils
 from salted import basis
 
-from salted.lib import equicomb, antiequicomb
+from salted.lib import equicomb, antiequicomb, equicombfps
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range, do_fps
 
 def build():
@@ -89,32 +89,35 @@ def build():
 
         # compute normalized equivariant descriptor
         featsize = nspe1*nspe2*nrad1*nrad2*llmax
-        p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-        p = np.transpose(p,(2,0,1))
+        # p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+        # p = np.transpose(p,(2,0,1))
 
-        print(f"feature space size = {featsize}")
+        # print(f"feature space size = {featsize}")
 
-        #TODO modify SALTED to directly deal with compact natoms_total dimension
-        if lam==0:
-            p = p.reshape(natoms_total,featsize)
-            pvec = np.zeros((ndata,natmax,featsize))
-        else:
-            p = p.reshape(natoms_total,2*lam+1,featsize)
-            pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
+        # #TODO modify SALTED to directly deal with compact natoms_total dimension
+        # if lam==0:
+        #     p = p.reshape(natoms_total,featsize)
+        #     pvec = np.zeros((ndata,natmax,featsize))
+        # else:
+        #     p = p.reshape(natoms_total,2*lam+1,featsize)
+        #     pvec = np.zeros((ndata,natmax,2*lam+1,featsize))
 
-        j = 0
-        for i in range(ndata):
-            for iat in range(natoms[i]):
-                pvec[i,iat] = p[j]
-                j += 1
+        # j = 0
+        # for i in range(ndata):
+        #     for iat in range(natoms[i]):
+        #         pvec[i,iat] = p[j]
+        #         j += 1
 
-        # Do feature selection with FPS sparsification
-        if ncut >= featsize:
-            ncut = featsize
+        # # Do feature selection with FPS sparsification
+        # if ncut >= featsize:
+        #     ncut = featsize
 
-        print("fps...")
-        pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
-        vfps = do_fps(pvec.T,ncut)
+        # print("fps...")
+        # pvec = pvec.reshape(ndata*natmax*(2*lam+1),featsize)
+        # vfps = do_fps(pvec.T,ncut)
+        
+        pvec = equicombfps.equicombfps(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+        vfps = do_fps(pvec,ncut)
         np.save(osp.join(sdir, f"fps{ncut}-{lam}.npy"), vfps)
 
         if saltedtype=="density-response" and lam>0 and lam<lmax_max:
