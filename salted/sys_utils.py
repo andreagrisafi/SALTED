@@ -465,7 +465,7 @@ class ParseConfig:
                 "predname": (False, PLACEHOLDER, str, None),  # SALTED prediction identifier
                 #### below are optional, but required for some qmcode ####
                 "save_descriptor": (False, False, bool, None),  # whether saving the descriptor
-                "predict_data": (False, PLACEHOLDER, str, lambda inp, val: check_with_qmcode(inp, val, "aims")),  # path to the prediction data by QM code, only for AIMS
+                "predict_data": (False, PLACEHOLDER, str, lambda inp, val: check_path_exists(val)),  # path to the prediction data by QM code, only for AIMS
             },
             "descriptor": {
                 "rep1": rep_template,  # descriptor 1
