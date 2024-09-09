@@ -25,7 +25,7 @@ CC=gcc
 init:
 	cd salted/lib; touch __init__.py
 
-f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so salted/lib/equicombsparse.so salted/lib/antiequicomb.so salted/lib/antiequicombsparse.so
+f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so salted/lib/equicombsparse.so salted/lib/antiequicomb.so salted/lib/antiequicombsparse.so salted/lib/equicombfps.so
 #salted/lib/gausslegendre.so salted/lib/neighlist_ewald.so salted/lib/nearfield_ewald.so salted/lib/lebedev.so
 
 salted/lib/ovlp2c.so: src/ovlp2c.f90
@@ -60,6 +60,9 @@ salted/lib/antiequicomb.so: src/antiequicomb.f90
 
 salted/lib/antiequicombsparse.so: src/antiequicombsparse.f90
 	cd salted/lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../../src/antiequicombsparse.f90 -m antiequicombsparse --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv antiequicombsparse.*.so antiequicombsparse.so
+
+salted/lib/equicombfps.so: src/equicombfps.f90
+	cd salted/lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../../src/equicombfps.f90 -m equicombfps --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombfps.*.so equicombfps.so
 
 #salted/lib/gausslegendre.so: src/gausslegendre.f90
 #	cd salted/lib; $(F2PYEXE) -c --opt=$(F2PYOPT) ../../src/gausslegendre.f90 -m gausslegendre --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv gausslegendre.*.so gausslegendre.so
