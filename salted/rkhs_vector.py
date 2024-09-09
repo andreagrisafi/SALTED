@@ -96,7 +96,7 @@ def build():
     if (rank == 0):
         dirpath = os.path.join(saltedpath, fdir, f"M{Menv}_zeta{zeta}")
         if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
+            os.makedirs(dirpath, exist_ok=True)
     if size > 1:  comm.Barrier()
 
     # Distribute structures to tasks
