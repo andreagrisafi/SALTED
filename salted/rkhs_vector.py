@@ -351,12 +351,34 @@ def build():
                 for i1 in range(natom_dict[(iconf,spe)]):
                     for i2 in range(Mspe[spe]):
                         kernel_nm[i1*3:i1*3+3][:,i2*3:i2*3+3] *= kernel0_nm[i1,i2]**(zeta-1)
+
+                kernel0_nn = np.dot(power[0][atom_idx[(iconf,spe)]],power[0][atom_idx[(iconf,spe)]].T)
+                kernel_nn = np.dot(power[1][atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*3,power[1].shape[-1]),power[1][atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*3,power[1].shape[-1]).T)
+                normfact = np.zeros(natom_dict[(iconf,spe)])
+                for i1 in range(natom_dict[(iconf,spe)]):
+                    for i2 in range(natom_dict[(iconf,spe)]):
+                        kernel_nn[i1*3:i1*3+3][:,i2*3:i2*3+3] *= kernel0_nn[i1,i2]**(zeta-1)
+                    normfact[i1] = np.sqrt(np.sum(kernel_nn[i1*3:i1*3+3][:,i1*3:i1*3+3]**2))
+
+                normfact_sparse = np.load(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{0}.npy"))
+                j1 = 0
+                for i1 in range(natom_dict[(iconf,spe)]):
+                    norm1 = normfact[i1]
+                    for imu1 in range(3):
+                        j2 = 0
+                        for i2 in range(Mspe[spe]):
+                            norm2 = normfact_sparse[i2]
+                            for imu2 in range(3):
+                                kernel_nm[j1,j2] /= norm1*norm2
+                                j2 += 1
+                        j1 += 1
+
                 Psi[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
                
                 # normalize RKHS descriptor
-                psi = Psi[(spe,0)].reshape(natom_dict[(iconf,spe)],3,Vmat[(0,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)],3*Vmat[(0,spe)].shape[-1])
-                inner = np.diagonal(np.dot(psi,psi.T))
-                Psi[(spe,0)] = np.einsum('a,ab->ab',1.0/np.sqrt(inner),psi).reshape(natom_dict[(iconf,spe)],3,Vmat[(0,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)]*3,Vmat[(0,spe)].shape[-1])
+                #psi = Psi[(spe,0)].reshape(natom_dict[(iconf,spe)],3,Vmat[(0,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)],3*Vmat[(0,spe)].shape[-1])
+                #inner = np.diagonal(np.dot(psi,psi.T))
+                #Psi[(spe,0)] = np.einsum('a,ab->ab',1.0/np.sqrt(inner),psi).reshape(natom_dict[(iconf,spe)],3,Vmat[(0,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)]*3,Vmat[(0,spe)].shape[-1])
 
                 Tsize += natom_dict[(iconf,spe)]*nmax[(spe,0)]
 
@@ -385,6 +407,7 @@ def build():
                     Msize = Mspe[spe]*3*(2*lam+1)
                     Nsize = natom_dict[(iconf,spe)]*3*(2*lam+1)
                     kernel_nm = np.zeros((Nsize,Msize),complex)
+                    kernel_nn = np.zeros((Nsize,Nsize),complex)
 
                     # Perform CG combination
                     for L in [lam-1,lam,lam+1]:
@@ -438,6 +461,13 @@ def build():
                         k0 = kernel0_nm**(zeta-1)
                         cgkernel = kernelequicomb.kernelequicomb(natom_dict[(iconf,spe)],Mspe[spe],lam,1,L,Nsize,Msize,len(cgcoefs),cgcoefs,knm.T,k0.T)
                         kernel_nm += cgkernel.T
+                        
+                        # compute complex K_nn kernel 
+                        knn = np.dot(pcmplx,np.conj(pcmplx).T)
+                        k0 = kernel0_nn**(zeta-1)
+                        cgkernel = kernelequicomb.kernelequicomb(natom_dict[(iconf,spe)],natom_dict[(iconf,spe)],lam,1,L,Nsize,Nsize,len(cgcoefs),cgcoefs,knn.T,k0.T)
+                        kernel_nn += cgkernel.T
+                        
 
                     # compute complex to real transformation matrix for lam X 1 tensor product space
                     A = sph_utils.complex_to_real_transformation([2*lam+1])[0]
@@ -457,13 +487,34 @@ def build():
                     kernel_nm = np.dot(ktemp2.reshape(Nsize,Mspe[spe],3*(2*lam+1)).reshape(Nsize*Mspe[spe],3*(2*lam+1)),np.conj(c2r).T).reshape(Nsize,Mspe[spe],3*(2*lam+1)).reshape(Nsize,Msize)
                     #print("imag:", np.linalg.norm(np.imag(kernel_nm)))
 
+                    ktemp1 = np.dot(c2r,np.transpose(kernel_nn.reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Nsize),(1,0,2)).reshape(3*(2*lam+1),natom_dict[(iconf,spe)]*Nsize))
+                    ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),natom_dict[(iconf,spe)],Nsize),(1,0,2)).reshape(Nsize,Nsize)
+                    kernel_nn = np.dot(ktemp2.reshape(Nsize,natom_dict[(iconf,spe)],3*(2*lam+1)).reshape(Nsize*natom_dict[(iconf,spe)],3*(2*lam+1)),np.conj(c2r).T).reshape(Nsize,natom_dict[(iconf,spe)],3*(2*lam+1)).reshape(Nsize,Nsize)
+
+                    normfact = np.zeros(natom_dict[(iconf,spe)])
+                    for i1 in range(natom_dict[(iconf,spe)]):
+                        normfact[i1] = np.sqrt(np.sum(np.real(kernel_nn)[i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)][:,i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)]**2))
+
+                    normfact_sparse = np.load(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{lam}.npy"))
+                    j1 = 0 
+                    for i1 in range(natom_dict[(iconf,spe)]):
+                        norm1 = normfact[i1]
+                        for imu1 in range(3*(2*lam+1)):
+                            j2 = 0 
+                            for i2 in range(Mspe[spe]):
+                                norm2 = normfact_sparse[i2]
+                                for imu2 in range(3*(2*lam+1)):
+                                    kernel_nm[j1,j2] /= norm1*norm2
+                                    j2 += 1
+                            j1 += 1
+
                     # project kernel on the RKHS
                     Psi[(spe,lam)] = np.real(np.dot(np.real(kernel_nm),Vmat[(lam,spe)]))
 
                     # normalize RKHS descriptor
-                    psi = Psi[(spe,lam)].reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Vmat[(lam,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)],3*(2*lam+1)*Vmat[(lam,spe)].shape[-1])
-                    inner = np.diagonal(np.dot(psi,psi.T))
-                    Psi[(spe,lam)] = np.einsum('a,ab->ab',1.0/np.sqrt(inner),psi).reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Vmat[(lam,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)]*3*(2*lam+1),Vmat[(lam,spe)].shape[-1])
+                    #psi = Psi[(spe,lam)].reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Vmat[(lam,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)],3*(2*lam+1)*Vmat[(lam,spe)].shape[-1])
+                    #inner = np.diagonal(np.dot(psi,psi.T))
+                    #Psi[(spe,lam)] = np.einsum('a,ab->ab',1.0/np.sqrt(inner),psi).reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Vmat[(lam,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)]*3*(2*lam+1),Vmat[(lam,spe)].shape[-1])
 
                     Tsize += natom_dict[(iconf,spe)]*(2*lam+1)*nmax[(spe,lam)]
 

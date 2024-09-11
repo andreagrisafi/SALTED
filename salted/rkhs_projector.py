@@ -80,9 +80,25 @@ def build():
                     print("L=", L)
                     power_env_sparse = features['sparse_descriptors'][spe][str(L)][:]
                     kernel_mm = np.dot(power_env_sparse,power_env_sparse.T)
+                    normfact = np.zeros(Mspe) 
                     for i1 in range(Mspe):
                         for i2 in range(Mspe):
-                            kernel_mm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_mm[i1,i2]**(zeta-1)
+                            kernel_mm[i1*3:i1*3+3][:,i2*3:i2*3+3] *= kernel0_mm[i1,i2]**(zeta-1)
+                        normfact[i1] = np.sqrt(np.sum(kernel_mm[i1*3:i1*3+3][:,i1*3:i1*3+3]**2))
+                    np.save(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
+
+                    j1 = 0
+                    for i1 in range(Mspe):
+                        norm1 = normfact[i1]
+                        for imu1 in range(3):
+                            j2 = 0
+                            for i2 in range(Mspe):
+                                norm2 = normfact[i2]
+                                for imu2 in range(3):
+                                    kernel_mm[j1,j2] /= norm1*norm2
+                                    j2 += 1
+                            j1 += 1
+
                     V = rkhs_proj(kernel_mm)
                     h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
 
@@ -138,6 +154,23 @@ def build():
                     kernel_mm = np.dot(ktemp2.reshape(Msize,Mspe,3*(2*lam+1)).reshape(Msize*Mspe,3*(2*lam+1)),np.conj(c2r).T).reshape(Msize,Mspe,3*(2*lam+1)).reshape(Msize,Msize)
                     #print(np.linalg.norm(np.real(kernel_mm)))
                     #print(np.linalg.norm(np.imag(kernel_mm)))
+                    
+                    normfact = np.zeros(Mspe)
+                    for i1 in range(Mspe):
+                        normfact[i1] = np.sqrt(np.sum(np.real(kernel_mm)[i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)][:,i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)]**2))
+                    np.save(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
+
+                    j1 = 0
+                    for i1 in range(Mspe):
+                        norm1 = normfact[i1]
+                        for imu1 in range(3*(2*lam+1)): 
+                            j2 = 0
+                            for i2 in range(Mspe):
+                                norm2 = normfact[i2]
+                                for imu2 in range(3*(2*lam+1)):
+                                    kernel_mm[j1,j2] /= norm1*norm2
+                                    j2 += 1
+                            j1 += 1
 
                     V = rkhs_proj(np.real(kernel_mm))
                     h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
