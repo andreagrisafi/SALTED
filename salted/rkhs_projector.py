@@ -57,6 +57,10 @@ def build():
 
     elif saltedtype == "density-response":
 
+        dirpath = os.path.join(saltedpath, "normfacts")
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath)
+
         # compute rkhs projector and save
         features = h5py.File(os.path.join(sdir,f"FEAT_M-{Menv}.h5"),'r')
         features_antisymm = h5py.File(os.path.join(sdir,f"FEAT_M-{Menv}_antisymm.h5"),'r')
