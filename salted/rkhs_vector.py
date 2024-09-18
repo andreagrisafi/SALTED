@@ -369,7 +369,7 @@ def build():
                         for i2 in range(Mspe[spe]):
                             norm2 = normfact_sparse[i2]
                             for imu2 in range(3):
-                                kernel_nm[j1,j2] /= norm1*norm2
+                                kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
                                 j2 += 1
                         j1 += 1
 
@@ -504,7 +504,7 @@ def build():
                             for i2 in range(Mspe[spe]):
                                 norm2 = normfact_sparse[i2]
                                 for imu2 in range(3*(2*lam+1)):
-                                    kernel_nm[j1,j2] /= norm1*norm2
+                                    kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
                                     j2 += 1
                             j1 += 1
 
