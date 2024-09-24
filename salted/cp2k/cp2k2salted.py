@@ -20,12 +20,18 @@ species = inp.system.species
 [lmax,nmax] = basis.basiset(inp.qm.dfbasis)
 
 dirpath = os.path.join(inp.salted.saltedpath, "coefficients")
-# dirpath = os.path.join(inp.salted.saltedpath, "coefficients-efield")
 if not os.path.exists(dirpath):
     os.mkdir(dirpath)
 
+if inp.salted.saltedtype=="density-response":
+    for icart in ["x","y","z"]:
+        dirpath = os.path.join(inp.salted.saltedpath, "coefficients", f"{icart}")
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+
 # init geometry
 for iconf in range(ndata):
+
     geom = xyzfile[iconf]
     symbols = geom.get_chemical_symbols()
     natoms = len(symbols)
@@ -38,20 +44,7 @@ for iconf in range(ndata):
                 for n in range(nmax[(spe,l)]):
                     nRI += 2*l+1
 
-    # load density coefficients and check dimension
-    coefficients = np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", inp.qm.coeffile))
-    # coefficients = np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", "efield", inp.qm.coeffile))
-    if len(coefficients)!=nRI:
-        print("ERROR: basis set size does not correspond to size of coefficients vector!")
-        sys.exit(0)
-    else:
-        print("conf", iconf+1, "size =", nRI, flush=True)
-
-    # save coefficients vector in SALTED format
-    if natoms%2 != 0:
-        coefficients = np.sum(coefficients,axis=1)
-    np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), coefficients)
-    # np.save(os.path.join(inp.salted.saltedpath, "coefficients-efield", f"coefficients_conf{iconf}.npy"), coefficients)
+    print("conf", iconf+1, "size =", nRI, flush=True)
 
     # save overlap matrix in SALTED format
     overlap = np.zeros((nRI, nRI)).astype(np.double)
@@ -65,6 +58,34 @@ for iconf in range(ndata):
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
     np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"), overlap)
+
+    if inp.salted.saltedtype=="density":
+
+        # load density coefficients and check dimension
+        coefficients = np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", inp.qm.coeffile))
+        if len(coefficients)!=nRI:
+            print("ERROR: basis set size does not correspond to size of coefficients vector!")
+            sys.exit(0)
+    
+        # save coefficients vector in SALTED format
+        if natoms%2 != 0:
+            coefficients = np.sum(coefficients,axis=1)
+        np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), coefficients)
+
+
+    elif inp.salted.saltedtype=="density-response":
+
+        # load density-response coefficients and check dimension
+        for icart in ["x","y","z"]:
+            coefficients = np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", f"{icart}_pos_res", inp.qm.coeffile))
+            coefficients -= np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", f"{icart}_neg_res", inp.qm.coeffile))
+            coefficients /= 2*0.00001945 
+            if len(coefficients)!=nRI:
+                print("ERROR: basis set size does not correspond to size of coefficients vector!")
+                sys.exit(0)
+
+            # save coefficients vector in SALTED format
+            np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"{icart}", f"coefficients_conf{iconf}.npy"), coefficients)
 
     ## save projections vector in SALTED format
     #projections = np.dot(overlap,coefficients)
