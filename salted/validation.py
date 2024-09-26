@@ -98,7 +98,7 @@ def build():
     if size > 1: comm.Barrier()
 
 
-    if qmcode=="cp2k":
+    if qmcode=="cp2k" and saltedtype=="density":
         bdir = osp.join(saltedpath,"basis")
         # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
         if rank == 0: print("Reading auxiliary basis info...")
@@ -160,7 +160,7 @@ def build():
     )
     if rank == 0 and os.path.exists(efname):
         os.remove(efname)
-    if qmcode == "cp2k":
+    if qmcode=="cp2k" and saltedtype=="density":
         dfname = osp.join(
             saltedpath, vdir, f"M{Menv}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}", f"dipoles.dat"
         )
@@ -171,7 +171,7 @@ def build():
         if rank == 0 and os.path.exists(qfname): os.remove(qfname)
     if parallel: comm.Barrier()
     efile = open(efname,"a")
-    if qmcode=="cp2k":
+    if qmcode=="cp2k" and saltedtype=="density":
         dfile = open(dfname,"a")
         qfile = open(qfname,"a")
 
@@ -244,7 +244,7 @@ def build():
                 pred_projs[icart] = np.dot(overl,pred_coefs[icart])
 
 
-        if qmcode=="cp2k":
+        if qmcode=="cp2k" and saltedtype=="density":
 
             from ase.io import read
             xyzfile = read(filename, ":")
@@ -366,7 +366,7 @@ def build():
     #                    iaux += 1
 
     efile.close()
-    if qmcode == "cp2k":
+    if qmcode == "cp2k" and saltedtype=="density":
         dfile.close()
         qfile.close()
 
@@ -376,7 +376,7 @@ def build():
         if rank == 0:
             errs = np.loadtxt(efname)
             np.savetxt(efname, errs[errs[:,0].argsort()])
-            if qmcode == "cp2k":
+            if qmcode == "cp2k" and saltedtype=="density":
                 dips = np.loadtxt(dfname)
                 np.savetxt(dfname, dips[dips[:,0].argsort()])
                 qs = np.loadtxt(qfname)

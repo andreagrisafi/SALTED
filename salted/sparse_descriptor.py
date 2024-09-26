@@ -184,6 +184,7 @@ def build():
         for spe in species:
             lmax[spe] += 1
 
+        power_env_sparse = {}
         for spe in species:
             for lam in range(lmax_max+1):
                 [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
