@@ -25,18 +25,25 @@ def build():
         ispe += 1
 
     species_array = np.zeros((ndata,natmax),int)
+    natoms_total = 0
     for iconf in range(ndata):
         for iat in range(natoms[iconf]):
             spe = atomic_symbols[iconf][iat]
             species_array[iconf,iat] = species_idx[spe]
+            natoms_total += 1
     species_array = species_array.reshape(ndata*natmax)
 
     # load lambda=0 power spectrum
     power = h5py.File(osp.join(sdir, "FEAT-0.h5"), 'r')['descriptor'][:]
     nfeat = power.shape[-1]
-
+ 
+    power_dense = np.zeros((natoms_total,nfeat))
+    idx = 0
+    for iconf in range(ndata):
+        power_dense[idx:idx+natoms[iconf]] = power[iconf,:natoms[iconf]]
+        idx += natoms[iconf]
     # compute sparse set with FPS
-    fps_idx = np.array(do_fps(power.reshape(ndata*natmax,nfeat),M),int)
+    fps_idx = np.array(do_fps(power_dense,M),int)
     fps_species = species_array[fps_idx]
     sparse_set = np.vstack((fps_idx,fps_species)).T
     print("Computed sparse set made of ", M, "environments")
