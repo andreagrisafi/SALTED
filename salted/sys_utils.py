@@ -702,7 +702,7 @@ class ParseConfig:
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    lambda inp, val: check_with_qmcode(inp, val, "aims"),
                 ),  # path to the prediction data by QM code, only for AIMS
             },
             "descriptor": {
