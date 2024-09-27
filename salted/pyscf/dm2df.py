@@ -20,87 +20,6 @@ Make sure to provide the density matrix following this convention!
 """
 
 
-def cal_df_coeffs_old(
-    atoms: List,
-    qmbasis: str,
-    ribasis: str,
-    dm: np.ndarray,
-    lmax: Dict[str, int],
-    nmax: Dict[Tuple[str, int], int],
-):
-    pyscf_time = time.time()
-    mol = gto.M(atom=atoms, basis=qmbasis)
-    auxmol = gto.M(atom=atoms, basis=ribasis)
-    pmol = mol + auxmol
-    assert dm.shape[0] == mol.nao_nr(), f"{dm.shape=}, {mol.nao_nr()=}"
-
-    overlap = auxmol.intor("int1e_ovlp_sph")  # AO overlap matrix
-    eri2c = auxmol.intor('int2c2e_sph')  # 2-centers 2-electrons integral
-    eri3c = pmol.intor(  # 3-centers 2-electrons integral
-        'int3c2e_sph',
-        shls_slice=(0, mol.nbas, 0, mol.nbas, mol.nbas, mol.nbas + auxmol.nbas)
-    )
-    eri3c = eri3c.reshape(mol.nao_nr(), mol.nao_nr(), -1)
-    rho = np.einsum('ijp,ij->p', eri3c, dm)
-    rho = np.linalg.solve(eri2c, rho)
-    pyscf_time = time.time() - pyscf_time
-
-    # Reorder L=1 components following the -1,0,+1 convention
-    reorder_time = time.time()
-    Coef = np.zeros(len(rho))
-    Over = np.zeros((len(rho), len(rho)))
-
-    i1 = 0
-    for iat in range(len(atoms)):
-        spe1 = atoms[iat][0]
-        for l1 in range(lmax[spe1]+1):
-            for n1 in range(nmax[(spe1,l1)]):
-                for im1 in range(2*l1+1):
-                    if l1==1 and im1!=2:
-                        Coef[i1] = rho[i1+1]
-                    elif l1==1 and im1==2:
-                        Coef[i1] = rho[i1-2]
-                    else:
-                        Coef[i1] = rho[i1]
-                    i2 = 0
-                    for jat in range(len(atoms)):
-                        spe2 = atoms[jat][0]
-                        for l2 in range(lmax[spe2]+1):
-                            for n2 in range(nmax[(spe2,l2)]):
-                                for im2 in range(2*l2+1):
-                                    if l1==1 and im1!=2 and l2!=1:
-                                        Over[i1,i2] = overlap[i1+1,i2]
-                                    elif l1==1 and im1==2 and l2!=1:
-                                        Over[i1,i2] = overlap[i1-2,i2]
-                                    elif l2==1 and im2!=2 and l1!=1:
-                                        Over[i1,i2] = overlap[i1,i2+1]
-                                    elif l2==1 and im2==2 and l1!=1:
-                                        Over[i1,i2] = overlap[i1,i2-2]
-                                    elif l1==1 and im1!=2 and l2==1 and im2!=2:
-                                        Over[i1,i2] = overlap[i1+1,i2+1]
-                                    elif l1==1 and im1!=2 and l2==1 and im2==2:
-                                        Over[i1,i2] = overlap[i1+1,i2-2]
-                                    elif l1==1 and im1==2 and l2==1 and im2!=2:
-                                        Over[i1,i2] = overlap[i1-2,i2+1]
-                                    elif l1==1 and im1==2 and l2==1 and im2==2:
-                                        Over[i1,i2] = overlap[i1-2,i2-2]
-                                    else:
-                                        Over[i1,i2] = overlap[i1,i2]
-                                    i2 += 1
-                    i1 += 1
-
-    # Compute density projections on auxiliary functions
-    Proj = np.dot(Over,Coef)
-    reorder_time = time.time() - reorder_time
-
-    return {
-        "coef": Coef,
-        "proj": Proj,
-        "over": Over,
-        "pyscf_time": pyscf_time,
-        "reorder_time": reorder_time,
-    }
-
 def cal_df_coeffs(
     atoms: List,
     qmbasis: str,
@@ -217,10 +136,6 @@ def main(geom_indexes: Union[List[int], None], num_threads: int = None):
         irreps = sum([df_irreps_by_spe[spe] for spe in symb], Irreps([]))
         dm = np.load(osp.join(inp.qm.path2qm, "density_matrices", f"dm_conf{geom_idx+1}.npy"))
         reordered_data = cal_df_coeffs(atoms, inp.qm.qmbasis, ribasis, dm, irreps)
-        # reordered_data_old = cal_df_coeffs_old(atoms, inp.qm.qmbasis, ribasis, dm, lmax, nmax)  # for checking consistency
-        # assert np.allclose(reordered_data_old["coef"], reordered_data["coef"])  # for checking consistency
-        # assert np.allclose(reordered_data_old["over"], reordered_data["over"])
-        # assert np.allclose(reordered_data_old["proj"], reordered_data["proj"])
         np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{geom_idx}.npy"), reordered_data["coef"])
         np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{geom_idx}.npy"), reordered_data["proj"])
         np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{geom_idx}.npy"), reordered_data["over"])
