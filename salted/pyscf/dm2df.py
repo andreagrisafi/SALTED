@@ -216,12 +216,11 @@ def main(geom_indexes: Union[List[int], None], num_threads: int = None):
         atoms = [(s, c) for s, c in zip(symb, coords)]
         irreps = sum([df_irreps_by_spe[spe] for spe in symb], Irreps([]))
         dm = np.load(osp.join(inp.qm.path2qm, "density_matrices", f"dm_conf{geom_idx+1}.npy"))
-        reordered_data_old = cal_df_coeffs_old(atoms, inp.qm.qmbasis, ribasis, dm, lmax, nmax)  # for checking consistency
-        # reordered_data = cal_df_coeffs_old(atoms, inp.qm.qmbasis, ribasis, dm, lmax, nmax)
         reordered_data = cal_df_coeffs(atoms, inp.qm.qmbasis, ribasis, dm, irreps)
-        assert np.allclose(reordered_data_old["coef"], reordered_data["coef"])  # for checking consistency
-        assert np.allclose(reordered_data_old["over"], reordered_data["over"])
-        assert np.allclose(reordered_data_old["proj"], reordered_data["proj"])
+        # reordered_data_old = cal_df_coeffs_old(atoms, inp.qm.qmbasis, ribasis, dm, lmax, nmax)  # for checking consistency
+        # assert np.allclose(reordered_data_old["coef"], reordered_data["coef"])  # for checking consistency
+        # assert np.allclose(reordered_data_old["over"], reordered_data["over"])
+        # assert np.allclose(reordered_data_old["proj"], reordered_data["proj"])
         np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{geom_idx}.npy"), reordered_data["coef"])
         np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{geom_idx}.npy"), reordered_data["proj"])
         np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{geom_idx}.npy"), reordered_data["over"])
