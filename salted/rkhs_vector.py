@@ -342,6 +342,13 @@ def build():
             Tsize = 0
             for spe in species:
 
+                Mcut = {}
+                Mcutsize = {}
+                for lam in range(lmax[spe]+1):
+                    frac = np.exp(-0.05*lam**2)
+                    Mcut[lam] = int(round(Mspe[spe]*frac))
+                    Mcutsize[lam] = Mcut[lam]*3*(2*lam+1)
+
                 for icart in range(3):
                     ispe[(icart,spe)] = 0
 
@@ -351,6 +358,7 @@ def build():
                 for i1 in range(natom_dict[(iconf,spe)]):
                     for i2 in range(Mspe[spe]):
                         kernel_nm[i1*3:i1*3+3][:,i2*3:i2*3+3] *= kernel0_nm[i1,i2]**(zeta-1)
+                kernel_nm = kernel_nm[:,:Mcutsize[0]]
 
                 kernel0_nn = np.dot(power[0][atom_idx[(iconf,spe)]],power[0][atom_idx[(iconf,spe)]].T)
                 kernel_nn = np.dot(power[1][atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*3,power[1].shape[-1]),power[1][atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*3,power[1].shape[-1]).T)
@@ -366,7 +374,7 @@ def build():
                     norm1 = normfact[i1]
                     for imu1 in range(3):
                         j2 = 0
-                        for i2 in range(Mspe[spe]):
+                        for i2 in range(Mcut[0]):
                             norm2 = normfact_sparse[i2]
                             for imu2 in range(3):
                                 kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
@@ -468,6 +476,7 @@ def build():
                         cgkernel = kernelequicomb.kernelequicomb(natom_dict[(iconf,spe)],natom_dict[(iconf,spe)],lam,1,L,Nsize,Nsize,len(cgcoefs),cgcoefs,knn.T,k0.T)
                         kernel_nn += cgkernel.T
                         
+                    kernel_nm = kernel_nm[:,:Mcutsize[lam]]
 
                     # compute complex to real transformation matrix for lam X 1 tensor product space
                     A = sph_utils.complex_to_real_transformation([2*lam+1])[0]
@@ -482,9 +491,9 @@ def build():
                         j1 += 3
 
                     # make kernel real
-                    ktemp1 = np.dot(c2r,np.transpose(kernel_nm.reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Msize),(1,0,2)).reshape(3*(2*lam+1),natom_dict[(iconf,spe)]*Msize))
-                    ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),natom_dict[(iconf,spe)],Msize),(1,0,2)).reshape(Nsize,Msize)
-                    kernel_nm = np.dot(ktemp2.reshape(Nsize,Mspe[spe],3*(2*lam+1)).reshape(Nsize*Mspe[spe],3*(2*lam+1)),np.conj(c2r).T).reshape(Nsize,Mspe[spe],3*(2*lam+1)).reshape(Nsize,Msize)
+                    ktemp1 = np.dot(c2r,np.transpose(kernel_nm.reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Mcutsize[lam]),(1,0,2)).reshape(3*(2*lam+1),natom_dict[(iconf,spe)]*Mcutsize[lam]))
+                    ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),natom_dict[(iconf,spe)],Mcutsize[lam]),(1,0,2)).reshape(Nsize,Mcutsize[lam])
+                    kernel_nm = np.dot(ktemp2.reshape(Nsize,Mcut[lam],3*(2*lam+1)).reshape(Nsize*Mcut[lam],3*(2*lam+1)),np.conj(c2r).T).reshape(Nsize,Mcut[lam],3*(2*lam+1)).reshape(Nsize,Mcutsize[lam])
                     #print("imag:", np.linalg.norm(np.imag(kernel_nm)))
 
                     ktemp1 = np.dot(c2r,np.transpose(kernel_nn.reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Nsize),(1,0,2)).reshape(3*(2*lam+1),natom_dict[(iconf,spe)]*Nsize))
@@ -501,7 +510,7 @@ def build():
                         norm1 = normfact[i1]
                         for imu1 in range(3*(2*lam+1)):
                             j2 = 0 
-                            for i2 in range(Mspe[spe]):
+                            for i2 in range(Mcut[lam]):
                                 norm2 = normfact_sparse[i2]
                                 for imu2 in range(3*(2*lam+1)):
                                     kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)

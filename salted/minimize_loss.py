@@ -241,9 +241,9 @@ def build():
             for iconf in range(ntrain):
 
                 # load reference QM data
-                ref_projs = np.load(osp.join(
-                    saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
-                ))
+                #ref_projs = np.load(osp.join(
+                    #saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
+                #))
                 ref_coefs = np.load(osp.join(
                     saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
                 ))
@@ -266,6 +266,7 @@ def build():
 
                 # compute predicted density projections
                 ovlp = ovlp_list[iconf]
+                ref_projs = np.dot(ovlp,ref_coefs)
                 pred_projs = np.dot(ovlp,pred_coefs)
 
                 # collect gradient contributions
@@ -282,9 +283,9 @@ def build():
                 for icart in ["x","y","z"]:
 
                     # load reference QM data
-                    ref_projs = np.load(osp.join(
-                        saltedpath, "projections", f"{icart}/projections_conf{trainrange[iconf]}.npy"
-                    ))
+                    #ref_projs = np.load(osp.join(
+                    #    saltedpath, "projections", f"{icart}/projections_conf{trainrange[iconf]}.npy"
+                    #))
                     ref_coefs = np.load(osp.join(
                         saltedpath, "coefficients", f"{icart}/coefficients_conf{trainrange[iconf]}.npy"
                     ))
@@ -293,6 +294,7 @@ def build():
                     pred_coefs = sparse.csr_matrix.dot(psi_list[itot],weights)
 
                     # compute predicted density projections
+                    ref_projs = np.dot(ovlp,ref_coefs)
                     pred_projs = np.dot(ovlp,pred_coefs)
 
                     # collect gradient contributions
@@ -347,7 +349,7 @@ def build():
                     psi_x_dire = sparse.csr_matrix.dot(psi_list[itot],cg_dire)
                     Ap += 2.0 * sparse.csc_matrix.dot(psi_list[itot].T,np.dot(ovlp_list[iconf],psi_x_dire))
                     itot += 1
-
+        
         return Ap
 
     if rank == 0:

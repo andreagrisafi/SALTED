@@ -3,6 +3,7 @@ Calculate RKHS projection matrix
 """
 
 import os
+import sys
 
 import h5py
 import numpy as np
@@ -74,6 +75,15 @@ def build():
             Mspe = power_env_sparse.shape[0]
             kernel0_mm = np.dot(power_env_sparse,power_env_sparse.T)
 
+            Mcut = {}
+            Mcutsize = {}
+            for lam in range(lmax[spe]+1):
+                frac = np.exp(-0.05*lam**2)
+                Mcut[lam] = int(round(Mspe*frac))
+                Mcutsize[lam] = Mcut[lam]*3*(2*lam+1)
+                print("lam=",lam,"Mcut=",Mcut[lam],"Msize=",Mcutsize[lam])
+            #sys.exit(0)
+
             for lam in range(lmax[spe]+1):
 
                 print("lam =", lam)
@@ -84,19 +94,19 @@ def build():
                     print("L=", L)
                     power_env_sparse = features['sparse_descriptors'][spe][str(L)][:]
                     kernel_mm = np.dot(power_env_sparse,power_env_sparse.T)
-                    normfact = np.zeros(Mspe) 
-                    for i1 in range(Mspe):
-                        for i2 in range(Mspe):
+                    normfact = np.zeros(Mcut[lam]) 
+                    for i1 in range(Mcut[lam]):
+                        for i2 in range(Mcut[lam]):
                             kernel_mm[i1*3:i1*3+3][:,i2*3:i2*3+3] *= kernel0_mm[i1,i2]**(zeta-1)
                         normfact[i1] = np.sqrt(np.sum(kernel_mm[i1*3:i1*3+3][:,i1*3:i1*3+3]**2))
                     np.save(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
 
                     j1 = 0
-                    for i1 in range(Mspe):
+                    for i1 in range(Mcut[lam]):
                         norm1 = normfact[i1]
                         for imu1 in range(3):
                             j2 = 0
-                            for i2 in range(Mspe):
+                            for i2 in range(Mcut[lam]):
                                 norm2 = normfact[i2]
                                 for imu2 in range(3):
                                     kernel_mm[j1,j2] /= np.sqrt(norm1*norm2)
@@ -140,7 +150,9 @@ def build():
                         k0 = kernel0_mm**(zeta-1)
                         cgkernel = kernelequicomb.kernelequicomb(Mspe,Mspe,lam,1,L,Msize,Msize,len(cgcoefs),cgcoefs,kmm.T,k0.T)
                         kernel_mm += cgkernel.T
-                   
+                                     
+                    kernel_mm = kernel_mm[:Mcutsize[lam]][:,:Mcutsize[lam]]
+
                     A = sph_utils.complex_to_real_transformation([2*lam+1])[0]
                     B = sph_utils.complex_to_real_transformation([3])[0]
 
@@ -153,30 +165,31 @@ def build():
                             j2 += 3 
                         j1 += 3
 
-                    ktemp1 = np.dot(c2r,np.transpose(kernel_mm.reshape(Mspe,3*(2*lam+1),Msize),(1,0,2)).reshape(3*(2*lam+1),Mspe*Msize))
-                    ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),Mspe,Msize),(1,0,2)).reshape(Msize,Msize) 
-                    kernel_mm = np.dot(ktemp2.reshape(Msize,Mspe,3*(2*lam+1)).reshape(Msize*Mspe,3*(2*lam+1)),np.conj(c2r).T).reshape(Msize,Mspe,3*(2*lam+1)).reshape(Msize,Msize)
+                    ktemp1 = np.dot(c2r,np.transpose(kernel_mm.reshape(Mcut[lam],3*(2*lam+1),Mcutsize[lam]),(1,0,2)).reshape(3*(2*lam+1),Mcut[lam]*Mcutsize[lam]))
+                    ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),Mcut[lam],Mcutsize[lam]),(1,0,2)).reshape(Mcutsize[lam],Mcutsize[lam]) 
+                    kernel_mm = np.dot(ktemp2.reshape(Mcutsize[lam],Mcut[lam],3*(2*lam+1)).reshape(Mcutsize[lam]*Mcut[lam],3*(2*lam+1)),np.conj(c2r).T).reshape(Mcutsize[lam],Mcut[lam],3*(2*lam+1)).reshape(Mcutsize[lam],Mcutsize[lam])
                     #print(np.linalg.norm(np.real(kernel_mm)))
                     #print(np.linalg.norm(np.imag(kernel_mm)))
                     
-                    normfact = np.zeros(Mspe)
-                    for i1 in range(Mspe):
+                    normfact = np.zeros(Mcut[lam])
+                    for i1 in range(Mcut[lam]):
                         normfact[i1] = np.sqrt(np.sum(np.real(kernel_mm)[i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)][:,i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)]**2))
                     np.save(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
 
                     j1 = 0
-                    for i1 in range(Mspe):
+                    for i1 in range(Mcut[lam]):
                         norm1 = normfact[i1]
                         for imu1 in range(3*(2*lam+1)): 
                             j2 = 0
-                            for i2 in range(Mspe):
+                            for i2 in range(Mcut[lam]):
                                 norm2 = normfact[i2]
                                 for imu2 in range(3*(2*lam+1)):
                                     kernel_mm[j1,j2] /= np.sqrt(norm1*norm2)
                                     j2 += 1
                             j1 += 1
 
-                    V = rkhs_proj(np.real(kernel_mm))
+                    
+                    V = rkhs_proj(kernel_mm)
                     h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
 
         h5f.close()
