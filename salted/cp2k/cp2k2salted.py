@@ -77,9 +77,10 @@ for iconf in range(ndata):
 
         # load density-response coefficients and check dimension
         for icart in ["x","y","z"]:
-            coefficients = np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", f"{icart}_pos_res", inp.qm.coeffile))
-            coefficients -= np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", f"{icart}_neg_res", inp.qm.coeffile))
-            coefficients /= 2*0.00001945 
+            # Estimate derivative by finite differences applying an electric field of 0.01V/angs
+            coefficients = np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", f"{icart}_positive", inp.qm.coeffile))
+            coefficients -= np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", f"{icart}_negative", inp.qm.coeffile))
+            coefficients /= 2*0.0001945  
             if len(coefficients)!=nRI:
                 print("ERROR: basis set size does not correspond to size of coefficients vector!")
                 sys.exit(0)
