@@ -98,7 +98,24 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
         for l in range(lmax[spe]+1):
              naux += nmax[(spe,l)]*(2*l+1)
     if rank==0: print("Number of auxiliary functions:", naux)
-    
+
+    # If total charge density is asked, read in the GTH pseudo-charge and return a radial numpy function
+    #if inp.qm.totcharge:
+    #    pseudof = open(inp.qm.pseudochargefile,"r")
+    #    pseudochargedensity = mathematica.mathematica(pseudof.readlines()[0],{'Erf[x]':'erf(x)'})
+    #    pseudof.close()
+    #    rpseudo = symbols('r')
+    #    pseudochargedensity = lambdify(rpseudo, pseudochargedensity, modules=['numpy'])
+    #    pseudochargedensity = np.vectorize(pseudochargedensity)
+    #    nn = 100000
+    #    dr = 5.0/nn
+    #    pseudocharge = 0.0
+    #    for ir in range(1,nn):
+    #        r = ir*dr
+    #        pseudocharge += r**2*pseudochargedensity(r)
+    #    pseudocharge *= 4*np.pi*dr
+    #    print("Integrated pseudo-charge =", pseudocharge)
+
     # compute radial part of GTOs on a 1D mesh 
     ngrid = 20000
     interp_radial = {}
@@ -115,7 +132,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                 inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5)
                 radial /= np.sqrt(inner)
                 interp_radial[(spe,l,n)] = interp1d(rvec,radial,kind="quadratic")
-   
+
     if len(refcube)==1:
 
         # Read reference cube file

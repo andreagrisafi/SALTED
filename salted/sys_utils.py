@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 import os
 import re
+import os.path as osp
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import h5py
@@ -104,6 +105,21 @@ def get_atom_idx(ndata, natoms, spelist, atomic_symbols):
                 natom_dict[(iconf, spe)] += 1
 
     return atom_idx, natom_dict
+
+def init_property_file(propname,saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm):
+    """Initialize files for printing the specified physical quantity"""
+
+    pfname = osp.join(
+        saltedpath, vdir, f"M{Menv}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}", f"{propname}.dat"
+    )
+
+    if rank == 0 and os.path.exists(pfname): os.remove(pfname)
+
+    if size>1: comm.Barrier()
+
+    pfile = open(pfname,"a")
+
+    return pfile
 
 
 def get_conf_range(rank, size, ntest, testrangetot) -> List[List[int]]:

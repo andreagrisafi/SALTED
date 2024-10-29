@@ -68,8 +68,8 @@ for iconf in range(ndata):
             sys.exit(0)
     
         # save coefficients vector in SALTED format
-        if natoms%2 != 0:
-            coefficients = np.sum(coefficients,axis=1)
+        #if natoms%2 != 0:
+        #    coefficients = np.sum(coefficients,axis=1)
         np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), coefficients)
 
 
