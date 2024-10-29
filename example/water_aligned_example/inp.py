@@ -1,6 +1,7 @@
 # system definition 
 # -----------------
 filename = "aligned.xyz" # XYZ file
+predict_filename = "predict_aligned.xyz" # XYZ file
 species = ["H","O"] # ordered list of species
 propname = "electro" 
 parallel = True
@@ -42,3 +43,10 @@ eigcut = 1e-10    # eigenvalues cutoff
 
 gradtol = 1e-4
 restart = False
+
+# path to prediction data
+# ------------
+predict_soapdir = "predict_soaps_x/"
+predict_kerndir = "predict_kernels_x/"
+predict_coefdir = "predict_coefficients_rho1/x/"
+predict_data = "predict_data/"

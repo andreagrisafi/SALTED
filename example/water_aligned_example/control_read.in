@@ -16,6 +16,7 @@
   ri_full_output .True.
   dfpt_iter_limit 1
   DFPT dielectric
+  dfpt_centralised .False.
   sc_accuracy_rho    1d-6
 #  use_calculate_fock_matrix_old .false.
 #  output cube total_density

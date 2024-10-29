@@ -7,3 +7,7 @@ The SALTED commands in script run-ml.sbatch are available through the SALTER bra
 To specify the axis along which the field is applied for learning, the relevant cartesian coordinate should be selected for the `coefdir` and `projdir` in `inp.py`, and the corresponding descriptors should be calculated by passing the correct argument to the -d flag of `run-tensoap.py` in `run-ml.sbatch` - 1 = x, 2 = y, 3 = z.
 
 The run-ml.sbatch also uses a modified version of the TENSOAP software, available from https://github.com/alanmlewis/TENSOAP. It should be installed by running `make` in the soapfast directory, and depends on Cython.
+
+To predict response coefficients, the script `run-ml-predict.sbatch` must be run three times, updating the -d flag of `run-tensoap.py` and the folder names listed in `inp.py` for each run. This includes both the folder names which contain the data about the trained model used make predictions, and the folder names which will contain the soap descriptors, kernels and coefficients of the predicted structures (`predict_soapdir`, `predict_kerndir`, `predict_coefdir` in `inp.py`).
+
+In order to use these predictions to calculate derived polarizabilities, remove the x/y/z folder label from `predict_coefdir` in `inp.py`, and then run `run-aims-predict`. This will run aims for each structure in `predict_filename`, with the results stored in folders inside `qmdata+predict_data`.
