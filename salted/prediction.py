@@ -11,7 +11,7 @@ from ase.io import read
 from scipy import special
 
 from salted import basis, sph_utils
-from salted.lib import equicomb, equicombsparse
+from salted.lib import equicomb, equicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb
 from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
@@ -272,17 +272,6 @@ def build():
         # Load training feature vectors and RKHS projection matrix
         Vmat,Mspe,power_env_sparse,power_env_sparse_antisymm = get_feats_projs_response(species,lmax)
 
-        # compute the weight-vector size
-        cuml_Mcut = {}
-        totsize = 0
-        for spe in species:
-            for lam in range(lmax[spe]+1):
-                for n in range(nmax[(spe,lam)]):
-                    cuml_Mcut[(spe,lam,n)] = totsize
-                    totsize += Vmat[(lam,spe)].shape[1]
-
-        if rank == 0: print(f"problem dimensionality: {totsize}", flush=True)
-
         lmax_max += 1
 
         cart = ["y","z","x"]
@@ -343,8 +332,8 @@ def build():
 
             # Fill vector of equivariant descriptor
             p = p.reshape(natoms_total,2*lam+1,featsize)
-            power_antisymm[lam] = np.zeros((ndata,natmax,2*lam+1,featsize))
 
+            power_antisymm[lam] = np.zeros((ndata,natmax,2*lam+1,featsize))
             j = 0
             for i,iconf in enumerate(conf_range):
                 for iat in range(natoms[iconf]):
@@ -385,7 +374,7 @@ def build():
                         kernel_nm[i1*3:i1*3+3][:,i2*3:i2*3+3] *= kernel0_nm[i1,i2]**(zeta-1)
                 kernel_nm = kernel_nm[:,:Mcutsize[0]]
 
-                kernel0_nn = np.dot(power[0][i,atom_idx[(iconf,spe)]],power[0][atom_idx[(iconf,spe)]].T)
+                kernel0_nn = np.dot(power[0][i,atom_idx[(iconf,spe)]],power[0][i,atom_idx[(iconf,spe)]].T)
                 kernel_nn = np.dot(power[1][i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*3,power[1].shape[-1]),power[1][i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*3,power[1].shape[-1]).T)
                 normfact = np.zeros(natom_dict[(iconf,spe)])
                 for i1 in range(natom_dict[(iconf,spe)]):
@@ -536,7 +525,7 @@ def build():
                             idx_cart += 1
 
             pred_coefs = {}
-            for cart in ["x","y","z"]:
+            for icart in ["x","y","z"]:
                 
                 # compute predictions per channel
                 C = {}
@@ -546,26 +535,26 @@ def build():
                     ispe[spe] = 0
                     for l in range(lmax[spe]+1):
                         for n in range(nmax[(spe,l)]):
-                            Mcut = psi_nm[(cart,spe,l)].shape[1]
-                            C[(spe,l,n)] = np.dot(psi_nm[(cart,spe,l)],weights[isize:isize+Mcut])
+                            Mcut = psi_nm_cart[(icart,spe,l)].shape[1]
+                            C[(spe,l,n)] = np.dot(psi_nm_cart[(icart,spe,l)],weights[isize:isize+Mcut])
                             isize += Mcut
 
                 # fill vector of predictions
                 i = 0
-                pred_coefs[cart] = np.zeros(Tsize)
+                pred_coefs[icart] = np.zeros(Tsize)
                 for iat in range(natoms[iconf]):
                     spe = atomic_symbols[iconf][iat]
                     for l in range(lmax[spe]+1):
                         for n in range(nmax[(spe,l)]):
-                            pred_coefs[cart][i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
+                            pred_coefs[icart][i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
                             i += 2*l+1
                     ispe[spe] += 1
 
                 # save predicted coefficients 
-                cartpath = os.path.join(dirpath, f"{cart}")
+                cartpath = os.path.join(dirpath, f"{icart}")
                 if not os.path.exists(cartpath):
                     os.mkdir(cartpath)
-                np.savetxt(osp.join(dirpath, f"{cart}", f"COEFFS-{iconf+1}.dat"), pred_coefs)
+                np.savetxt(osp.join(dirpath, f"{icart}", f"COEFFS-{iconf+1}.dat"), pred_coefs[icart])
 
             if qmcode=="cp2k":
                 # Compute polarizability

@@ -66,6 +66,11 @@ def build():
     if rank == 0:
         if not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
+        if saltedtype=="density-response":
+            for icart in ["x","y","z"]:
+                cartpath = os.path.join(dirpath, f"{icart}")
+                if not os.path.exists(cartpath):
+                    os.mkdir(cartpath)
     if size > 1: comm.Barrier()
 
     if average:
@@ -132,9 +137,8 @@ def build():
             # Compute predicted density projections <phi|rho>
             pred_projs = np.dot(overl,pred_coefs)
 
-            np.savetxt(osp.join(
-                saltedpath, vdir, f"M{Menv}_zeta{zeta}",
-                f"N{ntrain}_reg{reg_log10_intstr}", f"COEFFS-{iconf+1}.dat"
+            np.savetxt(osp.join(dirpath,
+                                f"COEFFS-{iconf+1}.dat"
             ), pred_coefs)
 
             if qmcode=="cp2k":
@@ -196,9 +200,9 @@ def build():
                 # Compute predicted density-response projections <phi|rho>
                 pred_projs[icart] = np.dot(overl,pred_coefs[icart])
 
-                np.savetxt(osp.join(
-                    saltedpath, vdir, f"M{Menv}_zeta{zeta}",
-                    f"N{ntrain}_reg{reg_log10_intstr}", f"COEFFS-{icart}_{iconf+1}.dat"
+                np.savetxt(osp.join(dirpath,
+                                    f"{icart}", 
+                                    f"COEFFS-{iconf+1}.dat"
                 ), pred_coefs[icart])
 
                 # Compute error
