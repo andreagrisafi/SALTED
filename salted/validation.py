@@ -4,7 +4,6 @@ import time
 import os.path as osp
 
 import numpy as np
-from scipy import special
 from scipy import sparse
 
 from salted import basis
