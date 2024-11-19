@@ -31,15 +31,6 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
-    #if parallel:
-    #    from mpi4py import MPI
-    #    comm = MPI.COMM_WORLD
-    #    size = comm.Get_size()
-    #    rank = comm.Get_rank()
-    #else:
-    #    rank = 0
-    #    size = 1
-
     # read basis
     [lmax,nmax] = basis.basiset(dfbasis)
     llist = []
@@ -76,21 +67,18 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
     # get basis set info 
     bdir = osp.join(saltedpath,"basis")
     if rank==0: print("Reading auxiliary basis info...")
+    contra = {}
     alphas = {}
-    sigmas = {}
     rcuts = {}
     for spe in species:
         for l in range(lmax[spe]+1):
-            avals = np.loadtxt(osp.join(bdir,f"{spe}-{dfbasis}-alphas-L{l}.dat"))
-            if nmax[(spe,l)]==1:
-                alphas[(spe,l,0)] = float(avals)
-                sigmas[(spe,l,0)] = np.sqrt(0.5/alphas[(spe,l,0)]) # bohr
-                rcuts[(spe,l,0)] = np.sqrt(float(2+l)/(2*alphas[(spe,l,0)]))*4
-            else:
-                for n in range(nmax[(spe,l)]):
-                    alphas[(spe,l,n)] = avals[n]
-                    sigmas[(spe,l,n)] = np.sqrt(0.5/alphas[(spe,l,n)]) # bohr
-                    rcuts[(spe,l,n)] = np.sqrt(float(2+l)/(2*alphas[(spe,l,n)]))*4
+            alphas[(spe,l)] = np.atleast_1d(np.loadtxt(osp.join(bdir,f"{spe}-{dfbasis}-alphas-L{l}.dat")))
+            contra[(spe,l)] = np.atleast_2d(np.loadtxt(osp.join(bdir,f"{spe}-{dfbasis}-contra-L{l}.dat")))
+            npgf = alphas[(spe,l)].shape[0]
+            rcuts_primitive = np.zeros(npgf)
+            for ipgf in range(npgf):
+                rcuts_primitive[ipgf] = np.sqrt(float(2+l)/(2*alphas[(spe,l)][ipgf]))*4
+            rcuts[(spe,l)] = max(rcuts_primitive)
 
     naux = 0
     for iat in range(natoms):
@@ -121,15 +109,20 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
     interp_radial = {}
     for spe in species:
         for l in range(lmax[spe]+1):
+            dxx = rcuts[(spe,l)]/float(ngrid-1)
+            npgf = len(alphas[(spe,l)])
             for n in range(nmax[(spe,l)]):
-                dxx = rcuts[(spe,l,n)]/float(ngrid-1)
+                inner = 0.0
+                for ipgf1 in range(npgf):
+                    for ipgf2 in range(npgf):
+                        inner += contra[(spe,l)][n,ipgf1] * contra[(spe,l)][n,ipgf2] * 0.5 * special.gamma(l+1.5) / ( (alphas[(spe,l)][ipgf1] + alphas[(spe,l)][ipgf2])**(l+1.5) )
                 rvec = np.zeros(ngrid)
                 radial = np.zeros(ngrid)
                 for irad in range(ngrid):
                     r = irad*dxx
                     rvec[irad] = r
-                    radial[irad] = r**l * np.exp(-alphas[(spe,l,n)]*r**2)
-                inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5)
+                    for ipgf in range(npgf):
+                        radial[irad] += contra[(spe,l)][n,ipgf] * r**l * np.exp(-alphas[(spe,l)][ipgf]*r**2) 
                 radial /= np.sqrt(inner)
                 interp_radial[(spe,l,n)] = interp1d(rvec,radial,kind="quadratic")
 
@@ -243,16 +236,16 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
         #print(iat+1,flush=True)
         spe = atomic_symbols_range[iat]
         for l in range(lmax[spe]+1):
+            repmax = np.zeros(3,int)
+            for ix in range(3):
+                nreps = math.ceil(rcuts[(spe,l)]/cell[ix,ix])
+                if nreps < 1:
+                    repmax[ix] = 1
+                else:
+                    repmax[ix] = nreps
             for n in range(nmax[(spe,l)]):
                 if rank==0: print("l=",l,"n=",n,flush=True)
                 coef = coefs_range[iaux:iaux+2*l+1]
-                repmax = np.zeros(3,int)
-                for ix in range(3):
-                    nreps = math.ceil(rcuts[(spe,l,n)]/cell[ix,ix])
-                    if nreps < 1:
-                        repmax[ix] = 1
-                    else:
-                        repmax[ix] = nreps
                 if inp.qm.periodic=="3D":
                     for ix in range(-repmax[0],repmax[0]+1):
                         for iy in range(-repmax[1],repmax[1]+1):
@@ -263,7 +256,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                                 coord[2] += iz*cell[2,2]
                                 dvec = grid_regular - coord
                                 d2list = np.sum(dvec**2,axis=1)
-                                indx = np.where(d2list<=rcuts[(spe,l,n)]**2)[0]
+                                indx = np.where(d2list<=rcuts[(spe,l)]**2)[0]
                                 nidx = len(indx)
                                 rr = dvec[indx]
                                 lr = np.sqrt(np.sum(rr**2,axis=1)) + 1e-12
@@ -294,7 +287,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                             coord[1] += iy*cell[1,1]
                             dvec = grid_regular - coord
                             d2list = np.sum(dvec**2,axis=1)
-                            indx = np.where(d2list<=rcuts[(spe,l,n)]**2)[0]
+                            indx = np.where(d2list<=rcuts[(spe,l)]**2)[0]
                             nidx = len(indx)
                             rr = dvec[indx]
                             lr = np.sqrt(np.sum(rr**2,axis=1)) + 1e-12
@@ -321,7 +314,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                     coord = coords_range[iat] - origin
                     dvec = grid_regular - coord
                     d2list = np.sum(dvec**2,axis=1)
-                    indx = np.where(d2list<=rcuts[(spe,l,n)]**2)[0]
+                    indx = np.where(d2list<=rcuts[(spe,l)]**2)[0]
                     nidx = len(indx)
                     rr = dvec[indx]
                     lr = np.sqrt(np.sum(rr**2,axis=1)) + 1e-12

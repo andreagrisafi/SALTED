@@ -23,17 +23,11 @@ def init_moments(inp,species,lmax,nmax,rank):
     # Get CP2K basis set information 
     bdir = osp.join(inp.salted.saltedpath,"basis")
     alphas = {}
-    sigmas = {}
+    contra = {}
     for spe in species:
         for l in range(lmax[spe]+1):
-            avals = np.loadtxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat"))
-            if nmax[(spe,l)]==1:
-                alphas[(spe,l,0)] = float(avals)
-                sigmas[(spe,l,0)] = np.sqrt(0.5/alphas[(spe,l,0)]) # bohr
-            else:
-                for n in range(nmax[(spe,l)]):
-                    alphas[(spe,l,n)] = avals[n]
-                    sigmas[(spe,l,n)] = np.sqrt(0.5/alphas[(spe,l,n)]) # bohr
+            alphas[(spe,l)] = np.atleast_1d(np.loadtxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat")))
+            contra[(spe,l)] = np.atleast_2d(np.loadtxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-contra-L{l}.dat")))
 
     # Compute basis function integrals 
     charge_integrals = {}
@@ -41,17 +35,29 @@ def init_moments(inp,species,lmax,nmax,rank):
     for spe in species:
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
+                npgf = len(alphas[(spe,l)])
+                # Compute inner product between contracted Gaussian-type functions 
+                inner = 0.0
+                for ipgf1 in range(npgf):
+                    for ipgf2 in range(npgf):
+                        # Compute primitive integral \int_0^\infty dr r^2 r^{2l} \exp[-r^2/\sigma^2]
+                        inner += contra[(spe,l)][n,ipgf1] * contra[(spe,l)][n,ipgf2] * 0.5 * special.gamma(l+1.5) / ( (alphas[(spe,l)][ipgf1] + alphas[(spe,l)][ipgf2])**(l+1.5) )
                 # Compute \int_0^\infty dr r^2 r^{2l} \exp[-r^2/\sigma^2]
-                inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5)
-                # Compute \int_0^\infty dr r^2 r^l \exp[-r^2/(2\sigma^2)]
-                charge_radint = 0.5 * special.gamma(float(l+3)/2.0) / ( (alphas[(spe,l,n)])**(float(l+3)/2.0) )
-                # Compute \int_0^\infty dr r^3 r^l \exp[-r^2/(2\sigma^2)]
-                dipole_radint = 2**float(1.0+float(l)/2.0) * sigmas[(spe,l,n)]**(4+l) * special.gamma(2.0+float(l)/2.0)
+                #inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5)
+                charge_radint = 0.0
+                dipole_radint = 0.0
+                # Perform contraction over primitive GTOs
+                for ipgf in range(npgf):
+                    # Compute primitive integral \int_0^\infty dr r^2 r^l \exp[-r^2/(2\sigma^2)]
+                    charge_radint += contra[(spe,l)][n,ipgf] * 0.5 * special.gamma(float(l+3)/2.0) / ( (alphas[(spe,l)][ipgf])**(float(l+3)/2.0) )
+                    # Compute primitive integral \int_0^\infty dr r^3 r^l \exp[-r^2/(2\sigma^2)]
+                    sigma = np.sqrt(0.5/alphas[(spe,l)][ipgf])
+                    dipole_radint += contra[(spe,l)][n,ipgf] * 2**float(1.0+float(l)/2.0) * sigma**(4+l) * special.gamma(2.0+float(l)/2.0)
                 # Muliply by radial and spherical harmonics normalization factor
                 charge_integrals[(spe,l,n)] = charge_radint * np.sqrt(4.0*np.pi) / np.sqrt(inner)
                 dipole_integrals[(spe,l,n)] = dipole_radint * np.sqrt(4.0*np.pi/3.0) / np.sqrt(inner)
 
-    return [alphas,sigmas,charge_integrals,dipole_integrals]
+    return [charge_integrals,dipole_integrals]
 
 def compute_charge_and_dipole(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average):
     """Compute total charge and dipole moment for the given configuration"""

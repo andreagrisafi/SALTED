@@ -25,7 +25,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     assert inp.qm.qmcode.lower() == "cp2k", f"{inp.qm.qmcode=}, but expected 'cp2k'"
 
     """Parse CP2K basis set"""
-    lmax, nmax, alphas = parse_files_basis_info(inp.system.species, inp.qm.dfbasis)
+    lmax, nmax, alphas, contra = parse_files_basis_info(inp.system.species, inp.qm.dfbasis)
 
     """Convert to basis_client format"""
     basis_data: Dict[str, SpeciesBasisData] = {}
@@ -55,7 +55,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
         for spe in inp.system.species:
             for l in range(lmax[spe] + 1):
                 np.savetxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat"), alphas[(spe, l)])
-                # np.savetxt(spe+"-"+inp.qm.dfbasis+"-contraction-coeffs-L"+str(l)+".dat",contra[(spe,l)])
+                np.savetxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-contra-L{l}.dat"), contra[(spe, l)])
         BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
@@ -80,9 +80,11 @@ def parse_files_basis_info(species:List[str], dfbasis:str) -> (
     for spe in species:
         lmaxlist = []
         alphalist = {}
+        contra_temp = {}
+        nsets_temp = {}
         for l in range(10):
-            # nmax[(spe, l)] = 0
             alphalist[l] = []
+            nsets_temp[l] = 0
         with open(spe + "-" + dfbasis) as f:
             for line in f:
                 nsets = int(list(islice(f, 1))[0])
@@ -95,10 +97,9 @@ def parse_files_basis_info(species:List[str], dfbasis:str) -> (
                     for l in range(llmin, llmax + 1):
                         lmaxlist.append(l)
                         nmaxtemp[l] = int(line.split()[4 + l - llmin])
-                        # nmax[(spe, l)] += nmaxtemp[l]
                         nmax[(spe, l)] = nmax.get((spe, l), 0) + nmaxtemp[l]
                         alphalist[l].append(np.zeros(nnpgf))
-                        contra[(spe, l)] = np.zeros((nmaxtemp[l], nnpgf))
+                        contra_temp[(nsets_temp[l],l)] = np.zeros((nmaxtemp[l], nnpgf))
                     lines = list(islice(f, nnpgf))
                     for ipgf in range(nnpgf):
                         line = lines[ipgf].split()
@@ -107,15 +108,29 @@ def parse_files_basis_info(species:List[str], dfbasis:str) -> (
                         for l in range(llmin, llmax + 1):
                             alphalist[l][-1][ipgf] = alpha
                             for n in range(nmaxtemp[l]):
-                                contra[(spe, l)][n, ipgf] = line[1 + icount]
+                                contra_temp[(nsets_temp[l],l)][n, ipgf] = line[1 + icount]
                                 icount += 1
+                    for l in range(llmin, llmax + 1):
+                        nsets_temp[l] += 1
                 break
         lmax[spe] = max(lmaxlist)
         print("L_max = ", lmax[spe])
         for l in range(lmax[spe] + 1):
             alphas[(spe, l)] = np.array(alphalist[l]).flatten()
+            npgf = len(alphas[(spe, l)])
+            contra[(spe, l)] = np.zeros((nmax[(spe,l)],npgf))
+            ntot = 0
+            mtot = 0
+            for iset in range(nsets_temp[l]):
+                ntemp = contra_temp[(iset,l)].shape[0]
+                mtemp = contra_temp[(iset,l)].shape[1]
+                for n in range(ntemp): 
+                    for m in range(mtemp): 
+                        contra[(spe, l)][ntot+n,mtot+m] = contra_temp[(iset,l)][n,m]
+                mtot += mtemp
+                ntot += ntemp 
 
-    return lmax, nmax, alphas
+    return lmax, nmax, alphas, contra
 
 
 if __name__ == "__main__":

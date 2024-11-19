@@ -368,7 +368,7 @@ def build():
                         kernel_nn[i1*3:i1*3+3][:,i2*3:i2*3+3] *= kernel0_nn[i1,i2]**(zeta-1)
                     normfact[i1] = np.sqrt(np.sum(kernel_nn[i1*3:i1*3+3][:,i1*3:i1*3+3]**2))
 
-                normfact_sparse = np.load(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{0}.npy"))
+                normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{0}.npy"))
                 j1 = 0
                 for i1 in range(natom_dict[(iconf,spe)]):
                     norm1 = normfact[i1]
@@ -504,7 +504,7 @@ def build():
                     for i1 in range(natom_dict[(iconf,spe)]):
                         normfact[i1] = np.sqrt(np.sum(np.real(kernel_nn)[i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)][:,i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)]**2))
 
-                    normfact_sparse = np.load(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{lam}.npy"))
+                    normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"))
                     j1 = 0 
                     for i1 in range(natom_dict[(iconf,spe)]):
                         norm1 = normfact[i1]

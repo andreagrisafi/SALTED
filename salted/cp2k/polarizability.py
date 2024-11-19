@@ -30,7 +30,7 @@ def build(iconf,ref_coefs):
         from ase.io import read
         xyzfile = read(filename, ":")
         # Initialize calculation of density/density-response moments
-        alphas,sigmas,charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,0)
+        charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,0)
 
     ref_alpha = compute_polarizability(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs)
 

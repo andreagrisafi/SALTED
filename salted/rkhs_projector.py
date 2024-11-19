@@ -58,7 +58,10 @@ def build():
 
     elif saltedtype == "density-response":
 
-        dirpath = os.path.join(saltedpath, "normfacts")
+        dirpath = os.path.join(saltedpath, f"normfacts_{saltedname}")
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath)
+        dirpath = os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}")
         if not os.path.exists(dirpath):
             os.makedirs(dirpath)
 
@@ -99,7 +102,7 @@ def build():
                         for i2 in range(Mcut[lam]):
                             kernel_mm[i1*3:i1*3+3][:,i2*3:i2*3+3] *= kernel0_mm[i1,i2]**(zeta-1)
                         normfact[i1] = np.sqrt(np.sum(kernel_mm[i1*3:i1*3+3][:,i1*3:i1*3+3]**2))
-                    np.save(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
+                    np.save(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
 
                     j1 = 0
                     for i1 in range(Mcut[lam]):
@@ -174,7 +177,7 @@ def build():
                     normfact = np.zeros(Mcut[lam])
                     for i1 in range(Mcut[lam]):
                         normfact[i1] = np.sqrt(np.sum(np.real(kernel_mm)[i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)][:,i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)]**2))
-                    np.save(os.path.join(saltedpath, "normfacts", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
+                    np.save(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
 
                     j1 = 0
                     for i1 in range(Mcut[lam]):

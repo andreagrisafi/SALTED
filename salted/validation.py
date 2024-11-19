@@ -83,7 +83,7 @@ def build():
         from ase.io import read
         xyzfile = read(filename, ":")
         # Initialize calculation of density/density-response moments
-        alphas,sigmas,charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
+        charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
 
     # Initialize files for validation results
     efile = init_property_file("errors",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
