@@ -14,7 +14,7 @@ from ase.io import read
 from scipy import sparse
 
 from salted import sph_utils
-from salted.lib import equicomb, equicombsparse, antiequicomb, antiequicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb
+from salted.lib import equicomb, equicombsparse, antiequicomb, antiequicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
 from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, get_feats_projs, get_feats_projs_response, read_system
 
 def build():
@@ -369,17 +369,19 @@ def build():
                     normfact[i1] = np.sqrt(np.sum(kernel_nn[i1*3:i1*3+3][:,i1*3:i1*3+3]**2))
 
                 normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{0}.npy"))
-                j1 = 0
-                for i1 in range(natom_dict[(iconf,spe)]):
-                    norm1 = normfact[i1]
-                    for imu1 in range(3):
-                        j2 = 0
-                        for i2 in range(Mcut[0]):
-                            norm2 = normfact_sparse[i2]
-                            for imu2 in range(3):
-                                kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
-                                j2 += 1
-                        j1 += 1
+                knorm = kernelnorm.kernelnorm(natom_dict[(iconf,spe)],Mcut[0],3,normfact,normfact_sparse,np.real(kernel_nm).T)
+                kernel_nm = knorm.T
+                #j1 = 0
+                #for i1 in range(natom_dict[(iconf,spe)]):
+                #    norm1 = normfact[i1]
+                #    for imu1 in range(3):
+                #        j2 = 0
+                #        for i2 in range(Mcut[0]):
+                #            norm2 = normfact_sparse[i2]
+                #            for imu2 in range(3):
+                #                kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
+                #                j2 += 1
+                #        j1 += 1
 
                 Psi[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
                
@@ -505,20 +507,22 @@ def build():
                         normfact[i1] = np.sqrt(np.sum(np.real(kernel_nn)[i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)][:,i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)]**2))
 
                     normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"))
-                    j1 = 0 
-                    for i1 in range(natom_dict[(iconf,spe)]):
-                        norm1 = normfact[i1]
-                        for imu1 in range(3*(2*lam+1)):
-                            j2 = 0 
-                            for i2 in range(Mcut[lam]):
-                                norm2 = normfact_sparse[i2]
-                                for imu2 in range(3*(2*lam+1)):
-                                    kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
-                                    j2 += 1
-                            j1 += 1
+                    knorm = kernelnorm.kernelnorm(natom_dict[(iconf,spe)],Mcut[lam],3*(2*lam+1),normfact,normfact_sparse,np.real(kernel_nm).T)
+                    kernel_nm = knorm.T
+                    #j1 = 0 
+                    #for i1 in range(natom_dict[(iconf,spe)]):
+                    #    norm1 = normfact[i1]
+                    #    for imu1 in range(3*(2*lam+1)):
+                    #        j2 = 0 
+                    #        for i2 in range(Mcut[lam]):
+                    #            norm2 = normfact_sparse[i2]
+                    #            for imu2 in range(3*(2*lam+1)):
+                    #                kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
+                    #                j2 += 1
+                    #        j1 += 1
 
                     # project kernel on the RKHS
-                    Psi[(spe,lam)] = np.real(np.dot(np.real(kernel_nm),Vmat[(lam,spe)]))
+                    Psi[(spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))
 
                     # normalize RKHS descriptor
                     #psi = Psi[(spe,lam)].reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Vmat[(lam,spe)].shape[-1]).reshape(natom_dict[(iconf,spe)],3*(2*lam+1)*Vmat[(lam,spe)].shape[-1])

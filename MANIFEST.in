@@ -8,6 +8,7 @@ include salted/lib/antiequicomb.so
 include salted/lib/antiequicombnonorm.so 
 include salted/lib/antiequicombsparse.so 
 include salted/lib/kernelequicomb.so 
+include salted/lib/kernelnorm.so 
 include salted/lib/equicombfield.so 
 include salted/lib/ovlp2cnonperiodic.so 
 include salted/lib/ovlp2c.so 

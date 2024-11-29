@@ -11,7 +11,7 @@ from ase.io import read
 from scipy import special
 
 from salted import basis, sph_utils
-from salted.lib import equicomb, equicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb
+from salted.lib import equicomb, equicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
 from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
@@ -20,6 +20,7 @@ from salted.sys_utils import (
     get_feats_projs,
     get_feats_projs_response,
     read_system,
+    init_property_file
 )
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
@@ -87,9 +88,11 @@ def build():
         charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
 
     # base directory path for this prediction
-    dirpath = osp.join(
+    pdir = osp.join(
         saltedpath,
-        f"predictions_{saltedname}_{predname}",
+        f"predictions_{saltedname}_{predname}"
+    )
+    dirpath = osp.join(pdir,
         f"M{Menv}_zeta{zeta}",
         f"N{ntrain}_reg{reg_log10_intstr}",
     )
@@ -108,10 +111,10 @@ def build():
     # Initialize files for derived properties 
     if qmcode=="cp2k":
         if saltedtype=="density":
-            qfile = init_property_file("charges",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
-            dfile = init_property_file("dipoles",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+            qfile = init_property_file("charges",saltedpath,pdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+            dfile = init_property_file("dipoles",saltedpath,pdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
         if saltedtype=="density-response":
-            pfile = init_property_file("polarizabilities",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+            pfile = init_property_file("polarizabilities",saltedpath,pdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
 
     start = time.time()
 
@@ -388,17 +391,19 @@ def build():
                     normfact[i1] = np.sqrt(np.sum(kernel_nn[i1*3:i1*3+3][:,i1*3:i1*3+3]**2))
 
                 normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{0}.npy"))
-                j1 = 0
-                for i1 in range(natom_dict[(iconf,spe)]):
-                    norm1 = normfact[i1]
-                    for imu1 in range(3):
-                        j2 = 0
-                        for i2 in range(Mcut[0]):
-                            norm2 = normfact_sparse[i2]
-                            for imu2 in range(3):
-                                kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
-                                j2 += 1
-                        j1 += 1
+                knorm = kernelnorm.kernelnorm(natom_dict[(iconf,spe)],Mcut[0],3,normfact,normfact_sparse,np.real(kernel_nm).T)
+                kernel_nm = knorm.T
+                #j1 = 0
+                #for i1 in range(natom_dict[(iconf,spe)]):
+                #    norm1 = normfact[i1]
+                #    for imu1 in range(3):
+                #        j2 = 0
+                #        for i2 in range(Mcut[0]):
+                #            norm2 = normfact_sparse[i2]
+                #            for imu2 in range(3):
+                #                kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
+                #                j2 += 1
+                #        j1 += 1
 
                 psi_nm[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
 
@@ -505,17 +510,19 @@ def build():
                         normfact[i1] = np.sqrt(np.sum(np.real(kernel_nn)[i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)][:,i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)]**2))
 
                     normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"))
-                    j1 = 0
-                    for i1 in range(natom_dict[(iconf,spe)]):
-                        norm1 = normfact[i1]
-                        for imu1 in range(3*(2*lam+1)):
-                            j2 = 0
-                            for i2 in range(Mcut[lam]):
-                                norm2 = normfact_sparse[i2]
-                                for imu2 in range(3*(2*lam+1)):
-                                    kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
-                                    j2 += 1
-                            j1 += 1
+                    knorm = kernelnorm.kernelnorm(natom_dict[(iconf,spe)],Mcut[lam],3*(2*lam+1),normfact,normfact_sparse,np.real(kernel_nm).T)
+                    kernel_nm = knorm.T
+                    #j1 = 0
+                    #for i1 in range(natom_dict[(iconf,spe)]):
+                    #    norm1 = normfact[i1]
+                    #    for imu1 in range(3*(2*lam+1)):
+                    #        j2 = 0
+                    #        for i2 in range(Mcut[lam]):
+                    #            norm2 = normfact_sparse[i2]
+                    #            for imu2 in range(3*(2*lam+1)):
+                    #                kernel_nm[j1,j2] /= np.sqrt(norm1*norm2)
+                    #                j2 += 1
+                    #        j1 += 1
 
                     # project kernel on the RKHS
                     psi_nm[(spe,lam)] = np.real(np.dot(np.real(kernel_nm),Vmat[(lam,spe)]))

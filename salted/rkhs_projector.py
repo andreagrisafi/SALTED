@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 from sympy.physics.wigner import wigner_3j
 
-from salted.lib import kernelequicomb
+from salted.lib import kernelequicomb, kernelnorm
 from salted import sph_utils
 from salted.sys_utils import ParseConfig, get_atom_idx, read_system, rkhs_proj
 
@@ -179,18 +179,19 @@ def build():
                         normfact[i1] = np.sqrt(np.sum(np.real(kernel_mm)[i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)][:,i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)]**2))
                     np.save(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
 
-                    j1 = 0
-                    for i1 in range(Mcut[lam]):
-                        norm1 = normfact[i1]
-                        for imu1 in range(3*(2*lam+1)): 
-                            j2 = 0
-                            for i2 in range(Mcut[lam]):
-                                norm2 = normfact[i2]
-                                for imu2 in range(3*(2*lam+1)):
-                                    kernel_mm[j1,j2] /= np.sqrt(norm1*norm2)
-                                    j2 += 1
-                            j1 += 1
-
+                    knorm = kernelnorm.kernelnorm(Mcut[lam],Mcut[lam],3*(2*lam+1),normfact,normfact,np.real(kernel_mm).T)
+                    kernel_mm = knorm.T
+                #    j1 = 0
+                #    for i1 in range(Mcut[lam]):
+                #        norm1 = normfact[i1]
+                #        for imu1 in range(3*(2*lam+1)): 
+                #            j2 = 0
+                #            for i2 in range(Mcut[lam]):
+                #                norm2 = normfact[i2]
+                #                for imu2 in range(3*(2*lam+1)):
+                #                    kernel_mm[j1,j2] /= np.sqrt(norm1*norm2)
+                #                    j2 += 1
+                #            j1 += 1
                     
                     V = rkhs_proj(kernel_mm)
                     h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
