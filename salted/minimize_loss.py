@@ -35,6 +35,7 @@ def build():
         filename_pred,
         predname,
         predict_data,
+        alpha_only,
         rep1,
         rcut1,
         sig1,

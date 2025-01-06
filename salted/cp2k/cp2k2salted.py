@@ -9,8 +9,7 @@ import copy
 import time
 
 from salted import basis
-from salted.sys_utils import ParseConfig
-
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
 
 inp = ParseConfig().parse_input()
 
@@ -19,18 +18,51 @@ ndata = len(xyzfile)
 species = inp.system.species
 [lmax,nmax] = basis.basiset(inp.qm.dfbasis)
 
-dirpath = os.path.join(inp.salted.saltedpath, "coefficients")
-if not os.path.exists(dirpath):
-    os.mkdir(dirpath)
+if inp.system.parallel:
 
-if inp.salted.saltedtype=="density-response":
-    for icart in ["x","y","z"]:
-        dirpath = os.path.join(inp.salted.saltedpath, "coefficients", f"{icart}")
-        if not os.path.exists(dirpath):
-            os.mkdir(dirpath)
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+
+if rank==0:
+
+    dirpath = os.path.join(inp.salted.saltedpath, "coefficients")
+    if not os.path.exists(dirpath):
+        os.mkdir(dirpath)
+    
+    if inp.salted.saltedtype=="density-response":
+        for icart in ["x","y","z"]:
+            dirpath = os.path.join(inp.salted.saltedpath, "coefficients", f"{icart}")
+            if not os.path.exists(dirpath):
+                os.mkdir(dirpath)
+
+
+if inp.system.parallel:
+
+    comm.Barrier()
+
+    if ndata < size:
+        if rank == 0:
+            raise ValueError(
+                f"More processes {size=} have been requested than confiturations {ndata=}. "
+                f"Please reduce the number of processes."
+            )
+        else:
+            exit()
+    conf_range = get_conf_range(rank, size, ndata, np.arange(ndata,dtype=int))
+    conf_range = comm.scatter(conf_range, root=0)
+    print(
+        f"Task {rank+1} handles the following configurations: {conf_range}", flush=True
+    )
+
+else:
+
+    conf_range = np.arange(ndata,dtype=int)
+
 
 # init geometry
-for iconf in range(ndata):
+for iconf in conf_range:
 
     geom = xyzfile[iconf]
     symbols = geom.get_chemical_symbols()

@@ -133,7 +133,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
     totsize = p.shape[-1]
     if rank == 0: print("problem dimensionality:", totsize,flush=True)
-    if totsize>70000:
+    if totsize>100000:
         raise ValueError(f"problem dimension too large ({totsize=}), minimize directly loss-function instead!")
 
     if rank == 0: print("computing regression matrices...")

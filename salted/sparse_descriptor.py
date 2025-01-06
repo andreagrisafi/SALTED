@@ -26,7 +26,7 @@ def build():
     (saltedname, saltedpath, saltedtype,
     filename, species, average, field, parallel,
     path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data,
+    filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,

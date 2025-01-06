@@ -419,7 +419,7 @@ class ParseConfig:
         (saltedname, saltedpath, saltedtype,
          filename, species, average, field, parallel,
          path2qm, qmcode, qmbasis, dfbasis,
-         filename_pred, predname, predict_data,
+         filename_pred, predname, predict_data, alpha_only,
          rep1, rcut1, sig1, nrad1, nang1, neighspe1,
          rep2, rcut2, sig2, nrad2, nang2, neighspe2,
          sparsify, nsamples, ncut,
@@ -470,6 +470,7 @@ class ParseConfig:
             inp.prediction.filename,
             inp.prediction.predname,
             inp.prediction.predict_data,
+            inp.prediction.alpha_only,
             inp.descriptor.rep1.type,
             inp.descriptor.rep1.rcut,
             inp.descriptor.rep1.sig,
@@ -720,6 +721,12 @@ class ParseConfig:
                     str,
                     lambda inp, val: check_with_qmcode(inp, val, "aims"),
                 ),  # path to the prediction data by QM code, only for AIMS
+                 "alpha_only": (
+                    False,
+                    False,
+                    bool,
+                    None,
+                ),
             },
             "descriptor": {
                 "rep1": rep_template,  # descriptor 1
