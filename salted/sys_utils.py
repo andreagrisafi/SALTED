@@ -417,7 +417,7 @@ class ParseConfig:
         Please copy & paste:
         ```python
         (saltedname, saltedpath, saltedtype,
-         filename, species, average, field, parallel,
+         filename, species, average, parallel,
          path2qm, qmcode, qmbasis, dfbasis,
          filename_pred, predname, predict_data, alpha_only,
          rep1, rcut1, sig1, nrad1, nang1, neighspe1,
@@ -461,7 +461,6 @@ class ParseConfig:
             inp.system.filename,
             inp.system.species,
             inp.system.average,
-            inp.system.field,
             inp.system.parallel,
             inp.qm.path2qm,
             inp.qm.qmcode,
@@ -508,7 +507,7 @@ class ParseConfig:
         Please copy & paste:
         ```python
         (
-            filename, species, average, field, parallel,
+            filename, species, average, parallel,
             rep1, rcut1, sig1, nrad1, nang1, neighspe1,
             rep2, rcut2, sig2, nrad2, nang2, neighspe2,
             sparsify, nsamples, ncut,
@@ -523,7 +522,6 @@ class ParseConfig:
             inp.system.filename,
             inp.system.species,
             inp.system.average,
-            inp.system.field,
             inp.system.parallel,
             inp.descriptor.rep1.type,
             inp.descriptor.rep1.rcut,
@@ -639,7 +637,6 @@ class ParseConfig:
                     bool,
                     None,
                 ),  # if bias the GPR by the average of predictions
-                "field": (False, False, bool, None),  # if predict the field response
                 "parallel": (False, False, bool, None),  # if use mpi4py
                 "seed": (False, 42, int, None),  # random seed
             },

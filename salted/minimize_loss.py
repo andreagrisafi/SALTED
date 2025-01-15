@@ -26,7 +26,6 @@ def build():
         filename,
         species,
         average,
-        field,
         parallel,
         path2qm,
         qmcode,
@@ -79,12 +78,8 @@ def build():
         rank = 0
         size = 1
 
-    if field:
-        fdir = f"rkhs-vectors_{saltedname}_field"
-        rdir = f"regrdir_{saltedname}_field"
-    else:
-        fdir = f"rkhs-vectors_{saltedname}"
-        rdir = f"regrdir_{saltedname}"
+    fdir = f"rkhs-vectors_{saltedname}"
+    rdir = f"regrdir_{saltedname}"
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = (
         read_system()

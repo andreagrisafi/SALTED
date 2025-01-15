@@ -18,6 +18,7 @@ For all the path-related variables, the path can be either a relative path or an
 | -:| :-: | :-: | :- |
 | `saltedname` | `str` | **Required** | A label to identify a particular SALTED setup. |
 | `saltedpath` | `str` | **Required** | Location of all files produced by SALTED. Either relative to the working directory or an absolute path. |
+| `saltedtype` | `str` | `density` | Option for selecting the type of SALTED target (`density` or `density-response`)
 
 ### System difinition `inp.system`
 
@@ -27,7 +28,6 @@ For all the path-related variables, the path can be either a relative path or an
 | `species` | `List[str]` | **Required** | List of element species considered in the electron density expansion. |
 | `average` | `bool` | `True` | Whether we use averaged coefficients to set a baseline for the density. Normally this should be true, unless a density difference is learned. |
 | `parallel` | `bool` | `False` | Whether to use MPI parallelization. |
-| `field` | `bool` | `False` | Option for using external field. For predicting densities without external fields, set to False. |
 
 ### Information about QM training set generation `inp.qm`
 
@@ -70,6 +70,7 @@ Remember to set `inp.predict` if one wants to predict densities.
 | `filename` | `str` | Required if predict | An extended-XYZ file consisting of structures whose densities we wish to predict. |
 | `predname` | `str` | Required if predict | A label to identify a particular set of predictions. |
 | `predict_data` | `str` | Required if predict and `qmcode=aims` | Path to ab initio output for prediction, relative to path2qm. |
+| `alpha_only` | `bool` | `False` | Whether to limit predictions to the subset of coefficients associated with the calculation of the polarizability tensor. Only usable in combintation with `saltedtype=density-response` and `qmcode=cp2k`. |
 
 ### ML (GPR) variables `inp.gpr`
 

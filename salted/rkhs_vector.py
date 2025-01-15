@@ -21,7 +21,7 @@ def build():
 
     # salted parameters
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, field, parallel,
+    filename, species, average, parallel,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,

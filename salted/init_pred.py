@@ -78,14 +78,9 @@ def build():
  
     # load regression weights
     ntrain = int(inp.gpr.Ntrain*inp.gpr.trainfrac)
-    if inp.system.field:
-        weights = np.load(osp.join(
-            saltedpath, f"regrdir_{saltedname}_field", f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
-        ))
-    else:
-        weights = np.load(osp.join(
-            saltedpath, f"regrdir_{saltedname}", f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
-        ))
+    weights = np.load(osp.join(
+        saltedpath, f"regrdir_{saltedname}", f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
+    ))
     
     print("load time:", (time.time()-loadstart))
     
