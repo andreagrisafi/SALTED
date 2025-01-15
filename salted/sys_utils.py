@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 import os
-import re
 import os.path as osp
+import re
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import h5py
@@ -721,12 +721,12 @@ class ParseConfig:
                     str,
                     lambda inp, val: check_with_qmcode(inp, val, "aims"),
                 ),  # path to the prediction data by QM code, only for AIMS
-                 "alpha_only": (
+                "alpha_only": (
                     False,
-                    False,
+                    PLACEHOLDER,
                     bool,
-                    None,
-                ),
+                    check_conditions_alpha_only
+                ),  # for condition details, see the function docstring
             },
             "descriptor": {
                 "rep1": rep_template,  # descriptor 1
@@ -943,6 +943,26 @@ def check_path_exists(path: str) -> bool:
 
 
 check_path_exists.parse_error_msg = "Path (value) does not exist."
+
+
+def check_conditions_alpha_only(inp:dict, val:bool) -> bool:
+    """the val is required if and only if inp.salted.saltedtype = density-response and inp.qm.qmcode = cp2k"""
+    if (inp["salted"]["saltedtype"] == "density-response") and (inp["qm"]["qmcode"].lower() == "cp2k"):
+        # if the conditions are met, then the value should be specified. It cannot be a placeholder.
+        if val == PLACEHOLDER:
+            return False
+        else:
+            return True
+    else:
+        # if the conditions are not met, then the value should not be specified. It should be a placeholder.
+        if val == PLACEHOLDER:
+            return True
+        else:
+            return False
+
+
+check_conditions_alpha_only.parse_error_msg = "Value is required if and only if inp.salted.saltedtype=density-response"\
+    " and inp.qm.qmcode=cp2k. Otherwise, please don't specify it in the input file."
 
 
 def test_inp():
