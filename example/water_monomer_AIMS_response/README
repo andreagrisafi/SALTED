@@ -1,0 +1,3 @@
+Note that in this folder we are creating RI coeffs of the density response
+for  a periodic calculation with DFPT dielectric. Change to DFPT polarizability
+for non-periodic systems.
