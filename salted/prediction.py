@@ -411,14 +411,6 @@ def build():
 
                 psi_nm[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
 
-                #idx = 0
-                #idx_cart = 0
-                #for iat in range(natom_dict[(iconf,spe)]):
-                #    for ik in range(3):
-                #        psi_nm_cart[(cart[ik],spe,0)][idx_cart] = psi_nm[(spe,0)][idx]
-                #        idx += 1
-                #    idx_cart += 1
-
                 psi_nm_reshaped = psi_nm[(spe, 0)].reshape(natom_dict[(iconf,spe)], 3, psi_nm[(spe, 0)].shape[-1])
                 for ik in range(3):
                     psi_nm_cart[(cart[ik], spe, 0)][:natom_dict[(iconf,spe)]] = psi_nm_reshaped[:, ik]
@@ -530,15 +522,6 @@ def build():
 
                     # project kernel on the RKHS
                     psi_nm[(spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))
-
-                    #idx = 0
-                    #idx_cart = 0
-                    #for iat in range(natom_dict[(iconf,spe)]):
-                    #    for imu in range(2*lam+1):
-                    #        for ik in range(3):
-                    #            psi_nm_cart[(cart[ik],spe,lam)][idx_cart] = psi_nm[(spe,lam)][idx]
-                    #            idx += 1
-                    #        idx_cart += 1
 
                     psi_nm_reshaped = psi_nm[(spe, lam)].reshape(natom_dict[(iconf,spe)]*(2*lam+1), 3, psi_nm[(spe, lam)].shape[-1])
                     for ik in range(3):

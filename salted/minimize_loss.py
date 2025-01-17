@@ -174,14 +174,6 @@ def build():
             # loop over training structures
             for iconf in range(ntrain):
 
-                # load reference QM data
-                #ref_projs = np.load(
-                #    osp.join(
-                #        saltedpath,
-                #        "projections",
-                #        f"projections_conf{trainrange[iconf]}.npy",
-                #    )
-                #)
                 ref_coefs = np.load(
                     osp.join(
                         saltedpath,
@@ -222,15 +214,6 @@ def build():
             # loop over training structures
             itot = 0
             for iconf in range(ntrain):
-
-                # load reference QM data
-                #ref_projs = np.load(
-                #    osp.join(
-                #        saltedpath,
-                #        "projections",
-                #        f"projections_conf{trainrange[iconf]}.npy",
-                #    )
-                #)
 
                 ovlp = ovlp_list[iconf]
 
@@ -283,9 +266,6 @@ def build():
             for iconf in range(ntrain):
 
                 # load reference QM data
-                #ref_projs = np.load(osp.join(
-                    #saltedpath, "projections", f"projections_conf{trainrange[iconf]}.npy"
-                #))
                 ref_coefs = np.load(osp.join(
                     saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
                 ))
@@ -325,9 +305,6 @@ def build():
                 for icart in ["x","y","z"]:
 
                     # load reference QM data
-                    #ref_projs = np.load(osp.join(
-                    #    saltedpath, "projections", f"{icart}/projections_conf{trainrange[iconf]}.npy"
-                    #))
                     ref_coefs = np.load(osp.join(
                         saltedpath, "coefficients", f"{icart}/coefficients_conf{trainrange[iconf]}.npy"
                     ))

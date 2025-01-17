@@ -409,8 +409,6 @@ def build():
                     # Perform CG combination
                     for L in [lam-1,lam,lam+1]:
 
-                        #print("L=", L)
-
                         c2r = sph_utils.complex_to_real_transformation([2*L+1])[0]
 
                         # compute complex descriptor for the given L
@@ -537,10 +535,6 @@ def build():
                                 Psi_cart[(cart[ik],spe,lam)][idx_cart] = Psi[(spe,lam)][idx]
                                 idx += 1
                             idx_cart += 1
-
-                    #for ik in range(3):
-                    #    print(spe,lam,cart[ik],np.linalg.norm(Psi_cart[(cart[ik],spe,lam)]))
-
 
             # build sparse feature-vector memory efficiently
             nrows = Tsize

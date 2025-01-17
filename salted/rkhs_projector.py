@@ -171,8 +171,6 @@ def build():
                     ktemp1 = np.dot(c2r,np.transpose(kernel_mm.reshape(Mcut[lam],3*(2*lam+1),Mcutsize[lam]),(1,0,2)).reshape(3*(2*lam+1),Mcut[lam]*Mcutsize[lam]))
                     ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),Mcut[lam],Mcutsize[lam]),(1,0,2)).reshape(Mcutsize[lam],Mcutsize[lam]) 
                     kernel_mm = np.dot(ktemp2.reshape(Mcutsize[lam],Mcut[lam],3*(2*lam+1)).reshape(Mcutsize[lam]*Mcut[lam],3*(2*lam+1)),np.conj(c2r).T).reshape(Mcutsize[lam],Mcut[lam],3*(2*lam+1)).reshape(Mcutsize[lam],Mcutsize[lam])
-                    #print(np.linalg.norm(np.real(kernel_mm)))
-                    #print(np.linalg.norm(np.imag(kernel_mm)))
                     
                     normfact = np.zeros(Mcut[lam])
                     for i1 in range(Mcut[lam]):
@@ -181,17 +179,6 @@ def build():
 
                     knorm = kernelnorm.kernelnorm(Mcut[lam],Mcut[lam],3*(2*lam+1),normfact,normfact,np.real(kernel_mm).T)
                     kernel_mm = knorm.T
-                #    j1 = 0
-                #    for i1 in range(Mcut[lam]):
-                #        norm1 = normfact[i1]
-                #        for imu1 in range(3*(2*lam+1)): 
-                #            j2 = 0
-                #            for i2 in range(Mcut[lam]):
-                #                norm2 = normfact[i2]
-                #                for imu2 in range(3*(2*lam+1)):
-                #                    kernel_mm[j1,j2] /= np.sqrt(norm1*norm2)
-                #                    j2 += 1
-                #            j1 += 1
                     
                     V = rkhs_proj(kernel_mm)
                     h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
