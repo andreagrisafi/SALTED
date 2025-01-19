@@ -1,0 +1,7 @@
+Note that in this folder we are creating RI coeffs of the density response
+for  a periodic calculation with DFPT dielectric. Change to DFPT polarizability
+for non-periodic systems.
+
+The workflow for the ML learning and prediction is then the same as for the other examples.
+Only the data generation and the calculation of derived quantities (reading in RI coefficients)
+is different in FHI-aims and the files in this folder cover these aspects.

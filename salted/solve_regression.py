@@ -18,14 +18,8 @@ def build():
     regul = inp.gpr.regul
     zeta = inp.gpr.z
 
-    if inp.system.field:
-        kdir = f"kernels_{saltedname}_field"
-        fdir = f"rkhs-vectors_{saltedname}_field"
-        rdir = f"regrdir_{saltedname}_field"
-    else:
-        kdir = f"kernels_{saltedname}"
-        fdir = f"rkhs-vectors_{saltedname}"
-        rdir = f"regrdir_{saltedname}"
+    fdir = f"rkhs-vectors_{saltedname}"
+    rdir = f"regrdir_{saltedname}"
 
     # define training set size
     ntrain = round(inp.gpr.trainfrac*inp.gpr.Ntrain)
@@ -34,7 +28,7 @@ def build():
     Avec = np.load(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"))
     totsize = Avec.shape[0]
     print("problem dimensionality:", totsize,flush=True)
-    if totsize > 70000:
+    if totsize > 100000:
         raise ValueError(f"problem dimension too large ({totsize=}), minimize directly loss-function instead!")
     Bmat = np.load(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"))
 
@@ -42,7 +36,7 @@ def build():
 
     w = np.linalg.solve(Bmat+np.eye(totsize)*regul,Avec)
 
-    print(f"regression time: {((time.time()-start)/60):.3f} minutes")
+    print(f"regression time: {((time.time()-start)/60):.3f} minutes",flush=True)
 
     np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(regul))}.npy"), w)
 

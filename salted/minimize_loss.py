@@ -26,7 +26,6 @@ def build():
         filename,
         species,
         average,
-        field,
         parallel,
         path2qm,
         qmcode,
@@ -35,6 +34,7 @@ def build():
         filename_pred,
         predname,
         predict_data,
+        alpha_only,
         rep1,
         rcut1,
         sig1,
@@ -78,12 +78,8 @@ def build():
         rank = 0
         size = 1
 
-    if field:
-        fdir = f"rkhs-vectors_{saltedname}_field"
-        rdir = f"regrdir_{saltedname}_field"
-    else:
-        fdir = f"rkhs-vectors_{saltedname}"
-        rdir = f"regrdir_{saltedname}"
+    fdir = f"rkhs-vectors_{saltedname}"
+    rdir = f"regrdir_{saltedname}"
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = (
         read_system()
@@ -172,50 +168,79 @@ def build():
         # init gradient
         gradient = np.zeros(totsize)
 
-        loss = 0.0
-        # loop over training structures
-        for iconf in range(ntrain):
+        if saltedtype=="density":
 
-            # load reference QM data
-            ref_projs = np.load(
-                osp.join(
-                    saltedpath,
-                    "projections",
-                    f"projections_conf{trainrange[iconf]}.npy",
+            loss = 0.0
+            # loop over training structures
+            for iconf in range(ntrain):
+
+                ref_coefs = np.load(
+                    osp.join(
+                        saltedpath,
+                        "coefficients",
+                        f"coefficients_conf{trainrange[iconf]}.npy",
+                    )
                 )
-            )
-            ref_coefs = np.load(
-                osp.join(
-                    saltedpath,
-                    "coefficients",
-                    f"coefficients_conf{trainrange[iconf]}.npy",
+
+                if average:
+                    Av_coeffs = np.zeros(ref_coefs.shape[0])
+                i = 0
+                for iat in range(natoms[trainrange[iconf]]):
+                    spe = atomic_symbols[trainrange[iconf]][iat]
+                    for l in range(lmax[spe] + 1):
+                        for n in range(nmax[(spe, l)]):
+                            if average and l == 0:
+                                Av_coeffs[i] = av_coefs[spe][n]
+                            i += 2 * l + 1
+
+                # rebuild predicted coefficients
+                pred_coefs = sparse.csr_matrix.dot(psi_list[iconf], weights)
+                if average:
+                    pred_coefs += Av_coeffs
+
+                # compute predicted density projections
+                ovlp = ovlp_list[iconf]
+                ref_projs = np.dot(ovlp, ref_coefs)
+                pred_projs = np.dot(ovlp, pred_coefs)
+
+                # collect gradient contributions
+                loss += sparse.csc_matrix.dot(
+                    pred_coefs - ref_coefs, pred_projs - ref_projs
                 )
-            )
 
-            if average:
-                Av_coeffs = np.zeros(ref_coefs.shape[0])
-            i = 0
-            for iat in range(natoms[trainrange[iconf]]):
-                spe = atomic_symbols[trainrange[iconf]][iat]
-                for l in range(lmax[spe] + 1):
-                    for n in range(nmax[(spe, l)]):
-                        if average and l == 0:
-                            Av_coeffs[i] = av_coefs[spe][n]
-                        i += 2 * l + 1
+        elif saltedtype=="density-response":
 
-            # rebuild predicted coefficients
-            pred_coefs = sparse.csr_matrix.dot(psi_list[iconf], weights)
-            if average:
-                pred_coefs += Av_coeffs
+            loss = 0.0
+            # loop over training structures
+            itot = 0
+            for iconf in range(ntrain):
 
-            # compute predicted density projections
-            ovlp = ovlp_list[iconf]
-            pred_projs = np.dot(ovlp, pred_coefs)
+                ovlp = ovlp_list[iconf]
 
-            # collect gradient contributions
-            loss += sparse.csc_matrix.dot(
-                pred_coefs - ref_coefs, pred_projs - ref_projs
-            )
+                for icart in ["x","y","z"]:
+
+                    ref_coefs = np.load(
+                        osp.join(
+                            saltedpath,
+                            f"coefficients/{icart}/",
+                            f"coefficients_conf{trainrange[iconf]}.npy",
+                        )
+                    )
+
+                    # rebuild predicted coefficients
+                    pred_coefs = sparse.csr_matrix.dot(psi_list[itot], weights)
+
+                    # compute predicted density projections
+                    ref_projs = np.dot(ovlp, ref_coefs)
+                    pred_projs = np.dot(ovlp, pred_coefs)
+
+                    # collect gradient contributions
+                    loss += sparse.csc_matrix.dot(
+                        pred_coefs - ref_coefs, pred_projs - ref_projs
+                    )
+                    itot += 1
+
+
 
         loss /= ntrain
 
@@ -235,49 +260,66 @@ def build():
         # init gradient
         gradient = np.zeros(totsize)
 
-        # loop over training structures
-        for iconf in range(ntrain):
+        if saltedtype=="density":
 
-            # load reference QM data
-            ref_projs = np.load(
-                osp.join(
-                    saltedpath,
-                    "projections",
-                    f"projections_conf{trainrange[iconf]}.npy",
-                )
-            )
-            ref_coefs = np.load(
-                osp.join(
-                    saltedpath,
-                    "coefficients",
-                    f"coefficients_conf{trainrange[iconf]}.npy",
-                )
-            )
+            # loop over training structures
+            for iconf in range(ntrain):
 
-            if average:
-                Av_coeffs = np.zeros(ref_coefs.shape[0])
-            i = 0
-            for iat in range(natoms[trainrange[iconf]]):
-                spe = atomic_symbols[trainrange[iconf]][iat]
-                for l in range(lmax[spe] + 1):
-                    for n in range(nmax[(spe, l)]):
-                        if average and l == 0:
-                            Av_coeffs[i] = av_coefs[spe][n]
-                        i += 2 * l + 1
+                # load reference QM data
+                ref_coefs = np.load(osp.join(
+                    saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
+                ))
 
-            # rebuild predicted coefficients
-            pred_coefs = sparse.csr_matrix.dot(psi_list[iconf], weights)
-            if average:
-                pred_coefs += Av_coeffs
+                if average:
+                    Av_coeffs = np.zeros(ref_coefs.shape[0])
+                i = 0
+                for iat in range(natoms[trainrange[iconf]]):
+                    spe = atomic_symbols[trainrange[iconf]][iat]
+                    for l in range(lmax[spe]+1):
+                        for n in range(nmax[(spe,l)]):
+                            if average and l==0:
+                                Av_coeffs[i] = av_coefs[spe][n]
+                            i += 2*l+1
 
-            # compute predicted density projections
-            ovlp = ovlp_list[iconf]
-            pred_projs = np.dot(ovlp, pred_coefs)
+                # rebuild predicted coefficients
+                pred_coefs = sparse.csr_matrix.dot(psi_list[iconf],weights)
+                if average:
+                    pred_coefs += Av_coeffs
 
-            # collect gradient contributions
-            gradient += 2.0 * sparse.csc_matrix.dot(
-                psi_list[iconf].T, pred_projs - ref_projs
-            )
+                # compute predicted density projections
+                ovlp = ovlp_list[iconf]
+                ref_projs = np.dot(ovlp,ref_coefs)
+                pred_projs = np.dot(ovlp,pred_coefs)
+
+                # collect gradient contributions
+                gradient += 2.0 * sparse.csc_matrix.dot(psi_list[iconf].T,pred_projs-ref_projs)
+        
+        elif saltedtype=="density-response":
+
+            # loop over training structures
+            itot = 0
+            for iconf in range(ntrain):
+
+                ovlp = ovlp_list[iconf]
+ 
+                for icart in ["x","y","z"]:
+
+                    # load reference QM data
+                    ref_coefs = np.load(osp.join(
+                        saltedpath, "coefficients", f"{icart}/coefficients_conf{trainrange[iconf]}.npy"
+                    ))
+
+                    # rebuild predicted coefficients
+                    pred_coefs = sparse.csr_matrix.dot(psi_list[itot],weights)
+
+                    # compute predicted density projections
+                    ref_projs = np.dot(ovlp,ref_coefs)
+                    pred_projs = np.dot(ovlp,pred_coefs)
+
+                    # collect gradient contributions
+                    gradient += 2.0 * sparse.csc_matrix.dot(psi_list[itot].T,pred_projs-ref_projs)
+                    
+                    itot += 1
 
         return gradient
 
@@ -308,17 +350,25 @@ def build():
     def curv_func(cg_dire, ovlp_list, psi_list):
         """Compute curvature on the given CG-direction."""
 
-        #        global totsize
         totsize = psi_list[0].shape[1]
 
         Ap = np.zeros((totsize))
 
-        for iconf in range(ntrain):
-            psi_x_dire = sparse.csr_matrix.dot(psi_list[iconf], cg_dire)
-            Ap += 2.0 * sparse.csc_matrix.dot(
-                psi_list[iconf].T, np.dot(ovlp_list[iconf], psi_x_dire)
-            )
+        if saltedtype=="density":
 
+            for iconf in range(ntrain):
+                psi_x_dire = sparse.csr_matrix.dot(psi_list[iconf],cg_dire)
+                Ap += 2.0 * sparse.csc_matrix.dot(psi_list[iconf].T,np.dot(ovlp_list[iconf],psi_x_dire))
+
+        elif saltedtype=="density-response":
+
+            itot = 0
+            for iconf in range(ntrain):
+                for icart in ["x","y","z"]:
+                    psi_x_dire = sparse.csr_matrix.dot(psi_list[itot],cg_dire)
+                    Ap += 2.0 * sparse.csc_matrix.dot(psi_list[itot].T,np.dot(ovlp_list[iconf],psi_x_dire))
+                    itot += 1
+        
         return Ap
 
     if rank == 0:
@@ -330,13 +380,15 @@ def build():
             np.load(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf}.npy"))
         )
         # load feature vector as a scipy sparse object
-        psi_list.append(
-            sparse.load_npz(
-                osp.join(
-                    saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
-                )
-            )
-        )
+        if saltedtype=="density":
+            psi_list.append(sparse.load_npz(osp.join(
+              saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+            )))
+        elif saltedtype=="density-response":
+            for icart in ["x","y","z"]:
+                psi_list.append(sparse.load_npz(osp.join(
+                  saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
+                )))
 
     totsize = psi_list[0].shape[1]
     norm = 1.0 / float(ntraintot)
@@ -404,6 +456,7 @@ def build():
     if rank == 0:
         print("minimizing...")
     for i in range(100000):
+        #loss = loss_func(w, ovlp_list, psi_list)
         Ad = curv_func(d, ovlp_list, psi_list)
         if parallel:
             Ad = comm.allreduce(Ad) * norm + 2.0 * regul * d
@@ -441,18 +494,33 @@ def build():
                 ),
                 r,
             )
-        r -= alpha * Ad
-        if rank == 0:
-            # np.sqrt(np.sum((r**2))) == np.linalg.norm(r)
-            print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
-        if np.linalg.norm(r) < gradtol:
-            break
+        if (i+1)%50==0:
+            r = -grad_func(w, ovlp_list, psi_list)
+            if parallel:
+                r = comm.allreduce(r) * norm + 2.0 * regul * w
+                if rank == 0:
+                    # np.sqrt(np.sum((r**2))) == np.linalg.norm(r)
+                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
+                    #print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
+            else:
+                r *= norm
+                r += 2.0 * regul * w
+            d = np.multiply(P, r)
+            delnew = np.dot(r, d)
         else:
-            s = np.multiply(P, r)
-            delold = delnew.copy()
-            delnew = np.dot(r, s)
-            beta = delnew / delold
-            d = s + beta * d
+            r -= alpha * Ad
+            if rank == 0:
+                # np.sqrt(np.sum((r**2))) == np.linalg.norm(r)
+                print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
+                #print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
+            if np.linalg.norm(r) < gradtol:
+                break
+            else:
+                s = np.multiply(P, r)
+                delold = delnew.copy()
+                delnew = np.dot(r, s)
+                beta = delnew / delold
+                d = s + beta * d
 
     if rank == 0:
         np.save(

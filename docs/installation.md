@@ -49,5 +49,4 @@ Especially, you can find an FHI-aims focused tutorial on SALTED [here in FHI-aim
 
 ### CP2K
 
-Please install the [official trunk version](https://github.com/cp2k/cp2k) of CP2K in order to print out the density coefficients and the 2-center auxiliary integrals needed to train SALTED.
-
+Printing of density coefficients and 2-center auxiliary integrals needed to train SALTED is made available starting from the v2023.1 release of CP2K.
