@@ -6,8 +6,8 @@ import numpy as np
 from scipy import special
 from ase.data import atomic_numbers
 
-from rascaline import SphericalExpansion
-from rascaline import LodeSphericalExpansion
+from featomic import SphericalExpansion
+from featomic import LodeSphericalExpansion
 from metatensor import Labels
 
 def cartesian_to_spherical_transformation(l):

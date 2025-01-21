@@ -23,15 +23,17 @@ In the SALTED directory, simply run :code:`make`, followed by :code:`pip install
 Dependencies
 ------------
 
---> **rascaline**: rascaline installation requires a RUST compiler. To install a RUST compiler, run:
+--> **featomic**: featomic installation requires a RUST compiler. To install a RUST compiler, run:
 :code:`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
-rascaline can then be installed using
-:code:`pip install git+https://github.com/Luthaf/rascaline.git`
+featomic can then be installed using
+:code:`pip install git+https://github.com/metatensor/featomic`
 
 --> **mpi4py**: mpi4py is required to use MPI parallelisation; SALTED can nonetheless be run without this.
 A parallel h5py installation is required to use MPI parellelisation. This can be installed by running:
 :code:`HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
 provided HDF5 has been compiled with MPI support.
+
+--> :code: `pip install meson ninja` to run f2py using meson backend following versions of Python > 3.12.
 
 Input file
 ----------
@@ -115,6 +117,3 @@ andrea.grisafi@ens.psl.eu
 
 alan.m.lewis@york.ac.uk
 
-Contributors
-------------
-Andrea Grisafi, Alan Lewis, Zekun Lou, Mariana Rossi
