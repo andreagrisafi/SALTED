@@ -33,7 +33,7 @@ A parallel h5py installation is required to use MPI parellelisation. This can be
 :code:`HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
 provided HDF5 has been compiled with MPI support.
 
---> :code: `pip install meson ninja` to run f2py using meson backend following versions of Python >= 3.12.
+--> :code:`pip install meson ninja` to run f2py using meson backend following versions of Python >= 3.12.
 
 Input file
 ----------
