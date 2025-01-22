@@ -1,6 +1,6 @@
 SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
 =========================================================================
-This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant predictions of the electron density of both molecular and condensed-phase systems, as decomposed on an atom-centered spherical harmonics basis.
+This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant learning and prediction of the electron density of molecular and condensed-phase systems, together with its static linear response function to applied electric fields. This is done by representing the continuous scalar (density) and vector (density-response) fields on a linear basis of atom-centered radial functions and spherical harmonics basis.
 
 Documentation
 -------------
@@ -53,8 +53,8 @@ SALTED input is provided in a :code:`inp.yaml` file, which is structured in the 
 
 Input Dataset
 -------------
-Input structures are required in extXYZ format; the corresponding filename must be specified in the :code:`inp.system.filename`. 
-Electron density training data consists in the expansion coefficients of the scalar field over atom-centered basis functions made of radial functions and spherical harmonics. These coefficients are computed following density-fitting (DF), a.k.a. resolution of the identity, approximations, commonly applied in electronic-structure codes. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis functions, the 2-center electronic integral matrices associated with the given density-fitting approximation are also required as input. 
+Input structures are required in extXYZ format; the corresponding filename must be specified in the :code:`inp.system.filename`.  
+Training data consists in the expansion coefficients of the scalar/vector field over atom-centered basis functions made of radial functions and spherical harmonics. These coefficients are computed following density-fitting (DF), a.k.a. resolution of the identity, approximations, commonly applied in electronic-structure codes. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis functions, the 2-center electronic integral matrices associated with the given density-fitting approximation are also required as input. 
 The electronic-structure codes that are to date interfaced with SALTED are:
     
    - **FHI-aims**
@@ -65,7 +65,7 @@ We refer to the code-specific examples for how to produce the required quantum-m
 
 Usage
 -----
-The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. SALTED functions can be run either by importing the corresponding modules in Python, or directly from command line. 
+The root directory used for storing SALTED data is specified in :code:`inp.salted.saltedpath`. Depending on the chosen input parameters, a SALTED workflow can be labelled adding a coherent string in the :code:`inp.salted.saltedname` variable; in turn, this defines the name of the output folders that are automatically generated during the program execution. The type of SALTED target can be selected by specifying :code:`inp.salted.saltedtype: density`, when asking to learn electron density, or :code:`inp.salted.saltedtype: density-response`, when asking to learn the electron-density linear response to applied electric fields. SALTED functions can be run either by importing the corresponding modules in Python, or directly from command line. 
 MPI parallelization can be activated by setting :code:`inp.system.parallel` as :code:`True`, and can be used, whenever applicable, to parallelize the calculation of SALTED functions over training data. 
 In what follows, we report an example of a general command line workflow: 
 
@@ -99,7 +99,7 @@ In what follows, we report an example of a general command line workflow:
 
    :code:`python3 -m salted.solve_regression`
 
-   NB: when the dimensionality exceeds $10^5$, it is recommended to perform a direct minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7). If the dimensionality exceeds $70000$, the loss function must be minimized directly. This can be run as follows:
+   NB: when the dimensionality exceeds $10^5$, it is recommended to perform a direct minimization of the SALTED loss function in place of an explicit matrix inversion (points 6 and 7). If the dimensionality exceeds $10^5$, the loss function must be minimized directly. This can be run as follows:
 
    :code:`python3 -m salted.minimize_loss` (MPI parallelizable)
 
