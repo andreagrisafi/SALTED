@@ -1,6 +1,6 @@
 SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
 =========================================================================
-This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant learning and prediction of the electron density of molecular and condensed-phase systems, together with its static linear response function to applied electric fields. This is done by representing the continuous scalar (density) and vector (density-response) fields on a linear basis of atom-centered radial functions and spherical harmonics basis.
+This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant learning and prediction of the electron density of molecular and condensed-phase systems, together with its static linear response function to applied electric fields. This is done by representing the continuous scalar (density) and vector (density-response) fields on a linear basis of atom-centered radial functions and spherical harmonics.
 
 Documentation
 -------------
@@ -39,7 +39,7 @@ Input file
 ----------
 SALTED input is provided in a :code:`inp.yaml` file, which is structured in the following sections:
 
-- :code:`salted` (required): define root storage directory and workflow label 
+- :code:`salted` (required): define root storage directory, workflow label and learning target 
 
 - :code:`system` (required): define system parameters 
 
