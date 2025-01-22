@@ -20,9 +20,11 @@ You can find the SALTED program on [GitHub](https://github.com/andreagrisafi/SAL
 
 ### Dependencies
 
- - `rascaline`: rascaline installation requires a RUST compiler. To install a RUST compiler, run: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`. rascaline can then be installed using `pip install git+https://github.com/Luthaf/rascaline.git`.
+ - `featomic`: featomic installation requires a RUST compiler. To install a RUST compiler, run: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`. featomic can then be installed using `pip install git+https://github.com/metatensor/featomic.git`.
 
  - `mpi4py`: mpi4py is required to use MPI parallelisation; SALTED can nonetheless be run without this. A parallel h5py installation is required to use MPI parellelisation. This can be installed by running: `HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py` provided HDF5 has been compiled with MPI support.
+
+ - `pip install meson ninja` to run f2py using meson backend following versions of Python > 3.12.
 
 ## Install electronic-structure codes 
 
@@ -49,4 +51,4 @@ Especially, you can find an FHI-aims focused tutorial on SALTED [here in FHI-aim
 
 ### CP2K
 
-Printing of density coefficients and 2-center auxiliary integrals needed to train SALTED is made available starting from the v2023.1 release of CP2K.
+Printing of RI density coefficients and 2-center auxiliary integrals needed to train SALTED is made available starting from the v2023.1 release of CP2K.
