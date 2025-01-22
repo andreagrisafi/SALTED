@@ -26,7 +26,7 @@ Dependencies
 --> **featomic**: featomic installation requires a RUST compiler. To install a RUST compiler, run:
 :code:`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
 featomic can then be installed using
-:code:`pip install git+https://github.com/metatensor/featomic`
+:code:`pip install git+https://github.com/metatensor/featomic.git`
 
 --> **mpi4py**: mpi4py is required to use MPI parallelisation; SALTED can nonetheless be run without this.
 A parallel h5py installation is required to use MPI parellelisation. This can be installed by running:
