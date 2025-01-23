@@ -434,24 +434,66 @@ class ParseConfig:
         nspe1 = len(inp.descriptor.rep1.neighspe)
         nspe2 = len(inp.descriptor.rep2.neighspe)
 
+        #HYPER_PARAMETERS_DENSITY = {
+        #    "cutoff": inp.descriptor.rep1.rcut,
+        #    "max_radial": inp.descriptor.rep1.nrad,
+        #    "max_angular": inp.descriptor.rep1.nang,
+        #    "atomic_gaussian_width": inp.descriptor.rep1.sig,
+        #    "center_atom_weight": 1.0,
+        #    "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
+        #    "cutoff_function": {"ShiftedCosine": {"width": 0.1}},
+        #}
+
         HYPER_PARAMETERS_DENSITY = {
-            "cutoff": inp.descriptor.rep1.rcut,
-            "max_radial": inp.descriptor.rep1.nrad,
-            "max_angular": inp.descriptor.rep1.nang,
-            "atomic_gaussian_width": inp.descriptor.rep1.sig,
-            "center_atom_weight": 1.0,
-            "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
-            "cutoff_function": {"ShiftedCosine": {"width": 0.1}},
+                   "cutoff": {
+                       "radius": inp.descriptor.rep1.rcut,
+                       "smoothing": {
+                           "type": "ShiftedCosine",
+                           "width": 0.1
+                       }
+                   },
+                   "density": {
+                       "type": "Gaussian",
+                       "width": inp.descriptor.rep1.sig
+                   },
+                   "basis": {
+                       "type": "TensorProduct",
+                       "max_angular": inp.descriptor.rep1.nang,
+                       "radial": {
+                           "type": "Gto",
+                           "max_radial": inp.descriptor.rep1.nrad-1
+                       },
+                       "spline_accuracy": 1e-06
+                   }
         }
 
+        #HYPER_PARAMETERS_POTENTIAL = {
+        #    "potential_exponent": 1,
+        #    "cutoff": inp.descriptor.rep2.rcut,
+        #    "max_radial": inp.descriptor.rep2.nrad,
+        #    "max_angular": inp.descriptor.rep2.nang,
+        #    "atomic_gaussian_width": inp.descriptor.rep2.sig,
+        #    "center_atom_weight": 1.0,
+        #    "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
+        #}
+
         HYPER_PARAMETERS_POTENTIAL = {
-            "potential_exponent": 1,
-            "cutoff": inp.descriptor.rep2.rcut,
-            "max_radial": inp.descriptor.rep2.nrad,
-            "max_angular": inp.descriptor.rep2.nang,
-            "atomic_gaussian_width": inp.descriptor.rep2.sig,
-            "center_atom_weight": 1.0,
-            "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
+
+            "density": {
+                "type": "SmearedPowerLaw",
+                "smearing": inp.descriptor.rep2.sig,
+                "exponent": 1
+            },
+            "basis": {
+                "type": "TensorProduct",
+                "max_angular": inp.descriptor.rep2.nang,
+                "radial": {
+                    "type": "Gto",
+                    "max_radial": inp.descriptor.rep2.nrad-1,
+                    "radius": inp.descriptor.rep2.rcut
+                },
+                "spline_accuracy": 1e-06
+            }
         }
 
         return (

@@ -118,7 +118,7 @@ def build():
 
     start = time.time()
 
-    start_rascaline = time.time()
+    start_featomic = time.time()
 
     # Read frames
     frames = read(filename_pred,":")
@@ -132,7 +132,7 @@ def build():
     v1 = np.transpose(omega1,(2,0,3,1))
     v2 = np.transpose(omega2,(2,0,3,1))
     
-    print("rascaline time (sec) = ",time.time()-start_rascaline,flush=True)
+    print("featomic time (sec) = ",time.time()-start_featomic,flush=True)
 
     if saltedtype=="density":
 
