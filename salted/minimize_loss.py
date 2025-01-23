@@ -503,6 +503,8 @@ def build():
                 r += 2.0 * regul * w
             if rank == 0:
                 print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
+            if np.linalg.norm(r) < gradtol:
+                break
             d = np.multiply(P, r)
             delnew = np.dot(r, d)
         else:
