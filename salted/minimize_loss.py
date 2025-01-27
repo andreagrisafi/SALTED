@@ -168,7 +168,7 @@ def build():
         # init gradient
         gradient = np.zeros(totsize)
 
-        if saltedtype=="density":
+        if saltedtype=="density" or saltedtype=="ghost-density":
 
             loss = 0.0
             # loop over training structures
@@ -260,7 +260,7 @@ def build():
         # init gradient
         gradient = np.zeros(totsize)
 
-        if saltedtype=="density":
+        if saltedtype=="density" or saltedtype=="ghost-density":
 
             # loop over training structures
             for iconf in range(ntrain):
@@ -359,7 +359,7 @@ def build():
 
         Ad = np.zeros((totsize))
 
-        if saltedtype=="density":
+        if saltedtype=="density" or saltedtype=="ghost-density":
 
             for iconf in range(ntrain):
                 psi_x_dire = sparse.csr_matrix.dot(psi_list[iconf],cg_dire)
@@ -391,7 +391,7 @@ def build():
             np.load(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf}.npy"))
         )
         # load feature vector as a scipy sparse object
-        if saltedtype=="density":
+        if saltedtype=="density" or saltedtype=="ghost-density":
             psi_list.append(sparse.load_npz(osp.join(
               saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
             )))

@@ -106,8 +106,6 @@ for iconf in conf_range:
             sys.exit(0)
     
         # save coefficients vector in SALTED format
-        #if natoms%2 != 0:
-        #    coefficients = np.sum(coefficients,axis=1)
         np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), coefficients)
 
 
@@ -125,6 +123,24 @@ for iconf in conf_range:
 
             # save coefficients vector in SALTED format
             np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"{icart}", f"coefficients_conf{iconf}.npy"), coefficients)
+
+    elif inp.salted.saltedtype=="ghost-density":
+
+        # load density coefficients and check dimension
+        coefficients = np.loadtxt(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", inp.qm.coeffile))
+
+        if coefficients.shape[0] != nRI:
+            print("ERROR: basis set size does not correspond to size of coefficients vector!")
+            sys.exit(0)
+
+        if coefficients.shape[1] != 2:
+            print("ERROR: spin up and spin down densities are required to compute ghost-electron coefficients!")
+            sys.exit(0)
+
+        # save coefficients vector in SALTED format
+        coefs_up = coefficients[:,0]
+        coefs_down = coefficients[:,1]
+        np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), coefs_up-coefs_down)
 
     ## save projections vector in SALTED format
     #projections = np.dot(overlap,coefficients)

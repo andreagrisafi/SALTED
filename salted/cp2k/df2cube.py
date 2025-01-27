@@ -365,7 +365,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
         print("Integral = ", nele)
 
         # compute error as a fraction of electronic charge
-        if refcube and saltedtype=="density":
+        if refcube and saltedtype != "density-response":
             error = np.sum(abs(rhor-rho_qm))*dx*dy*dz/nele
             print("% MAE =", error*100)
         
