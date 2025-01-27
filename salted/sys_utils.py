@@ -657,7 +657,7 @@ class ParseConfig:
                     False,
                     "density",
                     str,
-                    lambda inp, val: val in ("density", "density-response"),
+                    lambda inp, val: val in ("density", "density-response", "ghost-density"),
                 ),  # salted target
             },
             "system": {

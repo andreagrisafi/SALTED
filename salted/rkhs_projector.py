@@ -33,7 +33,7 @@ def build():
 
     sdir = os.path.join(saltedpath, f"equirepr_{saltedname}")
 
-    if saltedtype == "density":
+    if saltedtype == "density" or saltedtype=="ghost-density":
 
         # compute rkhs projector and save
         features = h5py.File(os.path.join(sdir,f"FEAT_M-{Menv}.h5"),'r')

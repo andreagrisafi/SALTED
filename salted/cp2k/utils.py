@@ -177,3 +177,112 @@ def compute_polarizability(geom,natoms,atomic_symbols,lmax,nmax,species,charge_i
                             iaux += 1
 
     return alpha
+
+def init_ghost_integrals(inp,cell,lmax,nmax,species):
+    """Compute the geometric integrals required to compute the center of charge of a 3D-periodic ghost electron-density following the topological definition derived from the modern theory of polarization. A fixed orthorombic cell is assumed."""
+
+    bohr2angs = 0.529177210670
+    cell /= bohr2angs
+
+    kmin = np.zeros((3,3))
+    kmin[0] = np.array([2*np.pi/cell[0,0],0.0,0.0])
+    kmin[1] = np.array([0.0,2*np.pi/cell[1,1],0.0])
+    kmin[2] = np.array([0.0,0.0,2*np.pi/cell[2,2]])
+
+    # Get CP2K basis set information 
+    bdir = osp.join(inp.salted.saltedpath,"basis")
+    alphas = {}
+    contra = {}
+    for spe in species:
+        for l in range(lmax[spe]+1):
+            alphas[(spe,l)] = np.atleast_1d(np.loadtxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat")))
+            contra[(spe,l)] = np.atleast_2d(np.loadtxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-contra-L{l}.dat")))
+
+    # Compute basis function integrals 
+    kmin_integrals = {}
+    for spe in species:
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                npgf = len(alphas[(spe,l)])
+                # Compute inner product between contracted Gaussian-type functions 
+                inner = 0.0
+                for ipgf1 in range(npgf):
+                    for ipgf2 in range(npgf):
+                        # Compute primitive integral \int_0^\infty dr r^2 r^{2l} \exp[-r^2/\sigma^2]
+                        inner += contra[(spe,l)][n,ipgf1] * contra[(spe,l)][n,ipgf2] * 0.5 * special.gamma(l+1.5) / ( (alphas[(spe,l)][ipgf1] + alphas[(spe,l)][ipgf2])**(l+1.5) )
+                # Loop over the 3 Cartesian directions
+                for ik in range(3):
+                    knorm = np.linalg.norm(kmin[ik])
+                    kmin_radint = 0.0 
+                    # Perform contraction over primitive GTOs
+                    for ipgf in range(npgf):
+                        # Compute Gaussian sigma 
+                        sigma = np.sqrt(0.5/alphas[(spe,l)][ipgf])
+                        # Compute \int_0^\infty dr r^2 * r^{l} * \exp[-r^2/(2\sigma^2)] * j_l(k_min*r) 
+                        kmin_radint += contra[(spe,l)][n,ipgf] * knorm**l * np.exp(-0.5*(knorm*sigma)**2) * np.sqrt(np.pi/2.0) * sigma**(3+2*l)
+                    # Normalize
+                    kmin_integrals[(ik,spe,l,n)] = kmin_radint / np.sqrt(inner)
+
+    kmin_harmonics = {}
+    for ik in range(3):
+        theta = np.arccos(kmin[ik,2]/np.linalg.norm(kmin[ik]))
+        phi = np.arctan2(kmin[ik,1],kmin[ik,0])
+        for spe in species:
+            for l in range(lmax[spe]+1):
+                kmin_harmonics[(ik,spe,l)] = np.zeros(2*l+1,complex)
+                for im in range(2*l+1):
+                    m = im-l
+                    kmin_harmonics[(ik,spe,l)][im] = special.sph_harm(m, l, phi, theta)
+
+    return [kmin_integrals,kmin_harmonics]
+
+def compute_ghost_center(geom,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,kmin_integrals,kmin_harmonics,coefs):
+    """Compute the center of charge of a 3D-periodic ghost electron-density following the topological definition derived from the modern theory of polarization."""
+
+    geom.wrap()
+    bohr2angs = 0.529177210670
+    coords = geom.get_positions()/bohr2angs
+    cell = geom.get_cell()/bohr2angs
+    all_symbols = geom.get_chemical_symbols()
+    all_natoms = int(len(all_symbols))
+
+    # Compute total charge 
+    charge = 0.0
+    iaux = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                if l==0:
+                    charge += charge_integrals[(spe,l,n)] * coefs[iaux]
+                iaux += 2*l+1
+    print("Charge before normalization = ", charge)   
+ 
+    kmin = np.zeros((3,3))
+    kmin[0] = np.array([2*np.pi/cell[0,0],0.0,0.0])
+    kmin[1] = np.array([0.0,2*np.pi/cell[1,1],0.0])
+    kmin[2] = np.array([0.0,0.0,2*np.pi/cell[2,2]])
+
+    # Compute center of charge
+    center_of_charge = np.zeros(3)
+    for ik in range(3):
+        iaux = 0
+        fourier_coef = 0.0+0.0j 
+        for iat in range(all_natoms):
+            phase_factor = np.exp(- 1.0j * np.dot(kmin[ik],coords[iat]))
+            spe = all_symbols[iat]
+            if spe in species:
+                for l in range(lmax[spe]+1):
+                    for n in range(nmax[(spe,l)]):
+                        for im in range(2*l+1):
+                            if l==0:
+                               # Rescale coefficients to ensure total charge integrates to 1 electron
+                               coefs[iaux] *= 1.0/charge
+                            # Collect contributions
+                            fourier_coef += (-1.0j)**l * phase_factor * coefs[iaux] * kmin_integrals[(ik,spe,l,n)] * kmin_harmonics[(ik,spe,l)][im]
+                            iaux += 1
+        fourier_coef *= 4*np.pi
+        berry_phase = np.imag(np.log(fourier_coef))
+        center_of_charge[ik] = berry_phase * (-1.0/kmin[ik,ik])
+        
+    return center_of_charge 

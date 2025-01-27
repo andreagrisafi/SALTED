@@ -87,7 +87,7 @@ def build():
 
     frames = read(filename,":")
 
-    if saltedtype=="density":
+    if saltedtype=="density" or saltedtype=="ghost-density":
 
         # Load feature space sparsification information if required
         if sparsify:

@@ -83,7 +83,7 @@ def build():
                         Mspe[spe] += 1
             itot += 1
 
-    if saltedtype=="density":
+    if saltedtype=="density" or saltedtype=="ghost-density":
 
         # Load sparsification details if needed
         if sparsify:

@@ -145,7 +145,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
         start = time.time()
 
-        if inp.salted.saltedtype=="density":
+        if inp.salted.saltedtype=="density" or saltedtype=="ghost-density":
 
             # load reference QM data
             ref_coefs = np.load(osp.join(
