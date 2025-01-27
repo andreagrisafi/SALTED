@@ -12,7 +12,12 @@ def build():
     # check for destructive interactions
     if inp.system.average == True and inp.salted.saltedtype == "density-response":
         raise ValueError(
-            "Invalid configuration: 'average' cannot be True when 'saltedtype' is 'density-response'. Please change your input settings."
+            "Invalid configuration: 'average' must be set to False when 'saltedtype' is 'density-response'. Please change your input settings."
+        )
+
+    if inp.system.average == True and inp.salted.saltedtype == "ghost-density":
+        raise ValueError(
+            "Invalid configuration: 'average' must be set to False when 'saltedtype' is 'ghost-density'. Please change your input settings."
         )
 
     # Precompute and save the required Wigner-3j symbols and Clebsch-Gordan, depending on SALTED target

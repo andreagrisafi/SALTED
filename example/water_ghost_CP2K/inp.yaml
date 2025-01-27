@@ -1,0 +1,50 @@
+# workflow label and root directory
+salted:
+  saltedname: test
+  saltedpath: ./
+  saltedtype: ghost-density
+
+# system general parameters
+system:
+  filename: ./conf_1_ext.xyz
+  species: [H, O]
+  parallel: False 
+
+# quantum mechanical info
+qm:
+  path2qm: ./
+  qmcode: cp2k 
+  dfbasis: RI_TZVP_GTH 
+  periodic: 3D 
+  pseudocharge: 6.0
+  coeffile: aa
+  ovlpfile: aa 
+
+# descriptor parameters 
+descriptor:
+  rep1:
+    type: rho
+    rcut: 4.0
+    sig: 0.3
+    nrad: 8
+    nang: 6
+    neighspe: [H, O]
+  rep2:
+    type: rho
+    rcut: 4.0
+    sig: 0.3
+    nrad: 8
+    nang: 6
+    neighspe: [H, O]
+  sparsify:
+    nsamples: 100
+    ncut: 1000
+
+# Gaussian process regression variables
+gpr:
+  z: 2.0
+  Menv: 100
+  Ntrain: 1000
+  trainfrac: 1.0
+  trainsel: sequential
+  #blocksize: 250
