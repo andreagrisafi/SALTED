@@ -181,9 +181,6 @@ def compute_polarizability(geom,natoms,atomic_symbols,lmax,nmax,species,charge_i
 def init_ghost_integrals(inp,cell,lmax,nmax,species):
     """Compute the geometric integrals required to compute the center of charge of a 3D-periodic ghost electron-density following the topological definition derived from the modern theory of polarization. A fixed orthorombic cell is assumed."""
 
-    bohr2angs = 0.529177210670
-    cell /= bohr2angs
-
     kmin = np.zeros((3,3))
     kmin[0] = np.array([2*np.pi/cell[0,0],0.0,0.0])
     kmin[1] = np.array([0.0,2*np.pi/cell[1,1],0.0])
