@@ -4,6 +4,7 @@ import time
 import os.path as osp
 import numpy as np
 from scipy import special
+from salted.sph_utils import complex_to_real_transformation
 
 def init_moments(inp,species,lmax,nmax,rank):
     """Compute basis function integrals relevant for computing total charge, dipole and polarizability tensor"""
@@ -270,13 +271,16 @@ def compute_ghost_center(geom,natoms,atomic_symbols,lmax,nmax,species,charge_int
             spe = all_symbols[iat]
             if spe in species:
                 for l in range(lmax[spe]+1):
+                    c2r = complex_to_real_transformation([2*l+1])[0]
                     for n in range(nmax[(spe,l)]):
+                        if l==0:
+                           # Rescale coefficients to ensure total charge integrates to 1 electron
+                           coefs[iaux] *= 1.0/charge
+                        # make coefficients complex
+                        coefs_complex = np.array(np.dot(np.conj(c2r).T,coefs[iaux:iaux+2*l+1]),complex)
                         for im in range(2*l+1):
-                            if l==0:
-                               # Rescale coefficients to ensure total charge integrates to 1 electron
-                               coefs[iaux] *= 1.0/charge
                             # Collect contributions
-                            fourier_coef += (-1.0j)**l * phase_factor * coefs[iaux] * kmin_integrals[(ik,spe,l,n)] * kmin_harmonics[(ik,spe,l)][im]
+                            fourier_coef += (-1.0j)**l * phase_factor * coefs_complex[im] * kmin_integrals[(ik,spe,l,n)] * kmin_harmonics[(ik,spe,l)][im]
                             iaux += 1
         fourier_coef *= 4*np.pi
         berry_phase = np.imag(np.log(fourier_coef))
