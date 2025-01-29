@@ -277,7 +277,7 @@ def compute_ghost_center(geom,natoms,atomic_symbols,lmax,nmax,species,charge_int
                            # Rescale coefficients to ensure total charge integrates to 1 electron
                            coefs[iaux] *= 1.0/charge
                         # make coefficients complex
-                        coefs_complex = np.array(np.dot(np.conj(c2r).T,coefs[iaux:iaux+2*l+1]),complex)
+                        coefs_complex = np.array(np.dot(c2r.T,coefs[iaux:iaux+2*l+1]),complex)
                         for im in range(2*l+1):
                             # Collect contributions
                             fourier_coef += (-1.0j)**l * phase_factor * coefs_complex[im] * kmin_integrals[(ik,spe,l,n)] * kmin_harmonics[(ik,spe,l)][im]
