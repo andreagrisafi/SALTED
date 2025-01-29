@@ -88,7 +88,7 @@ def build():
     # Initialize files for validation results
     efile = init_property_file("errors",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
     if qmcode=="cp2k": 
-        if saltedtype=="density":
+        if saltedtype=="density" or saltedtype=="ghost-density":
             qfile = init_property_file("charges",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
             dfile = init_property_file("dipoles",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
         if saltedtype=="density-response":
@@ -102,7 +102,7 @@ def build():
             saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
         ))
 
-        if saltedtype=="density":
+        if saltedtype=="density" or saltedtype=="ghost-density":
 
             # Load reference coefficients
             ref_coefs = np.load(osp.join(
@@ -232,7 +232,7 @@ def build():
 
     efile.close()
     if qmcode == "cp2k":
-        if saltedtype=="density":
+        if saltedtype=="density" or saltedtype=="ghost-density":
             qfile.close()
             dfile.close()
         if saltedtype=="density-response":
