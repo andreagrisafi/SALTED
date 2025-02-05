@@ -8,7 +8,7 @@ from scipy import sparse
 
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range, init_property_file
-from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
+from salted.cp2k.utils import init_moments, init_ghost_integrals, compute_charge_and_dipole, compute_polarizability, compute_ghost_center
 
 def build():
 
@@ -41,7 +41,7 @@ def build():
     rdir = f"regrdir_{saltedname}"
     fdir = f"rkhs-vectors_{saltedname}"
 
-    # define test set
+    # Define test set
     trainrangetot = np.loadtxt(osp.join(
         saltedpath, rdir, f"training_set_N{Ntrain}.txt"
     ), int)
@@ -57,11 +57,12 @@ def build():
 
     reg_log10_intstr = str(int(np.log10(regul)))
 
-    # load regression weights
+    # Load regression weights
     weights = np.load(osp.join(
         saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{reg_log10_intstr}.npy"
     ))
 
+    # Create validation directories
     dirpath = os.path.join(saltedpath, vdir, f"M{Menv}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}")
     if rank == 0:
         if not os.path.exists(dirpath):
@@ -73,26 +74,35 @@ def build():
                     os.mkdir(cartpath)
     if size > 1: comm.Barrier()
 
+    # Load spherical averages if needed
     if average:
-        # Load spherical averages 
         av_coefs = {}
         for spe in species:
             av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
 
+    # Initialize calculation of derived properties computed from densities in CP2K format 
     if qmcode=="cp2k":
         from ase.io import read
         xyzfile = read(filename, ":")
-        # Initialize calculation of density/density-response moments
-        charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
+        charge_integrals , dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
+        if saltedtype=="ghost-density":
+            if rank==0:
+                "WARNING: Calculation of center of charge of ghost densities assumes fixed orthorombic cells."
+            cell = xyzfile[0].get_cell()
+            bohr2angs = 0.529177210670
+            kmin_integrals , kmin_harmonics = init_ghost_integrals(inp,cell/bohr2angs,lmax,nmax,species)
 
-    # Initialize files for validation results
+    # Initialize files containing validation results
     efile = init_property_file("errors",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
     if qmcode=="cp2k": 
-        if saltedtype=="density" or saltedtype=="ghost-density":
+        if saltedtype=="density":
             qfile = init_property_file("charges",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
             dfile = init_property_file("dipoles",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
         if saltedtype=="density-response":
             pfile = init_property_file("polarizabilities",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+        if saltedtype=="ghost-density":
+            qfile = init_property_file("charges",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+            cfile = init_property_file("centers_of_charge",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
 
     error_density = 0
     variance = 0
@@ -102,7 +112,7 @@ def build():
             saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
         ))
 
-        if saltedtype=="density" or saltedtype=="ghost-density":
+        if saltedtype=="density":
 
             # Load reference coefficients
             ref_coefs = np.load(osp.join(
@@ -154,7 +164,6 @@ def build():
                                   charge,file=qfile)
                 print(iconf+1,ref_dipole["x"],ref_dipole["y"],ref_dipole["z"],
                                   dipole["x"],    dipole["y"],    dipole["z"],file=dfile)
-
             
             # compute error
             error = np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
@@ -167,7 +176,68 @@ def build():
             print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
             print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
+        elif saltedtype=="ghost-density":
+            
+            # Load reference coefficients
+            ref_coefs = np.load(osp.join(
+                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+            ))
+            ref_projs = np.dot(overl,ref_coefs)
+            Tsize = len(ref_coefs)
+
+            # Load RKHS descriptor
+            psivec = sparse.load_npz(osp.join(
+                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+            ))
+            psi = psivec.toarray()
+
+            # Perform prediction
+            pred_coefs = np.dot(psi,weights)
+
+            # Compute predicted density projections <phi|rho>
+            pred_projs = np.dot(overl,pred_coefs)
+
+            np.savetxt(osp.join(dirpath,
+                                f"COEFFS-{iconf+1}.dat"
+            ), pred_coefs)
+
+            if qmcode=="cp2k":
+
+                # Compute reference total charges and dipole moments
+                ref_charge, ref_dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs.copy(),average)
+                # Compute predicted total charges and dipole moments
+                charge, dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs.copy(),average)
+
+                # Save charge 
+                print(iconf+1,ref_charge,
+                                  charge,file=qfile)
                 
+                # Compute center of charge of reference ghost density in atomic units
+                ref_center_of_charge = compute_ghost_center(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,kmin_integrals,kmin_harmonics,ref_coefs)
+                # Compute center of charge of predicted ghost density in atomic units
+                center_of_charge = compute_ghost_center(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,kmin_integrals,kmin_harmonics,pred_coefs)
+                
+                # Convert to angstrom
+                ref_center_of_charge *= bohr2angs
+                center_of_charge *= bohr2angs
+                
+                # Fold within cell
+                for ik in range(3):
+                    ref_center_of_charge[ik] = ref_center_of_charge[ik] % cell[ik,ik]
+                    center_of_charge[ik] = center_of_charge[ik] % cell[ik,ik]
+
+                # Save center of charge in angstrom 
+                print(iconf+1,ref_center_of_charge[0],ref_center_of_charge[1],ref_center_of_charge[2],
+                                  center_of_charge[0],    center_of_charge[1],    center_of_charge[2],file=cfile)
+
+            # compute error
+            error = np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
+            error_density += error
+            var = np.dot(ref_coefs,ref_projs)
+            variance += var
+            print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
+            print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
+    
         elif saltedtype=="density-response":
 
             cart = ["x","y","z"]
@@ -232,11 +302,14 @@ def build():
 
     efile.close()
     if qmcode == "cp2k":
-        if saltedtype=="density" or saltedtype=="ghost-density":
+        if saltedtype=="density":
             qfile.close()
             dfile.close()
         if saltedtype=="density-response":
             pfile.close()
+        if saltedtype=="ghost-density":
+            qfile.close()
+            cfile.close()
 
     if parallel:
         error_density = comm.allreduce(error_density)

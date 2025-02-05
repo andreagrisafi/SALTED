@@ -22,7 +22,7 @@ from salted.sys_utils import (
     read_system,
     init_property_file
 )
-from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
+from salted.cp2k.utils import init_moments, init_ghost_integrals, compute_charge_and_dipole, compute_polarizability, compute_ghost_center
 
 def build():
 
@@ -51,6 +51,7 @@ def build():
         rank = comm.Get_rank()
     #    print('This is task',rank+1,'of',size)
     else:
+        comm = None
         rank = 0
         size = 1
 
@@ -83,10 +84,6 @@ def build():
         f"weights_N{ntrain}_reg{reg_log10_intstr}.npy"
     ))
 
-    if qmcode=="cp2k":
-        # Initialize calculation of density/density-response moments
-        charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
-
     # base directory path for this prediction
     pdir = osp.join(
         saltedpath,
@@ -115,6 +112,9 @@ def build():
             dfile = init_property_file("dipoles",saltedpath,pdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
         if saltedtype=="density-response":
             pfile = init_property_file("polarizabilities",saltedpath,pdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+        if saltedtype=="ghost-density":
+            qfile = init_property_file("charges",saltedpath,pdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+            cfile = init_property_file("centers_of_charge",saltedpath,pdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
 
     start = time.time()
 
@@ -123,6 +123,17 @@ def build():
     # Read frames
     frames = read(filename_pred,":")
     frames = [frames[i] for i in conf_range]
+
+    if qmcode=="cp2k":
+        # Initialize calculation of density/density-response moments
+        charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
+        if saltedtype=="ghost-density":
+            if rank==0:
+                "WARNING: Calculation of center of charge of ghost densities assumes fixed orthorombic cells."
+            cell = frames[0].get_cell()
+            bohr2angs = 0.529177210670
+            kmin_integrals , kmin_harmonics = init_ghost_integrals(inp,cell/bohr2angs,lmax,nmax,species)
+
 
     # Compute atom-density spherical expansion coefficients
     omega1 = sph_utils.get_representation_coeffs(frames,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms_total)
@@ -134,7 +145,7 @@ def build():
     
     print("featomic time (sec) = ",time.time()-start_featomic,flush=True)
 
-    if saltedtype=="density":
+    if saltedtype=="density" or saltedtype=="ghost-density":
 
         # Load feature space sparsification information if required
         if sparsify:
@@ -273,11 +284,30 @@ def build():
             # save predicted coefficients 
             np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
 
+            # Compute derived properties from predicted density when using CP2K format
             if qmcode=="cp2k":
-                # Compute charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(frames[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+                charge, dipole = compute_charge_and_dipole(frames[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs.copy(),average)
                 print(iconf+1,charge,file=qfile)
-                print(iconf+1,dipole["x"],dipole["y"],dipole["z"],file=dfile)
+
+                if saltedtype=="density":
+
+                    print(iconf+1,dipole["x"],dipole["y"],dipole["z"],file=dfile)
+
+                elif saltedtype=="ghost-density":
+
+                    # Compute center of charge of predicted ghost density in atomic units
+                    center_of_charge = compute_ghost_center(frames[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,kmin_integrals,kmin_harmonics,pred_coefs)
+    
+                    # Convert to angstrom
+                    center_of_charge *= bohr2angs
+    
+                    # Fold within cell
+                    for ik in range(3):
+                        center_of_charge[ik] = center_of_charge[ik] % cell[ik,ik]
+    
+                    # Save center of charge in angstrom 
+                    print(iconf+1,center_of_charge[0],center_of_charge[1],center_of_charge[2],file=cfile)
+
     
     elif saltedtype=="density-response":
 
@@ -575,6 +605,9 @@ def build():
             dfile.close()
         if saltedtype=="density-response":
             pfile.close()
+        if saltedtype=="ghost-density":
+            qfile.close()
+            cfile.close()
 
     if rank == 0: print(f"\ntotal time: {(time.time()-start):.2f} s")
 
