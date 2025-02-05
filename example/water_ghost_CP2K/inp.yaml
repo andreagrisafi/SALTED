@@ -1,14 +1,15 @@
 # workflow label and root directory
 salted:
-  saltedname: test
+  saltedname: test-2
   saltedpath: ./
   saltedtype: ghost-density
 
 # system general parameters
 system:
-  filename: ./conf_1_ext.xyz
+  filename: ./coords.xyz
   species: [H, O]
   parallel: False 
+  average: False
 
 # quantum mechanical info
 qm:
@@ -36,15 +37,20 @@ descriptor:
     nrad: 8
     nang: 6
     neighspe: [H, O]
-  sparsify:
-    nsamples: 100
-    ncut: 1000
+  #sparsify:
+  #  nsamples: 100
+  #  ncut: 1000
 
 # Gaussian process regression variables
 gpr:
   z: 2.0
   Menv: 100
-  Ntrain: 1000
+  Ntrain: 2 
   trainfrac: 1.0
   trainsel: sequential
+  regul: 1e-01
   #blocksize: 250
+
+prediction:
+  filename: coords-test.xyz
+  predname: test-pred
