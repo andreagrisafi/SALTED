@@ -85,13 +85,11 @@ def build():
     ))
 
     # base directory path for this prediction
-    pdir = osp.join(
-        saltedpath,
-        f"predictions_{saltedname}_{predname}"
-    )
-    dirpath = osp.join(pdir,
-        f"M{Menv}_zeta{zeta}",
-        f"N{ntrain}_reg{reg_log10_intstr}",
+    pdir = f"predictions_{saltedname}_{predname}"
+    dirpath = osp.join(saltedpath,
+                       pdir,
+                       f"M{Menv}_zeta{zeta}",
+                       f"N{ntrain}_reg{reg_log10_intstr}",
     )
 
     # Create directory for predictions
