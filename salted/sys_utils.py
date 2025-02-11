@@ -758,7 +758,7 @@ class ParseConfig:
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "aims"),
+                    lambda inp, val: check_path_exists(val),
                 ),  # path to the prediction data by QM code, only for AIMS
                 "alpha_only": (
                     False,

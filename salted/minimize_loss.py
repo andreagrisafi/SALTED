@@ -498,22 +498,20 @@ def build():
             r = -grad_func(w, ovlp_list, psi_list)
             if parallel:
                 r = comm.allreduce(r) * norm + 2.0 * regul * w
-                if rank == 0:
-                    # np.sqrt(np.sum((r**2))) == np.linalg.norm(r)
-                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
-                    #print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
             else:
                 r *= norm
                 r += 2.0 * regul * w
+            if rank == 0:
+                print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
+            if np.linalg.norm(r) < gradtol:
+                break
             d = np.multiply(P, r)
             delnew = np.dot(r, d)
         else:
             r -= alpha * Ad
-            if rank == 0:
-                # np.sqrt(np.sum((r**2))) == np.linalg.norm(r)
-                print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
-                #print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
             if np.linalg.norm(r) < gradtol:
+                if rank == 0:
+                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
                 break
             else:
                 s = np.multiply(P, r)
