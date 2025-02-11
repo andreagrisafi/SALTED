@@ -36,7 +36,7 @@ def build():
     charge_integrals = {}
     if inp.qm.qmcode=="cp2k":
         # Initialize calculation of density/density-response moments
-        from salted.cp2k.utils import init_moments
+        from salted.cp2k.utils import init_moments 
         charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,0)
 
     loadstart = time.time()
