@@ -428,12 +428,14 @@ def build():
             r = np.load(rpath)
             s = np.multiply(P, r)
             delnew = np.dot(r, s)
+            loss = loss_func(w, ovlp_list, psi_list)
         else:
             # Print a warning and revert to the else behavior
             print(
                 "Warning: One or more required files to restart do not exist. Reverting to default initialization."
             )
             w = np.ones(totsize) * 1e-04
+            loss = loss_func(w, ovlp_list, psi_list)
             r = -grad_func(w, ovlp_list, psi_list)
             if parallel:
                 r = comm.allreduce(r) * norm + 2.0 * regul * w
@@ -444,6 +446,7 @@ def build():
             delnew = np.dot(r, d)
     else:
         w = np.ones(totsize) * 1e-04
+        loss = loss_func(w, ovlp_list, psi_list)
         r = -grad_func(w, ovlp_list, psi_list)
         if parallel:
             r = comm.allreduce(r) * norm + 2.0 * regul * w
@@ -495,18 +498,34 @@ def build():
                 r,
             )
         if (i+1)%50==0:
-            r = -grad_func(w, ovlp_list, psi_list)
-            if parallel:
-                r = comm.allreduce(r) * norm + 2.0 * regul * w
-            else:
-                r *= norm
-                r += 2.0 * regul * w
+            loss_old = loss.copy()
+            loss = loss_func(w, ovlp_list, psi_list)
             if rank == 0:
-                print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
-            if np.linalg.norm(r) < gradtol:
-                break
-            d = np.multiply(P, r)
-            delnew = np.dot(r, d)
+                print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
+            if loss>loss_old:
+                print("WARNING: loss function increased, search direction reset as the steepest descent.")
+                r = -grad_func(w, ovlp_list, psi_list)
+                if parallel:
+                    r = comm.allreduce(r) * norm + 2.0 * regul * w
+                else:
+                    r *= norm
+                    r += 2.0 * regul * w
+                if np.linalg.norm(r) < gradtol:
+                    break
+                d = np.multiply(P, r)
+                delnew = np.dot(r, d)
+            else:
+                r -= alpha * Ad
+                if np.linalg.norm(r) < gradtol:
+                    if rank == 0:
+                        print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
+                    break
+                else:
+                    s = np.multiply(P, r)
+                    delold = delnew.copy()
+                    delnew = np.dot(r, s)
+                    beta = delnew / delold
+                    d = s + beta * d
         else:
             r -= alpha * Ad
             if np.linalg.norm(r) < gradtol:
