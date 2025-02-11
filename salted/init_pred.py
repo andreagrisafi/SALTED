@@ -36,33 +36,9 @@ def build():
     charge_integrals = {}
     if inp.qm.qmcode=="cp2k":
         # Initialize calculation of density/density-response moments
+        from salted.cp2k.utils import init_moments 
         charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,0)
 
-    #    # get basis set info from CP2K BASIS_LRIGPW_AUXMOLOPT
-    #    alphas = {}
-    #    sigmas = {}
-    #    for spe in species:
-    #        for l in range(lmax[spe]+1):
-    #            avals = np.loadtxt(osp.join(
-    #                saltedpath, "basis", f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat"
-    #            ))
-    #            if nmax[(spe,l)]==1:
-    #                alphas[(spe,l,0)] = float(avals)
-    #                sigmas[(spe,l,0)] = np.sqrt(0.5/alphas[(spe,l,0)]) # bohr
-    #            else:
-    #                for n in range(nmax[(spe,l)]):
-    #                    alphas[(spe,l,n)] = avals[n]
-    #                    sigmas[(spe,l,n)] = np.sqrt(0.5/alphas[(spe,l,n)]) # bohr
-
-    #    # compute integrals of basis functions (needed to a posteriori correction of the charge)
-    #    for spe in species:
-    #        for l in range(lmax[spe]+1):
-    #            charge_integrals_temp = np.zeros(nmax[(spe,l)])
-    #            for n in range(nmax[(spe,l)]):
-    #                inner = 0.5*special.gamma(l+1.5)*(sigmas[(spe,l,n)]**2)**(l+1.5)
-    #                charge_radint = 0.5 * special.gamma(float(l+3)/2.0) / ( (alphas[(spe,l,n)])**(float(l+3)/2.0) )
-    #                charge_integrals[(spe,l,n)] = charge_radint * np.sqrt(4.0*np.pi) / np.sqrt(inner)
-    
     loadstart = time.time()
    
     # Load feature space sparsification information if required 
