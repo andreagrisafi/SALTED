@@ -14,7 +14,7 @@ from salted import sph_utils
 from salted import basis
 from salted.sys_utils import ParseConfig
 
-def build(lmax,nmax,lmax_max,power_env_sparse,Mspe,Vmat,vfps,totsize,ntrain,Avec,Bmat,ref_coefs,over,structure):
+def build(lmax,nmax,lmax_max,power_env_sparse,Mspe,Vmat,vfps,ntrain,Avec,Bmat,ref_coefs,over,structure):
 
     inp = ParseConfig().parse_input()
 
@@ -51,7 +51,16 @@ def build(lmax,nmax,lmax_max,power_env_sparse,Mspe,Vmat,vfps,totsize,ntrain,Avec
         if spe in species:
            atom_idx[spe].append(iat)
            natom_dict[spe] += 1
-    
+   
+    # compute the weight-vector size
+    cuml_Mcut = {}
+    totsize = 0
+    for spe in species:
+        for lam in range(lmax[spe]+1):
+            for n in range(nmax[(spe,lam)]):
+                cuml_Mcut[(spe,lam,n)] = totsize
+                totsize += Vmat[(lam,spe)].shape[1]
+ 
     omega1 = sph_utils.get_representation_coeffs(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe1,species,nang1,nrad1,natoms)
     omega2 = sph_utils.get_representation_coeffs(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe2,species,nang2,nrad2,natoms)
 
@@ -139,12 +148,12 @@ def build(lmax,nmax,lmax_max,power_env_sparse,Mspe,Vmat,vfps,totsize,ntrain,Avec
     psi_nonzero = arraylist()
 
     i = 0
-    for iat in range(natoms[iconf]):
-        spe = atomic_symbols[iconf][iat]
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
         for l in range(lmax[spe]+1):
             i1 = ispe[spe]*(2*l+1)
             i2 = ispe[spe]*(2*l+1) + 2*l+1
-            x = Psi[(spe,l)][i1:i2]  # 2d array
+            x = psi_nm[(spe,l)][i1:i2]  # 2d array
             nz = np.nonzero(x)  # rwo 0: non-zero row indices, row 1: non-zero column indices
             vals = x[nz]  # 1d array
             for n in range(nmax[(spe,l)]):
