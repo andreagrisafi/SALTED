@@ -240,9 +240,9 @@ def build():
                     )
                     itot += 1
 
-
-
-        loss /= ntrain
+        loss *= norm
+        if parallel:
+            loss = comm.allreduce(loss, op=MPI.SUM)
 
         # add regularization term
         loss += regul * np.dot(weights, weights)
@@ -321,6 +321,11 @@ def build():
                     
                     itot += 1
 
+        if parallel:
+            gradient = comm.allreduce(gradient, op=MPI.SUM) * norm + 2.0 * regul * weights
+        else:
+            gradient *= norm
+            gradient += 2.0 * regul * weights
         return gradient
 
     def precond_func(ovlp_list, psi_list):
@@ -352,13 +357,13 @@ def build():
 
         totsize = psi_list[0].shape[1]
 
-        Ap = np.zeros((totsize))
+        Ad = np.zeros((totsize))
 
         if saltedtype=="density":
 
             for iconf in range(ntrain):
                 psi_x_dire = sparse.csr_matrix.dot(psi_list[iconf],cg_dire)
-                Ap += 2.0 * sparse.csc_matrix.dot(psi_list[iconf].T,np.dot(ovlp_list[iconf],psi_x_dire))
+                Ad += 2.0 * sparse.csc_matrix.dot(psi_list[iconf].T,np.dot(ovlp_list[iconf],psi_x_dire))
 
         elif saltedtype=="density-response":
 
@@ -366,10 +371,16 @@ def build():
             for iconf in range(ntrain):
                 for icart in ["x","y","z"]:
                     psi_x_dire = sparse.csr_matrix.dot(psi_list[itot],cg_dire)
-                    Ap += 2.0 * sparse.csc_matrix.dot(psi_list[itot].T,np.dot(ovlp_list[iconf],psi_x_dire))
+                    Ad += 2.0 * sparse.csc_matrix.dot(psi_list[itot].T,np.dot(ovlp_list[iconf],psi_x_dire))
                     itot += 1
         
-        return Ap
+        if parallel:
+            Ad = comm.allreduce(Ad, op=MPI.SUM) * norm + 2.0 * regul * cg_dire
+        else:
+            Ad *= norm
+            Ad += 2.0 * regul * cg_dire
+
+        return Ad
 
     if rank == 0:
         print("loading matrices...")
@@ -403,6 +414,7 @@ def build():
 
     reg_log10_intstr = str(int(np.log10(regul)))  # for consistency
 
+    init = True
     if restart == True:
         wpath = osp.join(
             saltedpath,
@@ -423,6 +435,7 @@ def build():
             f"rvector_N{ntraintot}_reg{reg_log10_intstr}.npy",
         )
         if osp.exists(wpath) and osp.exists(dpath) and osp.exists(rpath):
+            init = False
             w = np.load(wpath)
             d = np.load(dpath)
             r = np.load(rpath)
@@ -434,25 +447,11 @@ def build():
             print(
                 "Warning: One or more required files to restart do not exist. Reverting to default initialization."
             )
-            w = np.ones(totsize) * 1e-04
-            loss = loss_func(w, ovlp_list, psi_list)
-            r = -grad_func(w, ovlp_list, psi_list)
-            if parallel:
-                r = comm.allreduce(r) * norm + 2.0 * regul * w
-            else:
-                r *= norm
-                r += 2.0 * regul * w
-            d = np.multiply(P, r)
-            delnew = np.dot(r, d)
-    else:
+
+    if init:
         w = np.ones(totsize) * 1e-04
         loss = loss_func(w, ovlp_list, psi_list)
         r = -grad_func(w, ovlp_list, psi_list)
-        if parallel:
-            r = comm.allreduce(r) * norm + 2.0 * regul * w
-        else:
-            r *= norm
-            r += 2.0 * regul * w
         d = np.multiply(P, r)
         delnew = np.dot(r, d)
 
@@ -461,11 +460,6 @@ def build():
     for i in range(100000):
         #loss = loss_func(w, ovlp_list, psi_list)
         Ad = curv_func(d, ovlp_list, psi_list)
-        if parallel:
-            Ad = comm.allreduce(Ad) * norm + 2.0 * regul * d
-        else:
-            Ad *= norm
-            Ad += 2.0 * regul * d
         curv = np.dot(d, Ad)
         alpha = delnew / curv
         w = w + alpha * d
@@ -500,25 +494,21 @@ def build():
         if (i+1)%50==0:
             loss_old = loss.copy()
             loss = loss_func(w, ovlp_list, psi_list)
-            if rank == 0:
-                print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
             if loss>loss_old:
-                print("WARNING: loss function increased, search direction reset as the steepest descent.")
+                if rank == 0:
+                    print(f"WARNING: loss function increased, search direction reset as the steepest descent.")
                 r = -grad_func(w, ovlp_list, psi_list)
-                if parallel:
-                    r = comm.allreduce(r) * norm + 2.0 * regul * w
-                else:
-                    r *= norm
-                    r += 2.0 * regul * w
+                if rank == 0:
+                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
                 if np.linalg.norm(r) < gradtol:
                     break
                 d = np.multiply(P, r)
                 delnew = np.dot(r, d)
             else:
                 r -= alpha * Ad
+                if rank == 0:
+                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
                 if np.linalg.norm(r) < gradtol:
-                    if rank == 0:
-                        print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
                     break
                 else:
                     s = np.multiply(P, r)
@@ -567,7 +557,7 @@ def build():
             ),
             r,
         )
-        print("minimization compleated succesfully!")
+        print("minimization completed succesfully!")
         print(f"minimization time: {((time.time()-start)/60):.2f} minutes")
 
 
