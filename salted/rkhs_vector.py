@@ -195,9 +195,9 @@ def build():
                     else:
 
                         kernel_nm = np.dot(power[lam][atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),power[lam].shape[-1]),power_env_sparse[(lam,spe)].T)
-                        for i1 in range(natom_dict[(iconf,spe)]):
-                            for i2 in range(Mspe[spe]):
-                                kernel_nm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_nm[i1,i2]**(zeta-1)
+                        kernel_nm_blocks = kernel_nm.reshape(natom_dict[(iconf,spe)], 2*lam+1, Mspe[spe], 2*lam+1)
+                        kernel_nm_blocks *= kernel0_nm[:, np.newaxis, :, np.newaxis] ** (zeta - 1)
+                        kernel_nm = kernel_nm_blocks.reshape(natom_dict[(iconf,spe)]*(2*lam+1), Mspe[spe]*(2*lam+1))
                         Psi[(spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))
                 
                     Tsize += natom_dict[(iconf,spe)]*nmax[(spe,lam)]*(2*lam+1)
