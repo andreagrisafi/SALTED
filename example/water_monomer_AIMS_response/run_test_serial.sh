@@ -1,3 +1,4 @@
+python3 -m salted.get_basis_info
 python3 -m salted.initialize
 python3 -m salted.sparse_selection
 python3 -m salted.sparse_descriptor

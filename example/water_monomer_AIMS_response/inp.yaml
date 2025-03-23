@@ -9,7 +9,7 @@ salted:
 system:
   filename: ./water_monomers_1k.xyz
   species: [H, O]
-  parallel: False
+  parallel: True
   average: False
 
 # quantum mechanical info
@@ -40,6 +40,7 @@ gpr:
   z: 2.0
   Menv: 100
   Ntrain: 100
+  blocksize: 10
   trainfrac: 1.0
   trainsel: "random"
   regul: 1e-8

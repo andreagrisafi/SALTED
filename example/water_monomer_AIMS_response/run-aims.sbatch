@@ -14,12 +14,12 @@ export OMP_NUM_THREADS=1
 ulimit -s unlimited
 #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$INTEL_HOME/compilers_and_libraries/linux/lib/intel64/:$MKL_HOME/lib/intel64/:$HOME/.local/lib
 
-QMDIR='/ada/ptmp/mpsd/alewis/water_aligned/qmdata/'
+QMDIR='./'
 AIMS=~/aims.x
 
 DATADIR=${QMDIR}data
 
-python make_geoms.py
+python -m salted.aims.make_geoms
 
 n=$(ls $DATADIR/geoms | grep -c 'in')
 for (( i=1; i<=$n; i++ )); do
@@ -36,5 +36,4 @@ done
 
 wait
 
-srun -n 72 python move_data.py
-srun -n 72 python move_rho1_data.py
+srun -n 72 python -m salted.aims.move_data

@@ -2,6 +2,7 @@ from ase.io import read
 import numpy as np
 import spherical 
 import quaternionic
+from salted.sys_utils import ParseConfig
 
 def complex_to_real_transformation(sizes):
     """Transformation matrix from complex to real spherical harmonics"""
@@ -20,6 +21,8 @@ def complex_to_real_transformation(sizes):
         transformation_matrix /= np.sqrt(2.0)
         matrices.append(transformation_matrix)
     return matrices
+
+inp = ParseConfig().parse_input()
 
 f = read("water_monomers_1k.xyz",":")
 
@@ -124,7 +127,7 @@ np.save("Dreal_L1_from_"+str(itest)+"_to_0.npy",D_real)
 #print(cvec_1)
 #print(np.dot(D_real,cvec_2))
 
-path2qm = "./"
+path2qm = inp.qm.path2qm
 
 # L=0 covariance test
 print("L=0 : ")

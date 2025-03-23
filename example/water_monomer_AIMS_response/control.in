@@ -15,11 +15,10 @@
   ri_rho1 write
   ri_full_output .True.
 #  ri_output_density_only .True.
- DFPT dielectric
+  DFPT polarizability
   sc_accuracy_rho    1d-6
 #  use_calculate_fock_matrix_old .false.
 #  output cube total_density
-  k_grid 1 1 1
   wave_threshold 1e-8
   default_prodbas_acc 1e-6
   dfpt_centralised .false.
