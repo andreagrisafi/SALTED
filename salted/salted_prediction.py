@@ -12,9 +12,9 @@ from salted.lib import equicombsparse
 
 from salted import sph_utils
 from salted import basis
-from salted.sys_utils import ParseConfig
+from salted.sys_utils import ParseConfig, get_conf_range
 
-def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,structure):
+def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,comm,size,rank,structure):
 
     inp = ParseConfig().parse_input()
 
@@ -43,20 +43,48 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     for spe in excluded_species:
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
     natoms = int(len(atomic_symbols))
+
+    if parallel:
+
+        if natoms < size:
+            if rank == 0:
+                raise ValueError(
+                    f"More processes {size=} have been requested than atoms {natoms=}. "
+                    f"Please reduce the number of processes."
+                )
+            else:
+                exit()
+        atoms_range = get_conf_range(rank, size, natoms, np.arange(natoms,dtype=int))
+        atoms_range = comm.scatter(atoms_range, root=0)
+        print(
+            f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True
+        )
+
+    else:
+
+        atoms_range = np.arange(natoms,dtype=int)
+
+    natoms_range = int(len(atoms_range))
+    atomic_symbols_range = [atomic_symbols[i] for i in atoms_range]
    
     atom_idx = {}
     natom_dict = {}
     for spe in species:
         atom_idx[spe] = []
         natom_dict[spe] = 0
-    for iat in range(natoms):
-        spe = atomic_symbols[iat]
+    for iat in range(natoms_range):
+        spe = atomic_symbols_range[iat]
         if spe in species:
            atom_idx[spe].append(iat)
            natom_dict[spe] += 1
-    
+   
+    # Compute expansion coefficients of selected structural representations (rep1,rep2)  
     omega1 = sph_utils.get_representation_coeffs(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe1,species,nang1,nrad1,natoms)
     omega2 = sph_utils.get_representation_coeffs(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe2,species,nang2,nrad2,natoms)
+
+    # Retain only the atoms of the given MPI task
+    omega1 = omega1[:,atoms_range]
+    omega2 = omega2[:,atoms_range]
 
     # Reshape arrays of expansion coefficients for optimal Fortran indexing 
     v1 = np.transpose(omega1,(2,0,3,1))
@@ -86,20 +114,20 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
             nfps = len(vfps[lam])
-            p = equicombsparse.equicombsparse(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+            p = equicombsparse.equicombsparse(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
             p = np.transpose(p,(2,0,1))
             featsize = ncut
 
         else:
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
-            p = equicomb.equicomb(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+            p = equicomb.equicomb(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
             p = np.transpose(p,(2,0,1))
 
         if lam==0: 
-            pvec[lam] = p.reshape(natoms,featsize)
+            pvec[lam] = p.reshape(natoms_range,featsize)
         else:
-            pvec[lam] = p.reshape(natoms,2*lam+1,featsize)
+            pvec[lam] = p.reshape(natoms_range,2*lam+1,featsize)
         
         # print("equicomb time:", (time.time()-equistart))
     
@@ -167,23 +195,32 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         Av_coeffs = np.zeros(Tsize)
     
     # fill vector of predictions
-    i = 0
+    itot = 0 
     pred_coefs = np.zeros(Tsize)
     for iat in range(natoms):
         spe = atomic_symbols[iat]
+        if iat in atoms_range:
+            i=0
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    pred_coefs[itot+i:itot+i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
+                    i += 2*l+1
+            ispe[spe] += 1
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
-                pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
                 if average and l==0:
-                    Av_coeffs[i] = av_coefs[spe][n]
-                i += 2*l+1
-        ispe[spe] += 1
+                    Av_coeffs[itot] = av_coefs[spe][n]
+                itot += 2*l+1
     
     # add back spherical averages if required
-    if average:
+    if average and rank==0:
         pred_coefs += Av_coeffs
-    
-    if qmcode=="cp2k":
+   
+    if parallel:
+        comm.Barrier()
+        pred_coefs = comm.allreduce(pred_coefs)
+ 
+    if qmcode=="cp2k" and rank==0:
 
         if inp.salted.saltedtype=="density":
 
@@ -219,7 +256,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                                         pred_coefs[iaux] -= rho_int/(charge_integrals[(spe,l,n)]*natoms)
                             iaux += 1
 
- 
 #    if print("pred time:", time.time()-predstart,flush=True)
     
     return pred_coefs
