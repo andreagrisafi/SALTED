@@ -1,16 +1,21 @@
 import os
-import time
-import sys
 import os.path as osp
+import sys
+import time
 
 import numpy as np
 
-from salted.sys_utils import ParseConfig, sort_grid_data, read_system
+from salted.sys_utils import ParseConfig, read_system, sort_grid_data
 
 
 def main():
+    # load prediction dataset
     inp = ParseConfig().parse_input()
-    spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(
+        filename = inp.prediction.filename,
+        spelist = inp.system.species,
+        dfbasis = inp.qm.dfbasis,
+    )
 
     start_time = time.time()
 
@@ -46,7 +51,7 @@ def main():
 
     g.close()
     av_err = np.average(errs)
-    sem = np.std(errs)/np.sqrt(ndata)
+    # sem = np.std(errs)/np.sqrt(ndata)
 
     print('% MAE =', av_err)
     end_time = time.time()
