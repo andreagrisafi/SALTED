@@ -31,9 +31,10 @@ subroutine dense_dot_sparse(dense_mat, csc_indptr, csc_indices, csc_data, m, k, 
 
     !$omp parallel default(private) shared(result, dense_mat, csc_indptr, csc_indices, csc_data, m, k, n)
 
-    !$omp single
-    print *, "omp_sparse: Using", omp_get_num_threads(), "threads in OpenMP"
-    !$omp end single
+    ! for debugging
+    ! !$omp single
+    ! print *, "omp_sparse: Using", omp_get_num_threads(), "threads in OpenMP"
+    ! !$omp end single
 
     !$omp do schedule(dynamic, 16)
     do j = 1, n ! Loop over columns of sparse matrix

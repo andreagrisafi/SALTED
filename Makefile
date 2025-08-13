@@ -78,7 +78,8 @@ salted/lib/equicombfps.so: src/equicombfps.f90
 	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/equicombfps.f90 -m equicombfps --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombfps.*.so equicombfps.so
 
 salted/lib/omp_sparse.so: src/omp_sparse.f90
-	cd salted/lib; env FFLAGS=$(F90FLAGS) $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/omp_sparse.f90 -m omp_sparse --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv omp_sparse.*.so omp_sparse.so
+	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/omp_sparse.f90 -m omp_sparse --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv omp_sparse.*.so omp_sparse.so; rm -f ../../src/omp_sparse_mod.mod
+# cd salted/lib; env FFLAGS=$(F90FLAGS) $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/omp_sparse.f90 -m omp_sparse --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv omp_sparse.*.so omp_sparse.so; rm -f ../../src/omp_sparse_mod.mod
 
 #salted/lib/gausslegendre.so: src/gausslegendre.f90
 #	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/gausslegendre.f90 -m gausslegendre --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv gausslegendre.*.so gausslegendre.so
