@@ -20,30 +20,14 @@ def dense_dot_sparse(
     dense_matrix: np.ndarray, sparse_matrix: Union[scipy.sparse.coo_matrix, scipy.sparse.csc_matrix]
 ) -> np.ndarray:
     """
-    Multiply dense matrix with sparse matrix using OpenMP acceleration.
-
-    Optimized for SALTED's typical usage patterns:
-    - psi.T @ ref_projs (transpose(sparse) @ dense vector)
-    - psi.T @ (over @ psi) (transpose(sparse) @ dense @ sparse)
+    Compute dense matrix matmul sparse_matrix using OpenMP acceleration.
 
     Args:
         dense_matrix: Dense matrix of shape (M, K) with dtype float64
         sparse_matrix: Sparse matrix of shape (K, N) in COO or CSC format
 
     Returns:
-        Result matrix of shape (M, N) as numpy array
-
-    Example:
-        >>> import numpy as np
-        >>> import scipy.sparse as sp
-        >>> from salted.omp_sparse import dense_dot_sparse
-        >>>
-        >>> # Typical SALTED usage: psi.T @ ref_projs
-        >>> psi_sparse = sp.load_npz("psi_vectors.npz")  # (nfeatures, nsamples)
-        >>> ref_projs = np.load("reference_projections.npy")  # (nfeatures,)
-        >>>
-        >>> # OpenMP accelerated computation
-        >>> result = dense_dot_sparse(psi_sparse.T, ref_projs.reshape(-1, 1))
+        Result matrix (= dense @ sparse) of shape (M, N) as numpy array
     """
     # Input validation
     if not isinstance(dense_matrix, np.ndarray):
@@ -81,31 +65,21 @@ def dense_dot_sparse(
 
 
 def sparse_transpose_dot_dense(
-    sparse_matrix: Union[scipy.sparse.coo_matrix, scipy.sparse.csc_matrix], dense_vector: np.ndarray
+    sparse_matrix: Union[scipy.sparse.coo_matrix, scipy.sparse.csc_matrix], dense_matrix: np.ndarray
 ) -> np.ndarray:
     """
-    Compute sparse_matrix.T @ dense_vector using OpenMP acceleration.
-
-    This is a common pattern in SALTED: psi.T @ ref_projs
+    Compute sparse_matrix.T matmul dense matrix or dense vector using OpenMP acceleration.
 
     Args:
         sparse_matrix: Sparse matrix of shape (M, N)
-        dense_vector: Dense vector of shape (M,) or (M, K)
+        dense_matrix: Dense matrix of shape (M, K) or dense vector of shape (M,)
 
     Returns:
-        Result vector/matrix of shape (N,) or (N, K)
-
-    Example:
-        >>> # SALTED pattern: Avec += np.dot(psi.T, ref_projs)
-        >>> psi = sp.load_npz("psi_vectors.npz")  # sparse (nfeatures, nsamples)
-        >>> ref_projs = np.load("ref_projs.npy")  # dense (nfeatures,)
-        >>>
-        >>> # OpenMP accelerated operation:
-        >>> result = sparse_transpose_dot_dense(psi, ref_projs)
+        Result vector/matrix (= sparse.T @ dense) of shape (N,) or (N, K)
     """
     # Handle vector input by reshaping to matrix
-    if dense_vector.ndim == 1:
-        dense_vector = dense_vector.reshape(-1, 1)
+    if dense_matrix.ndim == 1:
+        dense_matrix = dense_matrix.reshape(-1, 1)
         squeeze_result = True
     else:
         squeeze_result = False
@@ -113,7 +87,7 @@ def sparse_transpose_dot_dense(
     # Transpose operation: (M,N).T @ (M,K) = (N,K)
     # This is equivalent to: (K,M) @ (M,N) = (K,N), then transpose to (N,K)
     result = dense_dot_sparse(
-        dense_vector.T,  # (K,M)
+        dense_matrix.T,  # (K,M)
         sparse_matrix,  # (M,N)
     ).T  # (N,K)
 
@@ -127,10 +101,10 @@ def _test_wrapper():
     print("Testing SALTED OpenMP Sparse Wrapper")
 
     # Create test matrices similar to SALTED usage
-    nfeatures, nsamples, nvecs = 1000, 800, 50
+    nfeatures, nsamples, nvecs = 1000, 800, 500
 
-    # Create sparse psi matrix (typical SALTED sparse density ~2-5%)
-    psi_sparse = scipy.sparse.random(nfeatures, nsamples, density=0.03, format="csc")
+    # Create sparse psi matrix
+    psi_sparse = scipy.sparse.random(nfeatures, nsamples, density=0.02, format="coo")
 
     # Create dense vectors (typical SALTED reference data)
     ref_projs = np.random.randn(nfeatures).astype(np.float64)
