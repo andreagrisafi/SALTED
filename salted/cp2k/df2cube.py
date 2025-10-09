@@ -45,6 +45,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
 
     # read system
     ndata = len(structure)
+    atomic_symbols_tot = structure.get_chemical_symbols()
     atomic_symbols = structure.get_chemical_symbols()
     valences = structure.get_atomic_numbers()
     coords = structure.get_positions()/bohr2angs
@@ -60,9 +61,16 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
     excluded_species = set(excluded_species)
     for spe in excluded_species:
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
-        valences = list(filter(lambda a: a != spe, valences))
-        coords = list(filter(lambda a: a != spe, coords))
     natoms = int(len(atomic_symbols))
+
+    atoms_idx = []
+    for iat in range(natoms_tot):
+        spe = atomic_symbols_tot[iat]
+        if spe in species:
+            atoms_idx.append(iat)
+
+    valences = valences[atoms_idx]
+    coords = coords[atoms_idx]
 
     # get basis set info 
     bdir = osp.join(saltedpath,"basis")
@@ -202,7 +210,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
         atoms_range = np.arange(natoms,dtype=int) 
 
     natoms_range = int(len(atoms_range))
-    coords_range = coords[atoms_range]
+    coords_range = [coords[i] for i in atoms_range]
     atomic_symbols_range = [atomic_symbols[i] for i in atoms_range]
 
     ncoefs = 0
