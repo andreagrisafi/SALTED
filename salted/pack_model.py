@@ -171,7 +171,7 @@ def pack_projectors(SALTED_file, path, inp):
     write_chunk_location(SALTED_file, "PROJE", begin_of_block)
 
 def pack_FEATS(SALTED_file, path, inp):
-    file_feat = first_match(os.path.join(path, f"equirepr_{inp.salted.saltedname}", f'FEAT_M-{inp.gpr.Menv}_*.h5'))
+    file_feat = first_match(os.path.join(path, f"equirepr_{inp.salted.saltedname}", f'FEAT_M-{inp.gpr.Menv}*.h5'))
     if file_feat is None:
         raise FileNotFoundError(f"No FEAT file found for M={inp.gpr.Menv} in {os.path.join(path, f'equirepr_{inp.salted.saltedname}')}")
     begin_of_block = SALTED_file.tell()
