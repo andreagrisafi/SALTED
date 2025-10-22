@@ -93,6 +93,30 @@ class BasisClient:
             self.data_fpath = os.path.join(
                 self.__salted_package_root, self.DEFAULT_DATA_FNAME
             )
+        if _dev_data_fpath is None:
+            # Try to place the dataset next to the salted package. If that directory is not writable
+            # (e.g. when running inside a read-only container like Apptainer), fall back to the
+            # current working directory so the process can still create and modify the file.
+            try:
+                salted_root = self.__salted_package_root
+                default_path = os.path.join(salted_root, self.DEFAULT_DATA_FNAME)
+                # If the file already exists check file writability, otherwise check directory writability.
+                if os.path.exists(default_path):
+                    writable = os.access(default_path, os.W_OK)
+                else:
+                    writable = os.access(salted_root, os.W_OK)
+                if writable:
+                    self.data_fpath = default_path
+                else:
+                    raise PermissionError("salted package directory not writable")
+            except Exception:
+                fallback = os.path.join(os.getcwd(), self.DEFAULT_DATA_FNAME)
+                print(
+                    f"[{self.__class__.__name__}] WARNING: salted package directory not writable or not available. "
+                    f"Falling back to writing basis data at {fallback}",
+                    file=sys.stderr,
+                )
+                self.data_fpath = fallback
         else:
             print(
                 f"[{self.__class__.__name__}] WARNING: _dev_data_fpath is for development only!!!",
