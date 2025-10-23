@@ -8,6 +8,7 @@ def u32(x):  return struct.pack('<I', x)
 def i32(x):  return struct.pack('<i', x)
 def i64(x):  return struct.pack('<q', x)
 def f64(x):  return struct.pack('<d', x)
+def sbool(x): return struct.pack('<?', x)
 
 from salted.sys_utils import ParseConfig
 #EVERYTHING IS LITTLE ENDIAN!
@@ -242,7 +243,7 @@ def pack_model_info(SALTED_file, inp):
         write_key5(SALTED_file, key)
         if isinstance(value, bool):
             SALTED_file.write(i32(int(types_dict["bool"])))
-            SALTED_file.write(i32(int(value)))
+            SALTED_file.write(sbool(int(value)))
         elif isinstance(value, int):
             SALTED_file.write(i32(int(types_dict["int32"])))
             SALTED_file.write(i32(value))
