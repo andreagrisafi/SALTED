@@ -169,7 +169,7 @@ def pack_projectors(SALTED_file, path, inp):
                 write_data_head(SALTED_file, data)
                 SALTED_file.write(np.asarray(data,dtype='<f8').tobytes())
             print()
-    write_chunk_location(SALTED_file, "PROJE", begin_of_block)
+    write_chunk_location(SALTED_file, "PROJ", begin_of_block)
 
 def pack_FEATS(SALTED_file, path, inp):
     file_feat = first_match(os.path.join(path, f"equirepr_{inp.salted.saltedname}", f'FEAT_M-{inp.gpr.Menv}*.h5'))
@@ -218,6 +218,7 @@ def pack_weights(SALTED_file, path, inp):
 def pack_model_info(SALTED_file, inp):
     inputs = [
         (b"averg", inp.system.average),  #Bools
+	(b"field", False),
         (b"spars", inp.descriptor.sparsify.ncut > 0),
         (b"ncut\0", inp.descriptor.sparsify.ncut),  #int32
         (b"nang1", inp.descriptor.rep1.nang),
@@ -329,7 +330,7 @@ try:
 except ImportError:
     HAS_PYSCF = False
 
-BLOCKS = ["AVERG", "WIG", "FPS", "FEATS", "PROJE", "WEIGH", "CONFG"]
+BLOCKS = ["AVERG", "WIG", "FPS", "FEATS", "PROJ", "WEIGH", "CONFG"]
 if HAS_PYSCF: BLOCKS.append("BASIS")
 N_BLOCKS = len(BLOCKS)
 def write_header(SALTED_file):
