@@ -1,6 +1,7 @@
 import h5py
 import glob, os
 import numpy as np
+import argparse
 
 import struct
 
@@ -29,7 +30,6 @@ from salted.sys_utils import ParseConfig
     #ndims (4 bytes, int32)
     #dims (4*ndims bytes, int32)
     #data (ndims*8 bytes, float64)
-
 
 types_dict = {
     "int32": 0,
@@ -75,13 +75,14 @@ def write_chunk_location(SALTED_file, chunk_name, location):
     #ndims (4 bytes, int32)
     #dims (4*ndims bytes, int32)
     #data (ndims*8 bytes, float64)
-def pack_averages(SALTED_file, path):
-    print("Writing Averages")
+def pack_averages(SALTED_file, path, debug: bool = False):
+    if debug: print("Writing Averages")
     begin_of_block = SALTED_file.tell()
     SALTED_file.write(i32(int(types_dict["float64"])))
-    files = glob.glob(os.path.join(path,"averages",'av*.npy'))
+    files = glob.glob(os.path.join(path,"coefficients","averages",'av*.npy'))
     SALTED_file.write(i32(int(len(files))))
     for file in files:
+        if debug: print(file)
         element = os.path.basename(file).split('.')[0].split("_")[-1]
         write_key5(SALTED_file, element.encode("utf-8"))
         data = np.load(file).astype(np.float64)
@@ -98,15 +99,15 @@ def pack_averages(SALTED_file, path):
     #ndims (4 bytes, int32)
     #dims (4*ndims bytes, int32)
     #data (ndims*8 bytes, float64)
-def pack_wigners(SALTED_file, path, inp):
-    print("Writing Wigners")
+def pack_wigners(SALTED_file, path, inp, debug: bool = False):
+    if debug: print("Writing Wigners")
     begin_of_block = SALTED_file.tell()
     SALTED_file.write(i32(int(types_dict["float64"])))
     files = glob.glob(os.path.join(path,"wigners",f'wigner_lam-*_lmax1-{inp.descriptor.rep1.nang}_lmax2-{inp.descriptor.rep2.nang}.dat'))
     files.sort(key=lambda x: int(x.split("_")[1].split("-")[1]))
     SALTED_file.write(i32(int(len(files))))
     for file in files:
-        print(file)
+        if debug: print(file)
         data = np.loadtxt(file).astype(np.float64)
         write_data_head(SALTED_file, data)
         SALTED_file.write(np.asarray(data,dtype='<f8').tobytes())
@@ -121,15 +122,15 @@ def pack_wigners(SALTED_file, path, inp):
     #ndims (4 bytes, int32)
     #dims (4*ndims bytes, int32)
     #data (ndims*8 bytes, float64)
-def pack_fps(SALTED_file, path, inp):
-    print("Writing FPS")
+def pack_fps(SALTED_file, path, inp, debug: bool = False):
+    if debug: print("Writing FPS")
     begin_of_block = SALTED_file.tell()
     SALTED_file.write(i32(int(types_dict["int64"])))
     files = glob.glob(os.path.join(path, f"equirepr_{inp.salted.saltedname}", f'fps{inp.descriptor.sparsify.ncut}-*.npy'))
     files.sort(key=lambda x: int(x.split("-")[-1].split(".")[0]))
     SALTED_file.write(i32(int(len(files))))
     for file in files:
-        print(file)
+        if debug: print(file)
         data = np.load(file).astype(np.int64)
         write_data_head(SALTED_file, data)
         SALTED_file.write(np.asarray(data,dtype='<i8').tobytes())
@@ -147,52 +148,52 @@ def pack_fps(SALTED_file, path, inp):
         #ndims (4 bytes, int32)
         #dims (4*ndims bytes, int32)
         #data (dim1*dim2*8 bytes, float64)
-def pack_projectors(SALTED_file, path, inp):
+def pack_projectors(SALTED_file, path, inp, debug: bool = False):
     file_proj = first_match(os.path.join(path, f"equirepr_{inp.salted.saltedname}", f'projector_M{inp.gpr.Menv}_zeta{inp.gpr.z:.1f}.h5'))
     if file_proj is None:
         raise FileNotFoundError(f"No projector file found for M={inp.gpr.Menv}, zeta={inp.gpr.z} in {os.path.join(path, f'equirepr_{inp.salted.saltedname}')}")
     begin_of_block = SALTED_file.tell()
-    print(f"Reading {file_proj}")
+    if debug: print(f"Reading {file_proj}")
     SALTED_file.write(i32(int(types_dict["float64"])))
     with h5py.File(file_proj, 'r') as h5file:
         proje = h5file["projectors"]
         SALTED_file.write(i32(int(len(proje.keys()))))
         for key in sorted(proje.keys()):
-            print(key, end=": ")
+            if debug: print(key, end=": ")
             #First 5 bytes are the key as string
             write_key5(SALTED_file, key.encode("utf-8"))
             #Write the number of sub-keys
             SALTED_file.write(i32(int(len(proje[key].keys()))))
             for key2 in sorted(proje[key].keys()):
-                print(key2, end = " ")
+                if debug: print(key2, end = " ")
                 data = np.array(proje[key][key2], dtype=np.float64)
                 write_data_head(SALTED_file, data)
                 SALTED_file.write(np.asarray(data,dtype='<f8').tobytes())
-            print()
+            if debug: print()
     write_chunk_location(SALTED_file, "PROJ", begin_of_block)
 
-def pack_FEATS(SALTED_file, path, inp):
+def pack_FEATS(SALTED_file, path, inp, debug: bool = False):
     file_feat = first_match(os.path.join(path, f"equirepr_{inp.salted.saltedname}", f'FEAT_M-{inp.gpr.Menv}*.h5'))
     if file_feat is None:
         raise FileNotFoundError(f"No FEAT file found for M={inp.gpr.Menv} in {os.path.join(path, f'equirepr_{inp.salted.saltedname}')}")
     begin_of_block = SALTED_file.tell()
-    print(f"Reading {file_feat}")
+    if debug: print(f"Reading {file_feat}")
     SALTED_file.write(i32(int(types_dict["float64"])))
     with h5py.File(file_feat, 'r') as h5file:
         descr = h5file["sparse_descriptors"]
         SALTED_file.write(i32(int(len(descr.keys()))))
         for key in sorted(descr.keys()):
-            print(key, end=": ")
+            if debug: print(key, end=": ")
             #First 5 bytes are the key as string
             write_key5(SALTED_file, key.encode("utf-8"))
             #Write the number of sub-keys
             SALTED_file.write(i32(int(len(descr[key].keys()))))
             for key2 in sorted(descr[key].keys()):
-                print(key2, end = " ")
+                if debug: print(key2, end = " ")
                 data = np.array(descr[key][key2], dtype=np.float64)
                 write_data_head(SALTED_file, data)
                 SALTED_file.write(np.asarray(data,dtype='<f8').tobytes())
-            print()
+            if debug: print()
     write_chunk_location(SALTED_file, "FEATS", begin_of_block)
 
 
@@ -203,11 +204,13 @@ def pack_FEATS(SALTED_file, path, inp):
     #ndims (4 bytes, int32)
     #dims (4*ndims bytes, int32)
     #data (ndims*8 bytes, float64)
-def pack_weights(SALTED_file, path, inp):
+def pack_weights(SALTED_file, path, inp, debug: bool = False):
+    if debug: print("Writing Weights")
     begin_of_block = SALTED_file.tell()
     SALTED_file.write(i32(int(types_dict["float64"])))
     SALTED_file.write(i32(1))
     file = first_match(os.path.join(path, f"regrdir_{inp.salted.saltedname}", f"M{inp.gpr.Menv}_zeta{inp.gpr.z:.1f}", f'weights_N{int(inp.gpr.Ntrain*inp.gpr.trainfrac)}_reg*'))
+    if debug: print(f"Found weights file: {file}")
     if file is None:
         raise FileNotFoundError(f"No weights file found for M={inp.gpr.Menv}, zeta={inp.gpr.z} in {os.path.join(path, f'regrdir_{inp.salted.saltedname}')}")
     data = np.load(file).astype(np.float64)
@@ -215,10 +218,11 @@ def pack_weights(SALTED_file, path, inp):
     SALTED_file.write(np.asarray(data,dtype='<f8').tobytes())
     write_chunk_location(SALTED_file, "WEIGH", begin_of_block)
 
-def pack_model_info(SALTED_file, inp):
+def pack_model_info(SALTED_file, inp, debug: bool = False):
+    if debug: print("Writing Model Info")
     inputs = [
         (b"averg", inp.system.average),  #Bools
-	(b"field", False),
+	    (b"field", False),
         (b"spars", inp.descriptor.sparsify.ncut > 0),
         (b"ncut\0", inp.descriptor.sparsify.ncut),  #int32
         (b"nang1", inp.descriptor.rep1.nang),
@@ -240,7 +244,7 @@ def pack_model_info(SALTED_file, inp):
     ]
     begin_of_block = SALTED_file.tell()
     for key, value in inputs:
-        print(key, value)
+        if debug: print(key, value)
         write_key5(SALTED_file, key)
         if isinstance(value, bool):
             SALTED_file.write(i32(int(types_dict["bool"])))
@@ -286,7 +290,7 @@ def preprocess_shells(basis):
         #N_DIMS (4 bytes, int32)
         #DIMS (nDims*4 bytes, int32)
         #DATA (dim1*8 bytes, float64)
-def pack_basis(SALTED_file, inp):
+def pack_basis(SALTED_file, inp, debug: bool = False):
     try:
         from pyscf import gto
         from pyscf.data.elements import ELEMENTS
@@ -340,20 +344,29 @@ def write_header(SALTED_file):
     #Leave (5+4)*N_Blocks bytes for the block names and locations (5bytes for the name, 4 bytes for the location)
     SALTED_file.write(b'\0'*(5+4)*N_BLOCKS)
     
-def build():
+def build(debug: bool = False):
     inp = ParseConfig().parse_input()
     path = inp.salted.saltedpath
     with open(f"{inp.salted.saltedname}.salted", "wb") as f:
         write_header(f)
-        pack_model_info(f, inp)
-        pack_averages(f, path)
-        pack_wigners(f, path, inp)
-        pack_fps(f, path, inp)
-        pack_FEATS(f, path, inp)
-        pack_projectors(f, path, inp)
-        pack_weights(f, path, inp)
+        pack_model_info(f, inp, debug)
+        pack_averages(f, path, debug)
+        pack_wigners(f, path, inp, debug)
+        pack_fps(f, path, inp, debug)
+        pack_FEATS(f, path, inp, debug)
+        pack_projectors(f, path, inp, debug)
+        pack_weights(f, path, inp, debug)
         if HAS_PYSCF:
-            pack_basis(f, inp)
+            pack_basis(f, inp, debug)
+
 
 if __name__ == "__main__":
-    build()
+    parser = argparse.ArgumentParser()
+    # create a parser obj, which accepts the indexes to calculate, start from 0
+    # formats: 1,2,3 or 1-3 or None (all structures)
+    parser.add_argument(
+        "-v", "--verbose", action='store_true',
+        help="Enable verbose mode",
+    )
+    args = parser.parse_args()
+    build(args.verbose)
