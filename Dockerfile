@@ -4,7 +4,7 @@ FROM python:3.10-bookworm
 SHELL ["/bin/bash", "-c"] 
 WORKDIR /src/temp
 
-#Install Rascaline
+#Install Featomic
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
     && chmod 700 installRust.sh \
     && ./installRust.sh -y \
