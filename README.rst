@@ -1,7 +1,7 @@
 SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
 =========================================================================
 
-.. image:: docs/images/logo.jpg
+.. image:: docs/images/salted-logo.jpg
    :alt: Logo
    :align: center
    :width: 80%
