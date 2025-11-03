@@ -1,5 +1,12 @@
 SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
 =========================================================================
+
+.. image:: docs/images/salted-logo.jpg
+   :alt: Logo
+   :align: center
+   :width: 80%
+
+
 This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant learning and prediction of the electron density of molecular and condensed-phase systems, together with its static linear response function to applied electric fields. This is done by representing the continuous scalar (density) and vector (density-response) fields on a linear basis of atom-centered radial functions and spherical harmonics.
 
 Documentation
