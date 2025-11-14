@@ -29,9 +29,10 @@ ifeq ($(PACKAGING_CHECK),fail)
 endif
 PACKAGING_VERSION := $(shell python -c "import packaging; print(packaging.__version__)")
 
-# Determine if we should use meson backend (NumPy >= 1.23.0) or distutils backend
+# Determine if we should use meson backend (NumPy >= 1.26.0) or distutils backend
 # https://numpy.org/doc/stable/reference/distutils_status_migration.html
 # find more with: conda run -n salted_tut python -m numpy.f2py -c --help-fcompiler
+# this command says: distutils has been deprecated since NumPy 1.26.x
 USE_MESON := $(shell python -c "from packaging import version; import numpy; print('yes' if version.parse(numpy.__version__) >= version.parse('1.26.0') else 'no')" 2>/dev/null || echo "no")
 
 # Check module version, set backend flag and compiler configuration
@@ -39,7 +40,7 @@ ifeq ($(USE_MESON),yes)
     # meson: availability and version (required for meson backend)
     MESON_CHECK := $(shell which meson >/dev/null 2>&1 && echo "ok" || echo "fail")
     ifeq ($(MESON_CHECK),fail)
-        $(error meson is not installed. Required for NumPy >= 1.23 (meson backend). Please install it.)
+        $(error meson is not installed. Required for NumPy >= 1.26 (meson backend). Please install it.)
     endif
     MESON_VERSION := $(shell meson --version)
     # Meson backend: use FC environment variable, not --fcompiler
@@ -53,7 +54,7 @@ else
     # setuptools: availability and version (required for distutils backend)
     SETUPTOOLS_CHECK := $(shell python -c "import setuptools; import sys; sys.exit(0)" 2>/dev/null && echo "ok" || echo "fail")
     ifeq ($(SETUPTOOLS_CHECK),fail)
-        $(error setuptools is not installed. Required for NumPy < 1.23 (distutils backend). Please install it.)
+        $(error setuptools is not installed. Required for NumPy < 1.26 (distutils backend). Please install it.)
     endif
     SETUPTOOLS_VERSION := $(shell python -c "import setuptools; print(setuptools.__version__)")
     SETUPTOOLS_OK := $(shell python -c "from packaging import version; import setuptools; print('yes' if version.parse(setuptools.__version__) < version.parse('60.0') else 'no')")
