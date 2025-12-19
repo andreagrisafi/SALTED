@@ -153,7 +153,8 @@ def build():
             print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
             print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
-            ref_coefs += Av_coeffs
+            if average:
+                ref_coefs += Av_coeffs
 
             if qmcode=="cp2k":
 
