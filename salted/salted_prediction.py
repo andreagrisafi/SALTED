@@ -198,7 +198,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for iat in range(natoms):
             spe = atomic_symbols[iat]
             if average:
-                #nele += pseudocharge
                 nele += pseudocharge_dict[spe]
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
