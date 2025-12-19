@@ -67,6 +67,10 @@ def compute_charge_and_dipole(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,
     coords = geom.get_positions()/bohr2angs
     all_symbols = geom.get_chemical_symbols()
     all_natoms = int(len(all_symbols))
+    
+    pseudocharge_dict = {}
+    for i in range(len(species)):
+        pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
 
     # Compute unnormalized electron-density integral
     iaux = 0
@@ -74,12 +78,15 @@ def compute_charge_and_dipole(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,
     charge = 0.0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        nele += pseudocharge
+        #nele += pseudocharge
+        nele += pseudocharge_dict[spe]
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
                 if l==0:
                     charge += charge_integrals[(spe,l,n)] * coefs[iaux]
                 iaux += 2*l+1
+
+    print(nele)
 
     # Initialize dipole 
     cart = ["y","z","x"]
@@ -94,9 +101,12 @@ def compute_charge_and_dipole(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,
         if spe in species:
             if average:
                 # Add contribution of nuclear pseudocharge to the dipole
-                dipole["x"] += pseudocharge * coords[iat,0] 
-                dipole["y"] += pseudocharge * coords[iat,1] 
-                dipole["z"] += pseudocharge * coords[iat,2] 
+                #dipole["x"] += pseudocharge * coords[iat,0] 
+                dipole["x"] += pseudocharge_dict[spe] * coords[iat,0] 
+                #dipole["y"] += pseudocharge * coords[iat,1] 
+                dipole["y"] += pseudocharge_dict[spe] * coords[iat,1] 
+                #dipole["z"] += pseudocharge * coords[iat,2] 
+                dipole["z"] += pseudocharge_dict[spe] * coords[iat,2] 
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     for im in range(2*l+1):

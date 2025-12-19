@@ -712,7 +712,8 @@ class ParseConfig:
                 "pseudocharge": (
                     False,
                     PLACEHOLDER,
-                    float,
+                    #float,
+                    list,
                     lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
                 ),  # pseudo nuclear charge, only for CP2K
                 "coeffile": (

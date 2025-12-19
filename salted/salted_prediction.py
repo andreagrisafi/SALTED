@@ -54,6 +54,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         if spe in species:
            atom_idx[spe].append(iat)
            natom_dict[spe] += 1
+
+    pseudocharge = inp.qm.pseudocharge
+    pseudocharge_dict = {}
+    for i in range(len(species)):
+        pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
     
     omega1 = sph_utils.get_representation_coeffs(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe1,species,nang1,nrad1,natoms)
     omega2 = sph_utils.get_representation_coeffs(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe2,species,nang2,nrad2,natoms)
@@ -193,7 +198,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for iat in range(natoms):
             spe = atomic_symbols[iat]
             if average:
-                nele += inp.qm.pseudocharge
+                #nele += pseudocharge
+                nele += pseudocharge_dict[spe]
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     if l==0:
