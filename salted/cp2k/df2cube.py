@@ -94,6 +94,10 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
         for l in range(lmax[spe]+1):
              naux += nmax[(spe,l)]*(2*l+1)
     if rank==0: print("Number of auxiliary functions:", naux)
+    if rank==0:
+        if naux != len(coefs):
+            print("Inconsistent number of coefficients and naux: ncoefs = " + str(len(coefs)) + ", naux = " +str(naux))
+            sys.exit(0)
 
     # If total charge density is asked, read in the GTH pseudo-charge and return a radial numpy function
     #if inp.qm.totcharge:
