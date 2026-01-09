@@ -16,3 +16,4 @@ include salted/lib/ovlp2cXYperiodic.so
 include salted/lib/ovlp3cnonperiodic.so  
 include salted/lib/ovlp3c.so  
 include salted/lib/ovlp3cXYperiodic.so
+include salted/lib/openmp_sparse.so

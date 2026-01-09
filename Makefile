@@ -25,7 +25,7 @@ CC=gcc
 init:
 	cd salted/lib; touch __init__.py
 
-f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so salted/lib/equicombsparse.so salted/lib/antiequicomb.so salted/lib/antiequicombsparse.so salted/lib/equicombnonorm.so salted/lib/antiequicombnonorm.so salted/lib/kernelequicomb.so salted/lib/kernelnorm.so salted/lib/equicombfps.so
+f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so salted/lib/equicombsparse.so salted/lib/antiequicomb.so salted/lib/antiequicombsparse.so salted/lib/equicombnonorm.so salted/lib/antiequicombnonorm.so salted/lib/kernelequicomb.so salted/lib/kernelnorm.so salted/lib/equicombfps.so salted/lib/omp_sparse.so
 
 #salted/lib/gausslegendre.so salted/lib/neighlist_ewald.so salted/lib/nearfield_ewald.so salted/lib/lebedev.so
 
@@ -76,6 +76,9 @@ salted/lib/kernelnorm.so: src/kernelnorm.f90
 
 salted/lib/equicombfps.so: src/equicombfps.f90
 	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/equicombfps.f90 -m equicombfps --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombfps.*.so equicombfps.so
+
+salted/lib/omp_sparse.so: src/omp_sparse.f90
+	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/omp_sparse.f90 -m omp_sparse --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv omp_sparse.*.so omp_sparse.so; rm -f ../../src/omp_sparse_mod.mod
 
 #salted/lib/gausslegendre.so: src/gausslegendre.f90
 #	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/gausslegendre.f90 -m gausslegendre --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv gausslegendre.*.so gausslegendre.so

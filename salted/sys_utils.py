@@ -841,6 +841,12 @@ class ParseConfig:
                     str,
                     lambda inp, val: val in ("random", "sequential"),
                 ),  # if shuffle the training set
+                "sparse_algorithm": (
+                    False,
+                    "omp_sparse",
+                    str,
+                    lambda inp, val: val in ("dense", "omp_sparse"),
+                )
             },
         }
 
