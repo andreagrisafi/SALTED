@@ -226,39 +226,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
     if qmcode=="cp2k" and rank==0:
 
-        # compute integral of predicted density
-        iaux = 0
-        rho_int = 0.0
-        nele = 0.0
-        for iat in range(natoms):
-            spe = atomic_symbols[iat]
-            if average:
-                nele += pseudocharge_dict[spe]
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    if l==0:
-                        rho_int += charge_integrals[(spe,l,n)] * pred_coefs[iaux]
-                    iaux += 2*l+1
- 
-        print("charge integral =", rho_int) 
+        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+        print(iconf+1,charge,dipole["x"],dipole["y"],dipole["z"],flush=True) 
 
-
-        # enforce charge conservation 
-        iaux = 0
-        for iat in range(natoms):
-            spe = atomic_symbols[iat]
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    for im in range(2*l+1):
-                        if l==0 and im==0:
-                            if average:
-                                pred_coefs[iaux] *= nele/rho_int
-                            else:
-                                if n==nmax[(spe,l)]-1:
-                                    pred_coefs[iaux] -= rho_int/(charge_integrals[(spe,l,n)]*natoms)
-                        iaux += 1
-
- 
 #    if print("pred time:", time.time()-predstart,flush=True)
     
     return pred_coefs
