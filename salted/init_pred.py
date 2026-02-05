@@ -60,7 +60,7 @@ def build():
     
     print("load time:", (time.time()-loadstart))
     
-    return [lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals]
+    return [lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals]
 
 if __name__ == "__main__":
     build()
