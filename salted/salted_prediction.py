@@ -13,8 +13,9 @@ from salted.lib import equicombsparse
 from salted import sph_utils
 from salted import basis
 from salted.sys_utils import ParseConfig, get_conf_range
+from salted.cp2k.utils import compute_charge_and_dipole
 
-def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,comm,size,rank,structure):
+def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,structure):
 
     inp = ParseConfig().parse_input()
 
@@ -224,14 +225,13 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         comm.Barrier()
         pred_coefs = comm.allreduce(pred_coefs)
 
-    if qmcode=="cp2k" and rank==0:
+    if qmcode=="cp2k":
 
         charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
-        print(iconf+1,charge,dipole["x"],dipole["y"],dipole["z"],flush=True) 
 
 #    if print("pred time:", time.time()-predstart,flush=True)
     
-    return pred_coefs
+    return [pred_coefs,charge,dipole]
 
 if __name__ == "__main__":
     build()
