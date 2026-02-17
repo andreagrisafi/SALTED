@@ -15,6 +15,15 @@ ifeq ($(PYTHON_CHECK),fail)
 endif
 PYTHON_VERSION := $(shell python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 
+# Check if Python version is less than 3.12
+PYTHON_LT_312 := $(shell python -c "import sys; print('yes' if sys.version_info < (3, 12) else 'no')")
+ifeq ($(PYTHON_LT_312),yes)
+    $(warning ***********************************************************************)
+    $(warning * [SUGGESTION] We strongly recommend using Python >= 3.12             *)
+    $(warning * due to changes in numpy build system                                *)
+    $(warning ***********************************************************************)
+endif
+
 # NumPy: availability and version
 NUMPY_CHECK := $(shell python -c "import numpy; import sys; sys.exit(0)" 2>/dev/null && echo "ok" || echo "fail")
 ifeq ($(NUMPY_CHECK),fail)
@@ -51,22 +60,31 @@ ifeq ($(USE_MESON),yes)
     F2PY_LIBS := -lgomp
     $(info [SALTED Build] Using meson backend (Python $(PYTHON_VERSION), NumPy $(NUMPY_VERSION), Meson $(MESON_VERSION)))
 else
-    # setuptools: availability and version (required for distutils backend)
-    SETUPTOOLS_CHECK := $(shell python -c "import setuptools; import sys; sys.exit(0)" 2>/dev/null && echo "ok" || echo "fail")
-    ifeq ($(SETUPTOOLS_CHECK),fail)
-        $(error setuptools is not installed. Required for NumPy < 1.26 (distutils backend). Please install it.)
+    # Distutils backend (NumPy < 1.26) logic
+    PYTHON_LE_311 := $(shell python -c "import sys; print('yes' if sys.version_info <= (3, 11) else 'no')")
+
+    ifeq ($(PYTHON_LE_311),yes)
+        # Python <= 3.11: Check setuptools < 60.0
+        SETUPTOOLS_CHECK := $(shell python -c "import setuptools; import sys; sys.exit(0)" 2>/dev/null && echo "ok" || echo "fail")
+        ifeq ($(SETUPTOOLS_CHECK),fail)
+            $(error setuptools is not installed. Required for NumPy < 1.26 (distutils backend). Please install it.)
+        endif
+        SETUPTOOLS_VERSION := $(shell python -c "import setuptools; print(setuptools.__version__)")
+        SETUPTOOLS_OK := $(shell python -c "from packaging import version; import setuptools; print('yes' if version.parse(setuptools.__version__) < version.parse('60.0') else 'no')")
+
+        ifeq ($(SETUPTOOLS_OK),no)
+            $(error setuptools >= 60.0 detected ($(SETUPTOOLS_VERSION)). Python <= 3.11 with NumPy < 1.26 requires setuptools < 60.0. Please run: pip install setuptools==59.8.0)
+        endif
+        $(info [SALTED Build] Using distutils backend (Python $(PYTHON_VERSION), NumPy $(NUMPY_VERSION), setuptools $(SETUPTOOLS_VERSION)))
+    else
+        # Python > 3.11: distutils is removed. Enforce Meson backend (NumPy >= 1.26).
+        $(error Python $(PYTHON_VERSION) detected with NumPy < 1.26. Python > 3.11 requires NumPy >= 1.26 (Meson backend) because distutils is removed from the standard library.)
     endif
-    SETUPTOOLS_VERSION := $(shell python -c "import setuptools; print(setuptools.__version__)")
-    SETUPTOOLS_OK := $(shell python -c "from packaging import version; import setuptools; print('yes' if version.parse(setuptools.__version__) < version.parse('60.0') else 'no')")
-    # Distutils backend: use --fcompiler and --f90flags
-    ifeq ($(SETUPTOOLS_OK),no)
-        $(error setuptools >= 60.0 detected ($(SETUPTOOLS_VERSION)). Consider downgrading to setuptools<60.0 for distutils backend compatibility, e.g. pip install setuptools==59.8.0)
-    endif
+
     F2PY_COMPILER_VARS :=
     BACKEND_FLAG :=
     F2PY_COMPILER_FLAGS := --fcompiler='gnu95' --f90flags='-fopenmp -O2'
     F2PY_LIBS := -lgomp
-    $(info [SALTED Build] Using distutils backend (Python $(PYTHON_VERSION), NumPy $(NUMPY_VERSION), setuptools $(SETUPTOOLS_VERSION)))
 endif
 
 # WITH INTEL COMPILERS
