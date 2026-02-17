@@ -87,7 +87,7 @@ else
     F2PY_LIBS := -lgomp
 endif
 
-# WITH INTEL COMPILERS
+# WITH INTEL COMPILERS, please do rewrite below if you want to use intel compiler
 #FCOMPILER := 'intelem'
 #F90FLAGS := '-qopenmp'
 #F2PYOPT := "--opt='-O3 -unroll-aggressive -qopt-prefetch -qopt-reportr5'"
