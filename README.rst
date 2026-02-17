@@ -30,10 +30,9 @@ In the SALTED directory, simply run :code:`make`, followed by :code:`pip install
 Dependencies
 ------------
 
-.. note::
-   We strongly recommend using **Python >= 3.12** combined with **NumPy >= 1.26**. 
-   These versions use the modern **Meson** build backend, which is fully supported and more robust. 
-   Older Python versions (<= 3.11) relying on the deprecated ``distutils`` backend may require ``setuptools < 60.0``.
+We strongly recommend using **Python >= 3.12** combined with **NumPy >= 1.26**.
+These versions use the modern **Meson** build backend, which is fully supported and more robust.
+Older Python versions (<= 3.11) relying on the deprecated ``distutils`` backend may require ``setuptools < 60.0``.
 
 --> **featomic**: featomic installation requires a RUST compiler. To install a RUST compiler, run:
 :code:`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
