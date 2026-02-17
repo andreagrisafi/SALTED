@@ -25,6 +25,12 @@ if inp.system.parallel:
     size = comm.Get_size()
     rank = comm.Get_rank()
 
+else:
+
+    comm = None
+    size = 1
+    rank = 0
+
 if rank==0:
 
     dirpath = os.path.join(inp.salted.saltedpath, "coefficients")

@@ -712,7 +712,7 @@ class ParseConfig:
                 "pseudocharge": (
                     False,
                     PLACEHOLDER,
-                    float,
+                    list,
                     lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
                 ),  # pseudo nuclear charge, only for CP2K
                 "coeffile": (
@@ -841,6 +841,12 @@ class ParseConfig:
                     str,
                     lambda inp, val: val in ("random", "sequential"),
                 ),  # if shuffle the training set
+                "sparse_algorithm": (
+                    False,
+                    "omp_sparse",
+                    str,
+                    lambda inp, val: val in ("dense", "omp_sparse"),
+                )
             },
         }
 

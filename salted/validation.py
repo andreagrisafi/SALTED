@@ -134,28 +134,14 @@ def build():
                 # Add spherical averages back 
                 pred_coefs += Av_coeffs
             
-            # Compute predicted density projections <phi|rho>
-            pred_projs = np.dot(overl,pred_coefs)
 
             np.savetxt(osp.join(dirpath,
                                 f"COEFFS-{iconf+1}.dat"
             ), pred_coefs)
 
-            if qmcode=="cp2k":
+            # Compute predicted density projections <phi|rho>
+            pred_projs = np.dot(overl,pred_coefs)
 
-                # Compute reference total charges and dipole moments
-                ref_charge, ref_dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average)
-                # Compute predicted total charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
-                
-
-                # Save charges and dipole moments
-                print(iconf+1,ref_charge,
-                                  charge,file=qfile)
-                print(iconf+1,ref_dipole["x"],ref_dipole["y"],ref_dipole["z"],
-                                  dipole["x"],    dipole["y"],    dipole["z"],file=dfile)
-
-            
             # compute error
             error = np.dot(pred_coefs-ref_coefs,pred_projs-ref_projs)
             error_density += error
@@ -167,7 +153,23 @@ def build():
             print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
             print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
-                
+            if average:
+                ref_coefs += Av_coeffs
+
+            if qmcode=="cp2k":
+
+                # Compute reference total charges and dipole moments
+                ref_charge, ref_dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average)
+                # Compute predicted total charges and dipole moments
+                charge, dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+
+
+                # Save charges and dipole moments
+                print(iconf+1,ref_charge,
+                                  charge,file=qfile)
+                print(iconf+1,ref_dipole["x"],ref_dipole["y"],ref_dipole["z"],
+                                  dipole["x"],    dipole["y"],    dipole["z"],file=dfile)
+
         elif saltedtype=="density-response":
 
             cart = ["x","y","z"]
@@ -214,7 +216,7 @@ def build():
                 # Compute reference and predicted polarizabilities
                 ref_alpha = compute_polarizability(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs)
                 alpha = compute_polarizability(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs)
-                
+
                 # Save polarizabilities
                 print(iconf+1,ref_alpha[("x","x")],ref_alpha[("x","y")],ref_alpha[("x","z")],
                               ref_alpha[("y","x")],ref_alpha[("y","y")],ref_alpha[("y","z")],
@@ -223,12 +225,12 @@ def build():
                                   alpha[("y","x")],    alpha[("y","y")],    alpha[("y","z")],
                                   alpha[("z","x")],    alpha[("z","y")],    alpha[("z","z")],
                                   file=pfile)
-            
+
 
             error_density += error
             variance += var
             print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
-            print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)    
+            print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
     efile.close()
     if qmcode == "cp2k":

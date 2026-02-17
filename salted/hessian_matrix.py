@@ -109,6 +109,43 @@ def build():
         np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
 
 
+def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
+    """
+    Compute sparse matrix operations with fallback logic.
+
+    Args:
+        psivec: Sparse matrix (scipy.sparse)
+        ref_projs: Dense vector/matrix
+        over: Dense overlap matrix
+        sparse_algorithm: "omp_sparse" or "dense"
+
+    Returns:
+        (avec_contrib, bmat_contrib, algorithm_used)
+    """
+    if sparse_algorithm == "omp_sparse":
+        try:
+            from salted.omp_sparse import dense_dot_sparse, sparse_transpose_dot_dense
+
+            # Avec += psi.T @ ref_projs
+            avec_contrib = sparse_transpose_dot_dense(psivec, ref_projs)
+
+            # Bmat += psi.T @ (over @ psi)
+            bmat_contrib = sparse_transpose_dot_dense(psivec, dense_dot_sparse(over, psivec))
+
+            return avec_contrib, bmat_contrib, "omp_sparse"
+
+        except Exception as e:
+            print(f"Warning: OpenMP sparse operations failed ({e}), falling back to dense")
+            # Fall through to dense computation
+
+    # Dense fallback (original behavior)
+    psi_dense = psivec.toarray()
+    avec_contrib = np.dot(psi_dense.T, ref_projs)
+    bmat_contrib = np.dot(psi_dense.T, np.dot(over, psi_dense))
+
+    return avec_contrib, bmat_contrib, "dense"
+
+
 def matrices(trainrange,ntrain,av_coefs,rank):
 
     inp = ParseConfig().parse_input()
@@ -118,6 +155,10 @@ def matrices(trainrange,ntrain,av_coefs,rank):
     Menv = inp.gpr.Menv
     zeta = inp.gpr.z
     fdir = f"rkhs-vectors_{saltedname}"
+    sparse_algorithm = inp.gpr.sparse_algorithm
+
+    if rank == 0:
+        print(f"Using sparse algorithm: {sparse_algorithm}", flush=True)
 
     if inp.salted.saltedtype=="density-response":
         p = sparse.load_npz(osp.join(
@@ -157,7 +198,6 @@ def matrices(trainrange,ntrain,av_coefs,rank):
             psivec = sparse.load_npz(osp.join(
                 saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
             ))
-            psi = psivec.toarray()
 
             if inp.system.average:
 
@@ -178,8 +218,16 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
             ref_projs = np.dot(over,ref_coefs)
 
-            Avec += np.dot(psi.T,ref_projs)
-            Bmat += np.dot(psi.T,np.dot(over,psi))
+            # Use sparse operations with automatic fallback
+            avec_contrib, bmat_contrib, algorithm_used = _compute_sparse_operations(
+                psivec, ref_projs, over, sparse_algorithm
+            )
+            if algorithm_used != sparse_algorithm:
+                # set sparse_algorithm to algorithm_used
+                print(f"Warning: Using fallback dense algorithm for conf {iconf} due to failure in {sparse_algorithm}, set current sparse_algorithm to {algorithm_used}", flush=True)
+                sparse_algorithm = algorithm_used
+            Avec += avec_contrib
+            Bmat += bmat_contrib
 
 
         elif inp.salted.saltedtype=="density-response":
@@ -196,12 +244,15 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 psivec = sparse.load_npz(osp.join(
                     saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
                 ))
-                psi = psivec.toarray()
 
                 ref_projs = np.dot(over,ref_coefs)
 
-                Avec += np.dot(psi.T,ref_projs)
-                Bmat += np.dot(psi.T,np.dot(over,psi))
+                # Use sparse operations with automatic fallback
+                avec_contrib, bmat_contrib, algorithm_used = _compute_sparse_operations(
+                    psivec, ref_projs, over, sparse_algorithm
+                )
+                Avec += avec_contrib
+                Bmat += bmat_contrib
 
         print("conf time =", time.time()-start)
 
