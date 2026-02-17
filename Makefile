@@ -54,7 +54,7 @@ ifeq ($(USE_MESON),yes)
     MESON_VERSION := $(shell meson --version)
     # Meson backend: use FC environment variable, not --fcompiler
     # Meson uses environment variables for compiler flags, NOT --f90flags (that's distutils-only)
-    F2PY_COMPILER_VARS := FC='gfortran' FFLAGS='-fopenmp -O2'
+    F2PY_COMPILER_VARS := FC='gfortran' FFLAGS='-fopenmp -O2' LDFLAGS='-fopenmp'
     BACKEND_FLAG := --backend meson
     F2PY_COMPILER_FLAGS :=
     F2PY_LIBS := -lgomp
