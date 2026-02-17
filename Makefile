@@ -18,10 +18,10 @@ PYTHON_VERSION := $(shell python -c "import sys; print(f'{sys.version_info.major
 # Check if Python version is less than 3.12
 PYTHON_LT_312 := $(shell python -c "import sys; print('yes' if sys.version_info < (3, 12) else 'no')")
 ifeq ($(PYTHON_LT_312),yes)
-    $(warning ***********************************************************************)
-    $(warning * [SUGGESTION] We strongly recommend using Python >= 3.12             *)
-    $(warning * due to changes in numpy build system                                *)
-    $(warning ***********************************************************************)
+    $(warning ************************************************************************)
+    $(warning * [SUGGESTION] Python < 3.12 with NumPy < 1.26 may require extra setup *)
+    $(warning * Consider Python >= 3.12 with NumPy >= 1.26 for a simpler build.      *)
+    $(warning ************************************************************************)
 endif
 
 # NumPy: availability and version
@@ -83,7 +83,7 @@ else
 
     F2PY_COMPILER_VARS :=
     BACKEND_FLAG :=
-    F2PY_COMPILER_FLAGS := --fcompiler='gnu95' --f90flags='-fopenmp -O2'
+    F2PY_COMPILER_FLAGS := --fcompiler=gnu95 --f90flags="-fopenmp -O2"
     F2PY_LIBS := -lgomp
 endif
 
@@ -101,4 +101,4 @@ f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so s
 # Pattern rule for compiling all Fortran modules
 # The % wildcard matches the module name, and $* expands to the matched part
 salted/lib/%.so: src/%.f90
-	cd salted/lib; $(F2PY_COMPILER_VARS) python -m numpy.f2py $(F2PYOPT) -c ../../src/$*.f90 -m $* $(BACKEND_FLAG) $(F2PY_COMPILER_FLAGS) $(F2PY_LIBS); mv $*.*.so $*.so
+	cd salted/lib; $(F2PY_COMPILER_VARS) python -m numpy.f2py $(BACKEND_FLAG) $(F2PY_COMPILER_FLAGS) -c ../../src/$*.f90 -m $* $(F2PY_LIBS); mv $*.*.so $*.so
