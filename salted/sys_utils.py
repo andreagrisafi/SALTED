@@ -123,7 +123,7 @@ def init_property_file(propname,saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intst
 
 
 
-def distribute_jobs(comm, jobs, root=0):
+def distribute_jobs(comm, jobs: list | np.ndarray, root=0) -> list | np.ndarray:
     """
     Distribute a list of jobs (e.g. indices) among MPI ranks using np.array_split for even distribution.
 
@@ -133,21 +133,29 @@ def distribute_jobs(comm, jobs, root=0):
         root: Root rank for scattering (default 0)
 
     Returns:
-        list: Jobs assigned to the current rank.
+        list: Jobs assigned to the current rank, in the same format as the input (list or np.ndarray)
     """
     if comm is None:
         return jobs
+
+    type_jobs = type(jobs)
+    if isinstance(jobs, np.ndarray):
+        restore_format_jobs = np.array
+    elif isinstance(jobs, list):
+        def restore_format_jobs(x):
+            return x.tolist()
+    else:
+        raise ValueError(f"Invalid type for jobs, should be list or numpy.ndarray, but got {type_jobs}")
 
     size = comm.Get_size()
     rank = comm.Get_rank()
 
     jobs_to_scatter = None
     if rank == root:
-        # Use np.array_split to split jobs into 'size' chunks.
         # This handles uneven division automatically (e.g., 10 items, 3 ranks -> 4, 3, 3 or similar)
         chunks = np.array_split(jobs, size)
         # Convert chunks to lists to ensure serializability and consistent return type
-        jobs_to_scatter = [chunk.tolist() for chunk in chunks]
+        jobs_to_scatter = [restore_format_jobs(chunk) for chunk in chunks]
 
     # Scatter the chunks to all ranks
     my_jobs = comm.scatter(jobs_to_scatter, root=root)
