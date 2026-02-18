@@ -5,90 +5,101 @@ all: f2py init
 clean:
 	cd salted; rm -rf lib
 
-LIBDIR = salted/lib
+LIBDIR := salted/lib
 dummy_build_folder := $(shell mkdir -p $(LIBDIR))
 
-F2PYEXE := $(shell which f2py || which f2py3)  # simple expansion, not recursive, won't be re-evaluated
+# Python: availability and version
+PYTHON_CHECK := $(shell python -c "import sys; sys.exit(0)" 2>/dev/null && echo "ok" || echo "fail")
+ifeq ($(PYTHON_CHECK),fail)
+    $(error Python is not installed or not in PATH. Please install it.)
+endif
+PYTHON_VERSION := $(shell python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 
-FCOMPILER='gfortran'
-F90FLAGS='-fopenmp'
-F2PYOPT='-O2'
-LIBS='-lgomp'
-CC=gcc
+# Check if Python version is less than 3.12
+PYTHON_LT_312 := $(shell python -c "import sys; print('yes' if sys.version_info < (3, 12) else 'no')")
+ifeq ($(PYTHON_LT_312),yes)
+    $(warning ************************************************************************)
+    $(warning * [SUGGESTION] Python < 3.12 with NumPy < 1.26 may require extra setup *)
+    $(warning * Consider Python >= 3.12 with NumPy >= 1.26 for a simpler build.      *)
+    $(warning ************************************************************************)
+endif
 
-# WITH INTEL COMPILERS
-#FCOMPILER='intelem'
-#F90FLAGS='-qopenmp'
-#F2PYOPT='-O3 -unroll-aggressive -qopt-prefetch -qopt-reportr5'
-#LIBS='-liomp5 -lpthread' # omp libraries with ifort
+# NumPy: availability and version
+NUMPY_CHECK := $(shell python -c "import numpy; import sys; sys.exit(0)" 2>/dev/null && echo "ok" || echo "fail")
+ifeq ($(NUMPY_CHECK),fail)
+    $(error NumPy is not installed. Please install it.)
+endif
+NUMPY_VERSION := $(shell python -c "import numpy; print(numpy.__version__)")
+
+# packaging: availability and version
+PACKAGING_CHECK := $(shell python -c "import packaging; import sys; sys.exit(0)" 2>/dev/null && echo "ok" || echo "fail")
+ifeq ($(PACKAGING_CHECK),fail)
+    $(error packaging module is not installed. Please install it.)
+endif
+PACKAGING_VERSION := $(shell python -c "import packaging; print(packaging.__version__)")
+
+# Determine if we should use meson backend (NumPy >= 1.26.0) or distutils backend
+# https://numpy.org/doc/stable/reference/distutils_status_migration.html
+# find more with: conda run -n salted_tut python -m numpy.f2py -c --help-fcompiler
+# this command says: distutils has been deprecated since NumPy 1.26.x
+USE_MESON := $(shell python -c "from packaging import version; import numpy; print('yes' if version.parse(numpy.__version__) >= version.parse('1.26.0') else 'no')" 2>/dev/null || echo "no")
+
+# Check module version, set backend flag and compiler configuration
+ifeq ($(USE_MESON),yes)
+    # meson: availability and version (required for meson backend)
+    MESON_CHECK := $(shell which meson >/dev/null 2>&1 && echo "ok" || echo "fail")
+    ifeq ($(MESON_CHECK),fail)
+        $(error meson is not installed. Required for NumPy >= 1.26 (meson backend). Please install it.)
+    endif
+    MESON_VERSION := $(shell meson --version)
+    # Meson backend: use FC environment variable, not --fcompiler
+    # Meson uses environment variables for compiler flags, NOT --f90flags (that's distutils-only)
+    F2PY_COMPILER_VARS := FC='gfortran' FFLAGS='-fopenmp -O2' LDFLAGS='-fopenmp'
+    BACKEND_FLAG := --backend meson
+    F2PY_COMPILER_FLAGS :=
+    F2PY_LIBS := -lgomp
+    $(info [SALTED Build] Using meson backend (Python $(PYTHON_VERSION), NumPy $(NUMPY_VERSION), Meson $(MESON_VERSION)))
+else
+    # Distutils backend (NumPy < 1.26) logic
+    PYTHON_LE_311 := $(shell python -c "import sys; print('yes' if sys.version_info <= (3, 11) else 'no')")
+
+    ifeq ($(PYTHON_LE_311),yes)
+        # Python <= 3.11: Check setuptools < 60.0
+        SETUPTOOLS_CHECK := $(shell python -c "import setuptools; import sys; sys.exit(0)" 2>/dev/null && echo "ok" || echo "fail")
+        ifeq ($(SETUPTOOLS_CHECK),fail)
+            $(error setuptools is not installed. Required for NumPy < 1.26 (distutils backend). Please install it.)
+        endif
+        SETUPTOOLS_VERSION := $(shell python -c "import setuptools; print(setuptools.__version__)")
+        SETUPTOOLS_OK := $(shell python -c "from packaging import version; import setuptools; print('yes' if version.parse(setuptools.__version__) < version.parse('60.0') else 'no')")
+
+        ifeq ($(SETUPTOOLS_OK),no)
+            $(error setuptools >= 60.0 detected ($(SETUPTOOLS_VERSION)). Python <= 3.11 with NumPy < 1.26 requires setuptools < 60.0. Please run: pip install setuptools==59.8.0)
+        endif
+        $(info [SALTED Build] Using distutils backend (Python $(PYTHON_VERSION), NumPy $(NUMPY_VERSION), setuptools $(SETUPTOOLS_VERSION)))
+    else
+        # Python > 3.11: distutils is removed. Enforce Meson backend (NumPy >= 1.26).
+        $(error Python $(PYTHON_VERSION) detected with NumPy < 1.26. Python > 3.11 requires NumPy >= 1.26 (Meson backend) because distutils is removed from the standard library.)
+    endif
+
+    F2PY_COMPILER_VARS :=
+    BACKEND_FLAG :=
+    F2PY_COMPILER_FLAGS := --fcompiler=gnu95 --f90flags="-fopenmp -O2"
+    F2PY_LIBS := -lgomp
+endif
+
+# WITH INTEL COMPILERS, please do rewrite below if you want to use intel compiler
+#FCOMPILER := 'intelem'
+#F90FLAGS := '-qopenmp'
+#F2PYOPT := "--opt='-O3 -unroll-aggressive -qopt-prefetch -qopt-reportr5'"
+#LIBS := '-liomp5 -lpthread' # omp libraries with ifort
 
 init:
 	cd salted/lib; touch __init__.py
 
 f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so salted/lib/equicombsparse.so salted/lib/antiequicomb.so salted/lib/antiequicombsparse.so salted/lib/equicombnonorm.so salted/lib/antiequicombnonorm.so salted/lib/kernelequicomb.so salted/lib/kernelnorm.so salted/lib/equicombfps.so salted/lib/omp_sparse.so
 
-#salted/lib/gausslegendre.so salted/lib/neighlist_ewald.so salted/lib/nearfield_ewald.so salted/lib/lebedev.so
-
-salted/lib/ovlp2c.so: src/ovlp2c.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/ovlp2c.f90 -m ovlp2c --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp2c.*.so ovlp2c.so
-
-salted/lib/ovlp3c.so: src/ovlp3c.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/ovlp3c.f90 -m ovlp3c --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp3c.*.so ovlp3c.so
-
-salted/lib/ovlp2cXYperiodic.so: src/ovlp2cXYperiodic.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/ovlp2cXYperiodic.f90 -m ovlp2cXYperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp2cXYperiodic.*.so ovlp2cXYperiodic.so
-
-salted/lib/ovlp3cXYperiodic.so: src/ovlp3cXYperiodic.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/ovlp3cXYperiodic.f90 -m ovlp3cXYperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp3cXYperiodic.*.so ovlp3cXYperiodic.so
-
-salted/lib/ovlp2cnonperiodic.so: src/ovlp2cnonperiodic.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/ovlp2cnonperiodic.f90 -m ovlp2cnonperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp2cnonperiodic.*.so ovlp2cnonperiodic.so
-
-salted/lib/ovlp3cnonperiodic.so: src/ovlp3cnonperiodic.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/ovlp3cnonperiodic.f90 -m ovlp3cnonperiodic --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv ovlp3cnonperiodic.*.so ovlp3cnonperiodic.so
-
-salted/lib/equicomb.so: src/equicomb.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/equicomb.f90 -m equicomb --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicomb.*.so equicomb.so
-
-salted/lib/equicombfield.so: src/equicombfield.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/equicombfield.f90 -m equicombfield --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombfield.*.so equicombfield.so
-
-salted/lib/equicombsparse.so: src/equicombsparse.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/equicombsparse.f90 -m equicombsparse --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombsparse.*.so equicombsparse.so
-
-salted/lib/antiequicomb.so: src/antiequicomb.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/antiequicomb.f90 -m antiequicomb --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv antiequicomb.*.so antiequicomb.so
-
-salted/lib/antiequicombsparse.so: src/antiequicombsparse.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/antiequicombsparse.f90 -m antiequicombsparse --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv antiequicombsparse.*.so antiequicombsparse.so
-
-salted/lib/equicombnonorm.so: src/equicombnonorm.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/equicombnonorm.f90 -m equicombnonorm --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombnonorm.*.so equicombnonorm.so
-
-salted/lib/antiequicombnonorm.so: src/antiequicombnonorm.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/antiequicombnonorm.f90 -m antiequicombnonorm --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv antiequicombnonorm.*.so antiequicombnonorm.so
-
-salted/lib/kernelequicomb.so: src/kernelequicomb.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/kernelequicomb.f90 -m kernelequicomb --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv kernelequicomb.*.so kernelequicomb.so
-
-salted/lib/kernelnorm.so: src/kernelnorm.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/kernelnorm.f90 -m kernelnorm --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv kernelnorm.*.so kernelnorm.so
-
-salted/lib/equicombfps.so: src/equicombfps.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/equicombfps.f90 -m equicombfps --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv equicombfps.*.so equicombfps.so
-
-salted/lib/omp_sparse.so: src/omp_sparse.f90
-	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/omp_sparse.f90 -m omp_sparse --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv omp_sparse.*.so omp_sparse.so; rm -f ../../src/omp_sparse_mod.mod
-
-#salted/lib/gausslegendre.so: src/gausslegendre.f90
-#	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/gausslegendre.f90 -m gausslegendre --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv gausslegendre.*.so gausslegendre.so
-#
-#salted/lib/neighlist_ewald.so: src/neighlist_ewald.f90
-#	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/neighlist_ewald.f90 -m neighlist_ewald --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv neighlist_ewald.*.so neighlist_ewald.so
-#
-#salted/lib/nearfield_ewald.so: src/nearfield_ewald.f90
-#	cd salted/lib; $(F2PYEXE) --backend meson -c --opt=$(F2PYOPT) ../../src/nearfield_ewald.f90 -m nearfield_ewald --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS); mv nearfield_ewald.*.so nearfield_ewald.so
-#
-#salted/lib/lebedev.so:
-#	cd salted/lib; $(CC) -fPIC -shared -o lebedev.so ../../src/Lebedev-Laikov.c
+# Pattern rule for compiling all Fortran modules
+# The % wildcard matches the module name, and $* expands to the matched part
+salted/lib/%.so: src/%.f90
+	cd salted/lib; $(F2PY_COMPILER_VARS) python -m numpy.f2py $(BACKEND_FLAG) $(F2PY_COMPILER_FLAGS) -c ../../src/$*.f90 -m $* $(F2PY_LIBS); mv $*.*.so $*.so
 
