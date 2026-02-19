@@ -122,7 +122,7 @@ def init_property_file(propname,saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intst
     return pfile
 
 
-def check_MPI_tasks_count(comm, n_items:int, item_name:str="items"):
+def check_MPI_tasks_count(comm, num_items:int, item_name:str="items"):
     """
     Ensures the number of MPI tasks does not exceed the number of items.
     Safe to call in both parallel and serial contexts.
@@ -141,10 +141,10 @@ def check_MPI_tasks_count(comm, n_items:int, item_name:str="items"):
     size = comm.Get_size()
     rank = comm.Get_rank()
 
-    if n_items < size:
+    if num_items < size:
         if rank == 0:
             raise ValueError(
-                f"More tasks {size=} have been requested than {item_name} {n_items=}. "
+                f"More tasks {size=} have been requested than {item_name} {num_items=}. "
                 f"Please reduce the number of tasks."
             )
         else:
