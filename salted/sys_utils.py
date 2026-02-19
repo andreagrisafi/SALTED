@@ -123,7 +123,7 @@ def init_property_file(propname,saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intst
 
 
 
-def distribute_jobs(comm, jobs: list | np.ndarray, root=0) -> list | np.ndarray:
+def distribute_jobs(comm, jobs: list | np.ndarray, root:int=0) -> list | np.ndarray:
     """
     Distribute a list of jobs (e.g. indices) among MPI ranks using np.array_split for even distribution.
 
@@ -138,20 +138,20 @@ def distribute_jobs(comm, jobs: list | np.ndarray, root=0) -> list | np.ndarray:
     if comm is None:
         return jobs
 
-    type_jobs = type(jobs)
-    if isinstance(jobs, np.ndarray):
-        restore_format_jobs = np.array
-    elif isinstance(jobs, list):
-        def restore_format_jobs(x):
-            return x.tolist()
-    else:
-        raise ValueError(f"Invalid type for jobs, should be list or numpy.ndarray, but got {type_jobs}")
-
     size = comm.Get_size()
     rank = comm.Get_rank()
 
     jobs_to_scatter = None
     if rank == root:
+        type_jobs = type(jobs)
+        if isinstance(jobs, np.ndarray):
+            restore_format_jobs = np.array
+        elif isinstance(jobs, list):
+            def restore_format_jobs(x):
+                return x.tolist()
+        else:
+            raise ValueError(f"Invalid type for jobs, should be list or numpy.ndarray, but got {type_jobs}")
+
         # This handles uneven division automatically (e.g., 10 items, 3 ranks -> 4, 3, 3 or similar)
         chunks = np.array_split(jobs, size)
         # Convert chunks to lists to ensure serializability and consistent return type
