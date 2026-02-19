@@ -1,19 +1,13 @@
-"""
-TODO:
-- stop minimization with explicit message from rank 0
-"""
-
 import os
 import os.path as osp
 import random
-import sys
 import time
 
 import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, read_system
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs, get_atom_idx, read_system
 
 
 def build():
@@ -75,6 +69,7 @@ def build():
         rank = comm.Get_rank()
         print(f"This is task {rank+1} of {size}", flush=True)
     else:
+        comm = None
         rank = 0
         size = 1
 
@@ -139,22 +134,9 @@ def build():
     ntraintot = int(trainfrac * Ntrain)
 
     if parallel:
-        if ntraintot < size:
-            if rank == 0:
-                raise ValueError(
-                    f"More processes {size=} have been requested than training structures {ntraintot=}. "
-                    f"Please reduce the number of processes."
-                )
-            else:
-                exit()
-        # if rank == 0 and ntraintot < size:
-        #     print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
-        #     comm.Abort()
-        trainrange = get_conf_range(rank, size, ntraintot, trainrangetot)
-        trainrange = comm.scatter(trainrange, root=0)
-        print(
-            f"Task {rank+1} handles the following structures: {trainrange}", flush=True
-        )
+        check_MPI_tasks_count(comm, ntraintot, "training structures")
+        trainrange = distribute_jobs(comm, trainrangetot[:ntraintot])
+        print(f"Task {rank+1} handles the following structures: {trainrange}", flush=True)
     else:
         trainrange = trainrangetot[:ntraintot]
     ntrain = int(len(trainrange))

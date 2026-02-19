@@ -8,7 +8,7 @@ from scipy import special
 from scipy import sparse
 
 from salted import basis
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range, init_property_file
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, init_property_file
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
 def build(iconf,ref_coefs):

@@ -9,7 +9,7 @@ import numpy as np
 from scipy import sparse
 from ase.data import atomic_numbers
 
-from salted.sys_utils import read_system,get_atom_idx,get_conf_range
+from salted.sys_utils import read_system,get_atom_idx
 
 from salted import sph_utils
 from salted import basis

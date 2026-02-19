@@ -15,12 +15,13 @@ from salted.lib import equicomb, equicombsparse, equicombnonorm, antiequicombnon
 from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
+    check_MPI_tasks_count,
     get_atom_idx,
-    get_conf_range,
     get_feats_projs,
     get_feats_projs_response,
     read_system,
-    init_property_file
+    init_property_file,
+    distribute_jobs
 )
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
@@ -51,6 +52,7 @@ def build():
         rank = comm.Get_rank()
     #    print('This is task',rank+1,'of',size)
     else:
+        comm = None
         rank = 0
         size = 1
 
@@ -59,13 +61,14 @@ def build():
 
     bohr2angs = 0.529177210670
 
-    # Distribute structures to tasks
-    ndata_true = ndata
-    if rank == 0: print(f"The dataset contains {ndata_true} frames.")
+    if rank == 0:
+        print(f"The dataset contains {ndata} frames.")
+
+    # Initialize conf_range for both parallel and serial cases
     if parallel:
-        conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
-        conf_range = comm.scatter(conf_range,root=0)  # List[int]
-        ndata = len(conf_range)
+        check_MPI_tasks_count(comm, ndata, "predicting structures")
+        conf_range = distribute_jobs(comm, list(range(ndata)))
+        ndata = len(conf_range)  # update ndata for each mpi task
         natmax = max(natoms[conf_range])
         print(f"Task {rank+1} handles the following structures: {conf_range}", flush=True)
     else:

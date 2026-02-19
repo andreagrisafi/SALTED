@@ -1,19 +1,18 @@
 import os
 import sys
 import time
+
 import h5py
 import numpy as np
-from scipy import special
 from ase.data import atomic_numbers
 from ase.io import read
+from scipy import special
 
-from salted.lib import equicomb 
-from salted.lib import equicombsparse
-
-from salted import sph_utils
-from salted import basis
-from salted.sys_utils import ParseConfig, get_conf_range
+from salted import basis, sph_utils
 from salted.cp2k.utils import compute_charge_and_dipole
+from salted.lib import equicomb, equicombsparse
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs
+
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,structure):
 
@@ -46,23 +45,10 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     natoms = int(len(atomic_symbols))
   
     if parallel:
-
-        if natoms < size:
-            if rank == 0:
-                raise ValueError(
-                    f"More processes {size=} have been requested than atoms {natoms=}. "
-                    f"Please reduce the number of processes."
-                )
-            else:
-                exit()
-        atoms_range = get_conf_range(rank, size, natoms, np.arange(natoms,dtype=int))
-        atoms_range = comm.scatter(atoms_range, root=0)
-        print(
-            f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True
-        )
-
+        check_MPI_tasks_count(comm, natoms, "atoms")
+        atoms_range = distribute_jobs(comm, np.arange(natoms,dtype=int))
+        print(f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True)
     else:
-
         atoms_range = np.arange(natoms,dtype=int)
 
     natoms_range = int(len(atoms_range))
