@@ -122,6 +122,34 @@ def init_property_file(propname,saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intst
     return pfile
 
 
+def check_MPI_tasks_count(comm, n_items:int, item_name:str="items"):
+    """
+    Ensures the number of MPI tasks does not exceed the number of items.
+    Safe to call in both parallel and serial contexts.
+
+    Args:
+        comm: MPI communicator (can be None, for serial execution)
+        n_items: Total number of items to distribute
+        item_name: Description of the items (for error message)
+
+    Raises:
+        ValueError: If the number of tasks exceeds the number of items
+    """
+    if comm is None:
+        return
+
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+
+    if n_items < size:
+        if rank == 0:
+            raise ValueError(
+                f"More tasks {size=} have been requested than {item_name} {n_items=}. "
+                f"Please reduce the number of tasks."
+            )
+        else:
+            exit()
+
 
 def distribute_jobs(comm, jobs: list | np.ndarray, root:int=0) -> list | np.ndarray:
     """
@@ -135,7 +163,7 @@ def distribute_jobs(comm, jobs: list | np.ndarray, root:int=0) -> list | np.ndar
     Returns:
         list: Jobs assigned to the current rank, in the same format as the input (list or np.ndarray)
     """
-    if comm is None:
+    if comm is None:  # for serial execution
         return jobs
 
     size = comm.Get_size()
@@ -166,9 +194,13 @@ def distribute_jobs(comm, jobs: list | np.ndarray, root:int=0) -> list | np.ndar
 def get_conf_range(rank, size, ntest, testrangetot) -> List[List[int]]:
     """
     DEPRECATED: Please use `distribute_jobs` instead.
-
     This function was used to manually split a range of jobs for MPI scattering.
     It is kept for backward compatibility but may be removed in future versions.
+
+    To replace this function, use:
+    ```python
+    jobs = distribute_jobs(comm, testrangetot[:ntest])
+    ```
     """
     if rank == 0:
         testrange = [[] for _ in range(size)]
