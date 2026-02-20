@@ -1,0 +1,111 @@
+@set PROJECT wat_mon
+@set RUN ENERGY
+&FORCE_EVAL
+  METHOD Quickstep
+    &DFT
+    BASIS_SET_FILE_NAME /opt/software/gaia/prod/3.1.0/cp2k-2024.1-gcc-12.1-zfzq/share/data/BASIS_ccGRB_UZH
+    AUTO_BASIS RI_HFX SMALL
+    POTENTIAL_FILE_NAME /opt/software/gaia/prod/3.1.0/cp2k-2024.1-gcc-12.1-zfzq/share/data/POTENTIAL_UZH
+    &MGRID
+      CUTOFF       800
+      REL_CUTOFF    80
+    &END MGRID
+    &POISSON
+      PERIODIC XYZ
+      POISSON_SOLVER PERIODIC
+    &END POISSON
+    &SCF
+      SCF_GUESS RESTART
+      EPS_SCF 1.0E-8
+      MAX_SCF 1
+      IGNORE_CONVERGENCE_FAILURE TRUE
+      ADDED_MOS 4000
+      CHOLESKY INVERSE
+      &SMEAR  ON
+         METHOD FERMI_DIRAC
+         ELECTRONIC_TEMPERATURE [K] 900
+         #fixmagneticmoment
+      &END SMEAR
+      &DIAGONALIZATION
+          ALGORITHM STANDARD
+      &END DIAGONALIZATION
+      &MIXING
+          METHOD BROYDEN_MIXING
+          ALPHA   0.1
+          BETA    1.5
+          NBROYDEN  8
+      &END MIXING
+    &END SCF
+    &XC
+      &XC_FUNCTIONAL PBE
+      &END XC_FUNCTIONAL
+      &VDW_POTENTIAL
+        POTENTIAL_TYPE  PAIR_POTENTIAL
+        &PAIR_POTENTIAL
+          TYPE  DFTD3
+          R_CUTOFF     1.0583544200000000E+01
+          REFERENCE_FUNCTIONAL PBE
+          PARAMETER_FILE_NAME /opt/software/gaia/prod/3.1.0/cp2k-2024.1-gcc-12.1-zfzq/share/data/dftd3.dat
+        &END PAIR_POTENTIAL
+      &END VDW_POTENTIAL
+      !The following HF section has no effect on the result of the calculation
+      !it is only there because the relevant quantities are only available in RI-HFX
+      &HF
+        FRACTION 0.0 !we do not want any HF
+        &INTERACTION_POTENTIAL
+          !this is completely irrelevant, except that we need a short range potential for the calculation
+          !to go through in PBCs, so IDENTITY (=overlap) is fine
+          POTENTIAL_TYPE TRUNCATED
+          CUTOFF_RADIUS 1.5
+          T_C_G_DATA  /opt/software/gaia/prod/3.1.0/cp2k-2024.1-gcc-12.1-zfzq/share/data/t_c_g.dat
+        &END
+        !This is the critical section
+        &RI
+          RI_METRIC TRUNCATED !this is the metric used for the projection of the density (overlap here)
+           MEMORY_CUT 8
+           #&PRINT
+           #  !Subsection required to have the RI density coefficient printed (in demo-RI_DENSITY_COEFFS.dat)
+           #  &RI_DENSITY_COEFFS
+           #    !MULT_BY_S !uncomment to have the RI coefficients directly multiplied by the metric (overlap here)
+           #  &END
+#          #  !To get the metric 2c integrals, use the following (in demo-RI_2C_INTS.fm), unformated
+           #  &RI_METRIC_2C_INTS
+           #  &END
+           #&END
+         &END
+      &END
+    &END XC
+    &PRINT
+      &BASIS_SET_FILE
+      &END
+    &END PRINT
+  &END DFT
+  &SUBSYS
+      @include cell.sys
+      @include coords.sys
+    &KIND O
+      BASIS_SET ccGRB-D-q6
+      POTENTIAL GTH-PBE-q6
+    &END KIND
+    &KIND H
+      BASIS_SET ccGRB-D-q1
+      POTENTIAL GTH-PBE-q1
+    &END KIND
+  &END SUBSYS
+&END FORCE_EVAL
+&GLOBAL
+  PROJECT ${PROJECT}
+  RUN_TYPE ${RUN}
+  PRINT_LEVEL MEDIUM
+  EXTENDED_FFT_LENGTHS
+&END GLOBAL
+
+
+
+
+
+
+
+
+
+

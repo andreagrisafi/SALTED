@@ -78,13 +78,6 @@
   &SUBSYS
       @include cell.sys
       @include coords.sys
-    #&CELL
-    #  ABC 16.6311514935076 14.402999687565085 33.57927833134   ! Cell vectors (example values)
-    #&END CELL
-    #&TOPOLOGY
-    #  COORD_FILE_FORMAT XYZ
-    #  COORD_FILE_NAME pt111_667.xyz   ! Path to the XYZ file containing atomic coordinates
-    #&END TOPOLOGY
     &KIND O
       BASIS_SET ccGRB-D-q6
       POTENTIAL GTH-PBE-q6
