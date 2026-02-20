@@ -129,7 +129,7 @@ def check_MPI_tasks_count(comm, num_items:int, item_name:str="items"):
 
     Args:
         comm: MPI communicator (can be None, for serial execution)
-        n_items: Total number of items to distribute
+        num_items: Total number of items to distribute
         item_name: Description of the items (for error message)
 
     Raises:
