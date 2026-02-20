@@ -4,7 +4,6 @@
   METHOD Quickstep
     &DFT
     BASIS_SET_FILE_NAME /opt/software/gaia/prod/3.1.0/cp2k-2024.1-gcc-12.1-zfzq/share/data/BASIS_ccGRB_UZH
-    AUTO_BASIS RI_HFX SMALL
     POTENTIAL_FILE_NAME /opt/software/gaia/prod/3.1.0/cp2k-2024.1-gcc-12.1-zfzq/share/data/POTENTIAL_UZH
     &MGRID
       CUTOFF       800
@@ -17,8 +16,7 @@
     &SCF
       SCF_GUESS RESTART
       EPS_SCF 1.0E-8
-      MAX_SCF 1
-      IGNORE_CONVERGENCE_FAILURE TRUE
+      MAX_SCF 300
       ADDED_MOS 4000
       CHOLESKY INVERSE
       &SMEAR  ON
@@ -52,37 +50,7 @@
           PARAMETER_FILE_NAME /opt/software/gaia/prod/3.1.0/cp2k-2024.1-gcc-12.1-zfzq/share/data/dftd3.dat
         &END PAIR_POTENTIAL
       &END VDW_POTENTIAL
-      !The following HF section has no effect on the result of the calculation
-      !it is only there because the relevant quantities are only available in RI-HFX
-      &HF
-        FRACTION 0.0 !we do not want any HF
-        &INTERACTION_POTENTIAL
-          !this is completely irrelevant, except that we need a short range potential for the calculation
-          !to go through in PBCs, so IDENTITY (=overlap) is fine
-          POTENTIAL_TYPE TRUNCATED
-          CUTOFF_RADIUS 1.5
-          T_C_G_DATA  /opt/software/gaia/prod/3.1.0/cp2k-2024.1-gcc-12.1-zfzq/share/data/t_c_g.dat
-        &END
-        !This is the critical section
-        &RI
-          RI_METRIC TRUNCATED !this is the metric used for the projection of the density (overlap here)
-           MEMORY_CUT 8
-           #&PRINT
-           #  !Subsection required to have the RI density coefficient printed (in demo-RI_DENSITY_COEFFS.dat)
-           #  &RI_DENSITY_COEFFS
-           #    !MULT_BY_S !uncomment to have the RI coefficients directly multiplied by the metric (overlap here)
-           #  &END
-#          #  !To get the metric 2c integrals, use the following (in demo-RI_2C_INTS.fm), unformated
-           #  &RI_METRIC_2C_INTS
-           #  &END
-           #&END
-         &END
-      &END
     &END XC
-    &PRINT
-      &BASIS_SET_FILE
-      &END
-    &END PRINT
   &END DFT
   &SUBSYS
       @include cell.sys
