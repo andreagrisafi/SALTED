@@ -3,7 +3,7 @@ Generate training data using CP2K
 
 In what follows, we describe how to generate training electron densities of a dataset made of water monomers and dimers, using the CP2K simulation program. NB: this is made possible through to the official development version of CP2K (https://github.com/cp2k/cp2k).
 
-1. The following input arguments must be added to the :code:`inp.qm` section:
+1. The file inp.yaml is the input file used by salted routines (the description of all keywords is available at https://salted.readthedocs.io/en/latest/input/). The following input arguments must be added to the :code:`inp.qm` section in it:
 
    :code:`qmcode`: define quantum-mechanical code as :code:`cp2k`
 
@@ -23,22 +23,22 @@ In what follows, we describe how to generate training electron densities of a da
 
    :code:`python3 -m salted.cp2k.xyz2sys`
 
-   System cells and coordinates will be automatically saved in folders named :code:`conf_1`, :code:`conf_2`, ... up to the total number of structures in the xyz dataset file, located into the selected :code:`inp.qm.path2qm`. In the dataset file, the cell must be written before each configuration coordinates, even if it does not change.
+   System cells and coordinates are extracted from the dataset of configurations and are saved in folders named :code:`conf_1`, :code:`conf_2` ...  in the path :code:`inp.qm.path2qm`. It is required that in the dataset file, the cell must be written before each configuration coordinates, even if it does not change.
+
+3. Run a converged SCF CP2K calculation and save the obtained wavefunction for each configuration, using the input file :code:`cp2k-inputs/SCF-print.inp`. For this, the input file can be copy in each folders created at the step before and run from there. The writing of a script to automatically do these steps is useful.
+
+4. Restart the CP2K calculation for each configuration, to print the RI fitting coefficients and the overlap integrals using `cp2k-inputs/RI-print.inp` . The auxiliary basis used to project the density is specified in this input.
    
-3. Print auxiliary basis set information from the CP2K automatically generated RI basis set, as described in https://doi.org/10.1021/acs.jctc.6b01041. An example of a CP2K input file can be found in :code:`cp2k-inputs/get_RI-AUTO_basis.inp`. It gives a single output file for all the species, of the contracted basis. The file may be corrupted if the printed numbers have too many digits. In this case, a modification to the cp2k source must be direclty done. From this, create the auxiliary basis files for each atom by running:
+5. Print auxiliary basis set information from the CP2K automatically generated RI basis set, as described in https://doi.org/10.1021/acs.jctc.6b01041. An example of a CP2K input file can be found in :code:`cp2k-inputs/get_RI-AUTO_basis.inp`. This can be done using any configuration, as the auxiliary basis used is the same for all configurations. The output gives a single file for all the species, of the contracted basis of the auxiliary one. Run
 
    :code:`python3 -m salted.cp2k.extract_basis cp2k_basis_filename`
 
-with cp2k_basis_filename the name of the output file.
+with cp2k_basis_filename the name of the output file to create one file per atom.
 
-4. Add the selected auxiliary basis to SALTED by running:
+6. Add the selected auxiliary basis to SALTED by running:
 
    :code:`python3 -m salted.get_basis_info`
 
-4. Run the CP2K calculations for each configuration in the created directories at step 2, using the selected auxiliary basis and print out the training data made of reference RI coefficients and 2-center auxiliary integrals. An example of a CP2K input file can be found in :code:`cp2k-inputs/RI-print.inp`.
-
-5. Run the CP2K calculations for each configuration in the created directories at step 2, using the selected auxiliary basis and print out the training data made of reference RI coefficients and 2-center auxiliary integrals. An example of a CP2K input file can be found in :code:`cp2k-inputs/RI-print.inp`.
-
-6. Set the :code:`inp.qm.coeffile` and :code:`inp.qm.ovlpfile` variables according to the filename of the generated training data and convert them to SALTED format by running:
+7. Set the :code:`inp.qm.coeffile` and :code:`inp.qm.ovlpfile` variables according to the filename of the generated training data and convert them to SALTED format by running:
 
    :code:`python3 -m salted.cp2k.cp2k2salted`
