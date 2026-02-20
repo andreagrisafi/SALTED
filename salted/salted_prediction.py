@@ -6,6 +6,8 @@ import numpy as np
 from scipy import special
 from ase.data import atomic_numbers
 from ase.io import read
+#os.environ["OMP_NUM_THREADS"] = "4"  # or however many cores you want
+#os.environ["OMP_DYNAMIC"] = "FALSE"      # disable dynamic thread adjustment
 
 from salted.lib import equicomb 
 from salted.lib import equicombsparse
@@ -119,9 +121,17 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
             nfps = len(vfps[lam])
+<<<<<<< Updated upstream
             p = equicombsparse.equicombsparse(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+=======
+            start = time.time()
+            p = equicombsparse.equicombsparse(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+            end = time.time()
+            print(str(end-start))
+>>>>>>> Stashed changes
             p = np.transpose(p,(2,0,1))
             featsize = ncut
+            print("done1")
 
         else:
 
@@ -148,6 +158,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
             kernel0_nm = np.dot(pvec[0][atom_idx[spe]],power_env_sparse[(0,spe)].T)
             kernel_nm = kernel0_nm**zeta
             psi_nm[(spe,0)] = np.dot(kernel_nm,Vmat[(0,spe)])
+            print(Vmat[(0,spe)].shape)
+            print(kernel_nm.shape)
+            print(psi_nm[(spe,0)].shape)
 
         # lam > 0
         for lam in range(1,lmax[spe]+1):
@@ -195,6 +208,14 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                 C[(spe,l,n)] = np.dot(psi_nm[(spe,l)],weights[isize:isize+Mcut])
                 isize += Mcut
     
+    l = 0
+    ave_c_n = np.zeros(nmax[(species[0],l)])
+    for n in range(nmax[(species[0],l)]):
+        ave_c_n[n] = np.mean(C[(species[0],l,n)])
+
+    ave_c_n = np.array([C[(species[0],l,n)] for n in range(nmax[(species[0],l)])])
+    np.save("/lus/home/CT9/c1710463/tbernhard/qmmm_salted/pt100_water/dataset_pt100/ave_c_n_2", ave_c_n)
+
     # init averages array if asked
     if average:
         Av_coeffs = np.zeros(Tsize)
@@ -231,7 +252,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
 #    if print("pred time:", time.time()-predstart,flush=True)
     
+<<<<<<< Updated upstream
     return [pred_coefs,charge,dipole]
+=======
+    return pred_coefs, ave_c_n
+>>>>>>> Stashed changes
 
 if __name__ == "__main__":
     build()

@@ -2,7 +2,6 @@ SUBROUTINE equicombsparse(natoms,nang1,nang2,nrad1,nrad2,v1,v2,&
                           wigdim,w3j,llmax,llvec,lam,c2r,&
                           featsize,nfps,vfps,p)
 
-!use omp_lib
 IMPLICIT NONE
 INTEGER:: natoms,nang1,nang2,nrad1,nrad2,llmax,lam,wigdim,ifps,ifeat,n
 INTEGER:: iat,n1,n2,iwig,l1,l2,il,imu,im1,im2,mu,m1,m2,featsize,nfps

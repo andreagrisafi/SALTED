@@ -225,7 +225,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                 grad_C[(spe,l,n)] = np.dot(grad_psi_nm[(spe,l)],weights[isize:isize+Mcut])
                 isize += Mcut
 
-    l = 2
+    l = 0
     ave_c_n = np.zeros(nmax[(species[0],l)])
     ave_grad_c_n = np.zeros((nmax[(species[0],l)], natoms, 3))
     for n in range(nmax[(species[0],l)]):
