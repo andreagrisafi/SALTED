@@ -122,7 +122,86 @@ def init_property_file(propname,saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intst
     return pfile
 
 
+def check_MPI_tasks_count(comm, num_items:int, item_name:str="items"):
+    """
+    Ensures the number of MPI tasks does not exceed the number of items.
+    Safe to call in both parallel and serial contexts.
+
+    Args:
+        comm: MPI communicator (can be None, for serial execution)
+        num_items: Total number of items to distribute
+        item_name: Description of the items (for error message)
+
+    Raises:
+        ValueError: If the number of tasks exceeds the number of items
+    """
+    if comm is None:
+        return
+
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+
+    if num_items < size:
+        if rank == 0:
+            raise ValueError(
+                f"More tasks {size=} have been requested than {item_name} {num_items=}. "
+                f"Please reduce the number of tasks."
+            )
+        else:
+            exit()
+
+
+def distribute_jobs(comm, jobs: list | np.ndarray, root:int=0) -> list | np.ndarray:
+    """
+    Distribute a list of jobs (e.g. indices) among MPI ranks using np.array_split for even distribution.
+
+    Args:
+        comm: MPI communicator (can be None for serial execution)
+        jobs: List or array of jobs to distribute
+        root: Root rank for scattering (default 0)
+
+    Returns:
+        list: Jobs assigned to the current rank, in the same format as the input (list or np.ndarray)
+    """
+    if comm is None:  # for serial execution
+        return jobs
+
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+
+    jobs_to_scatter = None
+    if rank == root:
+        type_jobs = type(jobs)
+        if isinstance(jobs, np.ndarray):
+            restore_format_jobs = np.array
+        elif isinstance(jobs, list):
+            def restore_format_jobs(x):
+                return x.tolist()
+        else:
+            raise ValueError(f"Invalid type for jobs, should be list or numpy.ndarray, but got {type_jobs}")
+
+        # This handles uneven division automatically (e.g., 10 items, 3 ranks -> 4, 3, 3 or similar)
+        chunks = np.array_split(jobs, size)
+        # Convert chunks to lists to ensure serializability and consistent return type
+        jobs_to_scatter = [restore_format_jobs(chunk) for chunk in chunks]
+
+    # Scatter the chunks to all ranks
+    my_jobs = comm.scatter(jobs_to_scatter, root=root)
+
+    return my_jobs
+
+
 def get_conf_range(rank, size, ntest, testrangetot) -> List[List[int]]:
+    """
+    DEPRECATED: Please use `distribute_jobs` instead.
+    This function was used to manually split a range of jobs for MPI scattering.
+    It is kept for backward compatibility but may be removed in future versions.
+
+    To replace this function, use:
+    ```python
+    jobs = distribute_jobs(comm, testrangetot[:ntest])
+    ```
+    """
     if rank == 0:
         testrange = [[] for _ in range(size)]
         blocksize = int(ntest / float(size))

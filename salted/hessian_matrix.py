@@ -8,7 +8,7 @@ import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, get_atom_idx, read_system
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs, get_atom_idx, read_system
 
 
 def build():
@@ -78,16 +78,8 @@ def build():
         print("Running in parallel mode")
         """ check partitioning """
         assert size > 1, "Please run in serial mode if using a single MPI task"
-        assert inp.gpr.blocksize > 0, "Please set inp.gpr.blocksize > 0 when running in parallel mode"
-        assert isinstance(inp.gpr.blocksize, int), "Please set inp.gpr.blocksize as an integer"
-        blocksize = inp.gpr.blocksize
-        assert ntrain % blocksize == 0, \
-            "Please choose a blocksize which is an exact divisor of inp.gpr.Ntrain * inp.gpr.trainfrac!"
-        nblocks = int(ntrain/blocksize)
-        assert nblocks == size, \
-            f"Please choose a number of MPI tasks (current ntasks={size}) consistent with " \
-            f"the number of blocks {nblocks} = inp.gpr.Ntrain * inp.gpr.trainfrac / inp.gpr.blocksize!"
-        this_task_trainrange = trainrange[rank*blocksize:(rank+1)*blocksize]
+        check_MPI_tasks_count(comm, ntrain, "training structures")
+        this_task_trainrange = distribute_jobs(comm, trainrange)
         """ calculate and gather """
         print(f"Task {rank} handling structures: {this_task_trainrange}")
         [Avec, Bmat] = matrices(this_task_trainrange, ntrain,av_coefs,rank)
@@ -101,7 +93,6 @@ def build():
         Bmat[(nslices-1)*100:] = comm.allreduce(Bmat[(nslices-1)*100:])
     else:
         print("Running in serial mode")
-        assert inp.gpr.blocksize == 0, "Please DON'T provide inp.gpr.blocksize in inp.yaml when running in serial mode"
         [Avec, Bmat] = matrices(trainrange,ntrain,av_coefs,rank)
 
     if rank==0:

@@ -7,7 +7,14 @@ import numpy as np
 from scipy import sparse
 
 from salted import basis
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range, init_property_file
+from salted.sys_utils import (
+    ParseConfig,
+    check_MPI_tasks_count,
+    distribute_jobs,
+    get_atom_idx,
+    init_property_file,
+    read_system,
+)
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
 def build():
@@ -49,10 +56,9 @@ def build():
     testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
     # Distribute structures to tasks
-    ntest = len(testrange)
     if parallel:
-        testrange = get_conf_range(rank,size,ntest,testrange)
-        testrange = comm.scatter(testrange,root=0)
+        check_MPI_tasks_count(comm, len(testrange))
+        testrange = distribute_jobs(comm, testrange)
         print(f"Task {rank+1} handles the following structures: {testrange}", flush=True)
 
     reg_log10_intstr = str(int(np.log10(regul)))

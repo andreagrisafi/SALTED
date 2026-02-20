@@ -13,7 +13,7 @@ from salted import sph_utils
 from salted import basis
 
 from salted.lib import equicomb, equicombfps
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range, do_fps
+from salted.sys_utils import ParseConfig, do_fps, get_atom_idx, read_system
 
 def build():
 

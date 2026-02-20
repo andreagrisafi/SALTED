@@ -4,6 +4,7 @@ import inp
 from mpi4py import MPI
 from ase.io import read
 from sys import argv
+from salted.sys_utils import distribute_jobs
 
 # MPI information
 comm = MPI.COMM_WORLD
@@ -34,17 +35,8 @@ xyzfile = read(inp.filename,":")
 ndata = len(xyzfile)
 
 # Distribute structures to tasks
-if rank == 0:
-    conf_range = [[] for _ in range(size)]
-    blocksize = int(round(ndata/float(size)))
-    for i in range(size):
-        if i == (size-1):
-            conf_range[i] = list(range(ndata))[i*blocksize:ndata]
-        else:
-            conf_range[i] = list(range(ndata))[i*blocksize:(i+1)*blocksize]
-else:
-    conf_range = None
-conf_range = comm.scatter(conf_range,root=0)
+conf_range = list(range(ndata))
+conf_range = distribute_jobs(comm, conf_range)
 
 for i in conf_range:
     dirpath = inp.path2qm+'data/'+str(i+1)+'/'

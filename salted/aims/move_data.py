@@ -3,7 +3,7 @@ import os.path as osp
 
 import numpy as np
 from ase.io import read
-from salted.sys_utils import ParseConfig, get_conf_range
+from salted.sys_utils import ParseConfig, distribute_jobs
 
 def build():
     inp = ParseConfig().parse_input()
@@ -16,6 +16,7 @@ def build():
         rank = comm.Get_rank()
         print('This is task',rank+1,'of',size,flush=True)
     else:
+        comm = None
         rank = 0
         size = 1
     
@@ -31,14 +32,13 @@ def build():
     
     xyzfile = read(inp.system.filename,":")
     ndata = len(xyzfile)
-    
+
     # Distribute structures to tasks
     if inp.system.parallel:
-        conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
-        conf_range = comm.scatter(conf_range,root=0)
+        conf_range = distribute_jobs(comm, list(range(ndata)))
     else:
         conf_range = list(range(ndata))
-    
+
     def get_reorder_bool(dirpath):
         """Determine the version of FHI-aims used.
         If a version newer than 240403, coefficients are 

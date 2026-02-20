@@ -3,7 +3,7 @@ import sys
 
 import numpy as np
 
-from salted.sys_utils import ParseConfig, get_conf_range, read_system
+from salted.sys_utils import ParseConfig, read_system, distribute_jobs
 
 
 def build():
@@ -17,6 +17,7 @@ def build():
         rank = comm.Get_rank()
         print('This is task',rank+1,'of',size,flush=True)
     else:
+        comm = None
         rank = 0
         size = 1
     
@@ -30,8 +31,7 @@ def build():
     
     # Distribute structures to tasks
     if inp.system.parallel:
-        conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
-        conf_range = comm.scatter(conf_range,root=0)
+        conf_range = distribute_jobs(comm, list(range(ndata)))
     else:
         conf_range = list(range(ndata))
     

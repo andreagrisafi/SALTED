@@ -9,7 +9,7 @@ import copy
 import time
 
 from salted import basis
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs
 
 inp = ParseConfig().parse_input()
 
@@ -48,16 +48,8 @@ if inp.system.parallel:
 
     comm.Barrier()
 
-    if ndata < size:
-        if rank == 0:
-            raise ValueError(
-                f"More processes {size=} have been requested than confiturations {ndata=}. "
-                f"Please reduce the number of processes."
-            )
-        else:
-            exit()
-    conf_range = get_conf_range(rank, size, ndata, np.arange(ndata,dtype=int))
-    conf_range = comm.scatter(conf_range, root=0)
+    check_MPI_tasks_count(comm, ndata, "configurations")
+    conf_range = distribute_jobs(comm, np.arange(ndata,dtype=int))
     print(
         f"Task {rank+1} handles the following configurations: {conf_range}", flush=True
     )

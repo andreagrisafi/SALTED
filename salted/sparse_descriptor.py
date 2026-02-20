@@ -9,7 +9,7 @@ import numpy as np
 from scipy import sparse
 from ase.data import atomic_numbers
 
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs, get_atom_idx, read_system
 
 from salted import wigner
 from salted import sph_utils
@@ -39,23 +39,24 @@ def build():
         size = comm.Get_size()
         rank = comm.Get_rank()
     else:
-        rank=0
-        size=1
+        comm = None
+        rank = 0
+        size = 1
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
-    
+
     frames = read(filename,":")
 
     sdir = osp.join(saltedpath, f"equirepr_{saltedname}")
 
     # Distribute structures to tasks
     if parallel:
-        conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
-        conf_range = comm.scatter(conf_range,root=0)
+        check_MPI_tasks_count(comm, ndata)
+        conf_range = distribute_jobs(comm, list(range(ndata)))
         print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
     else:
-        conf_range = range(ndata)
+        conf_range = list(range(ndata))
 
     sparse_set = np.loadtxt(osp.join(sdir, f"sparse_set_{Menv}.txt"),int)
     fps_idx = sparse_set[:,0]

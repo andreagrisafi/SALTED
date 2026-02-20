@@ -15,7 +15,7 @@ from scipy.interpolate import interp1d
 #from sympy import lambdify
 
 from salted import basis
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs
 
 def build(structure,coefs,cubename,refcube,comm,size,rank):
 
@@ -192,26 +192,14 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                                                      dy*np.asarray(range(nside[1])),
                                                      dz*np.asarray(range(nside[2])) ) ),(2,1,3,0))
     grid_regular=grid_regular.reshape((npoints,3))
-   
+
+
     if parallel:
-
-        if natoms < size:
-            if rank == 0:
-                raise ValueError(
-                    f"More processes {size=} have been requested than atoms {natoms=}. "
-                    f"Please reduce the number of processes."
-                )
-            else:
-                exit()
-        atoms_range = get_conf_range(rank, size, natoms, np.arange(natoms,dtype=int))
-        atoms_range = comm.scatter(atoms_range, root=0)
-        print(
-            f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True
-        )
-
+        check_MPI_tasks_count(comm, natoms)
+        atoms_range = distribute_jobs(comm, np.arange(natoms,dtype=int))
+        print(f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True)
     else:
-
-        atoms_range = np.arange(natoms,dtype=int) 
+        atoms_range = np.arange(natoms,dtype=int)
 
     natoms_range = int(len(atoms_range))
     coords_range = [coords[i] for i in atoms_range]
