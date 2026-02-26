@@ -1,12 +1,10 @@
-SUBROUTINE equicombsparse_grad(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,&
-                    wigdim,w3j,llmax,llvec,lam,c2r,&
-                    featsize,nfps,vfps,p,grad_p)
+SUBROUTINE equicomb_grad(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,&
+                    wigdim,w3j,llmax,llvec,lam,c2r,featsize,p,grad_p)
 
 use omp_lib
 IMPLICIT NONE
-INTEGER:: natoms,nang1,nang2,nrad1,nrad2,llmax,lam,wigdim,ifps,ifeat,n
-INTEGER:: iat,i_grad,n1,n2,iwig,l1,l2,il,imu,im1,im2,mu,m1,m2,featsize,nfps
-INTEGER, DIMENSION(nfps):: vfps
+INTEGER:: natoms,nang1,nang2,nrad1,nrad2,llmax,lam,wigdim,ifeat
+INTEGER:: iat,i_grad,n1,n2,iwig,l1,l2,il,imu,im1,im2,mu,m1,m2,featsize
 INTEGER, DIMENSION(2,llmax):: llvec
 REAL*8, DIMENSION(wigdim):: w3j
 REAL*8, DIMENSION(2*lam+1):: preal
@@ -21,8 +19,8 @@ COMPLEX*16, DIMENSION(3,natoms,2*nang2+1,nang2+1,nrad2,natoms):: dv2
 COMPLEX*16:: v1v, v2c, dv2c1, dv2c2, dv2c3
 REAL*8, ALLOCATABLE:: ptemp(:,:)
 REAL*8, ALLOCATABLE :: grad_ptemp (:,:,:,:)
-REAL*8, DIMENSION(2*lam+1,nfps,natoms):: p
-REAL*8, DIMENSION(3,natoms,2*lam+1,nfps,natoms):: grad_p
+REAL*8, DIMENSION(2*lam+1,featsize,natoms):: p 
+REAL*8, DIMENSION(3,natoms,2*lam+1,featsize,natoms):: grad_p 
 REAL*8, ALLOCATABLE :: dot1(:), dot2(:), dot3(:)
 REAL*8:: inner, normfact, normfact3
 
@@ -37,19 +35,18 @@ REAL*8:: inner, normfact, normfact3
 !f2py depend(lam) p, grad_p, c2r
 !f2py depend(llmax) llvec
 !f2py depend(wigdim) w3j 
-!f2py depend(nfps) vfps, p, grad_p
+!f2py depend(featsize) p, grad_p
 
 p = 0.d0
 grad_p = 0.d0
 
 !$OMP PARALLEL DEFAULT(NONE) &
 !$OMP& SHARED(p,grad_p,v1,v2,dv1,dv2,w3j,natoms,nang1,nang2, &
-!$OMP&        nrad1,nrad2,llmax,lam,wigdim,llvec,c2r,featsize, &
-!$OMP&        nfps,vfps) &
-!$OMP& PRIVATE(n,iat,i_grad,n1,n2,iwig,l1,l2,il,imu,im1,im2,mu, &
+!$OMP&        nrad1,nrad2,llmax,lam,wigdim,llvec,c2r,featsize) &
+!$OMP& PRIVATE(iat,i_grad,n1,n2,iwig,l1,l2,il,imu,im1,im2,mu, &
 !$OMP&         m1,m2,ifeat,preal,grad_preal,pcmplx,grad_pcmplx, &
 !$OMP&         v2c,dv2c1,dv2c2,dv2c3,ptemp,grad_ptemp,inner, &
-!$OMP&         normfact,dot1,dot2,dot3,ifps,normfact3,v1v)
+!$OMP&         normfact,dot1,dot2,dot3,normfact3,v1v)
 allocate(grad_preal(3,natoms,2*lam+1))
 allocate(grad_pcmplx(3,natoms,2*lam+1))
 allocate(grad_ptemp(3,natoms,2*lam+1,featsize))
@@ -136,17 +133,16 @@ do iat=1,natoms
    enddo
    normfact = dsqrt(inner)
    normfact3 = normfact**3
-   do n=1,nfps
-      ifps = vfps(n) + 1
+   do ifeat=1,featsize
       do imu=1,2*lam+1
-         p(imu,n,iat) = ptemp(imu,ifps) / normfact
+         p(imu,ifeat,iat) = ptemp(imu,ifeat) / normfact
          do i_grad=1,natoms
-            grad_p(1,i_grad,imu,n,iat) = (grad_ptemp(1,i_grad,imu,ifps) / normfact) &
-                    - ptemp(imu,ifps) * dot1(i_grad) / (normfact3)
-            grad_p(2,i_grad,imu,n,iat) = (grad_ptemp(2,i_grad,imu,ifps) / normfact) &
-                    - ptemp(imu,ifps) * dot2(i_grad) / (normfact3)
-            grad_p(3,i_grad,imu,n,iat) = (grad_ptemp(3,i_grad,imu,ifps) / normfact) &
-                    - ptemp(imu,ifps) * dot3(i_grad) / (normfact3)
+            grad_p(1,i_grad,imu,ifeat,iat) = (grad_ptemp(1,i_grad,imu,ifeat) / normfact) &
+                    - ptemp(imu,ifeat) * dot1(i_grad) / (normfact3)
+            grad_p(2,i_grad,imu,ifeat,iat) = (grad_ptemp(2,i_grad,imu,ifeat) / normfact) &
+                    - ptemp(imu,ifeat) * dot2(i_grad) / (normfact3)
+            grad_p(3,i_grad,imu,ifeat,iat) = (grad_ptemp(3,i_grad,imu,ifeat) / normfact) &
+                    - ptemp(imu,ifeat) * dot3(i_grad) / (normfact3)
          enddo
       enddo
    enddo
@@ -157,4 +153,3 @@ deallocate(grad_preal,grad_pcmplx,grad_ptemp,ptemp,dot1,dot2,dot3)
             
 return
 END
-

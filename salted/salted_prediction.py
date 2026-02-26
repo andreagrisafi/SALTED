@@ -6,18 +6,15 @@ import numpy as np
 from scipy import special
 from ase.data import atomic_numbers
 from ase.io import read
-#os.environ["OMP_NUM_THREADS"] = "4"  # or however many cores you want
-#os.environ["OMP_DYNAMIC"] = "FALSE"      # disable dynamic thread adjustment
 
 from salted.lib import equicomb 
 from salted.lib import equicombsparse
 
 from salted import sph_utils
 from salted import basis
-from salted.sys_utils import ParseConfig, get_conf_range
-from salted.cp2k.utils import compute_charge_and_dipole
+from salted.sys_utils import ParseConfig
 
-def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,structure):
+def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,structure):
 
     inp = ParseConfig().parse_input()
 
@@ -46,37 +43,14 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     for spe in excluded_species:
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
     natoms = int(len(atomic_symbols))
-  
-    if parallel:
-
-        if natoms < size:
-            if rank == 0:
-                raise ValueError(
-                    f"More processes {size=} have been requested than atoms {natoms=}. "
-                    f"Please reduce the number of processes."
-                )
-            else:
-                exit()
-        atoms_range = get_conf_range(rank, size, natoms, np.arange(natoms,dtype=int))
-        atoms_range = comm.scatter(atoms_range, root=0)
-        print(
-            f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True
-        )
-
-    else:
-
-        atoms_range = np.arange(natoms,dtype=int)
-
-    natoms_range = int(len(atoms_range))
-    atomic_symbols_range = [atomic_symbols[i] for i in atoms_range]
- 
+   
     atom_idx = {}
     natom_dict = {}
     for spe in species:
         atom_idx[spe] = []
         natom_dict[spe] = 0
-    for iat in range(natoms_range):
-        spe = atomic_symbols_range[iat]
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
         if spe in species:
            atom_idx[spe].append(iat)
            natom_dict[spe] += 1
@@ -89,13 +63,12 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     omega1 = sph_utils.get_representation_coeffs(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe1,species,nang1,nrad1,natoms)
     omega2 = sph_utils.get_representation_coeffs(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe2,species,nang2,nrad2,natoms)
 
-    # Retain only the atoms of the given MPI task
-    omega1 = omega1[:,atoms_range]
-    omega2 = omega2[:,atoms_range]
-
     # Reshape arrays of expansion coefficients for optimal Fortran indexing 
     v1 = np.transpose(omega1,(2,0,3,1))
     v2 = np.transpose(omega2,(2,0,3,1))
+
+    v1 = np.asfortranarray(v1, dtype=np.complex128)
+    v2 = np.asfortranarray(v2, dtype=np.complex128)
 
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
@@ -121,30 +94,25 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
             nfps = len(vfps[lam])
-<<<<<<< Updated upstream
-            p = equicombsparse.equicombsparse(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
-=======
             start = time.time()
             p = equicombsparse.equicombsparse(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
             end = time.time()
             print(str(end-start))
->>>>>>> Stashed changes
             p = np.transpose(p,(2,0,1))
             featsize = ncut
-            print("done1")
 
         else:
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
-            p = equicomb.equicomb(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+            p = equicomb.equicomb(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
             p = np.transpose(p,(2,0,1))
 
         if lam==0: 
-            pvec[lam] = p.reshape(natoms_range,featsize)
+            pvec[lam] = p.reshape(natoms,featsize)
         else:
-            pvec[lam] = p.reshape(natoms_range,2*lam+1,featsize)
+            pvec[lam] = p.reshape(natoms,2*lam+1,featsize)
         
-        # print("equicomb time:", (time.time()-equistart))
+        print("equicomb time:", (time.time()-equistart))
     
     rkhsstart = time.time()
  
@@ -158,9 +126,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
             kernel0_nm = np.dot(pvec[0][atom_idx[spe]],power_env_sparse[(0,spe)].T)
             kernel_nm = kernel0_nm**zeta
             psi_nm[(spe,0)] = np.dot(kernel_nm,Vmat[(0,spe)])
-            print(Vmat[(0,spe)].shape)
-            print(kernel_nm.shape)
-            print(psi_nm[(spe,0)].shape)
 
         # lam > 0
         for lam in range(1,lmax[spe]+1):
@@ -208,55 +173,66 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                 C[(spe,l,n)] = np.dot(psi_nm[(spe,l)],weights[isize:isize+Mcut])
                 isize += Mcut
     
-    l = 0
-    ave_c_n = np.zeros(nmax[(species[0],l)])
-    for n in range(nmax[(species[0],l)]):
-        ave_c_n[n] = np.mean(C[(species[0],l,n)])
-
-    ave_c_n = np.array([C[(species[0],l,n)] for n in range(nmax[(species[0],l)])])
-    np.save("/lus/home/CT9/c1710463/tbernhard/qmmm_salted/pt100_water/dataset_pt100/ave_c_n_2", ave_c_n)
-
     # init averages array if asked
     if average:
         Av_coeffs = np.zeros(Tsize)
-
+    
     # fill vector of predictions
-    itot = 0
+    i = 0
     pred_coefs = np.zeros(Tsize)
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        if iat in atoms_range:
-            i=0
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    pred_coefs[itot+i:itot+i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
-                    i += 2*l+1
-            ispe[spe] += 1
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
+                pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
                 if average and l==0:
-                    Av_coeffs[itot] = av_coefs[spe][n]
-                itot += 2*l+1
-
+                    Av_coeffs[i] = av_coefs[spe][n]
+                i += 2*l+1
+        ispe[spe] += 1
+    
     # add back spherical averages if required
-    if average and rank==0:
+    if average:
         pred_coefs += Av_coeffs
-
-    if parallel:
-        comm.Barrier()
-        pred_coefs = comm.allreduce(pred_coefs)
-
+    
+   
     if qmcode=="cp2k":
 
-        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+        # compute integral of predicted density
+        iaux = 0
+        rho_int = 0.0
+        nele = 0.0
+        for iat in range(natoms):
+            spe = atomic_symbols[iat]
+            if average:
+                nele += pseudocharge_dict[spe]
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    if l==0:
+                        rho_int += charge_integrals[(spe,l,n)] * pred_coefs[iaux]
+                    iaux += 2*l+1
+ 
+        print("charge integral =", rho_int) 
 
+
+        # enforce charge conservation 
+        iaux = 0
+        for iat in range(natoms):
+            spe = atomic_symbols[iat]
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    for im in range(2*l+1):
+                        if l==0 and im==0:
+                            if average:
+                                pred_coefs[iaux] *= nele/rho_int
+                            else:
+                                if n==nmax[(spe,l)]-1:
+                                    pred_coefs[iaux] -= rho_int/(charge_integrals[(spe,l,n)]*natoms)
+                        iaux += 1
+
+ 
 #    if print("pred time:", time.time()-predstart,flush=True)
     
-<<<<<<< Updated upstream
-    return [pred_coefs,charge,dipole]
-=======
-    return pred_coefs, ave_c_n
->>>>>>> Stashed changes
+    return 
 
 if __name__ == "__main__":
     build()

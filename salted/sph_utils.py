@@ -209,13 +209,9 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
 
     # Get 1st set of coefficients as a complex numpy array
     omega = np.zeros((nang+1,natoms,2*nang+1,nspe*nrad),complex)
-    start = time.time()
     for l in range(nang+1):
         c2r = complex_to_real_transformation([2*l+1])[0]
-        #omega[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
         omega[l,:,:2*l+1,:] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(spx.block(o3_lambda=l).values, (1,0,2)).reshape((np.conj(c2r.T).shape[1], natoms*nspe*nrad))).reshape(2*l+1,natoms,nspe*nrad),(1,0,2))
-    end = time.time()
-    print("Time omegas ", str(end-start))
 
     dspx = calculator.compute(structure, selected_keys=keys_selection, gradients=["positions"])
     dspx = dspx.keys_to_properties("neighbor_type")
@@ -223,7 +219,6 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
 
     # Get 1st set of coefficients as a complex numpy array
     domega = np.zeros((nang+1,natoms**2,3,2*nang+1,nspe*nrad),complex)
-    start = time.time() 
     for l in range(nang+1):
         grad = dspx.block(o3_lambda=l).gradient("positions")
         c2r = complex_to_real_transformation([2*l+1])[0]
@@ -236,14 +231,9 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
 
             # grad.values shape: (nidx, k, r, d)
             # Apply transformation to ALL indices at once
-            #transformed = np.einsum('cr,ikrd->ikcd',np.conj(c2r.T),grad.values,optimize=True)
             domega[l, target_idx, :, :2*l+1, :] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(grad.values,(2,0,1,3)).reshape((np.conj(c2r.T).shape[1],len(target_idx)*3*nspe*nrad))).reshape((2*l+1,len(target_idx),3,nspe*nrad)),(1,2,0,3))
 
         else:
-            #domega[l,:,:,:2*l+1,:] = np.einsum('cr,akrd->akcd',np.conj(c2r.T),grad.values)
             domega[l, :, :, :2*l+1, :] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(grad.values,(2,0,1,3)).reshape((np.conj(c2r.T).shape[1],natoms*natoms*3*nspe*nrad))).reshape((2*l+1,natoms*natoms,3,nspe*nrad)),(1,2,0,3))
-    end = time.time()
-    print("Time domegas ", str(end-start))
     
-
     return omega, domega
