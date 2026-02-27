@@ -211,8 +211,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         comm.Barrier()
         pred_coefs = comm.allreduce(pred_coefs)
 
+    charge = 0
+    dipole = 0
     if qmcode=="cp2k":
-
         charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
 
 #    if print("pred time:", time.time()-predstart,flush=True)
