@@ -911,7 +911,7 @@ class ParseConfig:
                     False,
                     0,
                     int,
-                    lambda inp, val: deprecate_warning(inp, val, "inp.gpr.blocksize"),
+                    lambda inp, val: deprecate_warning(inp, val, "inp.gpr.blocksize") or (val >= 0),
                     # lambda inp, val: val >= 0,  # before deprecation
                 ),  # block size for matrix inversion
                 "trainsel": (
