@@ -105,8 +105,6 @@ python -m salted.solve_regression                   # carry out matrix inversion
 
 The GPR weights are stored at `regrdir_[inp.salted.saltedname]/M[inp.gpr.Menv]_zeta[inp.gpr.z]/weights_N[ntrain]_reg[log10(inp.gpr.regul)].npy`. Here `[ntrain]` is determined by `inp.gpr.Ntrain * inp.gpr.trainfrac`, and `inp.gpr.regul` is the regularization parameter.
 
-Note that in order to parallelise the matrix inversion, we split matrices into mini-batches of size `inp.gpr.blocksize`, which must be an exact divisor of the training set size `ntrain`. `inp.gpr.blocksize` should not be included if running serially.
-
 ### Conjugate gradient method
 
 In order to solve the problem by CG minimization, run

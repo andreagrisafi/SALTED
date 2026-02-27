@@ -44,5 +44,4 @@ gpr:
   Menv: 100
   Ntrain: 40
   trainfrac: 1.0
-  blocksize: 10
   trainsel: "random"

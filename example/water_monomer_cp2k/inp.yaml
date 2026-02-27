@@ -50,4 +50,3 @@ gpr:
   regul: 1e-5
   gradtol: 1e-6 
   trainsel: sequential
-  blocksize: 5
