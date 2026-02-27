@@ -907,13 +907,6 @@ class ParseConfig:
                     bool,
                     lambda inp, val: isinstance(val, bool),
                 ),  # if restart the minimization
-                "blocksize": (
-                    False,
-                    0,
-                    int,
-                    lambda inp, val: deprecate_warning(inp, val, "inp.gpr.blocksize") or (val >= 0),
-                    # lambda inp, val: val >= 0,  # before deprecation
-                ),  # block size for matrix inversion
                 "trainsel": (
                     False,
                     "random",
@@ -1087,13 +1080,6 @@ def check_conditions_alpha_only(inp:dict, val:bool) -> bool:
 
 check_conditions_alpha_only.parse_error_msg = "Value is required if and only if inp.salted.saltedtype=density-response"\
     " and inp.qm.qmcode=cp2k. Otherwise, please don't specify it in the input file."
-
-
-def deprecate_warning(inp:dict, val:bool, deprecated_key:str) -> None:
-    print(
-        f"WARNING: The input key {deprecated_key} is deprecated and will be removed in future versions.",
-        file=sys.stderr,
-    )
 
 
 def test_inp():
