@@ -52,7 +52,6 @@ def build():
         eigcut,
         gradtol,
         restart,
-        blocksize,
         trainsel,
         nspe1,
         nspe2,

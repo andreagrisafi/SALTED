@@ -504,7 +504,7 @@ class ParseConfig:
          rep2, rcut2, sig2, nrad2, nang2, neighspe2,
          sparsify, nsamples, ncut,
          zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-         gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
+         gradtol, restart, trainsel) = ParseConfig().get_all_params()
         ```
         """
         inp = self.parse_input()
@@ -615,7 +615,6 @@ class ParseConfig:
             inp.gpr.eigcut,
             inp.gpr.gradtol,
             inp.gpr.restart,
-            inp.gpr.blocksize,
             inp.gpr.trainsel,
             nspe1,
             nspe2,
