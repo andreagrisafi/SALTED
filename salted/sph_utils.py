@@ -11,6 +11,8 @@ from featomic import SphericalExpansion
 from featomic import LodeSphericalExpansion
 from metatensor import Labels
 
+from numba import njit, prange
+
 def cartesian_to_spherical_transformation(l):
         """Compute Cartesian to spherical transformation matrices sorting the spherical components as {-l,..,0,..,+l} 
         while sorting the Cartesian components as shown in the corresponding arrays."""
@@ -237,3 +239,223 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
             domega[l, :, :, :2*l+1, :] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(grad.values,(2,0,1,3)).reshape((np.conj(c2r.T).shape[1],natoms*natoms*3*nspe*nrad))).reshape((2*l+1,natoms*natoms,3,nspe*nrad)),(1,2,0,3))
     
     return omega, domega
+
+@njit(parallel=True, fastmath = True)
+def grad_equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,wigdim,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
+    p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
+    grad_p = np.zeros((natoms, 3, natoms, 2*lam+1, nfps), dtype=np.float64)
+    dv2c = np.conj(dv2)
+    v2c  = np.conj(v2)
+
+    for iat in prange(natoms):
+        inner = 0.0
+        dot1 = np.zeros(natoms, dtype=np.float64)
+        dot2 = np.zeros(natoms, dtype=np.float64)
+        dot3 = np.zeros(natoms, dtype=np.float64)
+        ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
+        grad_ptemp = np.zeros((featsize, 2*lam+1, natoms, 3), dtype=np.float64)
+        ifeat = 0
+        for n1 in prange(nrad1):
+            for n2 in range(nrad2):
+                iwig = 0
+                for il in range(llmax):
+                    l1 = llvec[0,il]
+                    l2 = llvec[1,il]
+                    pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
+                    grad_pcmplx = np.zeros((2*lam+1, natoms, 3), dtype=np.complex128)
+                    for imu in range(2*lam+1):
+                        mu = imu-lam
+                        for im1 in range(2*l1+1):
+                            m1 = im1-l1
+                            m2 = m1-mu
+                            if (abs(m2)<=l2):
+                               im2 = m2+l2
+                               v2cv  = v2c[iat,n2,l2,im2]
+                               v1v = v1[iat,n1,l1,im1]
+                               pcmplx[imu] = pcmplx[imu] + w3j[iwig] * v1v * v2cv
+                               for i_grad in range(natoms):
+                                   grad_pcmplx[imu,i_grad,0] += w3j[iwig] * (dv1[iat,n1,l1,im1,i_grad,0] * v2cv + v1v * dv2c[iat,n2,l2,im2,i_grad,0])
+                                   grad_pcmplx[imu,i_grad,1] += w3j[iwig] * (dv1[iat,n1,l1,im1,i_grad,1] * v2cv + v1v * dv2c[iat,n2,l2,im2,i_grad,1])
+                                   grad_pcmplx[imu,i_grad,2] += w3j[iwig] * (dv1[iat,n1,l1,im1,i_grad,2] * v2cv + v1v * dv2c[iat,n2,l2,im2,i_grad,2])
+                               iwig = iwig + 1
+                    preal = np.zeros(2*lam+1, dtype=np.float64)
+                    grad_preal = np.zeros((2*lam+1, natoms, 3), dtype=np.float64)
+                    for imu in range(2*lam+1):
+                        for im1 in range(2*lam+1):
+                             preal[imu] = preal[imu] + np.real(c2r[imu,im1] * pcmplx[im1])
+                             for i_grad in range(natoms):
+                                  grad_preal[imu,i_grad,0] += np.real(c2r[imu,im1] * grad_pcmplx[im1,i_grad,0])
+                                  grad_preal[imu,i_grad,1] += np.real(c2r[imu,im1] * grad_pcmplx[im1,i_grad,1])
+                                  grad_preal[imu,i_grad,2] += np.real(c2r[imu,im1] * grad_pcmplx[im1,i_grad,2])
+                        inner = inner + preal[imu]**2
+                        ptemp[ifeat,imu] = preal[imu]
+                        for i_grad in range(natoms):
+                            dot1[i_grad] += preal[imu]*grad_preal[imu,i_grad,0]
+                            dot2[i_grad] += preal[imu]*grad_preal[imu,i_grad,1]
+                            dot3[i_grad] += preal[imu]*grad_preal[imu,i_grad,2]
+                            grad_ptemp[ifeat,imu,i_grad,0] = grad_preal[imu,i_grad,0]
+                            grad_ptemp[ifeat,imu,i_grad,1] = grad_preal[imu,i_grad,1]
+                            grad_ptemp[ifeat,imu,i_grad,2] = grad_preal[imu,i_grad,2]
+                    ifeat = ifeat + 1
+        normfact = np.sqrt(inner)
+        normfact3 = normfact**3
+        for n in range(nfps):
+            ifps = vfps[n]
+            for imu in range(2*lam+1):
+                p[iat,imu,n] = ptemp[ifps,imu] / normfact
+                for i_grad in range(natoms):
+                    grad_p[i_grad,0,iat,imu,n] = (grad_ptemp[ifps,imu,i_grad,0] / normfact) - ptemp[ifps,imu] * dot1[i_grad] / (normfact3)
+                    grad_p[i_grad,1,iat,imu,n] = (grad_ptemp[ifps,imu,i_grad,1] / normfact) - ptemp[ifps,imu] * dot2[i_grad] / (normfact3)
+                    grad_p[i_grad,2,iat,imu,n] = (grad_ptemp[ifps,imu,i_grad,2] / normfact) - ptemp[ifps,imu] * dot3[i_grad] / (normfact3)
+    return p, grad_p
+
+@njit(parallel=True, fastmath = True)
+def grad_equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,wigdim,w3j,llmax,llvec,lam,c2r,featsize):
+    p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
+    grad_p = np.zeros((natoms, 3, natoms, 2*lam+1, nfps), dtype=np.float64)
+    dv2c = np.conj(dv2)
+    v2c  = np.conj(v2)
+
+    for iat in prange(natoms):
+        inner = 0.0
+        dot1 = np.zeros(natoms, dtype=np.float64)
+        dot2 = np.zeros(natoms, dtype=np.float64)
+        dot3 = np.zeros(natoms, dtype=np.float64)
+        ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
+        grad_ptemp = np.zeros((featsize, 2*lam+1, natoms, 3), dtype=np.float64)
+        ifeat = 0
+        for n1 in prange(nrad1):
+            for n2 in range(nrad2):
+                iwig = 0
+                for il in range(llmax):
+                    l1 = llvec[0,il]
+                    l2 = llvec[1,il]
+                    pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
+                    grad_pcmplx = np.zeros((2*lam+1, natoms, 3), dtype=np.complex128)
+                    for imu in range(2*lam+1):
+                        mu = imu-lam
+                        for im1 in range(2*l1+1):
+                            m1 = im1-l1
+                            m2 = m1-mu
+                            if (abs(m2)<=l2):
+                               im2 = m2+l2
+                               v2cv  = v2c[iat,n2,l2,im2]
+                               v1v = v1[iat,n1,l1,im1]
+                               pcmplx[imu] = pcmplx[imu] + w3j[iwig] * v1v * v2cv
+                               for i_grad in range(natoms):
+                                   grad_pcmplx[imu,i_grad,0] += w3j[iwig] * (dv1[iat,n1,l1,im1,i_grad,0] * v2cv + v1v * dv2c[iat,n2,l2,im2,i_grad,0])
+                                   grad_pcmplx[imu,i_grad,1] += w3j[iwig] * (dv1[iat,n1,l1,im1,i_grad,1] * v2cv + v1v * dv2c[iat,n2,l2,im2,i_grad,1])
+                                   grad_pcmplx[imu,i_grad,2] += w3j[iwig] * (dv1[iat,n1,l1,im1,i_grad,2] * v2cv + v1v * dv2c[iat,n2,l2,im2,i_grad,2])
+                               iwig = iwig + 1
+                    preal = np.zeros(2*lam+1, dtype=np.float64)
+                    grad_preal = np.zeros((2*lam+1, natoms, 3), dtype=np.float64)
+                    for imu in range(2*lam+1):
+                        for im1 in range(2*lam+1):
+                             preal[imu] = preal[imu] + np.real(c2r[imu,im1] * pcmplx[im1])
+                             for i_grad in range(natoms):
+                                  grad_preal[imu,i_grad,0] += np.real(c2r[imu,im1] * grad_pcmplx[im1,i_grad,0])
+                                  grad_preal[imu,i_grad,1] += np.real(c2r[imu,im1] * grad_pcmplx[im1,i_grad,1])
+                                  grad_preal[imu,i_grad,2] += np.real(c2r[imu,im1] * grad_pcmplx[im1,i_grad,2])
+                        inner = inner + preal[imu]**2
+                        ptemp[ifeat,imu] = preal[imu]
+                        for i_grad in range(natoms):
+                            dot1[i_grad] += preal[imu]*grad_preal[imu,i_grad,0]
+                            dot2[i_grad] += preal[imu]*grad_preal[imu,i_grad,1]
+                            dot3[i_grad] += preal[imu]*grad_preal[imu,i_grad,2]
+                            grad_ptemp[ifeat,imu,i_grad,0] = grad_preal[imu,i_grad,0]
+                            grad_ptemp[ifeat,imu,i_grad,1] = grad_preal[imu,i_grad,1]
+                            grad_ptemp[ifeat,imu,i_grad,2] = grad_preal[imu,i_grad,2]
+                    ifeat = ifeat + 1
+        normfact = np.sqrt(inner)
+        normfact3 = normfact**3
+        for ifeat in range(featsize):
+            for imu in range(2*lam+1):
+                p[iat,imu,ifeat] = ptemp[ifeat,imu] / normfact
+                for i_grad in range(natoms):
+                    grad_p[i_grad,0,iat,imu,ifeat] = (grad_ptemp[ifeat,imu,i_grad,0] / normfact) - ptemp[ifeat,imu] * dot1[i_grad] / (normfact3)
+                    grad_p[i_grad,1,iat,imu,ifeat] = (grad_ptemp[ifeat,imu,i_grad,1] / normfact) - ptemp[ifeat,imu] * dot2[i_grad] / (normfact3)
+                    grad_p[i_grad,2,iat,imu,ifeat] = (grad_ptemp[ifeat,imu,i_grad,2] / normfact) - ptemp[ifeat,imu] * dot3[i_grad] / (normfact3)
+    return p, grad_p
+
+@njit(parallel=True, fastmath = True)
+def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,wigdim,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
+    p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
+    v2c  = np.conj(v2)
+
+    for iat in prange(natoms):
+        inner = 0.0
+        ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
+        ifeat = 0
+        for n1 in prange(nrad1):
+            for n2 in range(nrad2):
+                iwig = 0
+                for il in range(llmax):
+                    l1 = llvec[0,il]
+                    l2 = llvec[1,il]
+                    pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
+                    for imu in range(2*lam+1):
+                        mu = imu-lam
+                        for im1 in range(2*l1+1):
+                            m1 = im1-l1
+                            m2 = m1-mu
+                            if (abs(m2)<=l2):
+                               im2 = m2+l2
+                               v2cv  = v2c[iat,n2,l2,im2]
+                               v1v = v1[iat,n1,l1,im1]
+                               pcmplx[imu] = pcmplx[imu] + w3j[iwig] * v1v * v2cv
+                               iwig = iwig + 1
+                    preal = np.zeros(2*lam+1, dtype=np.float64)
+                    for imu in range(2*lam+1):
+                        for im1 in range(2*lam+1):
+                             preal[imu] = preal[imu] + np.real(c2r[imu,im1] * pcmplx[im1])
+                        inner = inner + preal[imu]**2
+                        ptemp[ifeat,imu] = preal[imu]
+                    ifeat = ifeat + 1
+        normfact = np.sqrt(inner)
+        normfact3 = normfact**3
+        for n in range(nfps):
+            ifps = vfps[n]
+            for imu in range(2*lam+1):
+                p[iat,imu,n] = ptemp[ifps,imu] / normfact
+    return p
+
+@njit(parallel=True, fastmath = True)
+def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,wigdim,w3j,llmax,llvec,lam,c2r,featsize):
+    p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
+    v2c  = np.conj(v2)
+
+    for iat in prange(natoms):
+        inner = 0.0
+        ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
+        ifeat = 0
+        for n1 in prange(nrad1):
+            for n2 in range(nrad2):
+                iwig = 0
+                for il in range(llmax):
+                    l1 = llvec[0,il]
+                    l2 = llvec[1,il]
+                    pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
+                    for imu in range(2*lam+1):
+                        mu = imu-lam
+                        for im1 in range(2*l1+1):
+                            m1 = im1-l1
+                            m2 = m1-mu
+                            if (abs(m2)<=l2):
+                               im2 = m2+l2
+                               v2cv  = v2c[iat,n2,l2,im2]
+                               v1v = v1[iat,n1,l1,im1]
+                               pcmplx[imu] = pcmplx[imu] + w3j[iwig] * v1v * v2cv
+                               iwig = iwig + 1
+                    preal = np.zeros(2*lam+1, dtype=np.float64)
+                    for imu in range(2*lam+1):
+                        for im1 in range(2*lam+1):
+                             preal[imu] = preal[imu] + np.real(c2r[imu,im1] * pcmplx[im1])
+                        inner = inner + preal[imu]**2
+                        ptemp[ifeat,imu] = preal[imu]
+                    ifeat = ifeat + 1
+        normfact = np.sqrt(inner)
+        normfact3 = normfact**3
+        for ifeat in range(featsize):
+            for imu in range(2*lam+1):
+                p[iat,imu,ifeat] = ptemp[ifeat,imu] / normfact
+    return p

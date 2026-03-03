@@ -7,9 +7,6 @@ from scipy import special
 from ase.data import atomic_numbers
 from ase.io import read
 
-from salted.lib import equicomb_grad
-from salted.lib import equicombsparse_grad
-
 from salted import sph_utils
 from salted import basis
 from salted.sys_utils import ParseConfig
@@ -60,19 +57,26 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     for i in range(len(species)):
         pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
     
+    #time_omega = time.time()
     omega1, domega1 = sph_utils.get_representation_gradient_coeffs(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe1,species,nang1,nrad1,natoms)
     omega2, domega2 = sph_utils.get_representation_gradient_coeffs(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe2,species,nang2,nrad2,natoms)
+    #print("Time get rep coeffs", str(time.time()-time_omega))
+
+    #start = time.time()
 
     # Reshape arrays of expansion coefficients for optimal Fortran indexing 
-    v1 = np.transpose(omega1,(2,0,3,1))
-    dv1 = np.transpose(domega1.reshape((domega1.shape[0],natoms,natoms,3,domega1.shape[3],domega1.shape[4])),(3,2,4,0,5,1))
-    v2 = np.transpose(omega2,(2,0,3,1))
-    dv2 = np.transpose(domega2.reshape((domega2.shape[0],natoms,natoms,3,domega2.shape[3],domega2.shape[4])),(3,2,4,0,5,1))
+    
+    v1 = np.zeros((natoms, omega1.shape[3],omega1.shape[0],omega1.shape[2]))
+    dv1 = np.zeros((natoms,domega1.shape[4],domega1.shape[0],domega1.shape[3],natoms,3))
+    v2 = np.zeros((natoms, omega2.shape[3],omega2.shape[0],omega2.shape[2]))
+    dv2 = np.zeros((natoms,domega2.shape[4],domega2.shape[0],domega2.shape[3],natoms,3))
+    v1 = np.transpose(omega1,(1,3,0,2)).copy()
+    dv1 = np.transpose(domega1.reshape((domega1.shape[0],natoms,natoms,3,domega1.shape[3],domega1.shape[4])),(1,5,0,4,2,3)).copy()
+    v2 = np.transpose(omega2,(1,3,0,2)).copy()
+    dv2 = np.transpose(domega2.reshape((domega2.shape[0],natoms,natoms,3,domega2.shape[3],domega2.shape[4])),(1,5,0,4,2,3)).copy()
 
-    v1 = np.asfortranarray(v1, dtype=np.complex128)
-    dv1 = np.asfortranarray(dv1, dtype=np.complex128)
-    v2 = np.asfortranarray(v2, dtype=np.complex128)
-    dv2 = np.asfortranarray(dv2, dtype=np.complex128)
+    #end = time.time()
+    #print("transpose", str(end-start))
 
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
@@ -81,7 +85,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     
 #        print("lambda =", lam)
     
-        equistart = time.time()
+        #equistart = time.time()
     
         llmax, llvec = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
  
@@ -99,31 +103,25 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
             nfps = len(vfps[lam])
-            p, grad_p = equicombsparse_grad.equicombsparse_grad(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
-            p = np.transpose(p,(2,0,1))
-            grad_p = np.transpose(grad_p,(1,0,4,2,3))
+            p, grad_p = sph_utils.grad_equicombsparse_numba(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+
             featsize = ncut
 
         else:
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
-            p, grad_p = equicomb_grad.equicomb_grad(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-            p = np.transpose(p,(2,0,1))
-            grad_p = np.transpose(grad_p,(1,0,4,2,3))
-
-        p = np.ascontiguousarray(p)
-        grad_p = np.ascontiguousarray(grad_p)
+            p, grad_p = sph_utils.grad_equicomb(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
 
         if lam==0: 
-            pvec[lam] = p.reshape(natoms,featsize)
-            grad_pvec[lam] = grad_p.reshape(natoms,3,natoms,featsize)
+            pvec[lam] = p.reshape(natoms, featsize)
+            grad_pvec[lam] = grad_p.reshape(natoms, 3, natoms, featsize)
         else:
             pvec[lam] = p.reshape(natoms,2*lam+1,featsize)
             grad_pvec[lam] = grad_p.reshape(natoms,3,natoms,2*lam+1,featsize)
-        
-        print("equicomb time:", (time.time()-equistart))
+
+        #print("equicomb time:", (time.time()-equistart))
     
-    rkhsstart = time.time()
+    #rkhsstart = time.time()
  
     psi_nm = {}
     grad_psi_nm = {}
@@ -156,7 +154,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                 grad_kernel_nm = np.dot(grad_pvec[lam][:,:,atom_idx[spe],:,:].reshape(natoms*3*natom_dict[spe]*(2*lam+1), featsize), power_env_sparse[(lam,spe)].T)
                 grad_kernel_nm_blocks = grad_kernel_nm.reshape(natoms, 3, natom_dict[spe], 2*lam+1, Mspe[spe], 2*lam+1)
                 grad_kernel_nm_blocks = (grad_kernel_nm_blocks * (kernel0_nm ** (zeta - 1))[np.newaxis, np.newaxis, :, np.newaxis, :, np.newaxis]) + kernel_nm.reshape(natom_dict[spe], 2*lam+1, Mspe[spe], 2*lam+1)[np.newaxis, np.newaxis, :, :, :, :] * ((zeta-1) * (grad_kernel0_nm.reshape(natoms,3,natom_dict[spe],Mspe[spe]) * (kernel0_nm ** (zeta-2))[np.newaxis, np.newaxis, :, :]))[:, :, :, np.newaxis, :, np.newaxis]
-                
+
                 kernel_nm = kernel_nm_blocks.reshape(natom_dict[spe]*(2*lam+1), Mspe[spe]*(2*lam+1))
                 grad_kernel_nm = grad_kernel_nm_blocks.reshape(natoms*3*natom_dict[spe]*(2*lam+1), Mspe[spe]*(2*lam+1))
                 #for i1 in range(natom_dict[spe]):
@@ -165,10 +163,10 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                 psi_nm[(spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
                 grad_psi_nm[(spe,lam)] = np.dot(grad_kernel_nm,Vmat[(lam,spe)])
 
-    print("rkhs time:", time.time()-rkhsstart,flush=True)
+    #print("rkhs time:", time.time()-rkhsstart,flush=True)
  
     # Perform equivariant predictions
-    predstart = time.time()
+    #predstart = time.time()
     
     # Load spherical averages if required
     if average:
@@ -258,7 +256,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                         iaux += 1
 
  
-    print("pred time:", time.time()-predstart,flush=True)
+    #print("pred time:", time.time()-predstart,flush=True)
     
     return 
 

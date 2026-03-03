@@ -7,9 +7,6 @@ from scipy import special
 from ase.data import atomic_numbers
 from ase.io import read
 
-from salted.lib import equicomb 
-from salted.lib import equicombsparse
-
 from salted import sph_utils
 from salted import basis
 from salted.sys_utils import ParseConfig
@@ -64,11 +61,10 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     omega2 = sph_utils.get_representation_coeffs(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe2,species,nang2,nrad2,natoms)
 
     # Reshape arrays of expansion coefficients for optimal Fortran indexing 
-    v1 = np.transpose(omega1,(2,0,3,1))
-    v2 = np.transpose(omega2,(2,0,3,1))
-
-    v1 = np.asfortranarray(v1, dtype=np.complex128)
-    v2 = np.asfortranarray(v2, dtype=np.complex128)
+    v1 = np.zeros((natoms, omega1.shape[3],omega1.shape[0],omega1.shape[2]))
+    v2 = np.zeros((natoms, omega2.shape[3],omega2.shape[0],omega2.shape[2]))
+    v1 = np.transpose(omega1,(1,3,0,2)).copy()
+    v2 = np.transpose(omega2,(1,3,0,2)).copy()
 
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
@@ -94,27 +90,25 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
             nfps = len(vfps[lam])
-            start = time.time()
-            p = equicombsparse.equicombsparse(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
-            end = time.time()
-            print(str(end-start))
-            p = np.transpose(p,(2,0,1))
+            #start = time.time()
+            p = sph_utils.equicombsparse_numba(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+            #end = time.time()
+            #print(str(end-start))
             featsize = ncut
 
         else:
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
-            p = equicomb.equicomb(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-            p = np.transpose(p,(2,0,1))
+            p = sph_utils.equicomb_numba(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
 
         if lam==0: 
             pvec[lam] = p.reshape(natoms,featsize)
         else:
             pvec[lam] = p.reshape(natoms,2*lam+1,featsize)
         
-        print("equicomb time:", (time.time()-equistart))
+        #print("equicomb time:", (time.time()-equistart))
     
-    rkhsstart = time.time()
+    #rkhsstart = time.time()
  
     psi_nm = {}
     for spe in species:
@@ -146,7 +140,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     #if print("rkhs time:", time.time()-rkhsstart,flush=True)
  
     # Perform equivariant predictions
-    predstart = time.time()
+    #predstart = time.time()
     
     # Load spherical averages if required
     if average:
