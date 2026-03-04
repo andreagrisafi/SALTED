@@ -251,7 +251,7 @@ def grad_equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,wigdi
         ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
         grad_ptemp = np.zeros((featsize, 2*lam+1, natoms, 3), dtype=np.float64)
         ifeat = 0
-        for n1 in prange(nrad1):
+        for n1 in range(nrad1):
             for n2 in range(nrad2):
                 iwig = 0
                 for il in range(llmax):
@@ -320,7 +320,7 @@ def grad_equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,wigdim,w3j,
         ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
         grad_ptemp = np.zeros((featsize, 2*lam+1, natoms, 3), dtype=np.float64)
         ifeat = 0
-        for n1 in prange(nrad1):
+        for n1 in range(nrad1):
             for n2 in range(nrad2):
                 iwig = 0
                 for il in range(llmax):
@@ -374,7 +374,7 @@ def grad_equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,wigdim,w3j,
     return p, grad_p
 
 @njit(parallel=True, fastmath = True)
-def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,wigdim,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
+def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
     p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
     v2c  = np.conj(v2)
 
@@ -382,7 +382,7 @@ def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,wigdim,w3j,llmax,l
         inner = 0.0
         ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
         ifeat = 0
-        for n1 in prange(nrad1):
+        for n1 in range(nrad1):
             for n2 in range(nrad2):
                 iwig = 0
                 for il in range(llmax):
@@ -415,15 +415,15 @@ def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,wigdim,w3j,llmax,l
     return p
 
 @njit(parallel=True, fastmath = True)
-def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,wigdim,w3j,llmax,llvec,lam,c2r,featsize):
-    p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
+def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize):
+    p = np.zeros((natoms, 2*lam+1, featsize), dtype=np.float64)
     v2c  = np.conj(v2)
 
     for iat in prange(natoms):
         inner = 0.0
         ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
         ifeat = 0
-        for n1 in prange(nrad1):
+        for n1 in range(nrad1):
             for n2 in range(nrad2):
                 iwig = 0
                 for il in range(llmax):

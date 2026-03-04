@@ -65,14 +65,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     #start = time.time()
 
     # Reshape arrays of expansion coefficients for optimal Fortran indexing 
-    
-    v1 = np.zeros((natoms, omega1.shape[3],omega1.shape[0],omega1.shape[2]))
-    dv1 = np.zeros((natoms,domega1.shape[4],domega1.shape[0],domega1.shape[3],natoms,3))
-    v2 = np.zeros((natoms, omega2.shape[3],omega2.shape[0],omega2.shape[2]))
-    dv2 = np.zeros((natoms,domega2.shape[4],domega2.shape[0],domega2.shape[3],natoms,3))
     v1 = np.transpose(omega1,(1,3,0,2)).copy()
-    dv1 = np.transpose(domega1.reshape((domega1.shape[0],natoms,natoms,3,domega1.shape[3],domega1.shape[4])),(1,5,0,4,2,3)).copy()
     v2 = np.transpose(omega2,(1,3,0,2)).copy()
+    dv1 = np.transpose(domega1.reshape((domega1.shape[0],natoms,natoms,3,domega1.shape[3],domega1.shape[4])),(1,5,0,4,2,3)).copy()
     dv2 = np.transpose(domega2.reshape((domega2.shape[0],natoms,natoms,3,domega2.shape[3],domega2.shape[4])),(1,5,0,4,2,3)).copy()
 
     #end = time.time()

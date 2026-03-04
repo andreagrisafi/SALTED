@@ -61,8 +61,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     omega2 = sph_utils.get_representation_coeffs(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe2,species,nang2,nrad2,natoms)
 
     # Reshape arrays of expansion coefficients for optimal Fortran indexing 
-    v1 = np.zeros((natoms, omega1.shape[3],omega1.shape[0],omega1.shape[2]))
-    v2 = np.zeros((natoms, omega2.shape[3],omega2.shape[0],omega2.shape[2]))
     v1 = np.transpose(omega1,(1,3,0,2)).copy()
     v2 = np.transpose(omega2,(1,3,0,2)).copy()
 

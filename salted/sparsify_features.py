@@ -12,7 +12,7 @@ from ase.io import read
 from salted import sph_utils
 from salted import basis
 
-from salted.lib import equicomb, equicombfps
+from salted.lib import equicombfps
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range, do_fps
 
 def build():
