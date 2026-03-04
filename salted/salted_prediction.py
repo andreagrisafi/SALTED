@@ -9,9 +9,10 @@ from ase.io import read
 
 from salted import sph_utils
 from salted import basis
-from salted.sys_utils import ParseConfig
+from salted.sys_utils import ParseConfig, get_conf_range
+from salted.cp2k.utils import compute_charge_and_dipole
 
-def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,structure):
+def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,structure):
 
     inp = ParseConfig().parse_input()
 
@@ -40,14 +41,37 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     for spe in excluded_species:
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
     natoms = int(len(atomic_symbols))
-   
+
+    if parallel:
+
+        if natoms < size:
+            if rank == 0:
+                raise ValueError(
+                    f"More processes {size=} have been requested than atoms {natoms=}. "
+                    f"Please reduce the number of processes."
+                )
+            else:
+                exit()
+        atoms_range = get_conf_range(rank, size, natoms, np.arange(natoms,dtype=int))
+        atoms_range = comm.scatter(atoms_range, root=0)
+        print(
+            f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True
+        )
+
+    else:
+
+        atoms_range = np.arange(natoms,dtype=int)
+
+    natoms_range = int(len(atoms_range))
+    atomic_symbols_range = [atomic_symbols[i] for i in atoms_range]
+
     atom_idx = {}
     natom_dict = {}
     for spe in species:
         atom_idx[spe] = []
         natom_dict[spe] = 0
-    for iat in range(natoms):
-        spe = atomic_symbols[iat]
+    for iat in range(natoms_range):
+        spe = atomic_symbols_range[iat]
         if spe in species:
            atom_idx[spe].append(iat)
            natom_dict[spe] += 1
@@ -61,8 +85,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     omega2 = sph_utils.get_representation_coeffs(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe2,species,nang2,nrad2,natoms)
 
     # Reshape arrays of expansion coefficients for optimal Fortran indexing 
-    v1 = np.transpose(omega1,(1,3,0,2)).copy()
-    v2 = np.transpose(omega2,(1,3,0,2)).copy()
+    v1 = np.transpose(omega1[:,atoms_range],(1,3,0,2)).copy()
+    v2 = np.transpose(omega2[:,atoms_range],(1,3,0,2)).copy()
 
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
@@ -168,63 +192,40 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     # init averages array if asked
     if average:
         Av_coeffs = np.zeros(Tsize)
-    
+
     # fill vector of predictions
-    i = 0
+    itot = 0
     pred_coefs = np.zeros(Tsize)
     for iat in range(natoms):
         spe = atomic_symbols[iat]
+        if iat in atoms_range:
+            i=0
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    pred_coefs[itot+i:itot+i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
+                    i += 2*l+1
+            ispe[spe] += 1
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
-                pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
                 if average and l==0:
-                    Av_coeffs[i] = av_coefs[spe][n]
-                i += 2*l+1
-        ispe[spe] += 1
+                    Av_coeffs[itot] = av_coefs[spe][n]
+                itot += 2*l+1
     
     # add back spherical averages if required
-    if average:
+    if average and rank==0:
         pred_coefs += Av_coeffs
     
-   
+    if parallel:
+        comm.Barrier()
+        pred_coefs = comm.allreduce(pred_coefs)  
+ 
     if qmcode=="cp2k":
 
-        # compute integral of predicted density
-        iaux = 0
-        rho_int = 0.0
-        nele = 0.0
-        for iat in range(natoms):
-            spe = atomic_symbols[iat]
-            if average:
-                nele += pseudocharge_dict[spe]
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    if l==0:
-                        rho_int += charge_integrals[(spe,l,n)] * pred_coefs[iaux]
-                    iaux += 2*l+1
- 
-        print("charge integral =", rho_int) 
-
-
-        # enforce charge conservation 
-        iaux = 0
-        for iat in range(natoms):
-            spe = atomic_symbols[iat]
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    for im in range(2*l+1):
-                        if l==0 and im==0:
-                            if average:
-                                pred_coefs[iaux] *= nele/rho_int
-                            else:
-                                if n==nmax[(spe,l)]-1:
-                                    pred_coefs[iaux] -= rho_int/(charge_integrals[(spe,l,n)]*natoms)
-                        iaux += 1
-
+        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
  
 #    if print("pred time:", time.time()-predstart,flush=True)
     
-    return 
+    return [pred_coefs,charge,dipole] 
 
 if __name__ == "__main__":
     build()

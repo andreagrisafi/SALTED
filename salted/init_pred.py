@@ -34,6 +34,7 @@ def build():
     lmax_max = max(llist)
 
     charge_integrals = {}
+    dipole_integrals = {}
     if inp.qm.qmcode=="cp2k":
         # Initialize calculation of density/density-response moments
         from salted.cp2k.utils import init_moments
