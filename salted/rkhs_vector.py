@@ -14,7 +14,7 @@ from ase.io import read
 from scipy import sparse
 
 from salted import sph_utils
-from salted.lib import equicomb, equicombsparse, antiequicomb, antiequicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
+from salted.lib import antiequicomb, antiequicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
 from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, get_feats_projs, get_feats_projs_response, read_system
 
 def build():
@@ -145,14 +145,14 @@ def build():
 
                     featsize = nspe1*nspe2*nrad1*nrad2*llmax
                     nfps = len(vfps[lam])
-                    p = equicombsparse.equicombsparse(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+                    p = sph_utils.equicombsparse_numba(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
                     p = np.transpose(p,(2,0,1))
                     featsize = ncut
 
                 else:
  
                     featsize = nspe1*nspe2*nrad1*nrad2*llmax
-                    p = equicomb.equicomb(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+                    p = sph_utils.equicomb_numba(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
                     p = np.transpose(p,(2,0,1))
 
                 # Fill vector of equivariant descriptor

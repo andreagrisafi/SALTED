@@ -15,8 +15,8 @@ from salted import wigner
 from salted import sph_utils
 from salted import basis
 
-from salted.lib import equicomb, antiequicomb, equicombnonorm, antiequicombnonorm
-from salted.lib import equicombsparse, antiequicombsparse
+from salted.lib import antiequicomb, equicombnonorm, antiequicombnonorm
+from salted.lib import antiequicombsparse
 
 def build():
 
@@ -140,14 +140,14 @@ def build():
 
                     featsize = nspe1*nspe2*nrad1*nrad2*llmax
                     nfps = len(vfps[lam])
-                    p = equicombsparse.equicombsparse(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+                    p = sph_utils.equicombsparse_numba(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
                     p = np.transpose(p,(2,0,1))
                     featsize = ncut
 
                 else:
 
                     featsize = nspe1*nspe2*nrad1*nrad2*llmax
-                    p = equicomb.equicomb(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+                    p = sph_utils.equicomb_numba(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
                     p = np.transpose(p,(2,0,1))
                 
                 # Fill vector of equivariant descriptor

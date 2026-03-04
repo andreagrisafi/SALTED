@@ -205,7 +205,7 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
         values=keys_array
     )
 
-    spx = calculator.compute(structure, selected_keys=keys_selection)
+    spx = calculator.compute(structure, selected_keys=keys_selection, gradients=["positions"])
     spx = spx.keys_to_properties("neighbor_type")
     spx = spx.keys_to_samples("center_type")
 
@@ -215,14 +215,10 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
         c2r = complex_to_real_transformation([2*l+1])[0]
         omega[l,:,:2*l+1,:] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(spx.block(o3_lambda=l).values, (1,0,2)).reshape((np.conj(c2r.T).shape[1], natoms*nspe*nrad))).reshape(2*l+1,natoms,nspe*nrad),(1,0,2))
 
-    dspx = calculator.compute(structure, selected_keys=keys_selection, gradients=["positions"])
-    dspx = dspx.keys_to_properties("neighbor_type")
-    dspx = dspx.keys_to_samples("center_type")
-
     # Get 1st set of coefficients as a complex numpy array
     domega = np.zeros((nang+1,natoms**2,3,2*nang+1,nspe*nrad),complex)
     for l in range(nang+1):
-        grad = dspx.block(o3_lambda=l).gradient("positions")
+        grad = spx.block(o3_lambda=l).gradient("positions")
         c2r = complex_to_real_transformation([2*l+1])[0]
         if grad.values.shape[0] != natoms**2:
 
@@ -412,7 +408,6 @@ def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,wigdim,w3j,llmax,l
                         ptemp[ifeat,imu] = preal[imu]
                     ifeat = ifeat + 1
         normfact = np.sqrt(inner)
-        normfact3 = normfact**3
         for n in range(nfps):
             ifps = vfps[n]
             for imu in range(2*lam+1):
@@ -454,7 +449,6 @@ def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,wigdim,w3j,llmax,llvec,l
                         ptemp[ifeat,imu] = preal[imu]
                     ifeat = ifeat + 1
         normfact = np.sqrt(inner)
-        normfact3 = normfact**3
         for ifeat in range(featsize):
             for imu in range(2*lam+1):
                 p[iat,imu,ifeat] = ptemp[ifeat,imu] / normfact
