@@ -113,7 +113,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
             nfps = len(vfps[lam])
             #start = time.time()
-            p = sph_utils.equicombsparse_numba(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+            p = sph_utils.equicombsparse_numba(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
             #end = time.time()
             #print(str(end-start))
             featsize = ncut
@@ -121,7 +121,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         else:
 
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
-            p = sph_utils.equicomb_numba(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+            p = sph_utils.equicomb_numba(natoms,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec.T,lam,c2r,featsize)
 
         if lam==0: 
             pvec[lam] = p.reshape(natoms,featsize)
@@ -222,10 +222,14 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     if qmcode=="cp2k":
 
         charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+        return [pred_coefs, charge, dipole] 
+
+    else:
+
+        return pred_coefs
  
 #    if print("pred time:", time.time()-predstart,flush=True)
     
-    return [pred_coefs,charge,dipole] 
 
 if __name__ == "__main__":
     build()
