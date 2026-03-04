@@ -23,9 +23,11 @@ else:
 # Initialize SALTED prediction
 lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals = init_pred.build()
 
+gradient=False
+
 # do prediction for the given structure    
 frames = read(inp.prediction.filename,":")
 for i in range(len(frames)):
     structure = frames[i]
-    coefs = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,structure) 
+    coefs = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,gradient,structure) 
     np.savetxt("dynamics/COEFFS-"+str(i+1)+".dat",coefs)
