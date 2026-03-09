@@ -123,6 +123,53 @@ def init_property_file(propname,saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intst
     return pfile
 
 
+def detect_mpi():
+    """Detect if the script was launched with mpirun/mpiexec.
+
+    Returns:
+        tuple: A tuple containing (comm, size, rank, parallel) where:
+            - comm: MPI communicator object or None
+            - size: Number of MPI processes (int)
+            - rank: Rank of current process (int)
+            - parallel: Boolean indicating if running in parallel
+
+    Cases:
+        - MPI with multiple processes: (MPI.COMM_WORLD, size>1, rank, True)
+        - MPI with single process: (MPI.COMM_WORLD, 1, 0, False)
+        - Serial (no MPI): (None, 1, 0, False)
+
+    Raises:
+        RuntimeError: If launched with mpirun but mpi4py is not installed.
+    """
+    import os
+
+    mpi_env_vars = [
+        "OMPI_COMM_WORLD_SIZE",   # OpenMPI
+        "PMI_SIZE",                # MPICH
+        "PMIX_RANK",               # PMIX (MPICH/Intel)
+        "MV2_COMM_WORLD_SIZE",    # MVAPICH2
+        "SLURM_NTASKS",           # SLURM + any MPI
+    ]
+    print([var in os.environ for var in mpi_env_vars])
+    launched_with_mpi = any(var in os.environ for var in mpi_env_vars)
+
+    if launched_with_mpi:
+        try:
+            from mpi4py import MPI
+        except ImportError:
+            raise RuntimeError(
+            "Script was launched with mpirun but mpi4py is not installed."
+            )
+        else:
+            comm = MPI.COMM_WORLD
+            size = comm.Get_size()
+            rank = comm.Get_rank()
+            parallel = size > 1
+            return comm, size, rank, parallel
+    else:
+        return None, 1, 0, False
+
+
 def check_MPI_tasks_count(comm, num_items:int, item_name:str="items"):
     """
     Ensures the number of MPI tasks does not exceed the number of items.
