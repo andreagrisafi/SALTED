@@ -148,7 +148,6 @@ def detect_mpi():
         "PMI_SIZE",                # MPICH
         "PMIX_RANK",               # PMIX (MPICH/Intel)
         "MV2_COMM_WORLD_SIZE",    # MVAPICH2
-        "SLURM_NTASKS",           # SLURM + any MPI
     ]
     print([var in os.environ for var in mpi_env_vars])
     launched_with_mpi = any(var in os.environ for var in mpi_env_vars)
