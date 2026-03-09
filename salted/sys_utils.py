@@ -201,6 +201,7 @@ def check_MPI_tasks_count(comm, num_items:int, item_name:str="items"):
 def distribute_jobs(comm, jobs: list | np.ndarray, root:int=0) -> list | np.ndarray:
     """
     Distribute a list of jobs (e.g. indices) among MPI ranks using np.array_split for even distribution.
+    Safe to call in both parallel and serial contexts.
 
     Args:
         comm: MPI communicator (can be None for serial execution)
@@ -543,7 +544,7 @@ class ParseConfig:
         Please copy & paste:
         ```python
         (saltedname, saltedpath, saltedtype,
-         filename, species, average, parallel,
+         filename, species, average,
          path2qm, qmcode, qmbasis, dfbasis,
          filename_pred, predname, predict_data, alpha_only,
          rep1, rcut1, sig1, nrad1, nang1, neighspe1,
@@ -629,7 +630,6 @@ class ParseConfig:
             inp.system.filename,
             inp.system.species,
             inp.system.average,
-            inp.system.parallel,
             inp.qm.path2qm,
             inp.qm.qmcode,
             inp.qm.qmbasis,
@@ -674,7 +674,7 @@ class ParseConfig:
         Please copy & paste:
         ```python
         (
-            filename, species, average, parallel,
+            filename, species, average,
             rep1, rcut1, sig1, nrad1, nang1, neighspe1,
             rep2, rcut2, sig2, nrad2, nang2, neighspe2,
             sparsify, nsamples, ncut,
@@ -689,7 +689,6 @@ class ParseConfig:
             inp.system.filename,
             inp.system.species,
             inp.system.average,
-            inp.system.parallel,
             inp.descriptor.rep1.type,
             inp.descriptor.rep1.rcut,
             inp.descriptor.rep1.sig,
@@ -803,7 +802,6 @@ class ParseConfig:
                     bool,
                     None,
                 ),  # if bias the GPR by the average of predictions
-                "parallel": (False, False, bool, None),  # if use mpi4py
                 "seed": (False, 42, int, None),  # random seed
             },
             "qm": {

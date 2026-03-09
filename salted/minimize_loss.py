@@ -20,7 +20,6 @@ def build():
         filename,
         species,
         average,
-        parallel,
         path2qm,
         qmcode,
         qmbasis,

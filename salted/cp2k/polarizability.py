@@ -16,7 +16,7 @@ def build(iconf,ref_coefs):
 
     inp = ParseConfig().parse_input()
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, parallel,
+    filename, species, average,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
