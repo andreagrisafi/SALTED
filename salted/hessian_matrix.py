@@ -8,27 +8,15 @@ import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs, get_atom_idx, read_system
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, get_atom_idx, read_system
 
 
 def build():
 
     inp = ParseConfig().parse_input()
 
-    parallel = inp.system.parallel
     saltedname, saltedpath = inp.salted.saltedname, inp.salted.saltedpath
-
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        comm = None
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 

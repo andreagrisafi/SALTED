@@ -10,6 +10,7 @@ from salted import basis
 from salted.sys_utils import (
     ParseConfig,
     check_MPI_tasks_count,
+    detect_mpi,
     distribute_jobs,
     get_atom_idx,
     init_property_file,
@@ -30,16 +31,7 @@ def build():
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    else:
-        comm = None
-        size = 1
-        rank = 0
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)

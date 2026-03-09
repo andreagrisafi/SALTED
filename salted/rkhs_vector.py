@@ -15,7 +15,7 @@ from scipy import sparse
 
 from salted import sph_utils
 from salted.lib import equicomb, equicombsparse, antiequicomb, antiequicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs, get_atom_idx, get_feats_projs, get_feats_projs_response, read_system
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, get_atom_idx, get_feats_projs, get_feats_projs_response, read_system
 
 def build():
 
@@ -30,23 +30,11 @@ def build():
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        comm = None
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-    # TODO: replace class arraylist with numpy.concatenate
-    # define a numpy equivalent to an appendable list
     class arraylist:
         def __init__(self):
             self.data = np.zeros((100000,))
@@ -71,17 +59,21 @@ def build():
             return self.data[:self.size]
 
     fdir = f"rkhs-vectors_{saltedname}"
-    
+
     if (rank == 0):
         dirpath = os.path.join(saltedpath, fdir, f"M{Menv}_zeta{zeta}")
         if not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
-    if size > 1:  comm.Barrier()
+    if parallel:
+        comm.Barrier()
 
-    # Distribute structures to tasks
-    check_MPI_tasks_count(comm, ndata, "structures")
-    conf_range = distribute_jobs(comm, list(range(ndata)))
-    print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+    if parallel:
+        # Distribute structures to tasks
+        check_MPI_tasks_count(comm, ndata, "structures")
+        conf_range = distribute_jobs(comm, list(range(ndata)))
+        print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+    else:
+        conf_range = list(range(ndata))
 
     frames = read(filename,":")
 

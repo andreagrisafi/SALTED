@@ -3,23 +3,13 @@ import sys
 
 import numpy as np
 
-from salted.sys_utils import ParseConfig, read_system, distribute_jobs
+from salted.sys_utils import ParseConfig, detect_mpi, distribute_jobs, read_system
 
 
 def build():
     inp = ParseConfig().parse_input()
 
-    if inp.system.parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-        print('This is task',rank+1,'of',size,flush=True)
-    else:
-        comm = None
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
     
     if rank == 0: print("WARNING! This script assumes you will use an AIMS version >= 240403 to read the predicted RI coefficients. If this is not true, please use move_data_in_reorder instead.")
 
@@ -30,7 +20,7 @@ def build():
     ntrain = int(inp.gpr.trainfrac*inp.gpr.Ntrain)
     
     # Distribute structures to tasks
-    if inp.system.parallel:
+    if parallel:
         conf_range = distribute_jobs(comm, list(range(ndata)))
     else:
         conf_range = list(range(ndata))

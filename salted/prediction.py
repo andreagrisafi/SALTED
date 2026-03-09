@@ -16,12 +16,13 @@ from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
     check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
     get_atom_idx,
     get_feats_projs,
     get_feats_projs_response,
     read_system,
     init_property_file,
-    distribute_jobs
 )
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
@@ -44,17 +45,7 @@ def build():
             "please specify the entry named `prediction.filename` and `prediction.predname` in the input file."
         )
 
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        comm = None
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename_pred, species, dfbasis)
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)

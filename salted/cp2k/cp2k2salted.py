@@ -9,7 +9,7 @@ import copy
 import time
 
 from salted import basis
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs
 
 inp = ParseConfig().parse_input()
 
@@ -18,18 +18,7 @@ ndata = len(xyzfile)
 species = inp.system.species
 [lmax,nmax] = basis.basiset(inp.qm.dfbasis)
 
-if inp.system.parallel:
-
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    size = comm.Get_size()
-    rank = comm.Get_rank()
-
-else:
-
-    comm = None
-    size = 1
-    rank = 0
+comm, size, rank, parallel = detect_mpi()
 
 if rank==0:
 
@@ -44,7 +33,7 @@ if rank==0:
                 os.mkdir(dirpath)
 
 
-if inp.system.parallel:
+if parallel:
 
     comm.Barrier()
 

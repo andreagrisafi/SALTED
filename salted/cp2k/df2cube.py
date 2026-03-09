@@ -15,7 +15,7 @@ from scipy.interpolate import interp1d
 #from sympy import lambdify
 
 from salted import basis
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs
 
 def build(structure,coefs,cubename,refcube,comm,size,rank):
 
@@ -30,6 +30,8 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+
+    comm, size, rank, parallel = detect_mpi()
 
     # read basis
     [lmax,nmax] = basis.basiset(dfbasis)

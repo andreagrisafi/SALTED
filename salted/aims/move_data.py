@@ -3,22 +3,12 @@ import os.path as osp
 
 import numpy as np
 from ase.io import read
-from salted.sys_utils import ParseConfig, distribute_jobs
+from salted.sys_utils import ParseConfig, detect_mpi, distribute_jobs
 
 def build():
     inp = ParseConfig().parse_input()
 
-    if inp.system.parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-        print('This is task',rank+1,'of',size,flush=True)
-    else:
-        comm = None
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
     
     if (rank == 0):
         """check if all subdirectories exist, if not create them"""
@@ -34,7 +24,7 @@ def build():
     ndata = len(xyzfile)
 
     # Distribute structures to tasks
-    if inp.system.parallel:
+    if parallel:
         conf_range = distribute_jobs(comm, list(range(ndata)))
     else:
         conf_range = list(range(ndata))

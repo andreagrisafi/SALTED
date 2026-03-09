@@ -9,7 +9,7 @@ import numpy as np
 from scipy import sparse
 from ase.data import atomic_numbers
 
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs, get_atom_idx, read_system
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, get_atom_idx, read_system
 
 from salted import wigner
 from salted import sph_utils
@@ -33,15 +33,7 @@ def build():
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
-    if parallel:
-        from mpi4py import MPI
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    else:
-        comm = None
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)

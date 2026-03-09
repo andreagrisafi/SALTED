@@ -11,7 +11,7 @@ from scipy import special
 from salted import basis, sph_utils
 from salted.cp2k.utils import compute_charge_and_dipole
 from salted.lib import equicomb, equicombsparse
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs
 
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,structure):
@@ -43,7 +43,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     for spe in excluded_species:
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
     natoms = int(len(atomic_symbols))
-  
+
+    comm, size, rank, parallel = detect_mpi()
     if parallel:
         check_MPI_tasks_count(comm, natoms, "atoms")
         atoms_range = distribute_jobs(comm, np.arange(natoms,dtype=int))

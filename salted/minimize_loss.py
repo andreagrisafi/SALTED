@@ -7,7 +7,7 @@ import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs, get_atom_idx, read_system
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, get_atom_idx, read_system
 
 
 def build():
@@ -59,18 +59,7 @@ def build():
         HYPER_PARAMETERS_POTENTIAL,
     ) = ParseConfig().get_all_params()
 
-    # MPI information
-    if parallel:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-        print(f"This is task {rank+1} of {size}", flush=True)
-    else:
-        comm = None
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
 
     fdir = f"rkhs-vectors_{saltedname}"
     rdir = f"regrdir_{saltedname}"
@@ -223,7 +212,7 @@ def build():
 
         loss *= norm
         if parallel:
-            loss = comm.allreduce(loss, op=MPI.SUM)
+            loss = comm.allreduce(loss)
 
         # add regularization term
         loss += regul * np.dot(weights, weights)
@@ -303,7 +292,7 @@ def build():
                     itot += 1
 
         if parallel:
-            gradient = comm.allreduce(gradient, op=MPI.SUM) * norm + 2.0 * regul * weights
+            gradient = comm.allreduce(gradient) * norm + 2.0 * regul * weights
         else:
             gradient *= norm
             gradient += 2.0 * regul * weights
@@ -356,7 +345,7 @@ def build():
                     itot += 1
         
         if parallel:
-            Ad = comm.allreduce(Ad, op=MPI.SUM) * norm + 2.0 * regul * cg_dire
+            Ad = comm.allreduce(Ad) * norm + 2.0 * regul * cg_dire
         else:
             Ad *= norm
             Ad += 2.0 * regul * cg_dire
