@@ -69,7 +69,8 @@ def build():
                 cartpath = os.path.join(dirpath, f"{icart}")
                 if not os.path.exists(cartpath):
                     os.mkdir(cartpath)
-    if size > 1: comm.Barrier()
+    if parallel:
+        comm.Barrier()
 
     if average:
         # Load spherical averages 

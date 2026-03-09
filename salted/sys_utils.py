@@ -774,7 +774,7 @@ class ParseConfig:
                     True,
                     None,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to SALTED outputs / working directory
                 "saltedtype": (
                     False,
@@ -782,13 +782,14 @@ class ParseConfig:
                     str,
                     lambda inp, val: val in ("density", "density-response"),
                 ),  # salted target
+                "seed": (False, 42, int, None),  # random seed
             },
             "system": {
                 "filename": (
                     True,
                     None,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to geometry file (training set)
                 "species": (
                     True,
@@ -802,14 +803,13 @@ class ParseConfig:
                     bool,
                     None,
                 ),  # if bias the GPR by the average of predictions
-                "seed": (False, 42, int, None),  # random seed
             },
             "qm": {
                 "path2qm": (
                     True,
                     None,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to the QM calculation outputs
                 "qmcode": (
                     True,
@@ -823,37 +823,37 @@ class ParseConfig:
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "pyscf"),
+                    get_qmcode_checker("pyscf"),
                 ),  # quantum mechanical basis, only for PySCF
                 "functional": (
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "pyscf"),
+                    get_qmcode_checker("pyscf"),
                 ),  # quantum mechanical functional, only for PySCF
                 "pseudocharge": (
                     False,
                     PLACEHOLDER,
                     list,
-                    lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
+                    get_qmcode_checker("cp2k"),
                 ),  # pseudo nuclear charge, only for CP2K
                 "coeffile": (
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
+                    get_qmcode_checker("cp2k"),
                 ),
                 "ovlpfile": (
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
+                    get_qmcode_checker("cp2k"),
                 ),
                 "periodic": (
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
+                    get_qmcode_checker("cp2k"),
                 ),  # periodic boundary conditions, only for CP2K
             },
             "prediction": {
@@ -861,7 +861,7 @@ class ParseConfig:
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to the prediction file
                 "predname": (
                     False,
@@ -880,13 +880,13 @@ class ParseConfig:
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to the prediction data by QM code, only for AIMS
                 "alpha_only": (
                     False,
                     PLACEHOLDER,
                     bool,
-                    check_conditions_alpha_only
+                    check_conditions_alpha_only,
                 ),  # for condition details, see the function docstring
             },
             "descriptor": {
@@ -1076,24 +1076,22 @@ class ParseConfig:
         loader.add_constructor("!float_sci", float_sci)
         return loader
 
-
-def check_with_qmcode(inp, val, qmcode: Union[str, List[str]]) -> bool:
-    """This means the entry is required IF and ONLY IF when using a / some specific qmcode(s)"""
+def get_qmcode_checker(qmcode: Union[str, list[str]]) -> callable:
+    """Factory that returns a checker function for a specific qmcode"""
     if isinstance(qmcode, str):
-        qmcode = [
-            qmcode,
-        ]
-    return (
-        (inp["qm"]["qmcode"].lower() not in qmcode) and (val == PLACEHOLDER)
-    ) or (  # if not using this qmcode, do not specify it
-        (inp["qm"]["qmcode"].lower() in qmcode) and (val != PLACEHOLDER)
-    )  # if using this qmcode, do specify it
+        qmcode = [qmcode]
 
+    def checker(inp, val) -> bool:
+        return (
+            (inp["qm"]["qmcode"].lower() not in qmcode) and (val == PLACEHOLDER)
+        ) or (
+            (inp["qm"]["qmcode"].lower() in qmcode) and (val != PLACEHOLDER)
+        )
 
-check_with_qmcode.parse_error_msg = "Value imcompatible with the qm.qmcode."
+    checker.parse_error_msg = f"Value incompatible with qm.qmcode (expected one of: {qmcode})."
+    return checker
 
-
-def check_path_exists(path: str) -> bool:
+def check_path_exists(_, path: str) -> bool:
     """Check if the path exists, the path should be either absolute or relative to the current working directory
     If the path is a placeholder, return True
     """

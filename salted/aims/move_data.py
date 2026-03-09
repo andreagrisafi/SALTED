@@ -95,7 +95,8 @@ def build():
         np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{i}.npy"), o)
         np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
     
-    if size > 1: comm.Barrier()
+    if parallel:
+        comm.Barrier()
     
     """delte ri basis overlap and proj coeffs files"""
     

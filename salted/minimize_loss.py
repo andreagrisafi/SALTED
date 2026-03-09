@@ -89,7 +89,7 @@ def build():
     if rank == 0:
         if not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
-    if size > 1:
+    if parallel:
         comm.Barrier()
 
     # define training set at random
