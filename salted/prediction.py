@@ -268,14 +268,15 @@ def build():
             if average:
                 pred_coefs += Av_coeffs
 
-            # save predicted coefficients 
-            np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
-
             if qmcode=="cp2k":
                 # Compute charges and dipole moments
                 charge, dipole = compute_charge_and_dipole(frames[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
                 print(iconf+1,charge,file=qfile)
                 print(iconf+1,dipole["x"],dipole["y"],dipole["z"],file=dfile)
+            
+            # save predicted coefficients 
+            np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
+
     
     elif saltedtype=="density-response":
 
