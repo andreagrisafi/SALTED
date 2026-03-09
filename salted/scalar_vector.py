@@ -76,13 +76,13 @@ def build():
 
         featsize = nspe1*nspe2*nrad1*nrad2*llmax
         nfps = len(vfps[lam])
-        p = sph_utils.equicombsparse_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+        p = sph_utils.equicombsparse_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
         featsize = ncut
 
     else:
        
         featsize = nspe1*nspe2*nrad1*nrad2*llmax
-        p = sph_utils.equicomb_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+        p = sph_utils.equicomb_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
 
     print("time = ", time.time()-start)
 

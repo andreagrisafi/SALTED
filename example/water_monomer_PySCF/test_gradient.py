@@ -9,6 +9,7 @@ from salted.sys_utils import ParseConfig
 inp = ParseConfig().parse_input()
 
 if inp.system.parallel:
+
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     fcomm = comm.py2f()
@@ -17,16 +18,17 @@ if inp.system.parallel:
     if rank==0: print("Parallel run over", ntasks, "tasks",flush=True)
 
 else:
+
     comm = None
     rank = 0
     ntasks = 1
 
 d = np.array([0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001])
 
-bohr2angs = 0.529177249
+lcut = 6
 
-icfg = 0
-structure = read("../water_total.xyz", ":")[icfg]
+icfg = -1 
+structure = read("./water_total.xyz", ":")[icfg]
 natoms = len(structure.positions)
 d_c = 0
 axis = "x"
@@ -43,17 +45,17 @@ ave_grad = {}
 grad_fd = {}
 
 # Initialize electrode charge density 
-output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,ntasks,rank,True,structure) 
+output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,ntasks,rank,lcut,True,structure) 
 ave["ref"] = output[0]
 grad_pred_coefs = output[1]
 
 for i in range(len(d)):
     structure.positions[iat,d_c] += d[i]
-    output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,ntasks,rank,False,structure)
+    output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,ntasks,rank,lcut,False,structure)
     ave[str(d[i])] = output[0].copy()
 
     structure.positions[iat,d_c] -= 2*d[i]
-    output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,ntasks,rank,False,structure)
+    output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,ntasks,rank,lcut,False,structure)
     ave[str("m"+str(d[i]))] = output[0].copy()
     
     structure.positions[iat,d_c] += d[i]
@@ -61,6 +63,7 @@ for i in range(len(d)):
     grad_fd[str(d[i])] = (np.array(ave[str(d[i])]) - np.array(ave[str("m"+str(d[i]))]))/(2*d[i])
 
 if rank == 0:
+
     atomic_symbols = structure.get_chemical_symbols()
     import matplotlib.pyplot as plt
     plt.clf()
@@ -76,18 +79,18 @@ if rank == 0:
     itot = 0
     for iatc in range(natoms):
         spe = atomic_symbols[iatc]
-        for l in range(lmax[spe]+1):
+        for l in range(min(lmax[spe],lcut)+1):
             for n in range(nmax[(spe,l)]):
                 if (spe == species) and (l == lam) and (n==channel):
                     for im in range(2*l+1):
-                        array[im].append(grad_pred_coefs[iat,d_c,itot+(im)])
+                        array[im].append(grad_pred_coefs[iat,d_c,itot+im])
                         for k in range(len(d)):
-                            array_fd[im][k].append(grad_fd[str(d[k])][itot+(im)])
-                itot += (2*l+1)
+                            array_fd[im][k].append(grad_fd[str(d[k])][itot+im])
+                itot += 2*l+1
     
     for im in range(2*lam+1):
         plt.loglog(1/d, [np.mean(np.abs(np.array(array_fd[im][k])-np.array(array[im]))) for k in range(len(d))], "-", label = r"$\mu =$"+ str(im-lam))
-        if np.mean(np.abs(np.array(array_fd[im][4])-np.array(array[im])))> 10**(-9):
+        if np.mean(np.abs(np.array(array_fd[im][4])-np.array(array[im])))> 10e-9:
             print(str(im))
     
     plt.xlabel("d"+axis + r" [$A^{-1}$]")

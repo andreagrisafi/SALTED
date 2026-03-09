@@ -12,7 +12,7 @@ from salted import basis
 from salted.sys_utils import ParseConfig, get_conf_range
 from salted.cp2k.utils import compute_charge_and_dipole, scale_grad_coefs
 
-def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,gradient,structure):
+def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,gradient,structure):
 
     inp = ParseConfig().parse_input()
 
@@ -106,7 +106,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
-    for lam in range(lmax_max+1):
+    for lam in range(min(lmax_max,lcut)+1):
     
 #        print("lambda =", lam)
     
@@ -131,11 +131,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
       
-                p, grad_p = sph_utils.grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+                p, grad_p = sph_utils.grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
             
             else:
 
-                p = sph_utils.equicombsparse_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+                p = sph_utils.equicombsparse_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
 
             featsize = ncut
 
@@ -145,11 +145,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
 
-                p, grad_p = sph_utils.grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+                p, grad_p = sph_utils.grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize)
 
             else:
 
-                p = sph_utils.equicomb_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+                p = sph_utils.equicomb_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
 
         if lam==0: 
 
@@ -192,7 +192,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                 grad_psi_nm[(spe,0)] = np.dot(grad_kernel_nm,Vmat[(0,spe)])
 
         # lam > 0
-        for lam in range(1,lmax[spe]+1):
+        for lam in range(1,min(lmax[spe],lcut)+1):
 
             featsize = pvec[lam].shape[-1]
             if zeta==1:
@@ -227,7 +227,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     Tsize = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        for l in range(lmax[spe]+1):
+        for l in range(min(lmax[spe],lcut)+1):
             for n in range(nmax[(spe,l)]):
                 Tsize += 2*l+1
     
@@ -240,10 +240,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         ispe[spe] = 0
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
-                Mcut = psi_nm[(spe,l)].shape[1]
-                C[(spe,l,n)] = np.dot(psi_nm[(spe,l)],weights[isize:isize+Mcut])
-                if gradient: 
-                    grad_C[(spe,l,n)] = np.dot(grad_psi_nm[(spe,l)],weights[isize:isize+Mcut])
+                Mcut = Vmat[(l,spe)].shape[1]
+                if l <= lcut:
+                    C[(spe,l,n)] = np.dot(psi_nm[(spe,l)],weights[isize:isize+Mcut])
+                    if gradient: 
+                        grad_C[(spe,l,n)] = np.dot(grad_psi_nm[(spe,l)],weights[isize:isize+Mcut])
                 isize += Mcut
     
     # init averages array if asked
@@ -251,18 +252,19 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         Av_coeffs = np.zeros(Tsize)
 
     # fill vector of predictions
+    atoms_range_set = set(atoms_range)
     itot = 0
     pred_coefs = np.zeros(Tsize)
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        if iat in atoms_range:
+        if iat in atoms_range_set:
             i=0
-            for l in range(lmax[spe]+1):
+            for l in range(min(lmax[spe],lcut)+1):
                 for n in range(nmax[(spe,l)]):
                     pred_coefs[itot+i:itot+i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
                     i += 2*l+1
             ispe[spe] += 1
-        for l in range(lmax[spe]+1):
+        for l in range(min(lmax[spe],lcut)+1):
             for n in range(nmax[(spe,l)]):
                 if average and l==0:
                     Av_coeffs[itot] = av_coefs[spe][n]
@@ -277,14 +279,14 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         grad_pred_coefs = np.zeros((natoms,3,Tsize))
         for iat in range(natoms):
             spe = atomic_symbols[iat]
-            if iat in atoms_range:
+            if iat in atoms_range_set:
                 i=0
-                for l in range(lmax[spe]+1):
+                for l in range(min(lmax[spe],lcut)+1):
                     for n in range(nmax[(spe,l)]):
                         grad_pred_coefs[:,:,itot+i:itot+i+(2*l+1)] = grad_C[(spe,l,n)].reshape(natoms,3,natom_dict[spe]*(2*l+1))[:,:,ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+(2*l+1)]
                         i += (2*l+1)
                 ispe[spe] += 1
-            for l in range(lmax[spe]+1):
+            for l in range(min(lmax[spe],lcut)+1):
                 for n in range(nmax[(spe,l)]):
                     itot += (2*l+1)
 
@@ -301,11 +303,15 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
  
     if qmcode=="cp2k":
 
-        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+        lcuts = {}
+        for spe in species:
+            lcuts[spe] = min(lcut,lmax[spe])
+ 
+        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
         
         if gradient:
 
-            grad_charge = scale_grad_coefs(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge)
+            grad_charge = scale_grad_coefs(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge)
 
             return [pred_coefs, grad_pred_coefs, charge, dipole] 
 
@@ -321,7 +327,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
         else:
 
-            return pred_coefs
+            return [pred_coefs]
 
     print("pred time:", time.time()-predstart,flush=True)
     

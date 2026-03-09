@@ -53,7 +53,7 @@ def build():
 
         wig = open(osp.join(
             inp.salted.saltedpath, "wigners", f"wigner_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
-        ), "a")
+        ), "w")
         get_wigner3j(llmax,llvec,lam,wig)
         wig.close()
 
@@ -65,7 +65,7 @@ def build():
 
             wig = open(osp.join(
                 inp.salted.saltedpath, "wigners", f"wigner_antisymm_lam-{lam}_lmax1-{nang1}_lmax2-{nang2}.dat"
-            ), "a")
+            ), "w")
             get_wigner3j(llmax,llvec,lam,wig)
             wig.close()
 
@@ -73,7 +73,7 @@ def build():
 
                 cgfile = open(osp.join(
                     inp.salted.saltedpath, "wigners", f"cg_response_lam-{lam}_L-{L}.dat"
-                ), "a")
+                ), "w")
 
                 icg = 0
                 for imu in range(2*lam+1):

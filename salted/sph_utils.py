@@ -255,8 +255,8 @@ def grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,
             for n2 in range(nrad2):
                 iwig = 0
                 for il in range(llmax):
-                    l1 = llvec[0,il]
-                    l2 = llvec[1,il]
+                    l1 = llvec[il,0]
+                    l2 = llvec[il,1]
                     pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
                     grad_pcmplx = np.zeros((2*lam+1, natoms, 3), dtype=np.complex128)
                     for imu in range(2*lam+1):
@@ -324,8 +324,8 @@ def grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv
             for n2 in range(nrad2):
                 iwig = 0
                 for il in range(llmax):
-                    l1 = llvec[0,il]
-                    l2 = llvec[1,il]
+                    l1 = llvec[il,0]
+                    l2 = llvec[il,1]
                     pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
                     grad_pcmplx = np.zeros((2*lam+1, natoms, 3), dtype=np.complex128)
                     for imu in range(2*lam+1):
@@ -386,8 +386,8 @@ def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,la
             for n2 in range(nrad2):
                 iwig = 0
                 for il in range(llmax):
-                    l1 = llvec[0,il]
-                    l2 = llvec[1,il]
+                    l1 = llvec[il,0]
+                    l2 = llvec[il,1]
                     pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
                     for imu in range(2*lam+1):
                         mu = imu-lam
@@ -427,8 +427,8 @@ def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,
             for n2 in range(nrad2):
                 iwig = 0
                 for il in range(llmax):
-                    l1 = llvec[0,il]
-                    l2 = llvec[1,il]
+                    l1 = llvec[il,0]
+                    l2 = llvec[il,1]
                     pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
                     for imu in range(2*lam+1):
                         mu = imu-lam
