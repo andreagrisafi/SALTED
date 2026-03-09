@@ -237,13 +237,13 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
     return omega, domega
 
 @njit(parallel=True, fastmath = True)
-def grad_equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,wigdim,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
-    p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
-    grad_p = np.zeros((natoms, 3, natoms, 2*lam+1, nfps), dtype=np.float64)
+def grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
+    p = np.zeros((natoms_range, 2*lam+1, nfps), dtype=np.float64)
+    grad_p = np.zeros((natoms, 3, natoms_range, 2*lam+1, nfps), dtype=np.float64)
     dv2c = np.conj(dv2)
     v2c  = np.conj(v2)
 
-    for iat in prange(natoms):
+    for iat in prange(natoms_range):
         inner = 0.0
         dot1 = np.zeros(natoms, dtype=np.float64)
         dot2 = np.zeros(natoms, dtype=np.float64)
@@ -306,13 +306,13 @@ def grad_equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,wigdi
     return p, grad_p
 
 @njit(parallel=True, fastmath = True)
-def grad_equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,wigdim,w3j,llmax,llvec,lam,c2r,featsize):
-    p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
-    grad_p = np.zeros((natoms, 3, natoms, 2*lam+1, nfps), dtype=np.float64)
+def grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,w3j,llmax,llvec,lam,c2r,featsize):
+    p = np.zeros((natoms_range, 2*lam+1, featsize), dtype=np.float64)
+    grad_p = np.zeros((natoms, 3, natoms_range, 2*lam+1, featsize), dtype=np.float64)
     dv2c = np.conj(dv2)
     v2c  = np.conj(v2)
 
-    for iat in prange(natoms):
+    for iat in prange(natoms_range):
         inner = 0.0
         dot1 = np.zeros(natoms, dtype=np.float64)
         dot2 = np.zeros(natoms, dtype=np.float64)

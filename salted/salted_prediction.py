@@ -10,7 +10,7 @@ from ase.io import read
 from salted import sph_utils
 from salted import basis
 from salted.sys_utils import ParseConfig, get_conf_range
-from salted.cp2k.utils import compute_charge_and_dipole
+from salted.cp2k.utils import compute_charge_and_dipole, scale_grad_coefs
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,gradient,structure):
 
@@ -131,7 +131,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
       
-                p, grad_p = sph_utils.grad_equicombsparse_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
+                p, grad_p = sph_utils.grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
             
             else:
 
@@ -145,7 +145,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
 
-                p, grad_p = sph_utils.grad_equicomb_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec.T,lam,c2r,featsize)
+                p, grad_p = sph_utils.grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec.T,lam,c2r,featsize)
 
             else:
 
@@ -167,9 +167,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
  
                 grad_pvec[lam] = grad_p.reshape(natoms,3,natoms_range,2*lam+1,featsize)
 
-        #print("equicomb time:", (time.time()-equistart))
+        print("equicomb time:", (time.time()-equistart))
     
-    #rkhsstart = time.time()
+    rkhsstart = time.time()
 
     psi_nm = {}
     if gradient: grad_psi_nm = {}
@@ -177,6 +177,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     for spe in species:
 
         # lam = 0
+        featsize = pvec[0].shape[-1]
         if zeta==1:
             psi_nm[(spe,0)] = np.dot(pvec[0][atom_idx[spe]],power_env_sparse[(0,spe)].T)
             if gradient: 
@@ -200,7 +201,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                     grad_psi_nm[(spe,lam)] = np.dot(grad_pvec[lam][:,:,atom_idx[spe],:,:].reshape(natoms*3*natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T) 
             else:
                 kernel_nm = np.dot(pvec[lam][atom_idx[spe]].reshape(natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
-                kernel_nm_blocks = kernel_nm.reshape(natom_dict[spe], 2*lam+1, Mspe[spe], 2*lam+1)
+                kernel_nm_blocks = kernel_nm.reshape(natom_dict[spe], 2*lam+1, Mspe[spe], 2*lam+1).copy()
                 kernel_nm_blocks *= kernel0_nm[:, np.newaxis, :, np.newaxis] ** (zeta - 1)
                 if gradient:
                     grad_kernel_nm = np.dot(grad_pvec[lam][:,:,atom_idx[spe],:,:].reshape(natoms*3*natom_dict[spe]*(2*lam+1), featsize), power_env_sparse[(lam,spe)].T)
@@ -212,10 +213,10 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                     grad_kernel_nm = grad_kernel_nm_blocks.reshape(natoms*3*natom_dict[spe]*(2*lam+1), Mspe[spe]*(2*lam+1))
                     grad_psi_nm[(spe,lam)] = np.dot(grad_kernel_nm,Vmat[(lam,spe)])
                      
-    #if print("rkhs time:", time.time()-rkhsstart,flush=True)
+    print("rkhs time:", time.time()-rkhsstart,flush=True)
  
     # Perform equivariant predictions
-    #predstart = time.time()
+    predstart = time.time()
     
     # Load spherical averages if required
     if average:
@@ -273,19 +274,19 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for spe in species:
             ispe[spe] = 0
         itot = 0
-        grad_pred_coefs = np.zeros(Tsize*natoms*3)
+        grad_pred_coefs = np.zeros((natoms,3,Tsize))
         for iat in range(natoms):
             spe = atomic_symbols[iat]
             if iat in atoms_range:
                 i=0
                 for l in range(lmax[spe]+1):
                     for n in range(nmax[(spe,l)]):
-                        grad_pred_coefs[itot+i:itot+i+(2*l+1)*natoms*3] = grad_C[(spe,l,n)][ispe[spe]*(2*l+1)*natoms*3:ispe[spe]*(2*l+1)*natoms*3+(2*l+1)*natoms*3]
-                        i += (2*l+1)*3*natoms
+                        grad_pred_coefs[:,:,itot+i:itot+i+(2*l+1)] = grad_C[(spe,l,n)].reshape(natoms,3,natom_dict[spe]*(2*l+1))[:,:,ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+(2*l+1)]
+                        i += (2*l+1)
                 ispe[spe] += 1
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
-                    itot += (2*l+1)*3*natoms
+                    itot += (2*l+1)
 
 
     # add back spherical averages if required
@@ -304,6 +305,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         
         if gradient:
 
+            grad_charge = scale_grad_coefs(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge)
+
             return [pred_coefs, grad_pred_coefs, charge, dipole] 
 
         else:
@@ -319,8 +322,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         else:
 
             return pred_coefs
- 
-#    if print("pred time:", time.time()-predstart,flush=True)
+
+    print("pred time:", time.time()-predstart,flush=True)
     
 
 if __name__ == "__main__":

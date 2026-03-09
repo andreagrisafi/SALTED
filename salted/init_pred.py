@@ -43,8 +43,8 @@ def build():
     loadstart = time.time()
    
     # Load feature space sparsification information if required 
+    vfps = {}
     if sparsify:
-        vfps = {}
         for lam in range(lmax_max+1):
             vfps[lam] = np.load(osp.join(
                 saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"
