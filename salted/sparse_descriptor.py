@@ -101,8 +101,9 @@ def build():
 
         for iconf in conf_range:
 
-            start_time = time.time()
-            print(f"conf: {iconf+1}", flush=True)
+            # start_time = time.time()
+            if inp.salted.verbose:
+                print(f"conf: {iconf+1}", flush=True)
 
             structure = frames[iconf]
 
@@ -153,7 +154,7 @@ def build():
                     nfps = len(fps_indexes_per_conf[(iconf,spe)])
                     power_env_sparse[(spe,lam)][Midx_spe[(iconf,spe)]:Midx_spe[(iconf,spe)]+nfps] = power[fps_indexes_per_conf[(iconf,spe)]]
 
-            end_time = time.time()
+            # end_time = time.time()
             #print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
 
         if parallel:
@@ -189,8 +190,9 @@ def build():
 
         for iconf in conf_range:
     
-            start_time = time.time()
-            print(f"conf: {iconf+1}", flush=True)
+            # start_time = time.time()
+            if inp.salted.verbose:
+                print(f"conf: {iconf+1}", flush=True)
     
             structure = frames[iconf]
     
@@ -231,7 +233,7 @@ def build():
                     nfps = len(fps_indexes_per_conf[(iconf,spe)])
                     power_env_sparse[(spe,lam)][Midx_spe[(iconf,spe)]:Midx_spe[(iconf,spe)]+nfps] = power[fps_indexes_per_conf[(iconf,spe)]]
     
-            end_time = time.time()
+            # end_time = time.time()
             #print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
     
         if parallel:
@@ -261,7 +263,8 @@ def build():
         for iconf in conf_range:
 
             structure = frames[iconf]
-            print(f"conf: {iconf+1}", flush=True)
+            if inp.salted.verbose:
+                print(f"conf: {iconf+1}", flush=True)
 
             # Compute spherical harmonics expansion coefficients
             omega1 = sph_utils.get_representation_coeffs(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms[iconf])
@@ -311,7 +314,7 @@ def build():
                     h5f.create_dataset(f"sparse_descriptors/{spe}/{lam}",data=power_env_sparse_antisymm[(spe,lam)])
             h5f.close()
 
-        end_time = time.time()
+        # end_time = time.time()
         #print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
 
 

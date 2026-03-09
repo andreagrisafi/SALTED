@@ -63,7 +63,8 @@ for iconf in conf_range:
                 for n in range(nmax[(spe,l)]):
                     nRI += 2*l+1
 
-    print("conf", iconf+1, "size =", nRI, flush=True)
+    if inp.salted.verbose:
+        print("conf", iconf+1, "size =", nRI, flush=True)
 
     # save overlap matrix in SALTED format
     overlap = np.zeros((nRI, nRI)).astype(np.double)

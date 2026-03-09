@@ -163,7 +163,8 @@ def matrices(trainrange,ntrain,av_coefs,rank):
     Avec = np.zeros(totsize)
     Bmat = np.zeros((totsize,totsize))
     for iconf in trainrange:
-        print("conf:", iconf+1,flush=True)
+        if inp.salted.verbose:
+            print(f"conf:{iconf+1}",flush=True)
 
         start = time.time()
 
@@ -235,7 +236,8 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 Avec += avec_contrib
                 Bmat += bmat_contrib
 
-        print("conf time =", time.time()-start)
+        if inp.salted.verbose:
+            print(f"conf:{iconf+1}, conf time = {time.time()-start}")
 
     Avec /= float(ntrain)
     Bmat /= float(ntrain)

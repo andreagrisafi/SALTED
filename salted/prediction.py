@@ -407,7 +407,8 @@ def build():
                 for ik in range(3):
                     psi_nm_cart[(cart[ik], spe, 0)][:natom_dict[(iconf,spe)]] = psi_nm_reshaped[:, ik]
 
-                print("kernel lam=0 time (sec) = ",time.time()-start_kernel_0,flush=True)
+                if inp.salted.verbose:
+                    print("kernel lam=0 time (sec) = ",time.time()-start_kernel_0,flush=True)
                 start_kernel_lam = time.time()
 
                 if alpha_only and qmcode=="cp2k":
@@ -519,7 +520,8 @@ def build():
                     for ik in range(3):
                         psi_nm_cart[(cart[ik], spe, lam)][:natom_dict[(iconf,spe)]*(2*lam+1)] = psi_nm_reshaped[:, ik]
 
-                print("kernel lam>0 time (sec) = ",time.time()-start_kernel_lam,flush=True)
+                if inp.salted.verbose:
+                    print("kernel lam>0 time (sec) = ",time.time()-start_kernel_lam,flush=True)
 
             start_pred = time.time()
 
@@ -562,7 +564,8 @@ def build():
                                alpha[("z","x")],    alpha[("z","y")],    alpha[("z","z")],
                                file=pfile)
 
-            print("prediction time (sec) = ",time.time()-start_pred,flush=True)
+            if inp.salted.verbose:
+                print("prediction time (sec) = ",time.time()-start_pred,flush=True)
 
     if qmcode == "cp2k":
         if saltedtype=="density":

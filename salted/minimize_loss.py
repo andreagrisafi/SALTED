@@ -306,7 +306,8 @@ def build():
 
         for iconf in range(ntrain):
 
-            print(iconf + 1, flush=True)
+            if inp.salted.verbose:
+                print(iconf + 1, flush=True)
             # psi_vector = psi_list[iconf].toarray()
             # ovlp_times_psi = np.dot(ovlp_list[iconf],psi_vector)
             # diag_hessian += 2.0*np.sum(np.multiply(ovlp_times_psi,psi_vector),axis=0)

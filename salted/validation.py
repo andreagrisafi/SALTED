@@ -150,7 +150,8 @@ def build():
             var = np.dot(ref_coefs,ref_projs)
             variance += var
             print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
-            print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
+            if inp.salted.verbose:
+                print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
             if average:
                 ref_coefs += Av_coeffs
@@ -229,7 +230,8 @@ def build():
             error_density += error
             variance += var
             print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
-            print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
+            if inp.salted.verbose:
+                print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
     efile.close()
     if qmcode == "cp2k":

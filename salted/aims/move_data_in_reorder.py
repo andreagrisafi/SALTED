@@ -25,7 +25,8 @@ def build():
         conf_range = list(range(ndata))
     
     for i in conf_range:
-        print(f"processing {i+1}/{ndata} frame")
+        if inp.salted.verbose:
+            print(f"processing {i+1}/{ndata} frame")
         t = np.load(os.path.join(
             inp.salted.saltedpath, pdir,
             f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",

@@ -149,7 +149,6 @@ def detect_mpi():
         "PMIX_RANK",               # PMIX (MPICH/Intel)
         "MV2_COMM_WORLD_SIZE",    # MVAPICH2
     ]
-    print([var in os.environ for var in mpi_env_vars])
     launched_with_mpi = any(var in os.environ for var in mpi_env_vars)
 
     if launched_with_mpi:
@@ -782,6 +781,7 @@ class ParseConfig:
                     str,
                     lambda inp, val: val in ("density", "density-response"),
                 ),  # salted target
+                "verbose": (False, False, bool, None),  # whether print verbose info
                 "seed": (False, 42, int, None),  # random seed
             },
             "system": {

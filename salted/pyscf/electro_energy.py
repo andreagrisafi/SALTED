@@ -101,7 +101,8 @@ g = open("external_energy.dat","w")
 print("Computing Hartree and external energy...")
 itest=0
 for iconf in range(ndata):
-    print("conf. number:", iconf+1, "/", ndata)
+    if inp.salted.verbose:
+        print("conf. number:", iconf+1, "/", ndata)
     atoms = atomic_symbols[iconf]
     valences = atomic_valence[iconf]
     nele = np.sum(valences)

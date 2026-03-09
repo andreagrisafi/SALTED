@@ -19,6 +19,8 @@ from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, dis
 
 def build():
 
+    inp = ParseConfig().parse_input()
+
     # salted parameters
     (saltedname, saltedpath, saltedtype,
     filename, species, average,
@@ -104,7 +106,8 @@ def build():
         for iconf in conf_range:
 
             start_time = time.time()
-            print(f"{iconf} start", flush=True)
+            if inp.salted.verbose:
+                print(f"{iconf} start", flush=True)
 
             structure = frames[iconf]
 
@@ -233,7 +236,8 @@ def build():
             del ij
 
             end_time = time.time()
-            print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
+            if inp.salted.verbose:
+                print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
 
     elif saltedtype=="density-response":
 
@@ -258,7 +262,8 @@ def build():
         for iconf in conf_range:
 
             start_time = time.time()
-            print(f"{iconf} start", flush=True)
+            if inp.salted.verbose:
+                print(f"{iconf} start", flush=True)
 
             structure = frames[iconf]
 
@@ -570,7 +575,8 @@ def build():
                 del ij
 
             end_time = time.time()
-            print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
+            if inp.salted.verbose:
+                print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
 
 if __name__ == "__main__":
     build()

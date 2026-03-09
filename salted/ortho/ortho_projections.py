@@ -65,7 +65,8 @@ for spe in spelist:
 
 #for iconf in range(istart,iend):
 for iconf in range(ndata):
-    print(iconf+1)
+    if inp.salted.verbose:
+        print(iconf+1)
     
     start = time.time()
     species = atomic_symbols[iconf]
@@ -120,4 +121,5 @@ for iconf in range(ndata):
             for n in range(nmax[(spe,l)]):
                 np.save(inp.path2qm+inp.projdir+"spe"+str(spe)+"_l"+str(l)+"_n"+str(n)+"/ortho_projections_conf"+str(iconf)+".npy",projs[(spe,l,n)].reshape(natoms_spe[(iconf,spe)]*(2*l+1)))
 
-    print((time.time()-start)/60.0, "minutes")
+    if inp.salted.verbose:
+        print((time.time()-start)/60.0, "minutes")

@@ -44,7 +44,8 @@ def main(geom_indexes: Union[List[int], None], num_threads: int = None):
     """ do DFT calculation """
     start_time = time.time()
     for cal_idx, (geom_idx, geom) in enumerate(zip(geom_indexes, geoms)):
-        print(f"calcualte {geom_idx=}, progress: {cal_idx}/{len(geom_indexes)}")
+        if inp.salted.verbose:
+            print(f"calcualte {geom_idx=}, progress: {cal_idx}/{len(geom_indexes)}")
         symb = geom.get_chemical_symbols()
         coords = geom.get_positions()
         atoms = [(s, c) for s, c in zip(symb, coords)]
