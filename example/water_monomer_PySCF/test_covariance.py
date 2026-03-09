@@ -120,8 +120,15 @@ D_real = np.real(np.dot(c2r,np.dot(D,np.conj(c2r.T))))
 
 cvec_1 = np.load("coefficients/coefficients_conf0.npy")[10:13]
 cvec_2 = np.load("coefficients/coefficients_conf"+str(itest)+".npy")[10:13]
+print("Coefficients conf 1:")
 print(cvec_1)
-print(np.dot(D_real,cvec_2))
+print("")
+rvec_2 = np.dot(D_real,cvec_2)
+print("Aligned coefficients conf 2 --> conf 1:")
+print(rvec_2)
+print("")
+print("Covariance error:")
+print(rvec_2-cvec_1)
 
 #path2qm = "/gpfsstore/rech/kln/ulo49cx/water_monomer/"
 #
