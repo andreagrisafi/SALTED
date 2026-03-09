@@ -167,7 +167,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
  
                 grad_pvec[lam] = grad_p.reshape(natoms,3,natoms_range,2*lam+1,featsize)
 
-        print("equicomb time:", (time.time()-equistart))
+        #print("equicomb time:", (time.time()-equistart))
     
     rkhsstart = time.time()
 
@@ -213,7 +213,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                     grad_kernel_nm = grad_kernel_nm_blocks.reshape(natoms*3*natom_dict[spe]*(2*lam+1), Mspe[spe]*(2*lam+1))
                     grad_psi_nm[(spe,lam)] = np.dot(grad_kernel_nm,Vmat[(lam,spe)])
                      
-    print("rkhs time:", time.time()-rkhsstart,flush=True)
+    #print("rkhs time:", time.time()-rkhsstart,flush=True)
  
     # Perform equivariant predictions
     predstart = time.time()
@@ -301,6 +301,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         if gradient:
             grad_pred_coefs = comm.allreduce(grad_pred_coefs)  
  
+    #print("pred time:", time.time()-predstart,flush=True)
+    
     if qmcode=="cp2k":
 
         lcuts = {}
@@ -329,7 +331,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             return [pred_coefs]
 
-    print("pred time:", time.time()-predstart,flush=True)
     
 
 if __name__ == "__main__":
