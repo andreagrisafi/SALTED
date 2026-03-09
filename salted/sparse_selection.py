@@ -43,7 +43,7 @@ def build():
         power_dense[idx:idx+natoms[iconf]] = power[iconf,:natoms[iconf]]
         idx += natoms[iconf]
     # compute sparse set with FPS
-    fps_idx = np.array(do_fps(power_dense,M),int)
+    fps_idx = np.array(do_fps(power_dense,M,verbose=inp.salted.verbose),int)
     fps_species = species_array[fps_idx]
     sparse_set = np.vstack((fps_idx,fps_species)).T
     print("Computed sparse set made of ", M, "environments")

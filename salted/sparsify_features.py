@@ -96,7 +96,7 @@ def build():
             sys.exit(1)
         
         pvec = equicombfps.equicombfps(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-        vfps = do_fps(pvec,ncut)
+        vfps = do_fps(pvec,ncut,verbose=inp.salted.verbose)
         np.save(osp.join(sdir, f"fps{ncut}-{lam}.npy"), vfps)
 
 if __name__ == "__main__":

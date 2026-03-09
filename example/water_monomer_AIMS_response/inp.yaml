@@ -9,7 +9,6 @@ salted:
 system:
   filename: ./water_monomers_1k.xyz
   species: [H, O]
-  parallel: False
   average: False
 
 # quantum mechanical info

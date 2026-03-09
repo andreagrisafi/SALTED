@@ -7,7 +7,6 @@ salted:
 system:
   filename: ./water_monomers_100.xyz
   species: [H, O]
-  parallel: False
 
 # quantum mechanical info
 qm:

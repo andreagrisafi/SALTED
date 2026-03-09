@@ -281,7 +281,7 @@ def get_conf_range(rank, size, ntest, testrangetot) -> List[List[int]]:
     return testrange
 
 
-def do_fps(x, d=0):
+def do_fps(x, d=0, verbose:bool=False):
     """Perform Farthest Point Sampling selection"""
     if d == 0:
         d = len(x)
@@ -292,7 +292,8 @@ def do_fps(x, d=0):
     n2 = np.sum((x * np.conj(x)), axis=1)
     dl = n2 + n2[iy[0]] - 2 * np.real(np.dot(x, np.conj(x[iy[0]])))
     for i in range(1, d):
-        print("Doing ", i, " of ", d, " dist = ", max(dl))
+        if verbose:
+            print("Doing ", i, " of ", d, " dist = ", max(dl))
         iy[i] = np.argmax(dl)
         nd = n2 + n2[iy[i]] - 2 * np.real(np.dot(x, np.conj(x[iy[i]])))
         dl = np.minimum(dl, nd)
