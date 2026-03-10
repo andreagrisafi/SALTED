@@ -131,10 +131,8 @@ def build():
     if parallel:
         check_MPI_tasks_count(comm, ntraintot, "training structures")
         trainrange = distribute_jobs(comm, trainrangetot[:ntraintot])
-        print(
-            f"Task {rank+1} handles the following structures: {format_index_ranges(trainrange),inp.salted.verbose}",
-            flush=True
-        )
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following structures: {format_index_ranges(trainrange,True)}", flush=True)
     else:
         trainrange = trainrangetot[:ntraintot]
     ntrain = int(len(trainrange))

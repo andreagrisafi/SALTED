@@ -54,10 +54,8 @@ def build():
     if parallel:
         check_MPI_tasks_count(comm, ndata)
         conf_range = distribute_jobs(comm, list(range(ndata)))
-        print(
-            f"Task {rank+1} handles the following structures: {format_index_ranges(conf_range),inp.salted.verbose}",
-            flush=True
-        )
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following structures: {format_index_ranges(conf_range,True)}", flush=True)
     else:
         conf_range = list(range(ndata))
 

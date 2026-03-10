@@ -52,10 +52,8 @@ def build():
     if parallel:
         check_MPI_tasks_count(comm, len(testrange))
         testrange = distribute_jobs(comm, testrange)
-        print(
-            f"Task {rank+1} handles the following structures: {format_index_ranges(testrange,inp.salted.verbose)}",
-            flush=True
-        )
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following structures: {format_index_ranges(testrange,True)}", flush=True)
 
     reg_log10_intstr = str(int(np.log10(regul)))
 

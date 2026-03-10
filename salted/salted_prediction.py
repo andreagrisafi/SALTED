@@ -48,10 +48,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     if parallel:
         check_MPI_tasks_count(comm, natoms, "atoms")
         atoms_range = distribute_jobs(comm, np.arange(natoms,dtype=int))
-        print(
-            f"Task {rank+1} handles the following atoms: {format_index_ranges(atoms_range,inp.salted.verbose)}",
-            flush=True
-        )
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following atoms: {format_index_ranges(atoms_range,True)}", flush=True)
     else:
         atoms_range = np.arange(natoms,dtype=int)
 

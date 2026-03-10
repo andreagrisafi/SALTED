@@ -199,10 +199,8 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
     if parallel:
         check_MPI_tasks_count(comm, natoms)
         atoms_range = distribute_jobs(comm, np.arange(natoms,dtype=int))
-        print(
-            f"Task {rank+1} handles the following atoms: {format_index_ranges(atoms_range,inp.salted.verbose)}",
-            flush=True
-        )
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following atoms: {format_index_ranges(atoms_range,True)}", flush=True)
     else:
         atoms_range = np.arange(natoms,dtype=int)
 
