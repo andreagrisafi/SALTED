@@ -12,6 +12,7 @@ from salted.sys_utils import (
     check_MPI_tasks_count,
     detect_mpi,
     distribute_jobs,
+    format_index_ranges,
     get_atom_idx,
     init_property_file,
     read_system,
@@ -51,7 +52,10 @@ def build():
     if parallel:
         check_MPI_tasks_count(comm, len(testrange))
         testrange = distribute_jobs(comm, testrange)
-        print(f"Task {rank+1} handles the following structures: {testrange}", flush=True)
+        print(
+            f"Task {rank+1} handles the following structures: {format_index_ranges(testrange,inp.salted.verbose)}",
+            flush=True
+        )
 
     reg_log10_intstr = str(int(np.log10(regul)))
 

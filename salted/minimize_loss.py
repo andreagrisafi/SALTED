@@ -7,7 +7,15 @@ import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, get_atom_idx, read_system
+from salted.sys_utils import (
+    ParseConfig,
+    check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
+    format_index_ranges,
+    get_atom_idx,
+    read_system,
+)
 
 
 def build():
@@ -123,7 +131,10 @@ def build():
     if parallel:
         check_MPI_tasks_count(comm, ntraintot, "training structures")
         trainrange = distribute_jobs(comm, trainrangetot[:ntraintot])
-        print(f"Task {rank+1} handles the following structures: {trainrange}", flush=True)
+        print(
+            f"Task {rank+1} handles the following structures: {format_index_ranges(trainrange),inp.salted.verbose}",
+            flush=True
+        )
     else:
         trainrange = trainrangetot[:ntraintot]
     ntrain = int(len(trainrange))
@@ -306,8 +317,6 @@ def build():
 
         for iconf in range(ntrain):
 
-            if inp.salted.verbose:
-                print(iconf + 1, flush=True)
             # psi_vector = psi_list[iconf].toarray()
             # ovlp_times_psi = np.dot(ovlp_list[iconf],psi_vector)
             # diag_hessian += 2.0*np.sum(np.multiply(ovlp_times_psi,psi_vector),axis=0)

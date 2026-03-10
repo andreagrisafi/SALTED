@@ -18,6 +18,7 @@ from salted.sys_utils import (
     check_MPI_tasks_count,
     detect_mpi,
     distribute_jobs,
+    format_index_ranges,
     get_atom_idx,
     get_feats_projs,
     get_feats_projs_response,
@@ -61,7 +62,10 @@ def build():
         conf_range = distribute_jobs(comm, list(range(ndata)))
         ndata = len(conf_range)  # update ndata for each mpi task
         natmax = max(natoms[conf_range])
-        print(f"Task {rank+1} handles the following structures: {conf_range}", flush=True)
+        print(
+            f"Task {rank+1} handles the following structures: {format_index_ranges(conf_range),inp.salted.verbose}",
+            flush=True
+        )
     else:
         conf_range = list(range(ndata))
     natoms_total = sum(natoms[conf_range])

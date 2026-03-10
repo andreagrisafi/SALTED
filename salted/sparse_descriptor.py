@@ -9,7 +9,15 @@ import numpy as np
 from scipy import sparse
 from ase.data import atomic_numbers
 
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, get_atom_idx, read_system
+from salted.sys_utils import (
+    ParseConfig,
+    check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
+    format_index_ranges,
+    get_atom_idx,
+    read_system,
+)
 
 from salted import wigner
 from salted import sph_utils
@@ -46,7 +54,10 @@ def build():
     if parallel:
         check_MPI_tasks_count(comm, ndata)
         conf_range = distribute_jobs(comm, list(range(ndata)))
-        print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+        print(
+            f"Task {rank+1} handles the following structures: {format_index_ranges(conf_range),inp.salted.verbose}",
+            flush=True
+        )
     else:
         conf_range = list(range(ndata))
 
@@ -102,8 +113,6 @@ def build():
         for iconf in conf_range:
 
             # start_time = time.time()
-            if inp.salted.verbose:
-                print(f"conf: {iconf+1}", flush=True)
 
             structure = frames[iconf]
 
@@ -191,8 +200,6 @@ def build():
         for iconf in conf_range:
     
             # start_time = time.time()
-            if inp.salted.verbose:
-                print(f"conf: {iconf+1}", flush=True)
     
             structure = frames[iconf]
     
@@ -263,8 +270,6 @@ def build():
         for iconf in conf_range:
 
             structure = frames[iconf]
-            if inp.salted.verbose:
-                print(f"conf: {iconf+1}", flush=True)
 
             # Compute spherical harmonics expansion coefficients
             omega1 = sph_utils.get_representation_coeffs(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms[iconf])

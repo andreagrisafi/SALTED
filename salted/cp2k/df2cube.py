@@ -15,7 +15,7 @@ from scipy.interpolate import interp1d
 #from sympy import lambdify
 
 from salted import basis
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, format_index_ranges
 
 def build(structure,coefs,cubename,refcube,comm,size,rank):
 
@@ -199,7 +199,10 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
     if parallel:
         check_MPI_tasks_count(comm, natoms)
         atoms_range = distribute_jobs(comm, np.arange(natoms,dtype=int))
-        print(f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True)
+        print(
+            f"Task {rank+1} handles the following atoms: {format_index_ranges(atoms_range,inp.salted.verbose)}",
+            flush=True
+        )
     else:
         atoms_range = np.arange(natoms,dtype=int)
 

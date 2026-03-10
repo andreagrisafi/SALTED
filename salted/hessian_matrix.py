@@ -8,7 +8,15 @@ import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, get_atom_idx, read_system
+from salted.sys_utils import (
+    ParseConfig,
+    check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
+    format_index_ranges,
+    get_atom_idx,
+    read_system,
+)
 
 
 def build():
@@ -71,7 +79,7 @@ def build():
         check_MPI_tasks_count(comm, ntrain, "training structures")
         this_task_trainrange = distribute_jobs(comm, trainrange)
         """ calculate and gather """
-        print(f"Task {rank} handling structures: {this_task_trainrange}")
+        print(f"Task {rank} handling structures: {format_index_ranges(this_task_trainrange,inp.salted.verbose)}")
         [Avec, Bmat] = matrices(this_task_trainrange, ntrain,av_coefs,rank)
         comm.Barrier()
         """ reduce matrices in slices to avoid MPI overflows """
@@ -163,8 +171,6 @@ def matrices(trainrange,ntrain,av_coefs,rank):
     Avec = np.zeros(totsize)
     Bmat = np.zeros((totsize,totsize))
     for iconf in trainrange:
-        if inp.salted.verbose:
-            print(f"conf:{iconf+1}",flush=True)
 
         start = time.time()
 

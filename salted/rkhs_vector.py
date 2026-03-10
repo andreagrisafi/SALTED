@@ -14,8 +14,15 @@ from ase.io import read
 from scipy import sparse
 
 from salted import sph_utils
-from salted.lib import equicomb, equicombsparse, antiequicomb, antiequicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, get_atom_idx, get_feats_projs, get_feats_projs_response, read_system
+from salted.lib import (
+    equicomb, equicombsparse, antiequicomb, antiequicombsparse,
+    equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm,
+)
+from salted.sys_utils import (
+    ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs,
+    format_index_ranges, get_atom_idx, get_feats_projs, get_feats_projs_response,
+    read_system,
+)
 
 def build():
 
@@ -73,7 +80,10 @@ def build():
         # Distribute structures to tasks
         check_MPI_tasks_count(comm, ndata, "structures")
         conf_range = distribute_jobs(comm, list(range(ndata)))
-        print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+        print(
+            f"Task {rank+1} handles the following structures: {format_index_ranges(conf_range,inp.salted.verbose)}",
+            flush=True
+        )
     else:
         conf_range = list(range(ndata))
 
@@ -106,8 +116,6 @@ def build():
         for iconf in conf_range:
 
             start_time = time.time()
-            if inp.salted.verbose:
-                print(f"{iconf} start", flush=True)
 
             structure = frames[iconf]
 
@@ -262,8 +270,6 @@ def build():
         for iconf in conf_range:
 
             start_time = time.time()
-            if inp.salted.verbose:
-                print(f"{iconf} start", flush=True)
 
             structure = frames[iconf]
 
