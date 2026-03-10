@@ -44,7 +44,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
     natoms = int(len(atomic_symbols))
 
-    comm, size, rank, parallel = detect_mpi()
     if parallel:
         check_MPI_tasks_count(comm, natoms, "atoms")
         atoms_range = distribute_jobs(comm, np.arange(natoms,dtype=int))
