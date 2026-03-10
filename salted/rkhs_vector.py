@@ -245,7 +245,7 @@ def build():
 
             end_time = time.time()
             if inp.salted.verbose:
-                print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
+                print(f"conf {iconf}, time = {(end_time - start_time):.2f} s", flush=True)
 
     elif saltedtype=="density-response":
 

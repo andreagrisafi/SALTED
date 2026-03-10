@@ -172,7 +172,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
     Bmat = np.zeros((totsize,totsize))
     for iconf in trainrange:
 
-        start = time.time()
+        start_time = time.time()
 
         if inp.salted.saltedtype=="density":
 
@@ -242,8 +242,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 Avec += avec_contrib
                 Bmat += bmat_contrib
 
-        if inp.salted.verbose:
-            print(f"conf:{iconf+1}, conf time = {time.time()-start}")
+        if inp.salted.verbose: print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s", flush=True)
 
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
