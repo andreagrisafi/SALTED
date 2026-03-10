@@ -8,27 +8,23 @@ import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, get_atom_idx, read_system
+from salted.sys_utils import (
+    ParseConfig,
+    check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
+    format_index_ranges,
+    get_atom_idx,
+    read_system,
+)
 
 
 def build():
 
     inp = ParseConfig().parse_input()
 
-    parallel = inp.system.parallel
     saltedname, saltedpath = inp.salted.saltedname, inp.salted.saltedpath
-
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        comm = None
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 
@@ -46,8 +42,10 @@ def build():
     av_coefs = {} # keep outside logical
     if inp.system.average:
         # compute average density coefficients
-        if rank==0: get_averages.build()
-        if parallel: comm.Barrier()
+        if rank==0:
+            get_averages.build()
+        if parallel:
+            comm.Barrier()
         # load average density coefficients
         for spe in species:
             av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
@@ -78,18 +76,11 @@ def build():
         print("Running in parallel mode")
         """ check partitioning """
         assert size > 1, "Please run in serial mode if using a single MPI task"
-        assert inp.gpr.blocksize > 0, "Please set inp.gpr.blocksize > 0 when running in parallel mode"
-        assert isinstance(inp.gpr.blocksize, int), "Please set inp.gpr.blocksize as an integer"
-        blocksize = inp.gpr.blocksize
-        assert ntrain % blocksize == 0, \
-            "Please choose a blocksize which is an exact divisor of inp.gpr.Ntrain * inp.gpr.trainfrac!"
-        nblocks = int(ntrain/blocksize)
-        assert nblocks == size, \
-            f"Please choose a number of MPI tasks (current ntasks={size}) consistent with " \
-            f"the number of blocks {nblocks} = inp.gpr.Ntrain * inp.gpr.trainfrac / inp.gpr.blocksize!"
-        this_task_trainrange = trainrange[rank*blocksize:(rank+1)*blocksize]
+        check_MPI_tasks_count(comm, ntrain, "training structures")
+        this_task_trainrange = distribute_jobs(comm, trainrange)
         """ calculate and gather """
-        print(f"Task {rank} handling structures: {this_task_trainrange}")
+        if inp.salted.verbose:
+            print(f"Task {rank} handling structures: {format_index_ranges(this_task_trainrange,True)}", flush=True)
         [Avec, Bmat] = matrices(this_task_trainrange, ntrain,av_coefs,rank)
         comm.Barrier()
         """ reduce matrices in slices to avoid MPI overflows """
@@ -101,7 +92,6 @@ def build():
         Bmat[(nslices-1)*100:] = comm.allreduce(Bmat[(nslices-1)*100:])
     else:
         print("Running in serial mode")
-        assert inp.gpr.blocksize == 0, "Please DON'T provide inp.gpr.blocksize in inp.yaml when running in serial mode"
         [Avec, Bmat] = matrices(trainrange,ntrain,av_coefs,rank)
 
     if rank==0:
@@ -182,9 +172,8 @@ def matrices(trainrange,ntrain,av_coefs,rank):
     Avec = np.zeros(totsize)
     Bmat = np.zeros((totsize,totsize))
     for iconf in trainrange:
-        print("conf:", iconf+1,flush=True)
 
-        start = time.time()
+        start_time = time.time()
 
         if inp.salted.saltedtype=="density":
 
@@ -254,7 +243,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 Avec += avec_contrib
                 Bmat += bmat_contrib
 
-        print("conf time =", time.time()-start)
+        if inp.salted.verbose: print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s", flush=True)
 
     Avec /= float(ntrain)
     Bmat /= float(ntrain)

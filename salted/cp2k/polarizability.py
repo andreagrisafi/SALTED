@@ -8,7 +8,7 @@ from scipy import special
 from scipy import sparse
 
 from salted import basis
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range, init_property_file
+from salted.sys_utils import ParseConfig, read_system, get_atom_idx, init_property_file
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
 def build(iconf,ref_coefs):
@@ -16,14 +16,14 @@ def build(iconf,ref_coefs):
 
     inp = ParseConfig().parse_input()
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, parallel,
+    filename, species, average,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+    gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 

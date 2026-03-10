@@ -15,12 +15,15 @@ from salted.lib import equicomb, equicombsparse, equicombnonorm, antiequicombnon
 from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
+    check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
+    format_index_ranges,
     get_atom_idx,
-    get_conf_range,
     get_feats_projs,
     get_feats_projs_response,
     read_system,
-    init_property_file
+    init_property_file,
 )
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
@@ -28,14 +31,14 @@ def build():
 
     inp = ParseConfig().parse_input()
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, parallel,
+    filename, species, average,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+    gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
         raise ValueError(
@@ -43,31 +46,24 @@ def build():
             "please specify the entry named `prediction.filename` and `prediction.predname` in the input file."
         )
 
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename_pred, species, dfbasis)
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     bohr2angs = 0.529177210670
 
-    # Distribute structures to tasks
-    ndata_true = ndata
-    if rank == 0: print(f"The dataset contains {ndata_true} frames.")
+    if rank == 0:
+        print(f"The dataset contains {ndata} frames.")
+
+    # Initialize conf_range for both parallel and serial cases
     if parallel:
-        conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
-        conf_range = comm.scatter(conf_range,root=0)  # List[int]
-        ndata = len(conf_range)
+        check_MPI_tasks_count(comm, ndata, "predicting structures")
+        conf_range = distribute_jobs(comm, list(range(ndata)))
+        ndata = len(conf_range)  # update ndata for each mpi task
         natmax = max(natoms[conf_range])
-        print(f"Task {rank+1} handles the following structures: {conf_range}", flush=True)
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following structures: {format_index_ranges(conf_range,True)}", flush=True)
     else:
         conf_range = list(range(ndata))
     natoms_total = sum(natoms[conf_range])
@@ -106,7 +102,8 @@ def build():
                 cartpath = os.path.join(dirpath, f"{icart}")
                 if not os.path.exists(cartpath):
                     os.mkdir(cartpath)
-    if size > 1: comm.Barrier()
+    if parallel:
+        comm.Barrier()
 
     # Initialize files for derived properties 
     if qmcode=="cp2k":
@@ -412,7 +409,8 @@ def build():
                 for ik in range(3):
                     psi_nm_cart[(cart[ik], spe, 0)][:natom_dict[(iconf,spe)]] = psi_nm_reshaped[:, ik]
 
-                print("kernel lam=0 time (sec) = ",time.time()-start_kernel_0,flush=True)
+                if inp.salted.verbose:
+                    print("kernel lam=0 time (sec) = ",time.time()-start_kernel_0,flush=True)
                 start_kernel_lam = time.time()
 
                 if alpha_only and qmcode=="cp2k":
@@ -524,7 +522,8 @@ def build():
                     for ik in range(3):
                         psi_nm_cart[(cart[ik], spe, lam)][:natom_dict[(iconf,spe)]*(2*lam+1)] = psi_nm_reshaped[:, ik]
 
-                print("kernel lam>0 time (sec) = ",time.time()-start_kernel_lam,flush=True)
+                if inp.salted.verbose:
+                    print("kernel lam>0 time (sec) = ",time.time()-start_kernel_lam,flush=True)
 
             start_pred = time.time()
 
@@ -567,7 +566,8 @@ def build():
                                alpha[("z","x")],    alpha[("z","y")],    alpha[("z","z")],
                                file=pfile)
 
-            print("prediction time (sec) = ",time.time()-start_pred,flush=True)
+            if inp.salted.verbose:
+                print("prediction time (sec) = ",time.time()-start_pred,flush=True)
 
     if qmcode == "cp2k":
         if saltedtype=="density":

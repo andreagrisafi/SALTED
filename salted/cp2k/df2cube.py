@@ -15,21 +15,23 @@ from scipy.interpolate import interp1d
 #from sympy import lambdify
 
 from salted import basis
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, format_index_ranges
 
 def build(structure,coefs,cubename,refcube,comm,size,rank):
 
     inp = ParseConfig().parse_input()
 
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, parallel,
+    filename, species, average,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+    gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+
+    comm, size, rank, parallel = detect_mpi()
 
     # read basis
     [lmax,nmax] = basis.basiset(dfbasis)
@@ -192,26 +194,15 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                                                      dy*np.asarray(range(nside[1])),
                                                      dz*np.asarray(range(nside[2])) ) ),(2,1,3,0))
     grid_regular=grid_regular.reshape((npoints,3))
-   
+
+
     if parallel:
-
-        if natoms < size:
-            if rank == 0:
-                raise ValueError(
-                    f"More processes {size=} have been requested than atoms {natoms=}. "
-                    f"Please reduce the number of processes."
-                )
-            else:
-                exit()
-        atoms_range = get_conf_range(rank, size, natoms, np.arange(natoms,dtype=int))
-        atoms_range = comm.scatter(atoms_range, root=0)
-        print(
-            f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True
-        )
-
+        check_MPI_tasks_count(comm, natoms)
+        atoms_range = distribute_jobs(comm, np.arange(natoms,dtype=int))
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following atoms: {format_index_ranges(atoms_range,True)}", flush=True)
     else:
-
-        atoms_range = np.arange(natoms,dtype=int) 
+        atoms_range = np.arange(natoms,dtype=int)
 
     natoms_range = int(len(atoms_range))
     coords_range = [coords[i] for i in atoms_range]

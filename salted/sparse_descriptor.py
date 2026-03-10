@@ -9,7 +9,15 @@ import numpy as np
 from scipy import sparse
 from ase.data import atomic_numbers
 
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
+from salted.sys_utils import (
+    ParseConfig,
+    check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
+    format_index_ranges,
+    get_atom_idx,
+    read_system,
+)
 
 from salted import wigner
 from salted import sph_utils
@@ -24,38 +32,32 @@ def build():
 
     # salted parameters
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, parallel,
+    filename, species, average,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+    gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
-    if parallel:
-        from mpi4py import MPI
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    else:
-        rank=0
-        size=1
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
-    
+
     frames = read(filename,":")
 
     sdir = osp.join(saltedpath, f"equirepr_{saltedname}")
 
     # Distribute structures to tasks
     if parallel:
-        conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
-        conf_range = comm.scatter(conf_range,root=0)
-        print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+        check_MPI_tasks_count(comm, ndata)
+        conf_range = distribute_jobs(comm, list(range(ndata)))
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following structures: {format_index_ranges(conf_range,True)}", flush=True)
     else:
-        conf_range = range(ndata)
+        conf_range = list(range(ndata))
 
     sparse_set = np.loadtxt(osp.join(sdir, f"sparse_set_{Menv}.txt"),int)
     fps_idx = sparse_set[:,0]
@@ -109,7 +111,6 @@ def build():
         for iconf in conf_range:
 
             start_time = time.time()
-            print(f"conf: {iconf+1}", flush=True)
 
             structure = frames[iconf]
 
@@ -160,8 +161,7 @@ def build():
                     nfps = len(fps_indexes_per_conf[(iconf,spe)])
                     power_env_sparse[(spe,lam)][Midx_spe[(iconf,spe)]:Midx_spe[(iconf,spe)]+nfps] = power[fps_indexes_per_conf[(iconf,spe)]]
 
-            end_time = time.time()
-            #print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
+            if inp.salted.verbose: print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s", flush=True)
 
         if parallel:
             comm.Barrier()
@@ -196,8 +196,7 @@ def build():
 
         for iconf in conf_range:
     
-            start_time = time.time()
-            print(f"conf: {iconf+1}", flush=True)
+            # start_time = time.time()
     
             structure = frames[iconf]
     
@@ -238,7 +237,7 @@ def build():
                     nfps = len(fps_indexes_per_conf[(iconf,spe)])
                     power_env_sparse[(spe,lam)][Midx_spe[(iconf,spe)]:Midx_spe[(iconf,spe)]+nfps] = power[fps_indexes_per_conf[(iconf,spe)]]
     
-            end_time = time.time()
+            # end_time = time.time()
             #print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
     
         if parallel:
@@ -268,7 +267,6 @@ def build():
         for iconf in conf_range:
 
             structure = frames[iconf]
-            print(f"conf: {iconf+1}", flush=True)
 
             # Compute spherical harmonics expansion coefficients
             omega1 = sph_utils.get_representation_coeffs(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms[iconf])
@@ -318,7 +316,7 @@ def build():
                     h5f.create_dataset(f"sparse_descriptors/{spe}/{lam}",data=power_env_sparse_antisymm[(spe,lam)])
             h5f.close()
 
-        end_time = time.time()
+        # end_time = time.time()
         #print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
 
 

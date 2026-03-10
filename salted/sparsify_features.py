@@ -13,20 +13,20 @@ from salted import sph_utils
 from salted import basis
 
 from salted.lib import equicomb, equicombfps
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range, do_fps
+from salted.sys_utils import ParseConfig, do_fps, get_atom_idx, read_system
 
 def build():
 
     inp = ParseConfig().parse_input()
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, parallel,
+    filename, species, average,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+    gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
     # Generate directories for saving descriptors
     sdir = osp.join(saltedpath, f"equirepr_{saltedname}")
@@ -96,7 +96,7 @@ def build():
             sys.exit(1)
         
         pvec = equicombfps.equicombfps(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-        vfps = do_fps(pvec,ncut)
+        vfps = do_fps(pvec,ncut,verbose=inp.salted.verbose)
         np.save(osp.join(sdir, f"fps{ncut}-{lam}.npy"), vfps)
 
 if __name__ == "__main__":

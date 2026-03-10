@@ -34,6 +34,7 @@ def build():
     lmax_max = max(llist)
 
     charge_integrals = {}
+    dipole_integrals = {}
     if inp.qm.qmcode=="cp2k":
         # Initialize calculation of density/density-response moments
         from salted.cp2k.utils import init_moments
@@ -58,7 +59,7 @@ def build():
         saltedpath, f"regrdir_{saltedname}", f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
     ))
     
-    print("load time:", (time.time()-loadstart))
+    if inp.salted.verbose: print("load time:", (time.time()-loadstart))
     
     return [lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals]
 

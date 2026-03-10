@@ -118,7 +118,8 @@ f = open("predicted_electrostatic_energies.dat","w")
 print("Computing Hartree and external energy...")
 itest=0
 for iconf in testrange:
-    print("testing conf. number:", itest+1, "/", len(testrange))
+    if inp.salted.verbose:
+        print("testing conf. number:", itest+1, "/", len(testrange))
     atoms = atomic_symbols[iconf]
     valences = atomic_valence[iconf]
     nele = np.sum(valences)

@@ -1,33 +1,32 @@
 import os
 import sys
 import time
+
 import h5py
 import numpy as np
-from scipy import special
 from ase.data import atomic_numbers
 from ase.io import read
+from scipy import special
 
-from salted.lib import equicomb 
-from salted.lib import equicombsparse
-
-from salted import sph_utils
-from salted import basis
-from salted.sys_utils import ParseConfig, get_conf_range
+from salted import basis, sph_utils
 from salted.cp2k.utils import compute_charge_and_dipole
+from salted.lib import equicomb, equicombsparse
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs, format_index_ranges
+
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,structure):
 
     inp = ParseConfig().parse_input()
 
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, parallel,
+    filename, species, average,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+    gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
     # read system
     ndata = len(structure)
@@ -44,25 +43,14 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     for spe in excluded_species:
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
     natoms = int(len(atomic_symbols))
-  
+
+    parallel = (size > 1)
     if parallel:
-
-        if natoms < size:
-            if rank == 0:
-                raise ValueError(
-                    f"More processes {size=} have been requested than atoms {natoms=}. "
-                    f"Please reduce the number of processes."
-                )
-            else:
-                exit()
-        atoms_range = get_conf_range(rank, size, natoms, np.arange(natoms,dtype=int))
-        atoms_range = comm.scatter(atoms_range, root=0)
-        print(
-            f"Task {rank+1} handles the following atoms: {atoms_range}", flush=True
-        )
-
+        check_MPI_tasks_count(comm, natoms, "atoms")
+        atoms_range = distribute_jobs(comm, np.arange(natoms,dtype=int))
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following atoms: {format_index_ranges(atoms_range,True)}", flush=True)
     else:
-
         atoms_range = np.arange(natoms,dtype=int)
 
     natoms_range = int(len(atoms_range))
@@ -225,8 +213,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         comm.Barrier()
         pred_coefs = comm.allreduce(pred_coefs)
 
+    charge = 0
+    dipole = 0
     if qmcode=="cp2k":
-
         charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
 
 #    if print("pred time:", time.time()-predstart,flush=True)

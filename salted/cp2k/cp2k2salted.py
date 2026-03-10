@@ -9,7 +9,7 @@ import copy
 import time
 
 from salted import basis
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range
+from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs
 
 inp = ParseConfig().parse_input()
 
@@ -18,18 +18,7 @@ ndata = len(xyzfile)
 species = inp.system.species
 [lmax,nmax] = basis.basiset(inp.qm.dfbasis)
 
-if inp.system.parallel:
-
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    size = comm.Get_size()
-    rank = comm.Get_rank()
-
-else:
-
-    comm = None
-    size = 1
-    rank = 0
+comm, size, rank, parallel = detect_mpi()
 
 if rank==0:
 
@@ -44,20 +33,12 @@ if rank==0:
                 os.mkdir(dirpath)
 
 
-if inp.system.parallel:
+if parallel:
 
     comm.Barrier()
 
-    if ndata < size:
-        if rank == 0:
-            raise ValueError(
-                f"More processes {size=} have been requested than confiturations {ndata=}. "
-                f"Please reduce the number of processes."
-            )
-        else:
-            exit()
-    conf_range = get_conf_range(rank, size, ndata, np.arange(ndata,dtype=int))
-    conf_range = comm.scatter(conf_range, root=0)
+    check_MPI_tasks_count(comm, ndata, "configurations")
+    conf_range = distribute_jobs(comm, np.arange(ndata,dtype=int))
     print(
         f"Task {rank+1} handles the following configurations: {conf_range}", flush=True
     )
@@ -82,7 +63,8 @@ for iconf in conf_range:
                 for n in range(nmax[(spe,l)]):
                     nRI += 2*l+1
 
-    print("conf", iconf+1, "size =", nRI, flush=True)
+    if inp.salted.verbose:
+        print("conf", iconf+1, "size =", nRI, flush=True)
 
     # save overlap matrix in SALTED format
     overlap = np.zeros((nRI, nRI)).astype(np.double)

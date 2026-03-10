@@ -18,7 +18,9 @@ For all the path-related variables, the path can be either a relative path or an
 | -:| :-: | :-: | :- |
 | `saltedname` | `str` | **Required** | A label to identify a particular SALTED setup. |
 | `saltedpath` | `str` | **Required** | Location of all files produced by SALTED. Either relative to the working directory or an absolute path. |
-| `saltedtype` | `str` | `density` | Option for selecting the type of SALTED target (`density` or `density-response`)
+| `saltedtype` | `str` | `density` | Option for selecting the type of SALTED target (`density` or `density-response`) |
+| `seed` | `int` | `42` | Random seed. Only implemented in parsing input; not implemented in the code. |
+| `verbose` | `bool` | `False` | Output verbosity. |
 
 ### System difinition `inp.system`
 
@@ -27,7 +29,6 @@ For all the path-related variables, the path can be either a relative path or an
 | `filename` | `str` | **Required** | An extended-XYZ file consisting of input structures. |
 | `species` | `List[str]` | **Required** | List of element species considered in the electron density expansion. |
 | `average` | `bool` | `True` | Whether we use averaged coefficients to set a baseline for the density. Normally this should be true, unless a density difference is learned. |
-| `parallel` | `bool` | `False` | Whether to use MPI parallelization. |
 
 ### Information about QM training set generation `inp.qm`
 
@@ -84,7 +85,6 @@ Remember to set `inp.predict` if one wants to predict densities.
 | `eigcut` | `float` | `1e-10` | Eigenvalues cutoff for RKHS projection. |
 | `gradtol` | `float` | `1e-5` | Minimum gradient norm tolerance for CG minimization. |
 | `restart` | `bool` | `False` | Whether to restart from previous minimization checkpoint. |
-| `blocksize` | `int` | `0` | Divide dataset into blocks with blocksize for MPI matrix inversion. |
 | `trainsel` | `Union[Literal["sequential"], Literal["random"]]` | `"random"` | Select the training set at random or sequentially from the entire dataset. |
 
 ---
