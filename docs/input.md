@@ -20,6 +20,7 @@ For all the path-related variables, the path can be either a relative path or an
 | `saltedpath` | `str` | **Required** | Location of all files produced by SALTED. Either relative to the working directory or an absolute path. |
 | `saltedtype` | `str` | `density` | Option for selecting the type of SALTED target (`density` or `density-response`) |
 | `seed` | `int` | `42` | Random seed. Only implemented in parsing input; not implemented in the code. |
+| `verbose` | `bool` | `False` | Output verbosity. |
 
 ### System difinition `inp.system`
 
