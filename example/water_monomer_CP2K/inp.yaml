@@ -5,8 +5,7 @@ salted:
 
 # system general parameters
 system:
-  filename: ./dataset.xyz
-  #filename: ./water_monomers_1k.xyz
+  filename: ./water_monomers_1k.xyz
   species: [H, O]
   average: True
   parallel: True
