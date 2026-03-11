@@ -177,7 +177,7 @@ def get_representation_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAM
 
     return omega
 
-def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,natoms):
+def get_representation_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,atoms_range):
     """Compute spherical harmonics expansion coefficients of the given structural representation."""
 
     if rep=="rho":
@@ -205,22 +205,82 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
         values=keys_array
     )
 
-    spx = calculator.compute(structure, selected_keys=keys_selection, gradients=["positions"])
+    natoms_range = len(atoms_range)
+    samples_selection = Labels(
+        names=["system","atom"],
+        values=np.column_stack([
+                np.zeros(natoms_range, dtype=int),  # system index
+                atoms_range                         # atom indices
+            ])
+    )
+
+    spx = calculator.compute(structure, selected_keys=keys_selection, selected_samples=samples_selection)
     spx = spx.keys_to_properties("neighbor_type")
     spx = spx.keys_to_samples("center_type")
 
     # Get 1st set of coefficients as a complex numpy array
-    omega = np.zeros((nang+1,natoms,2*nang+1,nspe*nrad),complex)
+    omega = np.zeros((nang+1,natoms_range,2*nang+1,nspe*nrad),complex)
     for l in range(nang+1):
         c2r = complex_to_real_transformation([2*l+1])[0]
-        omega[l,:,:2*l+1,:] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(spx.block(o3_lambda=l).values, (1,0,2)).reshape((np.conj(c2r.T).shape[1], natoms*nspe*nrad))).reshape(2*l+1,natoms,nspe*nrad),(1,0,2))
+        omega[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
+
+    return omega
+
+
+def get_representation_gradient_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,natoms,atoms_range):
+    """Compute spherical harmonics expansion coefficients of the given structural representation."""
+
+    if rep=="rho":
+        # get SPH expansion for atomic density
+        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
+
+    elif rep=="V":
+        # get SPH expansion for atomic potential
+        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
+
+    else:
+        if rank == 0: print("Error: requested representation", rep, "not provided")
+
+    nspe = len(neighspe)
+    keys_array = np.zeros(((nang+1)*len(species)*nspe,4),int)
+    i = 0
+    for l in range(nang+1):
+        for specen in species:
+            for speneigh in neighspe:
+                keys_array[i] = np.array([l,1,atomic_numbers[specen],atomic_numbers[speneigh]],int)
+                i += 1
+
+    keys_selection = Labels(
+        names=["o3_lambda","o3_sigma","center_type","neighbor_type"],
+        values=keys_array
+    )
+
+    natoms_range = len(atoms_range)
+    samples_selection = Labels(
+        names=["system","atom"],
+        values=np.column_stack([
+                np.zeros(natoms_range, dtype=int),  # system index
+                atoms_range                         # atom indices
+            ])
+    )
+
+    spx = calculator.compute(structure, selected_keys=keys_selection, selected_samples=samples_selection, gradients=["positions"])
+    spx = spx.keys_to_properties("neighbor_type")
+    spx = spx.keys_to_samples("center_type")
 
     # Get 1st set of coefficients as a complex numpy array
-    domega = np.zeros((nang+1,natoms**2,3,2*nang+1,nspe*nrad),complex)
+    omega = np.zeros((nang+1,natoms_range,2*nang+1,nspe*nrad),complex)
+    for l in range(nang+1):
+        c2r = complex_to_real_transformation([2*l+1])[0]
+        omega[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
+        #omega[l,:,:2*l+1,:] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(spx.block(o3_lambda=l).values, (1,0,2)).reshape((np.conj(c2r.T).shape[1], natoms_range*nspe*nrad))).reshape(2*l+1,natoms_range,nspe*nrad),(1,0,2))
+
+    # Get 1st set of coefficients as a complex numpy array
+    domega = np.zeros((nang+1,natoms_range*natoms,3,2*nang+1,nspe*nrad),complex)
     for l in range(nang+1):
         grad = spx.block(o3_lambda=l).gradient("positions")
         c2r = complex_to_real_transformation([2*l+1])[0]
-        if grad.values.shape[0] != natoms**2:
+        if grad.values.shape[0] != natoms_range*natoms:
 
             # Extract indices as arrays
             iat = grad.samples["sample"]      # shape (nidx,)
@@ -232,7 +292,7 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
             domega[l, target_idx, :, :2*l+1, :] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(grad.values,(2,0,1,3)).reshape((np.conj(c2r.T).shape[1],len(target_idx)*3*nspe*nrad))).reshape((2*l+1,len(target_idx),3,nspe*nrad)),(1,2,0,3))
 
         else:
-            domega[l, :, :, :2*l+1, :] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(grad.values,(2,0,1,3)).reshape((np.conj(c2r.T).shape[1],natoms*natoms*3*nspe*nrad))).reshape((2*l+1,natoms*natoms,3,nspe*nrad)),(1,2,0,3))
+            domega[l, :, :, :2*l+1, :] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(grad.values,(2,0,1,3)).reshape((np.conj(c2r.T).shape[1],natoms_range*natoms*3*nspe*nrad))).reshape((2*l+1,natoms_range*natoms,3,nspe*nrad)),(1,2,0,3))
     
     return omega, domega
 
