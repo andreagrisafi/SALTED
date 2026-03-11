@@ -3,21 +3,12 @@ import os.path as osp
 
 import numpy as np
 from ase.io import read
-from salted.sys_utils import ParseConfig, get_conf_range
+from salted.sys_utils import ParseConfig, detect_mpi, distribute_jobs
 
 def build():
     inp = ParseConfig().parse_input()
 
-    if inp.system.parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-        print('This is task',rank+1,'of',size,flush=True)
-    else:
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
     
     if (rank == 0):
         """check if all subdirectories exist, if not create them"""
@@ -31,14 +22,13 @@ def build():
     
     xyzfile = read(inp.system.filename,":")
     ndata = len(xyzfile)
-    
+
     # Distribute structures to tasks
-    if inp.system.parallel:
-        conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
-        conf_range = comm.scatter(conf_range,root=0)
+    if parallel:
+        conf_range = distribute_jobs(comm, list(range(ndata)))
     else:
         conf_range = list(range(ndata))
-    
+
     def get_reorder_bool(dirpath):
         """Determine the version of FHI-aims used.
         If a version newer than 240403, coefficients are 
@@ -105,7 +95,8 @@ def build():
         np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{i}.npy"), o)
         np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
     
-    if size > 1: comm.Barrier()
+    if parallel:
+        comm.Barrier()
     
     """delte ri basis overlap and proj coeffs files"""
     

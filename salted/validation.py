@@ -7,32 +7,32 @@ import numpy as np
 from scipy import sparse
 
 from salted import basis
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, get_conf_range, init_property_file
+from salted.sys_utils import (
+    ParseConfig,
+    check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
+    format_index_ranges,
+    get_atom_idx,
+    init_property_file,
+    read_system,
+)
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
 def build():
 
     inp = ParseConfig().parse_input()
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, parallel,
+    filename, species, average,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+    gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    else:
-        comm = None
-        size = 1
-        rank = 0
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
@@ -49,11 +49,11 @@ def build():
     testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
     # Distribute structures to tasks
-    ntest = len(testrange)
     if parallel:
-        testrange = get_conf_range(rank,size,ntest,testrange)
-        testrange = comm.scatter(testrange,root=0)
-        print(f"Task {rank+1} handles the following structures: {testrange}", flush=True)
+        check_MPI_tasks_count(comm, len(testrange))
+        testrange = distribute_jobs(comm, testrange)
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following structures: {format_index_ranges(testrange,True)}", flush=True)
 
     reg_log10_intstr = str(int(np.log10(regul)))
 
@@ -71,7 +71,8 @@ def build():
                 cartpath = os.path.join(dirpath, f"{icart}")
                 if not os.path.exists(cartpath):
                     os.mkdir(cartpath)
-    if size > 1: comm.Barrier()
+    if parallel:
+        comm.Barrier()
 
     if average:
         # Load spherical averages 
@@ -146,7 +147,8 @@ def build():
             var = np.dot(ref_coefs,ref_projs)
             variance += var
             print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
-            print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
+            if inp.salted.verbose:
+                print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
             if average:
                 ref_coefs += Av_coeffs
@@ -229,7 +231,8 @@ def build():
             error_density += error
             variance += var
             print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
-            print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
+            if inp.salted.verbose:
+                print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
     efile.close()
     if qmcode == "cp2k":

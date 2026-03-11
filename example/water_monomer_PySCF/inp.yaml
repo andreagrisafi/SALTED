@@ -8,7 +8,6 @@ system:
   filename: ./water_total.xyz
   #filename: ./water_monomers_1k.xyz
   species: [H, O]
-  parallel: False 
 
 # quantum mechanical info
 qm:
@@ -50,4 +49,3 @@ gpr:
   Ntrain: 1000
   trainfrac: 1.0
   trainsel: sequential
-  #blocksize: 250

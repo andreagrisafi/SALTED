@@ -42,7 +42,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
     natoms = int(len(atomic_symbols))
 
-
     parallel = (size > 1)
     if parallel:
         check_MPI_tasks_count(comm, natoms, "atoms")
@@ -320,8 +319,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         else:
 
             return [pred_coefs]
-
-    
 
 if __name__ == "__main__":
     build()

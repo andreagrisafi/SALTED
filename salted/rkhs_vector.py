@@ -1,7 +1,3 @@
-"""
-Calculate RKHS vectors
-"""
-
 import os
 import os.path as osp
 import time
@@ -14,38 +10,36 @@ from ase.io import read
 from scipy import sparse
 
 from salted import sph_utils
-from salted.lib import antiequicomb, antiequicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
-from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, get_feats_projs, get_feats_projs_response, read_system
+from salted.lib import (
+    equicomb, equicombsparse, antiequicomb, antiequicombsparse,
+    equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm,
+)
+from salted.sys_utils import (
+    ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs,
+    format_index_ranges, get_atom_idx, get_feats_projs, get_feats_projs_response,
+    read_system,
+)
 
 def build():
 
+    inp = ParseConfig().parse_input()
+
     # salted parameters
     (saltedname, saltedpath, saltedtype,
-    filename, species, average, parallel,
+    filename, species, average,
     path2qm, qmcode, qmbasis, dfbasis,
     filename_pred, predname, predict_data, alpha_only,
     rep1, rcut1, sig1, nrad1, nang1, neighspe1,
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, blocksize, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+    gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
-    if parallel:
-        from mpi4py import MPI
-        # MPI information
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-    #    print('This is task',rank+1,'of',size)
-    else:
-        rank=0
-        size=1
+    comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-    # TODO: replace class arraylist with numpy.concatenate
-    # define a numpy equivalent to an appendable list
     class arraylist:
         def __init__(self):
             self.data = np.zeros((100000,))
@@ -70,20 +64,22 @@ def build():
             return self.data[:self.size]
 
     fdir = f"rkhs-vectors_{saltedname}"
-    
+
     if (rank == 0):
         dirpath = os.path.join(saltedpath, fdir, f"M{Menv}_zeta{zeta}")
         if not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
-    if size > 1:  comm.Barrier()
-
-    # Distribute structures to tasks
     if parallel:
-        conf_range = get_conf_range(rank,size,ndata,list(range(ndata)))
-        conf_range = comm.scatter(conf_range,root=0)
-        print('Task',rank+1,'handles the following structures:',conf_range,flush=True)
+        comm.Barrier()
+
+    if parallel:
+        # Distribute structures to tasks
+        check_MPI_tasks_count(comm, ndata, "structures")
+        conf_range = distribute_jobs(comm, list(range(ndata)))
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following structures: {format_index_ranges(conf_range,True)}", flush=True)
     else:
-        conf_range = range(ndata)
+        conf_range = list(range(ndata))
 
     frames = read(filename,":")
 
@@ -114,7 +110,6 @@ def build():
         for iconf in conf_range:
 
             start_time = time.time()
-            print(f"{iconf} start", flush=True)
 
             structure = frames[iconf]
 
@@ -241,7 +236,8 @@ def build():
             del ij
 
             end_time = time.time()
-            print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
+            if inp.salted.verbose:
+                print(f"conf {iconf}, time = {(end_time - start_time):.2f} s", flush=True)
 
     elif saltedtype=="density-response":
 
@@ -266,7 +262,6 @@ def build():
         for iconf in conf_range:
 
             start_time = time.time()
-            print(f"{iconf} start", flush=True)
 
             structure = frames[iconf]
 
@@ -578,7 +573,8 @@ def build():
                 del ij
 
             end_time = time.time()
-            print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
+            if inp.salted.verbose:
+                print(f"{iconf} end, time cost = {(end_time - start_time):.2f} s", flush=True)
 
 if __name__ == "__main__":
     build()

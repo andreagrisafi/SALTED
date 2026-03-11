@@ -1,19 +1,21 @@
-"""
-TODO:
-- stop minimization with explicit message from rank 0
-"""
-
 import os
 import os.path as osp
 import random
-import sys
 import time
 
 import numpy as np
 from scipy import sparse
 
 from salted import get_averages
-from salted.sys_utils import ParseConfig, get_atom_idx, get_conf_range, read_system
+from salted.sys_utils import (
+    ParseConfig,
+    check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
+    format_index_ranges,
+    get_atom_idx,
+    read_system,
+)
 
 
 def build():
@@ -26,7 +28,6 @@ def build():
         filename,
         species,
         average,
-        parallel,
         path2qm,
         qmcode,
         qmbasis,
@@ -58,7 +59,6 @@ def build():
         eigcut,
         gradtol,
         restart,
-        blocksize,
         trainsel,
         nspe1,
         nspe2,
@@ -66,17 +66,7 @@ def build():
         HYPER_PARAMETERS_POTENTIAL,
     ) = ParseConfig().get_all_params()
 
-    # MPI information
-    if parallel:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-        size = comm.Get_size()
-        rank = comm.Get_rank()
-        print(f"This is task {rank+1} of {size}", flush=True)
-    else:
-        rank = 0
-        size = 1
+    comm, size, rank, parallel = detect_mpi()
 
     fdir = f"rkhs-vectors_{saltedname}"
     rdir = f"regrdir_{saltedname}"
@@ -107,7 +97,7 @@ def build():
     if rank == 0:
         if not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
-    if size > 1:
+    if parallel:
         comm.Barrier()
 
     # define training set at random
@@ -139,22 +129,10 @@ def build():
     ntraintot = int(trainfrac * Ntrain)
 
     if parallel:
-        if ntraintot < size:
-            if rank == 0:
-                raise ValueError(
-                    f"More processes {size=} have been requested than training structures {ntraintot=}. "
-                    f"Please reduce the number of processes."
-                )
-            else:
-                exit()
-        # if rank == 0 and ntraintot < size:
-        #     print('You have requested more processes than training structures. Please reduce the number of processes',flush=True)
-        #     comm.Abort()
-        trainrange = get_conf_range(rank, size, ntraintot, trainrangetot)
-        trainrange = comm.scatter(trainrange, root=0)
-        print(
-            f"Task {rank+1} handles the following structures: {trainrange}", flush=True
-        )
+        check_MPI_tasks_count(comm, ntraintot, "training structures")
+        trainrange = distribute_jobs(comm, trainrangetot[:ntraintot])
+        if inp.salted.verbose:
+            print(f"Task {rank} handles the following structures: {format_index_ranges(trainrange,True)}", flush=True)
     else:
         trainrange = trainrangetot[:ntraintot]
     ntrain = int(len(trainrange))
@@ -242,7 +220,7 @@ def build():
 
         loss *= norm
         if parallel:
-            loss = comm.allreduce(loss, op=MPI.SUM)
+            loss = comm.allreduce(loss)
 
         # add regularization term
         loss += regul * np.dot(weights, weights)
@@ -322,7 +300,7 @@ def build():
                     itot += 1
 
         if parallel:
-            gradient = comm.allreduce(gradient, op=MPI.SUM) * norm + 2.0 * regul * weights
+            gradient = comm.allreduce(gradient) * norm + 2.0 * regul * weights
         else:
             gradient *= norm
             gradient += 2.0 * regul * weights
@@ -337,7 +315,6 @@ def build():
 
         for iconf in range(ntrain):
 
-            print(iconf + 1, flush=True)
             # psi_vector = psi_list[iconf].toarray()
             # ovlp_times_psi = np.dot(ovlp_list[iconf],psi_vector)
             # diag_hessian += 2.0*np.sum(np.multiply(ovlp_times_psi,psi_vector),axis=0)
@@ -375,7 +352,7 @@ def build():
                     itot += 1
         
         if parallel:
-            Ad = comm.allreduce(Ad, op=MPI.SUM) * norm + 2.0 * regul * cg_dire
+            Ad = comm.allreduce(Ad) * norm + 2.0 * regul * cg_dire
         else:
             Ad *= norm
             Ad += 2.0 * regul * cg_dire

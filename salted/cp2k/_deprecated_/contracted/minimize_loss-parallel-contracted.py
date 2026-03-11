@@ -10,6 +10,7 @@ from random import shuffle
 from scipy import sparse
 from scipy.optimize import minimize
 from mpi4py import MPI
+from salted.sys_utils import distribute_jobs
 
 import basis
 
@@ -90,17 +91,7 @@ np.savetxt("training_set_N"+str(inp.Ntrain)+".txt",trainrangetot,fmt='%i')
 
 # Distribute structures to tasks
 ntraintot = int(inp.trainfrac*inp.Ntrain)
-if rank == 0:
-    trainrange = [[] for _ in range(size)]
-    blocksize = int(round(ntraintot/np.float(size)))
-    for i in range(size):
-        if i == (size-1):
-            trainrange[i] = trainrangetot[i*blocksize:ntraintot]
-        else:
-            trainrange[i] = trainrangetot[i*blocksize:(i+1)*blocksize]
-else:
-    trainrange = None
-trainrange = comm.scatter(trainrange,root=0)
+trainrange = distribute_jobs(comm, trainrangetot[:ntraintot])
 ntrain = int(len(trainrange))
 print('Task',rank+1,'handles the following structures:',trainrange)
 

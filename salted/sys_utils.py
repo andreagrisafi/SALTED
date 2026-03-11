@@ -3,6 +3,7 @@ import os
 import os.path as osp
 import re
 from typing import Dict, List, Literal, Optional, Tuple, Union
+import sys
 
 import h5py
 import numpy as np
@@ -79,9 +80,7 @@ def read_system(filename: str = None, spelist: List[str] = None, dfbasis: str = 
                 excluded_species.append(spe)
         excluded_species = set(excluded_species)
         for spe in excluded_species:
-            atomic_symbols[iconf] = list(
-                filter(lambda a: a != spe, atomic_symbols[iconf])
-            )
+            atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
         natoms[iconf] = int(len(atomic_symbols[iconf]))
 
     # Define maximum number of atoms
@@ -106,23 +105,148 @@ def get_atom_idx(ndata, natoms, spelist, atomic_symbols):
 
     return atom_idx, natom_dict
 
-def init_property_file(propname,saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm):
+
+def init_property_file(propname, saltedpath, vdir, Menv, zeta, ntrain, reg_log10_intstr, rank, size, comm):
     """Initialize files for printing the specified physical quantity"""
 
-    pfname = osp.join(
-        saltedpath, vdir, f"M{Menv}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}", f"{propname}.dat"
-    )
+    pfname = osp.join(saltedpath, vdir, f"M{Menv}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}", f"{propname}.dat")
 
-    if rank == 0 and os.path.exists(pfname): os.remove(pfname)
+    if rank == 0 and os.path.exists(pfname):
+        os.remove(pfname)
 
-    if size>1: comm.Barrier()
+    if size > 1:
+        comm.Barrier()
 
-    pfile = open(pfname,"a")
+    pfile = open(pfname, "a")
 
     return pfile
 
 
+def detect_mpi():
+    """Detect if the script was launched with mpirun/mpiexec.
+
+    Returns:
+        tuple: A tuple containing (comm, size, rank, parallel) where:
+            - comm: MPI communicator object or None
+            - size: Number of MPI processes (int)
+            - rank: Rank of current process (int)
+            - parallel: Boolean indicating if running in parallel
+
+    Cases:
+        - MPI with multiple processes: (MPI.COMM_WORLD, size>1, rank, True)
+        - MPI with single process: (MPI.COMM_WORLD, 1, 0, False)
+        - Serial (no MPI): (None, 1, 0, False)
+
+    Raises:
+        RuntimeError: If launched with mpirun but mpi4py is not installed.
+    """
+    import os
+
+    mpi_env_vars = [
+        "OMPI_COMM_WORLD_SIZE",  # OpenMPI
+        "PMI_SIZE",  # MPICH
+        "PMIX_RANK",  # PMIX (MPICH/Intel)
+        "MV2_COMM_WORLD_SIZE",  # MVAPICH2
+    ]
+    launched_with_mpi = any(var in os.environ for var in mpi_env_vars)
+
+    if launched_with_mpi:
+        try:
+            from mpi4py import MPI
+        except ImportError:
+            raise RuntimeError("Script was launched with mpirun but mpi4py is not installed.")
+        else:
+            comm = MPI.COMM_WORLD
+            size = comm.Get_size()
+            rank = comm.Get_rank()
+            parallel = size > 1
+            return comm, size, rank, parallel
+    else:
+        return None, 1, 0, False
+
+
+def check_MPI_tasks_count(comm, num_items: int, item_name: str = "items"):
+    """
+    Ensures the number of MPI tasks does not exceed the number of items.
+    Safe to call in both parallel and serial contexts.
+
+    Args:
+        comm: MPI communicator (can be None, for serial execution)
+        num_items: Total number of items to distribute
+        item_name: Description of the items (for error message)
+
+    Raises:
+        ValueError: If the number of tasks exceeds the number of items
+    """
+    if comm is None:
+        return
+
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+
+    if num_items < size:
+        if rank == 0:
+            raise ValueError(
+                f"More tasks {size=} have been requested than {item_name} {num_items=}. "
+                f"Please reduce the number of tasks."
+            )
+        else:
+            exit()
+
+
+def distribute_jobs(comm, jobs: list | np.ndarray, root: int = 0) -> list | np.ndarray:
+    """
+    Distribute a list of jobs (e.g. indices) among MPI ranks using np.array_split for even distribution.
+    Safe to call in both parallel and serial contexts.
+
+    Args:
+        comm: MPI communicator (can be None for serial execution)
+        jobs: List or array of jobs to distribute
+        root: Root rank for scattering (default 0)
+
+    Returns:
+        list: Jobs assigned to the current rank, in the same format as the input (list or np.ndarray)
+    """
+    if comm is None:  # for serial execution
+        return jobs
+
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+
+    jobs_to_scatter = None
+    if rank == root:
+        type_jobs = type(jobs)
+        if isinstance(jobs, np.ndarray):
+            restore_format_jobs = np.array
+        elif isinstance(jobs, list):
+
+            def restore_format_jobs(x):
+                return x.tolist()
+        else:
+            raise ValueError(f"Invalid type for jobs, should be list or numpy.ndarray, but got {type_jobs}")
+
+        # This handles uneven division automatically (e.g., 10 items, 3 ranks -> 4, 3, 3 or similar)
+        chunks = np.array_split(jobs, size)
+        # Convert chunks to lists to ensure serializability and consistent return type
+        jobs_to_scatter = [restore_format_jobs(chunk) for chunk in chunks]
+
+    # Scatter the chunks to all ranks
+    my_jobs = comm.scatter(jobs_to_scatter, root=root)
+
+    return my_jobs
+
+
 def get_conf_range(rank, size, ntest, testrangetot) -> List[List[int]]:
+    """
+    DEPRECATED: Please use `distribute_jobs` instead.
+    This function was used to manually split a range of jobs for MPI scattering.
+    It is kept for backward compatibility but may be removed in future versions.
+
+    To replace this function, use:
+    ```python
+    jobs = distribute_jobs(comm, testrangetot[:ntest])
+    ```
+    """
     if rank == 0:
         testrange = [[] for _ in range(size)]
         blocksize = int(ntest / float(size))
@@ -133,8 +257,7 @@ def get_conf_range(rank, size, ntest, testrangetot) -> List[List[int]]:
             testrangetot = testrangetot.tolist()
         else:
             raise ValueError(
-                f"Invalid type for testrangetot, "
-                f"should be list or numpy.ndarray, but got {type(testrangetot)}"
+                f"Invalid type for testrangetot, should be list or numpy.ndarray, but got {type(testrangetot)}"
             )
         for i in range(size):
             if i == (size - 1):
@@ -155,7 +278,7 @@ def get_conf_range(rank, size, ntest, testrangetot) -> List[List[int]]:
     return testrange
 
 
-def do_fps(x, d=0):
+def do_fps(x, d=0, verbose: bool = False):
     """Perform Farthest Point Sampling selection"""
     if d == 0:
         d = len(x)
@@ -166,7 +289,8 @@ def do_fps(x, d=0):
     n2 = np.sum((x * np.conj(x)), axis=1)
     dl = n2 + n2[iy[0]] - 2 * np.real(np.dot(x, np.conj(x[iy[0]])))
     for i in range(1, d):
-        print("Doing ", i, " of ", d, " dist = ", max(dl))
+        if verbose:
+            print("Doing ", i, " of ", d, " dist = ", max(dl))
         iy[i] = np.argmax(dl)
         nd = n2 + n2[iy[i]] - 2 * np.real(np.dot(x, np.conj(x[iy[i]])))
         dl = np.minimum(dl, nd)
@@ -202,9 +326,7 @@ def parse_index_str(index_str: Union[str, Literal["all"]]) -> Union[None, Tuple]
         assert isinstance(index_str, str)
         indexes = []
         for s in index_str.split(","):  # e.g. ["1", "3-5", "7-10"]
-            assert all(
-                [c.isdigit() or c == "-" for c in s]
-            ), f"Invalid index format: {s}"
+            assert all([c.isdigit() or c == "-" for c in s]), f"Invalid index format: {s}"
             if "-" in s:
                 assert s.count("-") == 1, f"Invalid index format: {s}"
                 start, end = s.split("-")
@@ -214,10 +336,50 @@ def parse_index_str(index_str: Union[str, Literal["all"]]) -> Union[None, Tuple]
                 indexes.append(int(s))
             else:
                 raise ValueError(
-                    f"Invalid index format: {s}, "
-                    f"should be digits or ranges joined by comma, e.g. 1,3-5,7-10"
+                    f"Invalid index format: {s}, should be digits or ranges joined by comma, e.g. 1,3-5,7-10"
                 )
         return tuple(indexes)
+
+
+def format_index_ranges(indexes: Optional[Union[tuple, list, np.ndarray]] = None, verbose=False) -> str:
+    """Format a list of indexes into a compact string representation of ranges.
+
+    Args:
+        indexes (Optional[Union[tuple, list, np.ndarray]]): Integers to format into ranges.
+            Duplicates are removed and sorted. Defaults to None.
+        verbose (bool): If True, always returns the full range string. If False, returns
+            a summary string when result exceeds 80 characters. Defaults to False.
+
+    Returns:
+        str: Compact string of indexes as ranges (e.g., "1-3,5-7,9"). Returns empty string
+            if indexes is None or empty. Returns "[TLDR] {n} indexes" if verbose is False
+            and result exceeds 80 characters.
+
+    Example:
+        >>> format_index_ranges([1, 2, 3, 5, 6, 7, 9])
+        '1-3,5-7,9'
+    """
+
+    if (indexes is None) or (len(indexes) == 0):
+        return ""
+
+    import itertools
+
+    indexes = sorted(set(int(i) for i in indexes))
+    result = []
+
+    for _, group in itertools.groupby(enumerate(indexes), lambda x: x[1] - x[0]):
+        group = list(group)
+        start, end = group[0][1], group[-1][1]
+        result.append(str(start) if start == end else f"{start}-{end}")
+
+    result_str = ",".join(result)
+
+    if verbose or len(result_str) <= 80:
+        return result_str
+    else:
+        return f"[TLDR] {len(indexes)} indexes"
+
 
 
 def sort_grid_data(data: np.ndarray) -> np.ndarray:
@@ -245,24 +407,18 @@ def get_feats_projs(species, lmax):
     power_env_sparse = {}
     sdir = os.path.join(inp.salted.saltedpath, f"equirepr_{inp.salted.saltedname}")
     features = h5py.File(os.path.join(sdir, f"FEAT_M-{inp.gpr.Menv}.h5"), "r")
-    projectors = h5py.File(
-        os.path.join(sdir, f"projector_M{inp.gpr.Menv}_zeta{inp.gpr.z}.h5"), "r"
-    )
+    projectors = h5py.File(os.path.join(sdir, f"projector_M{inp.gpr.Menv}_zeta{inp.gpr.z}.h5"), "r")
     for spe in species:
         for lam in range(lmax[spe] + 1):
             # load RKHS projectors
             Vmat[(lam, spe)] = projectors["projectors"][spe][str(lam)][:]
             # load sparse equivariant descriptors
-            power_env_sparse[(lam, spe)] = features["sparse_descriptors"][spe][
-                str(lam)
-            ][:]
+            power_env_sparse[(lam, spe)] = features["sparse_descriptors"][spe][str(lam)][:]
             if lam == 0:
                 Mspe[spe] = power_env_sparse[(lam, spe)].shape[0]
             # precompute projection on RKHS if linear model
             if inp.gpr.z == 1:
-                power_env_sparse[(lam, spe)] = np.dot(
-                    Vmat[(lam, spe)].T, power_env_sparse[(lam, spe)]
-                )
+                power_env_sparse[(lam, spe)] = np.dot(Vmat[(lam, spe)].T, power_env_sparse[(lam, spe)])
     features.close()
     projectors.close()
 
@@ -291,21 +447,15 @@ def get_feats_projs_response(species, lmax):
     power_env_sparse = {}
     power_env_sparse_antisymm = {}
     features = h5py.File(os.path.join(sdir, f"FEAT_M-{inp.gpr.Menv}.h5"), "r")
-    features_antisymm = h5py.File(
-        os.path.join(sdir, f"FEAT_M-{inp.gpr.Menv}_antisymm.h5"), "r"
-    )
+    features_antisymm = h5py.File(os.path.join(sdir, f"FEAT_M-{inp.gpr.Menv}_antisymm.h5"), "r")
     for spe in species:
         lmaxx = lmax[spe] + 1
         for lam in range(lmaxx + 1):
-            power_env_sparse[(lam, spe)] = features["sparse_descriptors"][spe][
-                str(lam)
-            ][:]
+            power_env_sparse[(lam, spe)] = features["sparse_descriptors"][spe][str(lam)][:]
             if lam == 0:
                 Mspe[spe] = power_env_sparse[(lam, spe)].shape[0]
         for lam in range(1, lmaxx):
-            power_env_sparse_antisymm[(lam, spe)] = features_antisymm[
-                "sparse_descriptors"
-            ][spe][str(lam)][:]
+            power_env_sparse_antisymm[(lam, spe)] = features_antisymm["sparse_descriptors"][spe][str(lam)][:]
     features.close()
 
     return Vmat, Mspe, power_env_sparse, power_env_sparse_antisymm
@@ -338,7 +488,7 @@ class AttrDict:
                     (
                         offset + f"{k}: {repr(v)}"
                         if not isinstance(v, dict)
-                        else offset + f"{k}:\n{rec_repr(v, offset+'  ')}"
+                        else offset + f"{k}:\n{rec_repr(v, offset + '  ')}"
                     )
                     for k, v in d.items()
                 ]
@@ -385,8 +535,7 @@ class ParseConfig:
         else:
             self.inp_fpath = _dev_inp_fpath
         assert os.path.exists(self.inp_fpath), (
-            f"Missing compulsory input file. "
-            f"Expected input file path: {self.inp_fpath}"
+            f"Missing compulsory input file. Expected input file path: {self.inp_fpath}"
         )
 
     def parse_input(self) -> AttrDict:
@@ -401,9 +550,7 @@ class ParseConfig:
         with open(self.inp_fpath) as file:
             inp = yaml.load(file, Loader=self.get_loader())
         if inp is None:
-            raise ValueError(
-                f"Input file is empty, please check the input file at path {self.inp_fpath}"
-            )
+            raise ValueError(f"Input file is empty, please check the input file at path {self.inp_fpath}")
         inp = self.check_input(inp)
         return AttrDict(inp)
 
@@ -417,24 +564,22 @@ class ParseConfig:
         Please copy & paste:
         ```python
         (saltedname, saltedpath, saltedtype,
-         filename, species, average, parallel,
+         filename, species, average,
          path2qm, qmcode, qmbasis, dfbasis,
          filename_pred, predname, predict_data, alpha_only,
          rep1, rcut1, sig1, nrad1, nang1, neighspe1,
          rep2, rcut2, sig2, nrad2, nang2, neighspe2,
          sparsify, nsamples, ncut,
          zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-         gradtol, restart, blocksize, trainsel) = ParseConfig().get_all_params()
+         gradtol, restart, trainsel) = ParseConfig().get_all_params()
         ```
         """
         inp = self.parse_input()
-        sparsify = (
-            False if inp.descriptor.sparsify.ncut <= 0 else True
-        )  # determine if sparsify by ncut
+        sparsify = False if inp.descriptor.sparsify.ncut <= 0 else True  # determine if sparsify by ncut
         nspe1 = len(inp.descriptor.rep1.neighspe)
         nspe2 = len(inp.descriptor.rep2.neighspe)
 
-        #HYPER_PARAMETERS_DENSITY = {
+        # HYPER_PARAMETERS_DENSITY = {
         #    "cutoff": inp.descriptor.rep1.rcut,
         #    "max_radial": inp.descriptor.rep1.nrad,
         #    "max_angular": inp.descriptor.rep1.nang,
@@ -442,32 +587,20 @@ class ParseConfig:
         #    "center_atom_weight": 1.0,
         #    "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
         #    "cutoff_function": {"ShiftedCosine": {"width": 0.1}},
-        #}
+        # }
 
         HYPER_PARAMETERS_DENSITY = {
-                   "cutoff": {
-                       "radius": inp.descriptor.rep1.rcut,
-                       "smoothing": {
-                           "type": "ShiftedCosine",
-                           "width": 0.1
-                       }
-                   },
-                   "density": {
-                       "type": "Gaussian",
-                       "width": inp.descriptor.rep1.sig
-                   },
-                   "basis": {
-                       "type": "TensorProduct",
-                       "max_angular": inp.descriptor.rep1.nang,
-                       "radial": {
-                           "type": "Gto",
-                           "max_radial": inp.descriptor.rep1.nrad-1
-                       },
-                       "spline_accuracy": 1e-06
-                   }
+            "cutoff": {"radius": inp.descriptor.rep1.rcut, "smoothing": {"type": "ShiftedCosine", "width": 0.1}},
+            "density": {"type": "Gaussian", "width": inp.descriptor.rep1.sig},
+            "basis": {
+                "type": "TensorProduct",
+                "max_angular": inp.descriptor.rep1.nang,
+                "radial": {"type": "Gto", "max_radial": inp.descriptor.rep1.nrad - 1},
+                "spline_accuracy": 1e-06,
+            },
         }
 
-        #HYPER_PARAMETERS_POTENTIAL = {
+        # HYPER_PARAMETERS_POTENTIAL = {
         #    "potential_exponent": 1,
         #    "cutoff": inp.descriptor.rep2.rcut,
         #    "max_radial": inp.descriptor.rep2.nrad,
@@ -475,25 +608,20 @@ class ParseConfig:
         #    "atomic_gaussian_width": inp.descriptor.rep2.sig,
         #    "center_atom_weight": 1.0,
         #    "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
-        #}
+        # }
 
         HYPER_PARAMETERS_POTENTIAL = {
-
-            "density": {
-                "type": "SmearedPowerLaw",
-                "smearing": inp.descriptor.rep2.sig,
-                "exponent": 1
-            },
+            "density": {"type": "SmearedPowerLaw", "smearing": inp.descriptor.rep2.sig, "exponent": 1},
             "basis": {
                 "type": "TensorProduct",
                 "max_angular": inp.descriptor.rep2.nang,
                 "radial": {
                     "type": "Gto",
-                    "max_radial": inp.descriptor.rep2.nrad-1,
-                    "radius": inp.descriptor.rep2.rcut
+                    "max_radial": inp.descriptor.rep2.nrad - 1,
+                    "radius": inp.descriptor.rep2.rcut,
                 },
-                "spline_accuracy": 1e-06
-            }
+                "spline_accuracy": 1e-06,
+            },
         }
 
         return (
@@ -503,7 +631,6 @@ class ParseConfig:
             inp.system.filename,
             inp.system.species,
             inp.system.average,
-            inp.system.parallel,
             inp.qm.path2qm,
             inp.qm.qmcode,
             inp.qm.qmbasis,
@@ -535,7 +662,6 @@ class ParseConfig:
             inp.gpr.eigcut,
             inp.gpr.gradtol,
             inp.gpr.restart,
-            inp.gpr.blocksize,
             inp.gpr.trainsel,
             nspe1,
             nspe2,
@@ -549,12 +675,12 @@ class ParseConfig:
         Please copy & paste:
         ```python
         (
-            filename, species, average, parallel,
+            filename, species, average,
             rep1, rcut1, sig1, nrad1, nang1, neighspe1,
             rep2, rcut2, sig2, nrad2, nang2, neighspe2,
             sparsify, nsamples, ncut,
             z, Menv, Ntrain, trainfrac, regul, eigcut,
-            gradtol, restart, blocksize, trainsel
+            gradtol, restart, trainsel
         ) = ParseConfig().get_all_params_simple1()
         ```
         """
@@ -564,7 +690,6 @@ class ParseConfig:
             inp.system.filename,
             inp.system.species,
             inp.system.average,
-            inp.system.parallel,
             inp.descriptor.rep1.type,
             inp.descriptor.rep1.rcut,
             inp.descriptor.rep1.sig,
@@ -588,7 +713,6 @@ class ParseConfig:
             inp.gpr.eigcut,
             inp.gpr.gradtol,
             inp.gpr.restart,
-            inp.gpr.blocksize,
             inp.gpr.trainsel,
         )
 
@@ -651,7 +775,7 @@ class ParseConfig:
                     True,
                     None,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to SALTED outputs / working directory
                 "saltedtype": (
                     False,
@@ -659,13 +783,15 @@ class ParseConfig:
                     str,
                     lambda inp, val: val in ("density", "density-response"),
                 ),  # salted target
+                "verbose": (False, False, bool, None),  # whether print verbose info
+                "seed": (False, 42, int, None),  # random seed
             },
             "system": {
                 "filename": (
                     True,
                     None,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to geometry file (training set)
                 "species": (
                     True,
@@ -679,15 +805,13 @@ class ParseConfig:
                     bool,
                     None,
                 ),  # if bias the GPR by the average of predictions
-                "parallel": (False, False, bool, None),  # if use mpi4py
-                "seed": (False, 42, int, None),  # random seed
             },
             "qm": {
                 "path2qm": (
                     True,
                     None,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to the QM calculation outputs
                 "qmcode": (
                     True,
@@ -701,37 +825,37 @@ class ParseConfig:
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "pyscf"),
+                    get_qmcode_checker("pyscf"),
                 ),  # quantum mechanical basis, only for PySCF
                 "functional": (
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "pyscf"),
+                    get_qmcode_checker("pyscf"),
                 ),  # quantum mechanical functional, only for PySCF
                 "pseudocharge": (
                     False,
                     PLACEHOLDER,
                     list,
-                    lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
+                    get_qmcode_checker("cp2k"),
                 ),  # pseudo nuclear charge, only for CP2K
                 "coeffile": (
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
+                    get_qmcode_checker("cp2k"),
                 ),
                 "ovlpfile": (
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
+                    get_qmcode_checker("cp2k"),
                 ),
                 "periodic": (
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_with_qmcode(inp, val, "cp2k"),
+                    get_qmcode_checker("cp2k"),
                 ),  # periodic boundary conditions, only for CP2K
             },
             "prediction": {
@@ -739,7 +863,7 @@ class ParseConfig:
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to the prediction file
                 "predname": (
                     False,
@@ -758,13 +882,13 @@ class ParseConfig:
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: check_path_exists(val),
+                    check_path_exists,
                 ),  # path to the prediction data by QM code, only for AIMS
                 "alpha_only": (
                     False,
                     PLACEHOLDER,
                     bool,
-                    check_conditions_alpha_only
+                    check_conditions_alpha_only,
                 ),  # for condition details, see the function docstring
             },
             "descriptor": {
@@ -829,12 +953,6 @@ class ParseConfig:
                     bool,
                     lambda inp, val: isinstance(val, bool),
                 ),  # if restart the minimization
-                "blocksize": (
-                    False,
-                    0,
-                    int,
-                    lambda inp, val: val >= 0,
-                ),  # block size for matrix inversion
                 "trainsel": (
                     False,
                     "random",
@@ -846,21 +964,17 @@ class ParseConfig:
                     "omp_sparse",
                     str,
                     lambda inp, val: val in ("dense", "omp_sparse"),
-                )
+                ),
             },
         }
 
-        def rec_apply_default_vals(
-            _inp: Dict, _inp_template: Dict[str, Union[Dict, Tuple]], _prev_key: str
-        ):
+        def rec_apply_default_vals(_inp: Dict, _inp_template: Dict[str, Union[Dict, Tuple]], _prev_key: str):
             """apply default values if optional parameters are not found"""
 
             """check if the keys in inp exist in inp_template"""
             for key, val in _inp.items():
                 if key not in _inp_template.keys():
-                    raise ValueError(
-                        f"Invalid input key: {_prev_key+key}. Please remove it from the input file."
-                    )
+                    raise ValueError(f"Invalid input key: {_prev_key + key}. Please remove it from the input file.")
             """apply default values"""
             for key, val in _inp_template.items():
                 if isinstance(val, dict):
@@ -874,29 +988,21 @@ class ParseConfig:
                     (required, val_default, val_type, extra_check_func) = val
                     if key not in _inp.keys():
                         if required:
-                            raise ValueError(
-                                f"Missing compulsory input key: {_prev_key+key} in the input file."
-                            )
+                            raise ValueError(f"Missing compulsory input key: {_prev_key + key} in the input file.")
                         else:
                             _inp[key] = val_default
                 else:
-                    raise ValueError(
-                        f"Invalid input template: {val}. Did you changed the template for parsing?"
-                    )
+                    raise ValueError(f"Invalid input template: {val}. Did you changed the template for parsing?")
             return _inp
 
-        def rec_check_vals(
-            _inp: Dict, _inp_template: Dict[str, Union[Dict, Tuple]], _prev_key: str
-        ):
+        def rec_check_vals(_inp: Dict, _inp_template: Dict[str, Union[Dict, Tuple]], _prev_key: str):
             """check values' type and range"""
             for key, template in _inp_template.items():
                 if isinstance(template, dict):
                     rec_check_vals(_inp[key], _inp_template[key], _prev_key + key + ".")
                 elif isinstance(template, tuple):
                     val = _inp[key]
-                    (required, val_default, val_type, extra_check_func) = _inp_template[
-                        key
-                    ]
+                    (required, val_default, val_type, extra_check_func) = _inp_template[key]
                     """
                     There are cases that a value is required for certain conditions,
                     so we always need to run extra_check_func
@@ -905,30 +1011,24 @@ class ParseConfig:
                         val != PLACEHOLDER
                     ):  # if is PLACEHOLDER, then don't check the type
                         raise ValueError(
-                            f"Incorrect input value type: key={_prev_key+key}, value={val}, "
+                            f"Incorrect input value type: key={_prev_key + key}, value={val}, "
                             f"current value type is {type(val)}, but expected {val_type}"
                         )
-                    if (
-                        extra_check_func is not None
-                    ):  # always run extra_check_func if not None
+                    if extra_check_func is not None:  # always run extra_check_func if not None
                         if not extra_check_func(inp, val):
                             if hasattr(extra_check_func, "parse_error_msg"):
                                 parse_error_msg = extra_check_func.parse_error_msg
                             else:
                                 parse_error_msg = ""
                             raise ValueError(
-                                f"Input value failed its check: key={_prev_key+key}, value={val}. "
+                                f"Input value failed its check: key={_prev_key + key}, value={val}. "
                                 f"{parse_error_msg}"
                                 f"Please check the required conditions."
                             )
                 else:
-                    raise ValueError(
-                        f"Invalid input template type: {template} of type {type(template)}"
-                    )
+                    raise ValueError(f"Invalid input template type: {template} of type {type(template)}")
 
-        inp = rec_apply_default_vals(
-            inp, inp_template, ""
-        )  # now inp has all the keys as in inp_template in all levels
+        inp = rec_apply_default_vals(inp, inp_template, "")  # now inp has all the keys as in inp_template in all levels
         rec_check_vals(inp, inp_template, "")
 
         return inp
@@ -949,9 +1049,7 @@ class ParseConfig:
 
         """for scientific notation, like 1e-4 -> float(1e-4)"""
         pattern = re.compile(r"^-?[0-9]+(\.[0-9]*)?[eEdD][-+]?[0-9]+$")
-        loader.add_implicit_resolver(
-            "!float_sci", pattern, list("-+0123456789")
-        )  # NOQA
+        loader.add_implicit_resolver("!float_sci", pattern, list("-+0123456789"))  # NOQA
 
         def float_sci(loader, node):
             value = loader.construct_scalar(node)
@@ -961,23 +1059,21 @@ class ParseConfig:
         return loader
 
 
-def check_with_qmcode(inp, val, qmcode: Union[str, List[str]]) -> bool:
-    """This means the entry is required IF and ONLY IF when using a / some specific qmcode(s)"""
+def get_qmcode_checker(qmcode: Union[str, list[str]]) -> callable:
+    """Factory that returns a checker function for a specific qmcode"""
     if isinstance(qmcode, str):
-        qmcode = [
-            qmcode,
-        ]
-    return (
-        (inp["qm"]["qmcode"].lower() not in qmcode) and (val == PLACEHOLDER)
-    ) or (  # if not using this qmcode, do not specify it
-        (inp["qm"]["qmcode"].lower() in qmcode) and (val != PLACEHOLDER)
-    )  # if using this qmcode, do specify it
+        qmcode = [qmcode]
+
+    def checker(inp, val) -> bool:
+        return ((inp["qm"]["qmcode"].lower() not in qmcode) and (val == PLACEHOLDER)) or (
+            (inp["qm"]["qmcode"].lower() in qmcode) and (val != PLACEHOLDER)
+        )
+
+    checker.parse_error_msg = f"Value incompatible with qm.qmcode (expected one of: {qmcode})."
+    return checker
 
 
-check_with_qmcode.parse_error_msg = "Value imcompatible with the qm.qmcode."
-
-
-def check_path_exists(path: str) -> bool:
+def check_path_exists(_, path: str) -> bool:
     """Check if the path exists, the path should be either absolute or relative to the current working directory
     If the path is a placeholder, return True
     """
@@ -990,7 +1086,7 @@ def check_path_exists(path: str) -> bool:
 check_path_exists.parse_error_msg = "Path (value) does not exist."
 
 
-def check_conditions_alpha_only(inp:dict, val:bool) -> bool:
+def check_conditions_alpha_only(inp: dict, val: bool) -> bool:
     """the val is required if and only if inp.salted.saltedtype = density-response and inp.qm.qmcode = cp2k"""
     if (inp["salted"]["saltedtype"] == "density-response") and (inp["qm"]["qmcode"].lower() == "cp2k"):
         # if the conditions are met, then the value should be specified. It cannot be a placeholder.
@@ -1006,8 +1102,10 @@ def check_conditions_alpha_only(inp:dict, val:bool) -> bool:
             return False
 
 
-check_conditions_alpha_only.parse_error_msg = "Value is required if and only if inp.salted.saltedtype=density-response"\
+check_conditions_alpha_only.parse_error_msg = (
+    "Value is required if and only if inp.salted.saltedtype=density-response"
     " and inp.qm.qmcode=cp2k. Otherwise, please don't specify it in the input file."
+)
 
 
 def test_inp():
@@ -1043,12 +1141,9 @@ class Irreps(tuple):
             Irreps object
         """
         if isinstance(irreps, str):
-            irreps_info_split = tuple(
-                sec.strip() for sec in irreps.split("+") if len(sec) > 0
-            )  # ("1x0", "2x1", ...)
+            irreps_info_split = tuple(sec.strip() for sec in irreps.split("+") if len(sec) > 0)  # ("1x0", "2x1", ...)
             mul_l_tuple = tuple(  # ((1, 0), (2, 1), ...)
-                tuple(int(i.strip()) for i in sec.split("x"))
-                for sec in irreps_info_split
+                tuple(int(i.strip()) for i in sec.split("x")) for sec in irreps_info_split
             )
             return super().__new__(cls, mul_l_tuple)
         elif isinstance(irreps, list) or isinstance(irreps, tuple):
@@ -1056,10 +1151,7 @@ class Irreps(tuple):
                 return super().__new__(cls, ())
             elif isinstance(irreps[0], tuple) or isinstance(irreps[0], list):
                 assert all(
-                    all(isinstance(i, int) for i in mul_l)
-                    and len(mul_l) == 2
-                    and mul_l[0] >= 0
-                    and mul_l[1] >= 0
+                    all(isinstance(i, int) for i in mul_l) and len(mul_l) == 2 and mul_l[0] >= 0 and mul_l[1] >= 0
                     for mul_l in irreps
                 ), ValueError(f"Invalid irreps_info: {irreps}")
                 return super().__new__(cls, tuple(tuple(mul_l) for mul_l in irreps))
