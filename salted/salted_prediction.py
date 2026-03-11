@@ -26,6 +26,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
 
+    start_time = time.time()
+
     # read system
     ndata = len(structure)
     
@@ -291,6 +293,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
             grad_pred_coefs = comm.allreduce(grad_pred_coefs)  
  
     #print("pred time:", time.time()-predstart,flush=True)
+    if inp.salted.verbose and rank==0:
+        print(f"Total prediction time = {(time.time() - start_time):.2f} s", flush=True)
     
     if qmcode=="cp2k":
 

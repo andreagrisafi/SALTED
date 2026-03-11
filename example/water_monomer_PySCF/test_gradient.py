@@ -4,24 +4,11 @@ import numpy as np
 from ase.io import read
 from salted import init_pred, sph_utils
 from salted import salted_prediction, salted_prediction_gradient
-from salted.sys_utils import ParseConfig
+from salted.sys_utils import ParseConfig, detect_mpi
 
 inp = ParseConfig().parse_input()
 
-if inp.system.parallel:
-
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    fcomm = comm.py2f()
-    rank = comm.Get_rank()
-    ntasks = comm.Get_size()
-    if rank==0: print("Parallel run over", ntasks, "tasks",flush=True)
-
-else:
-
-    comm = None
-    rank = 0
-    ntasks = 1
+comm, size, rank, _ = detect_mpi()
 
 d = np.array([0.1, 0.01, 0.001, 0.0001, 0.00001, 0.000001])
 
@@ -45,17 +32,17 @@ ave_grad = {}
 grad_fd = {}
 
 # Initialize electrode charge density 
-output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,ntasks,rank,lcut,True,structure) 
+output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,True,structure) 
 ave["ref"] = output[0]
 grad_pred_coefs = output[1]
 
 for i in range(len(d)):
     structure.positions[iat,d_c] += d[i]
-    output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,ntasks,rank,lcut,False,structure)
+    output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,False,structure)
     ave[str(d[i])] = output[0].copy()
 
     structure.positions[iat,d_c] -= 2*d[i]
-    output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,ntasks,rank,lcut,False,structure)
+    output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,False,structure)
     ave[str("m"+str(d[i]))] = output[0].copy()
     
     structure.positions[iat,d_c] += d[i]

@@ -2,19 +2,11 @@ import sys
 import numpy as np
 from ase.io import read
 from salted.cp2k import df2cube
-from salted.sys_utils import ParseConfig
 
+from salted.sys_utils import ParseConfig, detect_mpi
 inp = ParseConfig().parse_input()
 
-if inp.system.parallel:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    size = comm.Get_size()
-    rank = comm.Get_rank()
-else:
-    comm = None
-    size = 1
-    rank = 0
+comm, size, rank, _ = detect_mpi()
 
 # Load structure
 iconf = 1 

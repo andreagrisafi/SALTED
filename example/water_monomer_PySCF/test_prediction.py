@@ -37,5 +37,6 @@ frames = read(inp.prediction.filename,":")
 for i in range(len(frames)):
     structure = frames[i]
     [coefs] = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,gradient,structure) 
-    ref_coefs = np.loadtxt(dirpath+"/COEFFS-"+str(Ntrain+i+1)+".dat")
-    print("Conf", i+1, "Consistent prediction?", np.allclose(coefs,ref_coefs)) 
+    if rank==0:
+        ref_coefs = np.loadtxt(dirpath+"/COEFFS-"+str(Ntrain+i+1)+".dat")
+        print("Conf", i+1, "Consistent prediction?", np.allclose(coefs,ref_coefs)) 
