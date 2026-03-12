@@ -23,7 +23,7 @@ icart["y"] = 1
 icart["z"] = 2
 
 # Select Cartesian axis for gradient
-axis = "z"
+axis = "y"
 d_c = icart[axis]
 
 # Select configuration
@@ -98,7 +98,7 @@ if rank == 0:
         
         plt.xlabel("Delta "+axis + r" [$A^{-1}$]")
         plt.ylabel("Finite-difference error [arb. units.]")
-        plt.title(r"$\nabla_{axis,"+str(iat)+"}$, lam=" + str(lam)+", spe="+species+", n="+ str(irad))
+        plt.title(r"$\nabla_{"+axis+",atom-"+str(iat)+"}$, lam=" + str(lam)+", spe="+species+", n="+ str(irad))
         plt.legend()
         plt.savefig("lam-"+str(lam)+".png")
         plt.clf()
