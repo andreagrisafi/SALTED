@@ -141,14 +141,17 @@ def get_representation_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAM
     """Compute spherical harmonics expansion coefficients of the given structural representation."""
 
     if rep=="rho":
+
         # get SPH expansion for atomic density
         calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
 
     elif rep=="V":
+
         # get SPH expansion for atomic potential
         calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
 
     else:
+
         if rank == 0: print("Error: requested representation", rep, "not provided")
 
     nspe = len(neighspe)
@@ -181,14 +184,17 @@ def get_representation_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_DENSITY,H
     """Compute spherical harmonics expansion coefficients of the given structural representation."""
 
     if rep=="rho":
+
         # get SPH expansion for atomic density
         calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
 
     elif rep=="V":
+
         # get SPH expansion for atomic potential
         calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
 
     else:
+
         if rank == 0: print("Error: requested representation", rep, "not provided")
 
     nspe = len(neighspe)
