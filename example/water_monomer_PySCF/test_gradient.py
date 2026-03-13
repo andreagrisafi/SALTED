@@ -3,7 +3,7 @@ import time
 import numpy as np
 from ase.io import read
 from salted import init_pred, sph_utils
-from salted import salted_prediction, salted_prediction_gradient
+from salted import salted_prediction
 from salted.sys_utils import ParseConfig, detect_mpi
 import matplotlib.pyplot as plt
 
@@ -38,10 +38,8 @@ iat = 0
 coefs = {}
 grad_finite_diff = {}
 
-output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,True,structure) 
-# Reference coefficients
-coefs["ref"] = output[0]
 # Analytical gradient
+output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,True,structure) 
 grad_pred_coefs = output[1]
 
 # Compute gradient by finite-differences for each atomic displacement d
@@ -94,6 +92,7 @@ if rank == 0:
                     itot += 2*l+1
         
         for im in range(2*lam+1):
+            print([np.mean(np.abs(np.array(array_fd[im][k])-np.array(array[im]))) for k in range(len(d))])
             plt.loglog(1/d, [np.mean(np.abs(np.array(array_fd[im][k])-np.array(array[im]))) for k in range(len(d))], "-", label = r"$\mu =$"+ str(im-lam))
         
         plt.xlabel("Delta "+axis + r" [$A^{-1}$]")

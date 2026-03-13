@@ -292,7 +292,6 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
 
     return omega, domega
 
-
 def get_representation_gradient_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,natoms,atoms_range):
     """Compute spherical harmonics expansion coefficients of the given structural representation."""
 
@@ -322,42 +321,59 @@ def get_representation_gradient_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_
     )
 
     natoms_range = len(atoms_range)
+
+    if rank>0 and rep == "rho":
+        new_indices = np.concatenate((np.arange(atoms_range[0],natoms, dtype=int),np.arange(0,atoms_range[0], dtype=int)))
+        structure_sorted = structure[new_indices].copy()
+        inv_indices = np.argsort(new_indices)
+        atoms_range_sorted = np.arange(0,natoms_range, dtype = int)
+    else:
+        structure_sorted = structure.copy()
+        atoms_range_sorted = atoms_range
+
     samples_selection = Labels(
         names=["system","atom"],
         values=np.column_stack([
                 np.zeros(natoms_range, dtype=int),  # system index
-                atoms_range                         # atom indices
+                atoms_range_sorted                  # atom indices
             ])
     )
 
-    spx = calculator.compute(structure, selected_keys=keys_selection, selected_samples=samples_selection, gradients=["positions"])
+    spx = calculator.compute(structure_sorted, selected_keys=keys_selection, selected_samples=samples_selection, gradients=["positions"])
     spx = spx.keys_to_properties("neighbor_type")
     spx = spx.keys_to_samples("center_type")
 
     # Get 1st set of coefficients as a complex numpy array
     omega = np.zeros((nang+1,natoms_range,2*nang+1,nspe*nrad),complex)
+    domega = np.zeros((nang+1,natoms_range*natoms,3,2*nang+1,nspe*nrad),complex)
+
     for l in range(nang+1):
         c2r = complex_to_real_transformation([2*l+1])[0]
+        
         omega[l,:,:2*l+1,:] = np.einsum('cr,ard->acd',np.conj(c2r.T),spx.block(o3_lambda=l).values)
-        #omega[l,:,:2*l+1,:] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(spx.block(o3_lambda=l).values, (1,0,2)).reshape((np.conj(c2r.T).shape[1], natoms_range*nspe*nrad))).reshape(2*l+1,natoms_range,nspe*nrad),(1,0,2))
 
-    # Get 1st set of coefficients as a complex numpy array
-    domega = np.zeros((nang+1,natoms_range*natoms,3,2*nang+1,nspe*nrad),complex)
-    for l in range(nang+1):
         grad = spx.block(o3_lambda=l).gradient("positions")
         c2r = complex_to_real_transformation([2*l+1])[0]
         if grad.values.shape[0] != natoms_range*natoms:
 
             # Extract indices as arrays
             iat = grad.samples["sample"]      # shape (nidx,)
-            i_grad = grad.samples["atom"]     # shape (nidx,)
+            i_gradc = grad.samples["atom"]    # shape (nidx,)
+
+            if rank > 0 and rep == "rho":
+                # Create a boolean mask where neighbors are "before" the atoms_range split
+                mask = i_gradc < (natoms - atoms_range[0])
+                # Apply the transformation vectorized
+                i_grad = np.where(mask, i_gradc + atoms_range[0], i_gradc - (natoms - atoms_range[0]))
+            else:
+                i_grad = i_gradc
+            
             target_idx = iat * natoms + i_grad
 
-            # grad.values shape: (nidx, k, r, d)
-            # Apply transformation to ALL indices at once
             domega[l, target_idx, :, :2*l+1, :] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(grad.values,(2,0,1,3)).reshape((np.conj(c2r.T).shape[1],len(target_idx)*3*nspe*nrad))).reshape((2*l+1,len(target_idx),3,nspe*nrad)),(1,2,0,3))
 
         else:
+
             domega[l, :, :, :2*l+1, :] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(grad.values,(2,0,1,3)).reshape((np.conj(c2r.T).shape[1],natoms_range*natoms*3*nspe*nrad))).reshape((2*l+1,natoms_range*natoms,3,nspe*nrad)),(1,2,0,3))
     
     return omega, domega
