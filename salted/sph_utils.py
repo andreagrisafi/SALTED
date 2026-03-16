@@ -325,7 +325,6 @@ def get_representation_gradient_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_
     if rank>0 and rep == "rho":
         new_indices = np.concatenate((np.arange(atoms_range[0],natoms, dtype=int),np.arange(0,atoms_range[0], dtype=int)))
         structure_sorted = structure[new_indices].copy()
-        inv_indices = np.argsort(new_indices)
         atoms_range_sorted = np.arange(0,natoms_range, dtype = int)
     else:
         structure_sorted = structure.copy()
@@ -367,7 +366,6 @@ def get_representation_gradient_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_
                 i_grad = np.where(mask, i_gradc + atoms_range[0], i_gradc - (natoms - atoms_range[0]))
             else:
                 i_grad = i_gradc
-            
             target_idx = iat * natoms + i_grad
 
             domega[l, target_idx, :, :2*l+1, :] = np.transpose(np.dot(np.conj(c2r.T),np.transpose(grad.values,(2,0,1,3)).reshape((np.conj(c2r.T).shape[1],len(target_idx)*3*nspe*nrad))).reshape((2*l+1,len(target_idx),3,nspe*nrad)),(1,2,0,3))
