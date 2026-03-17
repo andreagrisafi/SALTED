@@ -1,8 +1,6 @@
 include salted/lib/equicomb.so 
-include salted/lib/equicomb_grad.so 
 include salted/lib/equicombnonorm.so 
 include salted/lib/equicombsparse.so 
-include salted/lib/equicombsparse_grad.so 
 include salted/lib/equicombfps.so 
 include salted/lib/equicombnonorm.so 
 include salted/lib/equicombsparse.so 

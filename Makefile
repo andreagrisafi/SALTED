@@ -97,7 +97,7 @@ endif
 init:
 	cd salted/lib; touch __init__.py
 
-f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicomb_grad.so salted/lib/equicombfield.so salted/lib/equicombsparse.so salted/lib/equicombsparse_grad.so salted/lib/antiequicomb.so salted/lib/antiequicombsparse.so salted/lib/equicombnonorm.so salted/lib/antiequicombnonorm.so salted/lib/kernelequicomb.so salted/lib/kernelnorm.so salted/lib/equicombfps.so salted/lib/omp_sparse.so
+f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so salted/lib/ovlp3cXYperiodic.so salted/lib/ovlp2cnonperiodic.so salted/lib/ovlp3cnonperiodic.so salted/lib/equicomb.so salted/lib/equicombfield.so salted/lib/equicombsparse.so salted/lib/antiequicomb.so salted/lib/antiequicombsparse.so salted/lib/equicombnonorm.so salted/lib/antiequicombnonorm.so salted/lib/kernelequicomb.so salted/lib/kernelnorm.so salted/lib/equicombfps.so salted/lib/omp_sparse.so
 
 # Pattern rule for compiling all Fortran modules
 # The % wildcard matches the module name, and $* expands to the matched part
