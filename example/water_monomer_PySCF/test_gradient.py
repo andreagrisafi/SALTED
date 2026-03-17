@@ -12,7 +12,7 @@ inp = ParseConfig().parse_input()
 comm, size, rank, _ = detect_mpi()
 
 # Initialize SALTED prediction
-lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals = init_pred.build()
+lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals = init_pred.build(rank)
 # Truncated angular order
 lcut = 6
 

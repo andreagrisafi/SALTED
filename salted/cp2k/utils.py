@@ -12,13 +12,13 @@ def init_moments(inp,species,lmax,nmax,rank):
 
         if inp.salted.saltedtype=="density":
 
-            print("Total charges and polarization vectors will be computed from the reference and predicted electron densities.")
-            print("WARNING: Computed values of polarization vectors have physical meaning only along those Cartesian directions for which the electron density goes to zero at the cell periodic boundaries. The modern theory of polarization should be used otherwise.")
+            print("Total charges and polarization vectors are computed as the zero and first moment of the electron density.")
+            print("WARNING: Computed values of polarization vectors have physical meaning only along those Cartesian directions for which the electron density vanishes before reaching the cell periodic boundaries; the modern theory of polarization should be used otherwise.")
 
         elif inp.salted.saltedtype=="density-response":
             
-            print("Polarizability tensors will be computed from the reference and predicted density-response functions.")
-            print("WARNING: Computed values of polarizability tensors have physical meaning only along those Cartesian directions for which the electron density goes to zero at the cell periodic boundaries. The modern theory of polarization should be used otherwise.")
+            print("Polarizability tensors are computed as the first moment of the electron-density electric-field response.")
+            print("WARNING: Computed values of polarizability tensors have physical meaning only along those Cartesian directions for which the electron density vanishes before reaching the cell periodic boundaries; the modern theory of polarization should be used otherwise.")
 
     # Get CP2K basis set information 
     bdir = osp.join(inp.salted.saltedpath,"basis")

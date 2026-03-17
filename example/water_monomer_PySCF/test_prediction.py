@@ -27,7 +27,7 @@ reg_log10_intstr = str(int(np.log10(regul)))
 dirpath = os.path.join(saltedpath, vdir, f"M{Menv}_zeta{zeta}", f"N{ntrain}_reg{reg_log10_intstr}")
 
 # Initialize SALTED prediction
-lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals = init_pred.build()
+lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals = init_pred.build(rank)
 
 lcut = 6
 gradient=False
