@@ -35,14 +35,18 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     atomic_symbols = structure.get_chemical_symbols()
     natoms_tot = len(atomic_symbols)
     excluded_species = []
+    atomic_global_idx = []
     for iat in range(natoms_tot):
         spe = atomic_symbols[iat]
         if spe not in species:
             excluded_species.append(spe)
+        else:
+            atomic_global_idx.append(iat)
     excluded_species = set(excluded_species)
     for spe in excluded_species:
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
     natoms = int(len(atomic_symbols))
+    atomic_global_idx = np.array(atomic_global_idx,int)
 
     parallel = (size > 1)
     if parallel:
@@ -74,8 +78,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     
     if gradient:
     
-        omega1, domega1 = sph_utils.get_representation_gradient_coeffs_atomrange(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms,atoms_range)
-        omega2, domega2 = sph_utils.get_representation_gradient_coeffs_atomrange(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe2,species,nang2,nrad2,natoms,atoms_range)
+        omega1, domega1 = sph_utils.get_representation_gradient_coeffs_atomrange(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms,atomic_global_idx[atoms_range])
+        omega2, domega2 = sph_utils.get_representation_gradient_coeffs_atomrange(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe2,species,nang2,nrad2,natoms,atomic_global_idx[atoms_range])
     
         dv1 = np.transpose(domega1.reshape((domega1.shape[0],natoms_range,natoms,3,domega1.shape[3],domega1.shape[4])),(1,5,0,4,2,3)).copy()
         dv2 = np.transpose(domega2.reshape((domega2.shape[0],natoms_range,natoms,3,domega2.shape[3],domega2.shape[4])),(1,5,0,4,2,3)).copy()
@@ -84,8 +88,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
    
     else: 
 
-        omega1 = sph_utils.get_representation_coeffs_atomrange(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,atoms_range)
-        omega2 = sph_utils.get_representation_coeffs_atomrange(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe2,species,nang2,nrad2,atoms_range)
+        omega1 = sph_utils.get_representation_coeffs_atomrange(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,atomic_global_idx[atoms_range])
+        omega2 = sph_utils.get_representation_coeffs_atomrange(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe2,species,nang2,nrad2,atomic_global_idx[atoms_range])
    
     v1 = np.transpose(omega1,(1,3,0,2)).copy()
     v2 = np.transpose(omega2,(1,3,0,2)).copy()
