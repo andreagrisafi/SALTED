@@ -78,11 +78,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     
     if gradient:
     
-        omega1, domega1 = sph_utils.get_representation_gradient_coeffs_atomrange(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms,atomic_global_idx[atoms_range])
-        omega2, domega2 = sph_utils.get_representation_gradient_coeffs_atomrange(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe2,species,nang2,nrad2,natoms,atomic_global_idx[atoms_range])
+        omega1, domega1 = sph_utils.get_representation_gradient_coeffs_atomrange(structure,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms_tot,atomic_global_idx[atoms_range])
+        omega2, domega2 = sph_utils.get_representation_gradient_coeffs_atomrange(structure,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe2,species,nang2,nrad2,natoms_tot,atomic_global_idx[atoms_range])
     
-        dv1 = np.transpose(domega1.reshape((domega1.shape[0],natoms_range,natoms,3,domega1.shape[3],domega1.shape[4])),(1,5,0,4,2,3)).copy()
-        dv2 = np.transpose(domega2.reshape((domega2.shape[0],natoms_range,natoms,3,domega2.shape[3],domega2.shape[4])),(1,5,0,4,2,3)).copy()
+        dv1 = np.transpose(domega1.reshape((domega1.shape[0],natoms_range,natoms_tot,3,domega1.shape[3],domega1.shape[4])),(1,5,0,4,2,3)).copy()
+        dv2 = np.transpose(domega2.reshape((domega2.shape[0],natoms_range,natoms_tot,3,domega2.shape[3],domega2.shape[4])),(1,5,0,4,2,3)).copy()
         
         grad_pvec = {}
    
@@ -126,7 +126,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
       
-                p, grad_p = sph_utils.grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
+                p, grad_p = sph_utils.grad_equicombsparse_numba(natoms_tot,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
             
             else:
 
@@ -140,7 +140,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
 
-                p, grad_p = sph_utils.grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize)
+                p, grad_p = sph_utils.grad_equicomb_numba(natoms_tot,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize)
 
             else:
 
@@ -152,7 +152,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
 
-                grad_pvec[lam] = grad_p.reshape(natoms, 3, natoms_range, featsize)
+                grad_pvec[lam] = grad_p.reshape(natoms_tot, 3, natoms_range, featsize)
 
         else:
 
@@ -160,7 +160,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
  
-                grad_pvec[lam] = grad_p.reshape(natoms,3,natoms_range,2*lam+1,featsize)
+                grad_pvec[lam] = grad_p.reshape(natoms_tot,3,natoms_range,2*lam+1,featsize)
 
         #print("equicomb time:", (time.time()-equistart))
     
@@ -176,14 +176,14 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         if zeta==1:
             psi_nm[(spe,0)] = np.dot(pvec[0][atom_idx[spe]],power_env_sparse[(0,spe)].T)
             if gradient: 
-                grad_psi_nm[(spe,0)] = np.dot(grad_pvec[0][:,:,atom_idx[spe],:].reshape(natoms*3*natom_dict[spe],featsize),power_env_sparse[(0,spe)].T)
+                grad_psi_nm[(spe,0)] = np.dot(grad_pvec[0][:,:,atom_idx[spe],:].reshape(natoms_tot*3*natom_dict[spe],featsize),power_env_sparse[(0,spe)].T)
         else:
             kernel0_nm = np.dot(pvec[0][atom_idx[spe]],power_env_sparse[(0,spe)].T)
             kernel_nm = kernel0_nm**zeta
             psi_nm[(spe,0)] = np.dot(kernel_nm,Vmat[(0,spe)])
             if gradient:
-                grad_kernel0_nm = np.dot(grad_pvec[0][:,:,atom_idx[spe],:].reshape((natoms*3*natom_dict[spe],featsize)),power_env_sparse[(0,spe)].T)
-                grad_kernel_nm = (zeta*grad_kernel0_nm.reshape((natoms,3,natom_dict[spe],Mspe[spe]))*kernel0_nm[np.newaxis, np.newaxis, :, :]**(zeta-1)).reshape((natoms*3*natom_dict[spe],Mspe[spe]))
+                grad_kernel0_nm = np.dot(grad_pvec[0][:,:,atom_idx[spe],:].reshape((natoms_tot*3*natom_dict[spe],featsize)),power_env_sparse[(0,spe)].T)
+                grad_kernel_nm = (zeta*grad_kernel0_nm.reshape((natoms_tot,3,natom_dict[spe],Mspe[spe]))*kernel0_nm[np.newaxis, np.newaxis, :, :]**(zeta-1)).reshape((natoms_tot*3*natom_dict[spe],Mspe[spe]))
                 grad_psi_nm[(spe,0)] = np.dot(grad_kernel_nm,Vmat[(0,spe)])
 
         # lam > 0
@@ -193,19 +193,19 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
             if zeta==1:
                 psi_nm[(spe,lam)] = np.dot(pvec[lam][atom_idx[spe]].reshape(natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
                 if gradient: 
-                    grad_psi_nm[(spe,lam)] = np.dot(grad_pvec[lam][:,:,atom_idx[spe],:,:].reshape(natoms*3*natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T) 
+                    grad_psi_nm[(spe,lam)] = np.dot(grad_pvec[lam][:,:,atom_idx[spe],:,:].reshape(natoms_tot*3*natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T) 
             else:
                 kernel_nm = np.dot(pvec[lam][atom_idx[spe]].reshape(natom_dict[spe]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
                 kernel_nm_blocks = kernel_nm.reshape(natom_dict[spe], 2*lam+1, Mspe[spe], 2*lam+1).copy()
                 kernel_nm_blocks *= kernel0_nm[:, np.newaxis, :, np.newaxis] ** (zeta - 1)
                 if gradient:
-                    grad_kernel_nm = np.dot(grad_pvec[lam][:,:,atom_idx[spe],:,:].reshape(natoms*3*natom_dict[spe]*(2*lam+1), featsize), power_env_sparse[(lam,spe)].T)
-                    grad_kernel_nm_blocks = grad_kernel_nm.reshape(natoms, 3, natom_dict[spe], 2*lam+1, Mspe[spe], 2*lam+1)
-                    grad_kernel_nm_blocks = (grad_kernel_nm_blocks * (kernel0_nm ** (zeta - 1))[np.newaxis, np.newaxis, :, np.newaxis, :, np.newaxis]) + kernel_nm.reshape(natom_dict[spe], 2*lam+1, Mspe[spe], 2*lam+1)[np.newaxis, np.newaxis, :, :, :, :] * ((zeta-1) * (grad_kernel0_nm.reshape(natoms,3,natom_dict[spe],Mspe[spe]) * (kernel0_nm ** (zeta-2))[np.newaxis, np.newaxis, :, :]))[:, :, :, np.newaxis, :, np.newaxis]
+                    grad_kernel_nm = np.dot(grad_pvec[lam][:,:,atom_idx[spe],:,:].reshape(natoms_tot*3*natom_dict[spe]*(2*lam+1), featsize), power_env_sparse[(lam,spe)].T)
+                    grad_kernel_nm_blocks = grad_kernel_nm.reshape(natoms_tot, 3, natom_dict[spe], 2*lam+1, Mspe[spe], 2*lam+1)
+                    grad_kernel_nm_blocks = (grad_kernel_nm_blocks * (kernel0_nm ** (zeta - 1))[np.newaxis, np.newaxis, :, np.newaxis, :, np.newaxis]) + kernel_nm.reshape(natom_dict[spe], 2*lam+1, Mspe[spe], 2*lam+1)[np.newaxis, np.newaxis, :, :, :, :] * ((zeta-1) * (grad_kernel0_nm.reshape(natoms_tot,3,natom_dict[spe],Mspe[spe]) * (kernel0_nm ** (zeta-2))[np.newaxis, np.newaxis, :, :]))[:, :, :, np.newaxis, :, np.newaxis]
                 kernel_nm = kernel_nm_blocks.reshape(natom_dict[spe]*(2*lam+1), Mspe[spe]*(2*lam+1))
                 psi_nm[(spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
                 if gradient:
-                    grad_kernel_nm = grad_kernel_nm_blocks.reshape(natoms*3*natom_dict[spe]*(2*lam+1), Mspe[spe]*(2*lam+1))
+                    grad_kernel_nm = grad_kernel_nm_blocks.reshape(natoms_tot*3*natom_dict[spe]*(2*lam+1), Mspe[spe]*(2*lam+1))
                     grad_psi_nm[(spe,lam)] = np.dot(grad_kernel_nm,Vmat[(lam,spe)])
                      
     #print("rkhs time:", time.time()-rkhsstart,flush=True)
@@ -271,14 +271,14 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for spe in species:
             ispe[spe] = 0
         itot = 0
-        grad_pred_coefs = np.zeros((natoms,3,Tsize))
+        grad_pred_coefs = np.zeros((natoms_tot,3,Tsize))
         for iat in range(natoms):
             spe = atomic_symbols[iat]
             if iat in atoms_range_set:
                 i=0
                 for l in range(min(lmax[spe],lcut)+1):
                     for n in range(nmax[(spe,l)]):
-                        grad_pred_coefs[:,:,itot+i:itot+i+(2*l+1)] = grad_C[(spe,l,n)].reshape(natoms,3,natom_dict[spe]*(2*l+1))[:,:,ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+(2*l+1)]
+                        grad_pred_coefs[:,:,itot+i:itot+i+(2*l+1)] = grad_C[(spe,l,n)].reshape(natoms_tot,3,natom_dict[spe]*(2*l+1))[:,:,ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+(2*l+1)]
                         i += (2*l+1)
                 ispe[spe] += 1
             for l in range(min(lmax[spe],lcut)+1):

@@ -141,7 +141,7 @@ def scale_grad_coefs(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,species,c
     # Compute unnormalized electron-density integral
     iaux = 0
     nele = 0.0
-    grad_charge = np.zeros((natoms,3))
+    grad_charge = np.zeros((all_natoms,3))
     for iat in range(natoms):
         spe = atomic_symbols[iat]
         nele += pseudocharge_dict[spe]
