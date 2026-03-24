@@ -73,7 +73,6 @@ def build():
     """
 
     if parallel:
-        print("Running in parallel mode")
         """ check partitioning """
         assert size > 1, "Please run in serial mode if using a single MPI task"
         check_MPI_tasks_count(comm, ntrain, "training structures")
