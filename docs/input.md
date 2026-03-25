@@ -86,6 +86,7 @@ Remember to set `inp.predict` if one wants to predict densities.
 | `gradtol` | `float` | `1e-5` | Minimum gradient norm tolerance for CG minimization. |
 | `restart` | `bool` | `False` | Whether to restart from previous minimization checkpoint. |
 | `trainsel` | `Union[Literal["sequential"], Literal["random"]]` | `"random"` | Select the training set at random or sequentially from the entire dataset. |
+| `sparse_algorithm` | `Union[Literal["dense"], Literal["omp_sparse"]]` | `"omp_sparse"` | The algorithm to compute Hessian matrices, if making use of the RKHS vector sparsity. |
 
 ---
 
