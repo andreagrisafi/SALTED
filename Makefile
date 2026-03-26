@@ -88,6 +88,7 @@ else
 endif
 
 # WITH INTEL COMPILERS, please do rewrite below if you want to use intel compiler
+
 #FCOMPILER := 'intelem'
 #F90FLAGS := '-qopenmp'
 #F2PYOPT := "--opt='-O3 -unroll-aggressive -qopt-prefetch -qopt-reportr5'"
@@ -102,4 +103,3 @@ f2py: salted/lib/ovlp2c.so salted/lib/ovlp3c.so salted/lib/ovlp2cXYperiodic.so s
 # The % wildcard matches the module name, and $* expands to the matched part
 salted/lib/%.so: src/%.f90
 	cd salted/lib; $(F2PY_COMPILER_VARS) python -m numpy.f2py $(BACKEND_FLAG) $(F2PY_COMPILER_FLAGS) -c ../../src/$*.f90 -m $* $(F2PY_LIBS); mv $*.*.so $*.so
-

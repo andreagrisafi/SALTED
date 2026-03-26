@@ -15,9 +15,6 @@ from salted import sph_utils
 from salted import basis
 from salted.sys_utils import ParseConfig
 
-from salted.lib import equicomb
-from salted.lib import equicombsparse
-
 def build():
 
     inp = ParseConfig().parse_input()
@@ -66,9 +63,9 @@ def build():
     omega1 = sph_utils.get_representation_coeffs(frames,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe1,species,nang1,nrad1,natoms_total)
     omega2 = sph_utils.get_representation_coeffs(frames,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,0,neighspe2,species,nang2,nrad2,natoms_total)
 
-    # Reshape arrays of expansion coefficients for optimal Fortran indexing
-    v1 = np.transpose(omega1,(2,0,3,1))
-    v2 = np.transpose(omega2,(2,0,3,1))
+    # Reshape arrays of expansion coefficients for optimal Fortran indexing 
+    v1 = np.transpose(omega1,(1,3,0,2)).copy()
+    v2 = np.transpose(omega2,(1,3,0,2)).copy()
 
     # Compute complex to real transformation matrix for the given lambda value
     c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
@@ -79,15 +76,13 @@ def build():
 
         featsize = nspe1*nspe2*nrad1*nrad2*llmax
         nfps = len(vfps[lam])
-        p = equicombsparse.equicombsparse(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
-        p = np.transpose(p,(2,0,1))
+        p = sph_utils.equicombsparse_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
         featsize = ncut
 
     else:
-
+       
         featsize = nspe1*nspe2*nrad1*nrad2*llmax
-        p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-        p = np.transpose(p,(2,0,1))
+        p = sph_utils.equicomb_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
 
     print("time = ", time.time()-start)
 

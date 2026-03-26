@@ -10,7 +10,7 @@ from scipy import special
 from salted import basis
 from salted.sys_utils import ParseConfig, get_feats_projs
 
-def build():
+def build(rank):
 
     inp = ParseConfig().parse_input()
 
@@ -38,13 +38,13 @@ def build():
     if inp.qm.qmcode=="cp2k":
         # Initialize calculation of density/density-response moments
         from salted.cp2k.utils import init_moments
-        charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,0)
+        charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
 
     loadstart = time.time()
    
     # Load feature space sparsification information if required 
+    vfps = {}
     if sparsify:
-        vfps = {}
         for lam in range(lmax_max+1):
             vfps[lam] = np.load(osp.join(
                 saltedpath, f"equirepr_{saltedname}", f"fps{ncut}-{lam}.npy"

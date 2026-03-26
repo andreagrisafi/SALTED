@@ -11,7 +11,7 @@ from ase.io import read
 from scipy import special
 
 from salted import basis, sph_utils
-from salted.lib import equicomb, equicombsparse, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
+from salted.lib import equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
 from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
@@ -126,8 +126,8 @@ def build():
     omega2 = sph_utils.get_representation_coeffs(frames,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe2,species,nang2,nrad2,natoms_total)
 
     # Reshape arrays of expansion coefficients for optimal Fortran indexing
-    v1 = np.transpose(omega1,(2,0,3,1))
-    v2 = np.transpose(omega2,(2,0,3,1))
+    v1 = np.transpose(omega1,(1,3,0,2)).copy()
+    v2 = np.transpose(omega2,(1,3,0,2)).copy()
     
     print("featomic time (sec) = ",time.time()-start_featomic,flush=True)
 
@@ -171,15 +171,13 @@ def build():
 
                 featsize = nspe1*nspe2*nrad1*nrad2*llmax
                 nfps = len(vfps[lam])
-                p = equicombsparse.equicombsparse(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize,nfps,vfps[lam])
-                p = np.transpose(p,(2,0,1))
+                p = sph_utils.equicombsparse_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
                 featsize = ncut
 
             else:
 
                 featsize = nspe1*nspe2*nrad1*nrad2*llmax
-                p = equicomb.equicomb(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-                p = np.transpose(p,(2,0,1))
+                p = sph_utils.equicomb_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
 
             # Fill vector of equivariant descriptor
             if lam==0:
@@ -267,14 +265,15 @@ def build():
             if average:
                 pred_coefs += Av_coeffs
 
-            # save predicted coefficients 
-            np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
-
             if qmcode=="cp2k":
                 # Compute charges and dipole moments
                 charge, dipole = compute_charge_and_dipole(frames[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
                 print(iconf+1,charge,file=qfile)
                 print(iconf+1,dipole["x"],dipole["y"],dipole["z"],file=dfile)
+            
+            # save predicted coefficients 
+            np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
+
     
     elif saltedtype=="density-response":
 

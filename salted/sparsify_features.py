@@ -12,7 +12,7 @@ from ase.io import read
 from salted import sph_utils
 from salted import basis
 
-from salted.lib import equicomb, equicombfps
+from salted.lib import equicombfps
 from salted.sys_utils import ParseConfig, do_fps, get_atom_idx, read_system
 
 def build():
@@ -92,7 +92,7 @@ def build():
 
         # Do feature selection with FPS sparsification
         if ncut >= featsize:
-            print("ERROR: requested number of sparse features larger than total feature space size! Please get rid of the inp.descriptor.sparsify section.")
+            print(f"ERROR: requested number of sparse features larger than total feature space size: {ncut} > {featsize}. Please remove the inp.descriptor.sparsify section or reduce ncut value.")
             sys.exit(1)
         
         pvec = equicombfps.equicombfps(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)

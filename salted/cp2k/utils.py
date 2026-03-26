@@ -12,13 +12,13 @@ def init_moments(inp,species,lmax,nmax,rank):
 
         if inp.salted.saltedtype=="density":
 
-            print("Total charges and polarization vectors will be computed from the reference and predicted electron densities.")
-            print("WARNING: Computed values of polarization vectors have physical meaning only along those Cartesian directions for which the electron density goes to zero at the cell periodic boundaries. The modern theory of polarization should be used otherwise.")
+            print("Total charges and polarization vectors are computed as the zero and first moment of the electron density.")
+            print("WARNING: Computed values of polarization vectors have physical meaning only along those Cartesian directions for which the electron density vanishes before reaching the cell periodic boundaries; the modern theory of polarization should be used otherwise.")
 
         elif inp.salted.saltedtype=="density-response":
             
-            print("Polarizability tensors will be computed from the reference and predicted density-response functions.")
-            print("WARNING: Computed values of polarizability tensors have physical meaning only along those Cartesian directions for which the electron density goes to zero at the cell periodic boundaries. The modern theory of polarization should be used otherwise.")
+            print("Polarizability tensors are computed as the first moment of the electron-density electric-field response.")
+            print("WARNING: Computed values of polarizability tensors have physical meaning only along those Cartesian directions for which the electron density vanishes before reaching the cell periodic boundaries; the modern theory of polarization should be used otherwise.")
 
     # Get CP2K basis set information 
     bdir = osp.join(inp.salted.saltedpath,"basis")
@@ -124,6 +124,52 @@ def compute_charge_and_dipole(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,
                         iaux += 1
 
     return [charge,dipole]
+
+def scale_grad_coefs(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,coefs,grad_coefs,average,charge):
+    """Compute total charge and dipole moment for the given configuration"""
+
+    geom.wrap()
+    bohr2angs = 0.529177210670
+    coords = geom.get_positions()/bohr2angs
+    all_symbols = geom.get_chemical_symbols()
+    all_natoms = int(len(all_symbols))
+
+    pseudocharge_dict = {}
+    for i in range(len(species)):
+        pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
+
+    # Compute unnormalized electron-density integral
+    iaux = 0
+    nele = 0.0
+    grad_charge = np.zeros((all_natoms,3))
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        nele += pseudocharge_dict[spe]
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                if l==0:
+                    grad_charge[:,:] += charge_integrals[(spe,l,n)] * grad_coefs[:,:,iaux]
+                iaux += 2*l+1
+
+    # Perform dipole calculation
+    iaux = 0
+    for iat in range(all_natoms):
+        spe = all_symbols[iat]
+        if spe in species:
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    for im in range(2*l+1):
+                        if l==0:
+                            if average:
+                                # rescale isotropic coefficients to conserve the electronic charge
+                                grad_coefs[:,:,iaux] = (grad_coefs[:,:,iaux]*nele/charge)-coefs[iaux]*grad_charge[:,:]/charge
+                            else:
+                                # remove residual charge from the most diffuse isotropic function
+                                if n==nmax[(spe,l)]-1:
+                                    grad_coefs[:,:,iaux] -= grad_charge[:,:]/(charge_integrals[(spe,l,n)]*natoms)
+                        iaux += 1
+
+    return 
 
 def compute_polarizability(geom,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,coefs):
     """Compute polarizability tensor for the given configuration"""

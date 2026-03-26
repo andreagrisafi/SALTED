@@ -135,11 +135,6 @@ def build():
                 # Add spherical averages back 
                 pred_coefs += Av_coeffs
             
-
-            np.savetxt(osp.join(dirpath,
-                                f"COEFFS-{iconf+1}.dat"
-            ), pred_coefs)
-
             # Compute predicted density projections <phi|rho>
             pred_projs = np.dot(overl,pred_coefs)
 
@@ -171,6 +166,10 @@ def build():
                                   charge,file=qfile)
                 print(iconf+1,ref_dipole["x"],ref_dipole["y"],ref_dipole["z"],
                                   dipole["x"],    dipole["y"],    dipole["z"],file=dfile)
+            
+            np.savetxt(osp.join(dirpath,
+                                f"COEFFS-{iconf+1}.dat"
+            ), pred_coefs)
 
         elif saltedtype=="density-response":
 
