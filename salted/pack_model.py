@@ -219,6 +219,7 @@ def pack_weights(SALTED_file, path, inp, debug: bool = False):
     write_chunk_location(SALTED_file, "WEIGH", begin_of_block)
 
 def pack_model_info(SALTED_file, inp, debug: bool = False):
+    [lmax, nmax] = basis.basiset(inp.qm.dfbasis)
     if debug: print("Writing Model Info")
     inputs = [
         (b"averg", inp.system.average),  #Bools
@@ -240,7 +241,9 @@ def pack_model_info(SALTED_file, inp, debug: bool = False):
         (b"speci", " ".join(inp.system.species)),   #str (and list str)
         (b"nspe1", " ".join(inp.descriptor.rep1.neighspe)),
         (b"nspe2", " ".join(inp.descriptor.rep2.neighspe)),
-        (b"dfbas", inp.qm.dfbasis)
+        (b"dfbas", inp.qm.dfbasis),
+        (b"dflmx", lmax),
+        (b"dfnmx", nmax),
     ]
     begin_of_block = SALTED_file.tell()
     for key, value in inputs:

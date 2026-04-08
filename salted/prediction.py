@@ -27,7 +27,7 @@ from salted.sys_utils import (
 )
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
-def build():
+def initialize_from_folder():
 
     inp = ParseConfig().parse_input()
     (saltedname, saltedpath, saltedtype,
@@ -46,15 +46,16 @@ def build():
             "please specify the entry named `prediction.filename` and `prediction.predname` in the input file."
         )
 
-    comm, size, rank, parallel = detect_mpi()
-
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename_pred, species, dfbasis)
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-    bohr2angs = 0.529177210670
-
     if rank == 0:
         print(f"The dataset contains {ndata} frames.")
+
+def build():
+    comm, size, rank, parallel = detect_mpi()
+    
+    initialize_from_folder()
 
     # Initialize conf_range for both parallel and serial cases
     if parallel:
