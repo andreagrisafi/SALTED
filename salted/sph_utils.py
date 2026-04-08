@@ -1,10 +1,9 @@
 import sys
 import math
 import time
-from typing import Tuple
-
 import numpy as np
 from scipy import special
+from ase import Atoms
 from ase.data import atomic_numbers
 
 from featomic import SphericalExpansion
@@ -91,7 +90,7 @@ def complex_to_real_transformation(sizes):
 
     return matrices
 
-def get_angular_indexes_symmetric(lam,nang1,nang2) -> Tuple[int, np.ndarray]:
+def get_angular_indexes_symmetric(lam,nang1,nang2) -> tuple[int, np.ndarray]:
     """Select relevant angular indexes for equivariant descriptor calculation"""
 
     llmax = 0
@@ -114,7 +113,7 @@ def get_angular_indexes_symmetric(lam,nang1,nang2) -> Tuple[int, np.ndarray]:
 
     return llmax, llvec
 
-def get_angular_indexes_antisymmetric(lam,nang1,nang2) -> Tuple[int, np.ndarray]:
+def get_angular_indexes_antisymmetric(lam,nang1,nang2) -> tuple[int, np.ndarray]:
     """Select relevant angular indexes for equivariant descriptor calculation, antisymmetric with respect to inversion operations"""
 
     llmax = 0
@@ -137,18 +136,46 @@ def get_angular_indexes_antisymmetric(lam,nang1,nang2) -> Tuple[int, np.ndarray]
 
     return llmax, llvec
 
-def get_representation_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,natoms):
-    """Compute spherical harmonics expansion coefficients of the given structural representation."""
+def reps_equivalent(
+    rep1: str, neighspe1: list[str], hyper_params1: dict,
+    rep2: str, neighspe2: list[str], hyper_params2: dict,
+) -> bool:
+    """Return True if two rep configs are identical (same type, neighbor species, and hyperparameters).
+
+    When True, the caller can reuse omega1 for omega2 instead of recomputing.
+    """
+    return rep1 == rep2 and list(neighspe1) == list(neighspe2) and hyper_params1 == hyper_params2
+
+
+def get_representation_coeffs(
+    structure: Atoms, rep: str, hyper_params: dict,
+    rank: int, neighspe: list[str], species: list[str],
+    nang: int, nrad: int, natoms: int,
+) -> np.ndarray:
+    """Compute spherical harmonics expansion coefficients of the given structural representation.
+
+    Args:
+        structure (Atoms): ASE Atoms object.
+        rep (str): representation type, "rho" (SOAP) or "V" (LODE).
+        hyper_params (dict): featomic hyperparameter dict for this representation,
+                             as returned by sys_utils.build_featomic_hyper_params().
+        rank (int): MPI rank (used for error messages).
+        neighspe (list[str]): neighbor species list.
+        species (list[str]): center species list.
+        nang (int): max angular channel.
+        nrad (int): number of radial basis functions.
+        natoms (int): number of atoms in the structure.
+    """
 
     if rep=="rho":
 
         # get SPH expansion for atomic density
-        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
+        calculator = SphericalExpansion(**hyper_params)
 
     elif rep=="V":
 
         # get SPH expansion for atomic potential
-        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
+        calculator = LodeSphericalExpansion(**hyper_params)
 
     else:
 
@@ -180,18 +207,35 @@ def get_representation_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAM
 
     return omega
 
-def get_representation_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,atoms_range):
-    """Compute spherical harmonics expansion coefficients of the given structural representation."""
+def get_representation_coeffs_atomrange(
+    structure: Atoms, rep: str, hyper_params: dict,
+    rank: int, neighspe: list[str], species: list[str],
+    nang: int, nrad: int, atoms_range: np.ndarray,
+) -> np.ndarray:
+    """Compute spherical harmonics expansion coefficients of the given structural representation.
+
+    Args:
+        structure (Atoms): ASE Atoms object.
+        rep (str): representation type, "rho" (SOAP) or "V" (LODE).
+        hyper_params (dict): featomic hyperparameter dict for this representation,
+                             as returned by sys_utils.build_featomic_hyper_params().
+        rank (int): MPI rank (used for error messages).
+        neighspe (list[str]): neighbor species list.
+        species (list[str]): center species list.
+        nang (int): max angular channel.
+        nrad (int): number of radial basis functions.
+        atoms_range (np.ndarray): indices of atoms to compute.
+    """
 
     if rep=="rho":
 
         # get SPH expansion for atomic density
-        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
+        calculator = SphericalExpansion(**hyper_params)
 
     elif rep=="V":
 
         # get SPH expansion for atomic potential
-        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
+        calculator = LodeSphericalExpansion(**hyper_params)
 
     else:
 
@@ -232,16 +276,33 @@ def get_representation_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_DENSITY,H
 
     return omega
 
-def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,natoms):
-    """Compute spherical harmonics expansion coefficients of the given structural representation."""
+def get_representation_gradient_coeffs(
+    structure: Atoms, rep: str, hyper_params: dict,
+    rank: int, neighspe: list[str], species: list[str],
+    nang: int, nrad: int, natoms: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute spherical harmonics expansion coefficients and their position gradients.
+
+    Args:
+        structure (Atoms): ASE Atoms object.
+        rep (str): representation type, "rho" (SOAP) or "V" (LODE).
+        hyper_params (dict): featomic hyperparameter dict for this representation,
+                             as returned by sys_utils.build_featomic_hyper_params().
+        rank (int): MPI rank (used for error messages).
+        neighspe (list[str]): neighbor species list.
+        species (list[str]): center species list.
+        nang (int): max angular channel.
+        nrad (int): number of radial basis functions.
+        natoms (int): number of atoms in the structure.
+    """
 
     if rep=="rho":
         # get SPH expansion for atomic density
-        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
+        calculator = SphericalExpansion(**hyper_params)
 
     elif rep=="V":
         # get SPH expansion for atomic potential
-        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
+        calculator = LodeSphericalExpansion(**hyper_params)
 
     else:
         if rank == 0: print("Error: requested representation", rep, "not provided")
@@ -292,16 +353,34 @@ def get_representation_gradient_coeffs(structure,rep,HYPER_PARAMETERS_DENSITY,HY
 
     return omega, domega
 
-def get_representation_gradient_coeffs_atomrange(structure,rep,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe,species,nang,nrad,natoms,atoms_range):
-    """Compute spherical harmonics expansion coefficients of the given structural representation."""
+def get_representation_gradient_coeffs_atomrange(
+    structure: Atoms, rep: str, hyper_params: dict,
+    rank: int, neighspe: list[str], species: list[str],
+    nang: int, nrad: int, natoms: int, atoms_range: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute spherical harmonics expansion coefficients and position gradients for a subset of atoms.
+
+    Args:
+        structure (Atoms): ASE Atoms object.
+        rep (str): representation type, "rho" (SOAP) or "V" (LODE).
+        hyper_params (dict): featomic hyperparameter dict for this representation,
+                             as returned by sys_utils.build_featomic_hyper_params().
+        rank (int): MPI rank (used for error messages).
+        neighspe (list[str]): neighbor species list.
+        species (list[str]): center species list.
+        nang (int): max angular channel.
+        nrad (int): number of radial basis functions.
+        natoms (int): total number of atoms in the structure.
+        atoms_range (np.ndarray): indices of atoms to compute.
+    """
 
     if rep=="rho":
         # get SPH expansion for atomic density
-        calculator = SphericalExpansion(**HYPER_PARAMETERS_DENSITY)
+        calculator = SphericalExpansion(**hyper_params)
 
     elif rep=="V":
         # get SPH expansion for atomic potential
-        calculator = LodeSphericalExpansion(**HYPER_PARAMETERS_POTENTIAL)
+        calculator = LodeSphericalExpansion(**hyper_params)
 
     else:
         if rank == 0: print("Error: requested representation", rep, "not provided")

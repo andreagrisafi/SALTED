@@ -14,6 +14,46 @@ from ase.io import read
 from salted import basis
 
 
+def build_featomic_hyper_params(rep_cfg) -> dict:
+    """Return the featomic kwargs dict for a single representation config.
+
+    Args:
+        rep_cfg: a rep config object with fields type, rcut, sig, nrad, nang
+                 (as returned by inp.descriptor.rep1 / rep2).
+
+    Returns:
+        dict: hyperparameter dict ready to be passed to SphericalExpansion
+              (for type="rho") or LodeSphericalExpansion (for type="V").
+    """
+    if rep_cfg.type == "rho":
+        return {
+            "cutoff": {"radius": rep_cfg.rcut, "smoothing": {"type": "ShiftedCosine", "width": 0.1}},
+            "density": {"type": "Gaussian", "width": rep_cfg.sig},
+            "basis": {
+                "type": "TensorProduct",
+                "max_angular": rep_cfg.nang,
+                "radial": {"type": "Gto", "max_radial": rep_cfg.nrad - 1},
+                "spline_accuracy": 1e-06,
+            },
+        }
+    elif rep_cfg.type == "V":
+        return {
+            "density": {"type": "SmearedPowerLaw", "smearing": rep_cfg.sig, "exponent": 1},
+            "basis": {
+                "type": "TensorProduct",
+                "max_angular": rep_cfg.nang,
+                "radial": {
+                    "type": "Gto",
+                    "max_radial": rep_cfg.nrad - 1,
+                    "radius": rep_cfg.rcut,
+                },
+                "spline_accuracy": 1e-06,
+            },
+        }
+    else:
+        raise ValueError(f"Unknown representation type '{rep_cfg.type}': must be 'rho' or 'V'.")
+
+
 def read_system(filename: str = None, spelist: List[str] = None, dfbasis: str = None):
     """read a geometry file and return the formatted information
 
@@ -571,58 +611,19 @@ class ParseConfig:
          rep2, rcut2, sig2, nrad2, nang2, neighspe2,
          sparsify, nsamples, ncut,
          zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-         gradtol, restart, trainsel) = ParseConfig().get_all_params()
+         gradtol, restart, trainsel,
+         nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
         ```
+        HP1 and HP2 are the featomic hyperparameter dicts for rep1 and rep2,
+        built from their respective configs via build_featomic_hyper_params().
         """
         inp = self.parse_input()
         sparsify = False if inp.descriptor.sparsify.ncut <= 0 else True  # determine if sparsify by ncut
         nspe1 = len(inp.descriptor.rep1.neighspe)
         nspe2 = len(inp.descriptor.rep2.neighspe)
 
-        # HYPER_PARAMETERS_DENSITY = {
-        #    "cutoff": inp.descriptor.rep1.rcut,
-        #    "max_radial": inp.descriptor.rep1.nrad,
-        #    "max_angular": inp.descriptor.rep1.nang,
-        #    "atomic_gaussian_width": inp.descriptor.rep1.sig,
-        #    "center_atom_weight": 1.0,
-        #    "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
-        #    "cutoff_function": {"ShiftedCosine": {"width": 0.1}},
-        # }
-
-        HYPER_PARAMETERS_DENSITY = {
-            "cutoff": {"radius": inp.descriptor.rep1.rcut, "smoothing": {"type": "ShiftedCosine", "width": 0.1}},
-            "density": {"type": "Gaussian", "width": inp.descriptor.rep1.sig},
-            "basis": {
-                "type": "TensorProduct",
-                "max_angular": inp.descriptor.rep1.nang,
-                "radial": {"type": "Gto", "max_radial": inp.descriptor.rep1.nrad - 1},
-                "spline_accuracy": 1e-06,
-            },
-        }
-
-        # HYPER_PARAMETERS_POTENTIAL = {
-        #    "potential_exponent": 1,
-        #    "cutoff": inp.descriptor.rep2.rcut,
-        #    "max_radial": inp.descriptor.rep2.nrad,
-        #    "max_angular": inp.descriptor.rep2.nang,
-        #    "atomic_gaussian_width": inp.descriptor.rep2.sig,
-        #    "center_atom_weight": 1.0,
-        #    "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
-        # }
-
-        HYPER_PARAMETERS_POTENTIAL = {
-            "density": {"type": "SmearedPowerLaw", "smearing": inp.descriptor.rep2.sig, "exponent": 1},
-            "basis": {
-                "type": "TensorProduct",
-                "max_angular": inp.descriptor.rep2.nang,
-                "radial": {
-                    "type": "Gto",
-                    "max_radial": inp.descriptor.rep2.nrad - 1,
-                    "radius": inp.descriptor.rep2.rcut,
-                },
-                "spline_accuracy": 1e-06,
-            },
-        }
+        HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
+        HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
 
         return (
             inp.salted.saltedname,
@@ -665,8 +666,8 @@ class ParseConfig:
             inp.gpr.trainsel,
             nspe1,
             nspe2,
-            HYPER_PARAMETERS_DENSITY,
-            HYPER_PARAMETERS_POTENTIAL,
+            HP1,
+            HP2,
         )
 
     def get_all_params_simple1(self) -> Tuple:
