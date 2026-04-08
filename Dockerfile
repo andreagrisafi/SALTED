@@ -15,13 +15,13 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
 RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.2.tar.bz2 \
     && tar -xf openmpi-5.0.2.tar.bz2 \
     && cd openmpi-5.0.2 \
-    && ./configure --prefix=/usr/local/openmpi5/lib \
+    && ./configure --prefix=/usr/local/lib \
     && make all install \
     && cd .. \
 	&& rm -R openmpi-5.0.2
 
-ENV PATH=/usr/local/openmpi5/lib/bin:$PATH
-ENV LD_LIBRARY_PATH=/usr/local/openmpi5/lib
+ENV PATH=/usr/local/lib/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV HDF5_DIR=/usr/local/hdf5
 
 #Install HDF5
