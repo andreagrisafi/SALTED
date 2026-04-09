@@ -25,7 +25,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
     && pip install git+https://github.com/metatensor/featomic.git
 
 ENV PATH=/usr/local/bin:$PATH
-ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:/usr/lib/x86_64-linux-gnu
 ENV HDF5_DIR=/usr/local/hdf5
 
 #Create symlinks for PMI2 libs, as Open MPI's configure script expects them in /usr/lib
