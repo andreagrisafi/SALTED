@@ -59,8 +59,8 @@ RUN wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5
 RUN HDF5_DIR=/usr/local/hdf5 CC=/usr/local/bin/mpicc HDF5_MPI=ON \
     pip install --no-binary=h5py h5py
 
-
-RUN pip install meson packaging numba \
+# Install Python dependencies
+RUN pip install meson packaging numba ase scipy pyyaml \
     && pip install --prefer-binary pyscf
 
 #Install SALTED

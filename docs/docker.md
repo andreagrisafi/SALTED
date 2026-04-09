@@ -59,4 +59,10 @@ To execute a command within the Apptainer container:
   apptainer exec salted.sif [COMMAND]
 ```
 
+To run a parallel job usig Slurm, use `srun` with the Apptainer image:
+
+```bash
+  srun --ntasks=4 --mpi=pmi2 apptainer exec salted.sif [COMMAND]
+```
+
 This setup allows seamless integration of SALTED across local development environments and HPC systems, maintaining consistent dependencies and runtime behavior.
