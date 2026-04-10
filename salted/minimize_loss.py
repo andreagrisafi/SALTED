@@ -62,8 +62,8 @@ def build():
         trainsel,
         nspe1,
         nspe2,
-        HYPER_PARAMETERS_DENSITY,
-        HYPER_PARAMETERS_POTENTIAL,
+        HP1,
+        HP2,
     ) = ParseConfig().get_all_params()
 
     comm, size, rank, parallel = detect_mpi()

@@ -38,7 +38,7 @@ def build():
     rep2, rcut2, sig2, nrad2, nang2, neighspe2,
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HYPER_PARAMETERS_DENSITY, HYPER_PARAMETERS_POTENTIAL) = ParseConfig().get_all_params()
+    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
         raise ValueError(
@@ -122,8 +122,13 @@ def build():
     frames = [frames[i] for i in conf_range]
 
     # Compute atom-density spherical expansion coefficients
-    omega1 = sph_utils.get_representation_coeffs(frames,rep1,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe1,species,nang1,nrad1,natoms_total)
-    omega2 = sph_utils.get_representation_coeffs(frames,rep2,HYPER_PARAMETERS_DENSITY,HYPER_PARAMETERS_POTENTIAL,rank,neighspe2,species,nang2,nrad2,natoms_total)
+    omega1 = sph_utils.get_representation_coeffs(
+        frames, rep1, HP1, rank, neighspe1, species, nang1, nrad1, natoms_total)
+    if sph_utils.reps_equivalent(rep1, neighspe1, HP1, rep2, neighspe2, HP2):
+        omega2 = omega1
+    else:
+        omega2 = sph_utils.get_representation_coeffs(
+            frames, rep2, HP2, rank, neighspe2, species, nang2, nrad2, natoms_total)
 
     # Reshape arrays of expansion coefficients for optimal Fortran indexing
     v1 = np.transpose(omega1,(1,3,0,2)).copy()
