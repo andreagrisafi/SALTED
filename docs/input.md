@@ -27,7 +27,7 @@ For all the path-related variables, the path can be either a relative path or an
 | var name | type | default | usage |
 | -:| :-: | :-: | :- |
 | `filename` | `str` | **Required** | An extended-XYZ file consisting of input structures. |
-| `species` | `List[str]` | **Required** | List of element species considered in the electron density expansion. |
+| `species` | `list[str]` | **Required** | List of element species considered in the electron density expansion. |
 | `average` | `bool` | `True` | Whether we use averaged coefficients to set a baseline for the density. Normally this should be true, unless a density difference is learned. |
 
 ### Information about QM training set generation `inp.qm`
@@ -35,7 +35,7 @@ For all the path-related variables, the path can be either a relative path or an
 | var name | type | default | usage |
 | -:| :-: | :-: | :- |
 | `path2qm` | `str` | **Required** | Location of the quantum-mechanical training data. |
-| `qmcode` | `Union[Literal["aims"], Literal["cp2k"], Literal["pyscf"]]` | **Required** | Which ab initio software was used to generate training data. |
+| `qmcode` | `Literal["aims"] \| Literal["cp2k"] \| Literal["pyscf"]` | **Required** | Which ab initio software was used to generate training data. |
 | `dfbasis` | `str` | **Required** | A label for the auxiliary basis set used to expand the density. |
 | `qmbasis` | `str` | Required if `qmcode=pyscf` | Wavefunction basis set to use when generating the training data (only for PySCF). |
 | `functional` | `str` | Required if `qmcode=pyscf` | DFT functional to use when generating the training data (only for PySCF). |
@@ -48,12 +48,12 @@ For all the path-related variables, the path can be either a relative path or an
 
 | var name | type | default | usage |
 | -:| :-: | :-: | :- |
-| `type` | `Union[Literal["rho"], Literal["V"]]` | **Required** | Representation type, `"rho"` for atomic density and `"V"` for atomic potential. |
+| `type` | `Literal["rho"] \| Literal["V"]` | **Required** | Representation type, `"rho"` for atomic density and `"V"` for atomic potential. |
 | `rcut` | `float` | **Required** | Radial cutoff (Angstrom) of the structural representation. |
 | `nrad` | `int` | **Required** | Number of radial functions to be used for the structural representation. |
 | `nang` | `int` | **Required** | Maximum angular momentum to be used for the structural representation. |
 | `sig` | `float` | **Required** | Gaussian function width (Angstrom) for atomic density and/or derived atomic potential. |
-| `neighspe` | `List[str]` | **Required** | List of atomic species to be used for structural representation. |
+| `neighspe` | `list[str]` | **Required** | List of atomic species to be used for structural representation. |
 
 ### Feature sparsification parameters `inp.descriptor.sparsify`
 
@@ -85,8 +85,8 @@ Remember to set `inp.predict` if one wants to predict densities.
 | `eigcut` | `float` | `1e-10` | Eigenvalues cutoff for RKHS projection. |
 | `gradtol` | `float` | `1e-5` | Minimum gradient norm tolerance for CG minimization. |
 | `restart` | `bool` | `False` | Whether to restart from previous minimization checkpoint. |
-| `trainsel` | `Union[Literal["sequential"], Literal["random"]]` | `"random"` | Select the training set at random or sequentially from the entire dataset. |
-| `sparse_algorithm` | `Union[Literal["dense"], Literal["omp_sparse"]]` | `"omp_sparse"` | The algorithm to compute Hessian matrices, if making use of the RKHS vector sparsity. |
+| `trainsel` | `Literal["sequential"] \| Literal["random"]` | `"random"` | Select the training set at random or sequentially from the entire dataset. |
+| `sparse_algorithm` | `Literal["dense"] \| Literal["omp_sparse"]` | `"omp_sparse"` | The algorithm to compute Hessian matrices, if making use of the RKHS vector sparsity. |
 
 ---
 

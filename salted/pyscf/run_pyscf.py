@@ -2,7 +2,6 @@ import argparse
 import os
 import sys
 import time
-from typing import List, Tuple, Union
 
 import numpy as np
 from ase.io import read
@@ -12,7 +11,7 @@ from salted.sys_utils import ARGHELP_INDEX_STR, ParseConfig, parse_index_str
 
 
 def run_pyscf(
-    atoms: List,
+    atoms: list,
     basis: str,
     xc: str,
 ):
@@ -22,7 +21,7 @@ def run_pyscf(
     return mf.make_rdm1()
 
 
-def main(geom_indexes: Union[List[int], None], num_threads: int = None):
+def main(geom_indexes: list[int] | None, num_threads: int = None):
     inp = ParseConfig().parse_input()
     geoms_all = read(inp.system.filename, ":")
     if geom_indexes is None:

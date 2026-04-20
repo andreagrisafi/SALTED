@@ -1,7 +1,6 @@
 import os
 import os.path as osp
 import time
-from typing import Dict, List, Tuple
 import copy
 
 import numpy as np
@@ -160,7 +159,7 @@ def build():
                     power[lam] = p.reshape(natoms[iconf],2*lam+1,featsize)
 
             # Compute kernels and RKHS descriptors 
-            Psi:Dict[Tuple[int, str], np.ndarray] = {}
+            Psi:dict[tuple[int, str], np.ndarray] = {}
             ispe = {}
             Tsize = 0
             for spe in species:
@@ -339,7 +338,7 @@ def build():
                         Psi_cart[(ic,spe,lam)] = np.zeros((natom_dict[(iconf,spe)]*(2*lam+1),Vmat[(lam,spe)].shape[-1]))
 
 
-            Psi:Dict[Tuple[int, str], np.ndarray] = {}
+            Psi:dict[tuple[int, str], np.ndarray] = {}
             ispe = {}
             Tsize = 0
             for spe in species:

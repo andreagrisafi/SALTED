@@ -15,22 +15,22 @@ Whichever code is used, the result should be the generation of new directories n
 
 ### PySCF
 
-1. The following input arguments must be added to the `inp.qm` section:  
+1. The following input arguments must be added to the `inp.qm` section:
     - `qmcode`: define the quantum-mechanical code as `pyscf`
-    - `path2qm`: set the path where the PySCF data are going to be saved 
+    - `path2qm`: set the path where the PySCF data are going to be saved
     - `qmbasis`: define the wave function basis set for the Kohn-Sham calculation (example: `cc-pvqz`)
     - `functional`: define the functional for the Kohn-Sham calculation (example: `b3lyp`)
 1. Define the auxiliary basis set using the input variable `dfbasis`, as provided in the `inp.qm` section. This must be chosen consistently with the wave function basis set (example: `RI-cc-pvqz`). Then, add this basis set information to SALTED by running:
 ```bash
-   python3 -m salted.get_basis_info
+python3 -m salted.get_basis_info
 ```
-1. Run PySCF to compute the Kohn-Sham density matrices: 
+1. Run PySCF to compute the Kohn-Sham density matrices:
 ```bash
-   python3 -m salted.pyscf.run_pyscf
+python3 -m salted.pyscf.run_pyscf
 ```
-1. From the computed density matrices, perform the density fitting on the selected auxiliary basis set by running: 
+1. From the computed density matrices, perform the density fitting on the selected auxiliary basis set by running:
 ```bash
-   python3 -m salted.pyscf.dm2df
+python3 -m salted.pyscf.dm2df
 ```
 
 ### FHI-aims
@@ -40,31 +40,31 @@ A detailed description of how to generate the training data for SALTED using FHI
 
 ### CP2K
 
-1. The following input arguments must be added to the `inp.qm` section:
+1. The following input arguments must be included in the `inp.qm` section:
     - `qmcode`: define quantum-mechanical code as `cp2k`
     - `path2qm`: set the path where the CP2K data are going to be saved
     - `periodic`: set the periodicity of the system (`0D,2D,3D`)
     - `coeffile`: filename of RI density coefficients as printed by CP2K
-    - `ovlpfile`: filename of 2-center auxiliary integrals as printed by CP2K
-    - `dfbasis`: define auxiliary basis for the electron density expansion
-    - `pseudocharge`: define pseudocharge according to the adopted GTH pseudopotential
+    - `ovlpfile`: filename of 2-center RI integrals as printed by CP2K
+    - `dfbasis`: RI (density-fitting) basis filename appended for each species, extracted from CP2K
+    - `pseudocharge`: list of pseudocharges associated with the adopted GTH pseudopotential. **NB:** the list ordering must be consistent with the ordering of species provided in `inp.system.species`.
 1. Initialize the systems used for the CP2K calculation by running:
-```bash
-   python3 -m salted.cp2k.xyz2sys
-```
-   System cells and coordinates will be automatically saved in folders named `conf_1`, `conf_2`, ... up to the total number of structures included in the dataset, located into the selected `inp.qm.path2qm`. 
-1. Print auxiliary basis set information from the CP2K automatically generated RI basis set, as described in https://doi.org/10.1021/acs.jctc.6b01041. An example of a CP2K input file can be found in `cp2k-inputs/get_RI-AUTO_basis.inp`. 
-1. An uncontracted version of this basis can be produced to increase the efficiency of the RI printing workflow, by running:
-```bash
-   python3 -m salted.cp2k.uncontract_ri_basis contracted_basis_file uncontracted_basis_file
-```
-   Then, copy `uncontracted_basis_file` to the `cp2k/data/` folder in order to use this basis set to produce the reference density-fitting data, and set the corresponding filename in the `inp.qm.dfbasis` input variable.
-1. Add the selected auxiliary basis to SALTED by running:
-```bash
-   python3 -m salted.get_basis_info
-```
-1. Run the CP2K calculations using the selected auxiliary basis and print out the training data made of reference RI coefficients and 2-center auxiliary integrals. An example of a CP2K input file can be found in `cp2k-inputs/qmmm_RI-print.inp`. 
-1. Set the `inp.qm.coeffile` and `inp.qm.ovlpfile` variables according to the filename of the generated training data and convert them to SALTED format by running:
-```bash
-   python3 -m salted.cp2k.cp2k2salted
-```
+    ```bash
+    python3 -m salted.cp2k.xyz2sys
+    ```
+   System cells and coordinates are extracted from the configuration dataset in XYZ format and saved in folders named `conf_1`, `conf_2`, ... located in the path `inp.qm.path2qm`. **NB:** cell information (`Lattice`) must be included in second line of each XYZ configuration, even if it does not change.
+1. Run SCF calculations and save the optimized wavefunction for each configuration in the corresponding folders previously generated. An example CP2K input is provided in `cp2k-inputs/SCF.inp`.
+1. Print the RI density-fitting coefficients and 2-center RI integrals by restarting the CP2K calculation from the optimized wavefunction. This restart operation derives from the large memory required by the RI fitting procedure, which might require using larger computational resources than the plain SCF cycle. An example CP2K input is provided in `cp2k-inputs/rho-RI-print.inp`. **NB:** The RI basis is automatically generated by CP2K from the selected wavefunction basis set, as described in https://doi.org/10.1021/acs.jctc.6b01041, following SMALL, MEDIUM, or LARGE tiers.
+1. Print the RI basis set information required for SALTED postprocessing of the CP2K density. An example CP2K input is provided in `cp2k-inputs/RI-basis.inp`. This operation can be performed only once for any arbitrary configuration included in the dataset adopting the given choice of RI basis. The output is a single file including wavefunction and RI basis set information of all the species included in the selected test configuration. To extract the RI basis information for each species, run
+    ```bash
+    python3 -m salted.cp2k.extract_basis cp2k_basis_filename
+    ```
+    with `cp2k_basis_filename` the output basis set filename. This will create a separate file for each species in the format, e.g., H-`dfbasis`, O-`dfbasis`.
+1. Add the RI basis set information to SALTED by running:
+    ```bash
+    python3 -m salted.get_basis_info
+    ```
+1. Set the `inp.qm.coeffile` and `inp.qm.ovlpfile` input arguments according to the filenames of the RI density-fitting coefficients and 2-center RI integrals generated at step 4. Then, convert the full training dataset in SALTED format by running:
+    ```bash
+    python3 -m salted.cp2k.cp2k2salted
+    ```

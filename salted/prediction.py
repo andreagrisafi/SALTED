@@ -2,7 +2,6 @@ import os
 import os.path as osp
 import sys
 import time
-from typing import Dict, List
 
 import h5py
 import numpy as np
@@ -583,7 +582,7 @@ def build():
     if rank == 0: print(f"\ntotal time: {(time.time()-start):.2f} s")
 
 
-def save_pred_descriptor(data:Dict[int, np.ndarray], config_range:List[int], natoms:List[int], dpath:str):
+def save_pred_descriptor(data: dict[int, np.ndarray], config_range: list[int], natoms: list[int], dpath: str):
     """Save the descriptor data of the prediction dataset.
 
     Args:
@@ -611,7 +610,7 @@ def save_pred_descriptor(data:Dict[int, np.ndarray], config_range:List[int], nat
 
     """ cut natmax to the number of atoms in the structure """
     for idx, idx_in_full_dataset in enumerate(config_range):
-        this_data:Dict[int, np.ndarray] = dict()
+        this_data: dict[int, np.ndarray] = dict()
         this_natoms = natoms[idx]
         for lam, data_this_lam in data.items():
             this_data[f"lam{lam}"] = data_this_lam[idx, :this_natoms]  # shape (natom, [2*lambda+1,] featsize)
