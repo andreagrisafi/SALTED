@@ -1,7 +1,5 @@
 """Translate basis info from PySCF calculation to SALTED basis info"""
 
-from typing import Dict, List
-
 from pyscf import df
 from pyscf.gto import basis
 
@@ -25,7 +23,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     qmbasis = inp.qm.qmbasis
 
     """load density fitting basis from pyscf module"""
-    basis_data: Dict[str, SpeciesBasisData] = load_from_pyscf(list(spe_set), qmbasis)
+    basis_data: dict[str, SpeciesBasisData] = load_from_pyscf(list(spe_set), qmbasis)
 
     """write to the database"""
     if dryrun:
@@ -36,7 +34,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
 
 
 
-def load_from_pyscf(species_list: List[str], qmbasis: str):
+def load_from_pyscf(species_list: list[str], qmbasis: str):
     """load the xxx-jkfit density fitting basis from PySCF
 
     Args:

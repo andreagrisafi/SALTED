@@ -8,8 +8,6 @@ This module provides a simple interface to the compiled OpenMP Fortran functions
 integrated into SALTED's build system.
 """
 
-from typing import Union
-
 import numpy as np
 import scipy.sparse
 
@@ -17,7 +15,8 @@ from salted.lib import omp_sparse as _omp_sparse_lib
 
 
 def dense_dot_sparse(
-    dense_matrix: np.ndarray, sparse_matrix: Union[scipy.sparse.coo_matrix, scipy.sparse.csc_matrix]
+    dense_matrix: np.ndarray,
+    sparse_matrix: scipy.sparse.coo_matrix | scipy.sparse.csc_matrix,
 ) -> np.ndarray:
     """
     Compute dense matrix matmul sparse_matrix using OpenMP acceleration.
@@ -65,7 +64,8 @@ def dense_dot_sparse(
 
 
 def sparse_transpose_dot_dense(
-    sparse_matrix: Union[scipy.sparse.coo_matrix, scipy.sparse.csc_matrix], dense_matrix: np.ndarray
+    sparse_matrix: scipy.sparse.coo_matrix | scipy.sparse.csc_matrix,
+    dense_matrix: np.ndarray,
 ) -> np.ndarray:
     """
     Compute sparse_matrix.T matmul dense matrix or dense vector using OpenMP acceleration.
