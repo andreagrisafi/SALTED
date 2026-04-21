@@ -9,7 +9,7 @@ from ase.io import read
 from scipy import special
 
 from salted import basis, sph_utils
-from salted.cp2k.utils import compute_charge_and_dipole, scale_grad_coefs
+from salted.cp2k.utils import compute_charge_and_dipole_parallelized, scale_grad_coefs
 from salted.sys_utils import ParseConfig, check_MPI_tasks_count, distribute_jobs, format_index_ranges 
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,gradient,structure):
@@ -56,7 +56,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
             print(f"Task {rank} handles the following atoms: {format_index_ranges(atoms_range,True)}", flush=True)
     else:
         atoms_range = np.arange(natoms,dtype=int)
-
+    
     natoms_range = int(len(atoms_range))
     atomic_symbols_range = [atomic_symbols[i] for i in atoms_range]
 
@@ -75,6 +75,8 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     pseudocharge_dict = {}
     for i in range(len(species)):
         pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
+    
+    #time_omega = time.time()
     
     if gradient:
     
@@ -105,9 +107,10 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     v2 = np.transpose(omega2,(1,3,0,2)).copy()
         
  
-    #print("Time get rep coeffs", str(time.time()-time_omega))
+    #if rank==0:
+    #    print("Time get rep coeffs", str(time.time()-time_omega))
 
-    #start = time.time()
+    start = time.time()
 
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
@@ -172,9 +175,10 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
  
                 grad_pvec[lam] = grad_p.reshape(natoms_tot,3,natoms_range,2*lam+1,featsize)
 
-        #print("equicomb time:", (time.time()-equistart))
+        #if rank == 0:
+        #    print("equicomb time:", (time.time()-equistart))
     
-    rkhsstart = time.time()
+    #rkhsstart = time.time()
 
     psi_nm = {}
     if gradient: grad_psi_nm = {}
@@ -218,10 +222,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
                     grad_kernel_nm = grad_kernel_nm_blocks.reshape(natoms_tot*3*natom_dict[spe]*(2*lam+1), Mspe[spe]*(2*lam+1))
                     grad_psi_nm[(spe,lam)] = np.dot(grad_kernel_nm,Vmat[(lam,spe)])
                      
-    #print("rkhs time:", time.time()-rkhsstart,flush=True)
+    #if rank == 0:
+    #    print("rkhs time:", time.time()-rkhsstart,flush=True)
  
     # Perform equivariant predictions
-    predstart = time.time()
+    #predstart = time.time()
     
     # Load spherical averages if required
     if average:
@@ -300,12 +305,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     if average and rank==0:
         pred_coefs += Av_coeffs
     
-    if parallel:
-        comm.Barrier()
-        pred_coefs = comm.allreduce(pred_coefs)  
-        if gradient:
-            grad_pred_coefs = comm.allreduce(grad_pred_coefs)  
- 
     #print("pred time:", time.time()-predstart,flush=True)
     if inp.salted.verbose and rank==0:
         print(f"Total prediction time = {(time.time() - start_time):.2f} s", flush=True)
@@ -316,11 +315,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for spe in species:
             lcuts[spe] = min(lcut,lmax[spe])
  
-        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+        charge, dipole = compute_charge_and_dipole_parallelized(structure,inp.qm.pseudocharge,natoms,atoms_range_set,atomic_global_idx,atomic_symbols,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
         
         if gradient:
 
-            grad_charge = scale_grad_coefs(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge)
+            grad_charge = scale_grad_coefs(structure,inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge,parallel,comm)
 
             return [pred_coefs, grad_pred_coefs, charge, dipole] 
 
