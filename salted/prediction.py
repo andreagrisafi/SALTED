@@ -586,13 +586,13 @@ def save_pred_descriptor(data: dict[int, np.ndarray], config_range: list[int], n
     """Save the descriptor data of the prediction dataset.
 
     Args:
-        data (Dict[int, np.ndarray]): the descriptor data to be saved.
+        data (dict[int, np.ndarray]): the descriptor data to be saved.
             int -> lambda value,
             np.ndarray -> descriptor data, shape (ndata, natmax, [2*lambda+1,] featsize)
                 natmax should be cut to the number of atoms in the structure (natoms[i])
                 2*lambda+1 is only for lambda > 0.
-        config_range (List[int]): the indices of the structures in the full dataset.
-        natoms (List[int]): the number of atoms in each structure. Should be the same length as config_range.
+        config_range (list[int]): the indices of the structures in the full dataset.
+        natoms (list[int]): the number of atoms in each structure. Should be the same length as config_range.
         dpath (str): the directory to save the descriptor data.
 
     Output:

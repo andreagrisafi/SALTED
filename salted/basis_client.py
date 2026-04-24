@@ -48,7 +48,9 @@ class BasisClient:
     basis_client = BasisClient()        # instantiate the basis client
     basis_data = basis_client.read("my_basis")       # read basis data
     lmax, nmax = basis_client.read_as_old_format("my_basis")  # read basis data in the old format (see docstring)
-    basis_client.write("my_basis", {"H": {"lmax": 1, "nmax": [4, 3]}, "O": {"lmax": 2, "nmax": [5, 4, 3]}})  # write basis data
+    basis_client.write("my_basis", {
+        "H": {"lmax": 1, "nmax": [4, 3]}, "O": {"lmax": 2, "nmax": [5, 4, 3]}
+    })  # write basis data
     basis_client.pop("my_basis")        # remove basis data
     ```
 
@@ -227,7 +229,7 @@ class BasisClient:
     def write(self, basis_name: str, basis_data: dict[str, SpeciesBasisData], force_overwrite: bool = False):
         """Write basis data to the dataset file"""
         with open(self.data_fpath) as f:
-            basis_data_all: Dict = yaml.safe_load(f)
+            basis_data_all: dict = yaml.safe_load(f)
         if basis_data_all is None:  # in case the file is empty
             basis_data_all = dict()
 

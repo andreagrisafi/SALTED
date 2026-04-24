@@ -59,7 +59,7 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
 
     Args:
         filename (str, optional): geometry file. Defaults to None.
-        spelist (List[str], optional): list of species. Defaults to None.
+        spelist (list[str], optional): list of species. Defaults to None.
         dfbasis (str, optional): density fitting basis. Defaults to None.
 
     Notes:
@@ -67,13 +67,13 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
         If one wants to read other files, please specify all the parameters (filename, spelist, dfbasis).
 
     Returns:
-        speclist (List[str]): list of species
-        lmax (Dict[str, int]): maximum l for each species
-        nmax (Dict[Tuple[str, int], int]): maximum n for each species and l
+        speclist (list[str]): list of species
+        lmax (dict[str, int]): maximum l for each species
+        nmax (dict[tuple[str, int], int]): maximum n for each species and l
         llmax (int): maximum l in the system
         nnmax (int): maximum n in the system
         ndata (int): number of configurations
-        atomic_symbols (List[List[str]]): list of atomic symbols for each configuration
+        atomic_symbols (list[list[str]]): list of atomic symbols for each configuration
         natoms (numpy.ndarray): number of atoms for each configuration, shape (ndata,)
         natmax (int): maximum number of atoms in the system
     """
@@ -241,7 +241,7 @@ def distribute_jobs(comm, jobs: list | np.ndarray, root: int = 0) -> list | np.n
 
     Args:
         comm: MPI communicator (can be None for serial execution)
-        jobs: List or array of jobs to distribute
+        jobs: list or array of jobs to distribute
         root: Root rank for scattering (default 0)
 
     Returns:
@@ -1131,9 +1131,9 @@ class Irreps(tuple):
             irreps (str | list[int] | tuple[int]): irreps info
                 - str, e.g. `1x0+2x1+3x2+3x3+2x4+1x5`
                     - multiplicities and l values joined by `x`
-                - Tuple[Tuple[int]], e.g. ((1, 0), (2, 1), (3, 2), (3, 3), (2, 4), (1, 5),)
+                - tuple[tuple[int]], e.g. ((1, 0), (2, 1), (3, 2), (3, 3), (2, 4), (1, 5),)
                     - each tuple is (multiplicity, l)
-                - Tuple[int], e.g. (0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5,)
+                - tuple[int], e.g. (0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5,)
                     - list of l values, the multiplicities are calculated automatically
 
         Notes:
