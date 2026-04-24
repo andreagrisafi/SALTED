@@ -662,11 +662,11 @@ def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,
 
 @njit(parallel=True, fastmath = True)
 def equicombfps(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, featsize):
-    p = np.zeros((natoms * (2*lam+1), featsize), dtype=np.float64)
+    p = np.zeros((featsize, natoms * (2*lam+1)), dtype=np.float64)
     v2c  = np.conj(v2)
     for iat in prange(natoms):
         inner = 0.0
-        ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
+        ptemp = np.zeros((featsize,2*lam+1), dtype=np.float64)
         ifeat = 0
         for n1 in range(nrad1):
             for n2 in range(nrad2):
@@ -691,12 +691,12 @@ def equicombfps(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, l
                         for im1 in range(2*lam+1):
                             preal[imu] = preal[imu] + np.real(c2r[imu,im1] * pcmplx[im1])
                         inner = inner + preal[imu]**2
-                        ptemp[ifeat,imu] = preal[imu]
+                        ptemp[ifeat, imu] = preal[imu]
                     ifeat = ifeat + 1
-        normfact = dsqrt(inner)
+        normfact = np.sqrt(inner)
         for ifeat in range(featsize):
             for imu in range(2*lam+1):
-                p[ifeat, (iat)*(2*lam+1) + imu] = ptemp(imu, ifeat) / normfact
+                p[ifeat, iat*(2*lam+1) + imu] = ptemp[ifeat, imu] / normfact
     
     return p
 

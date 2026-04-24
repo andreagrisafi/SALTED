@@ -76,7 +76,7 @@ def load_from_pyscf(species_list: list[str], qmbasis: str):
 
 # def collect_l_nums(data:List[int, List[float]]) -> SpeciesBasisData:
 # use Annotated
-def collect_l_nums(data: List) -> SpeciesBasisData:
+def collect_l_nums(data: list) -> SpeciesBasisData:
     """collect l numbers for each species based on the data from PySCF
     input: above dict value,
         e.g.
