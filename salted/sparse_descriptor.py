@@ -23,8 +23,7 @@ from salted import wigner
 from salted import sph_utils
 from salted import basis
 
-from salted.lib import antiequicomb, equicombnonorm, antiequicombnonorm
-from salted.lib import antiequicombsparse
+from salted.sph_utils import equicombnonorm, antiequicombnonorm
 
 def build():
 
@@ -213,8 +212,8 @@ def build():
                     structure, rep2, HP2, rank, neighspe2, species, nang2, nrad2, natoms[iconf])
 
             # Reshape arrays of expansion coefficients for optimal Fortran indexing
-            v1 = np.transpose(omega1,(2,0,3,1))
-            v2 = np.transpose(omega2,(2,0,3,1))
+            v1 = np.transpose(omega1,(1,3,0,2)).copy()
+            v2 = np.transpose(omega2,(1,3,0,2)).copy()
     
             # Compute equivariant features for the given structure
             for lam in range(lmax_max+1):
@@ -232,8 +231,7 @@ def build():
     
                 # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
                 featsize = nspe1*nspe2*nrad1*nrad2*llmax
-                p = equicombnonorm.equicombnonorm(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-                p = np.transpose(p,(2,0,1))
+                p = equicombnonorm(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
     
                 # Fill vector of equivariant descriptor
                 if lam==0:
@@ -286,8 +284,8 @@ def build():
                     structure, rep2, HP2, rank, neighspe2, species, nang2, nrad2, natoms[iconf])
 
             # Reshape arrays of expansion coefficients for optimal Fortran indexing
-            v1 = np.transpose(omega1,(2,0,3,1))
-            v2 = np.transpose(omega2,(2,0,3,1))
+            v1 = np.transpose(omega1,(1,3,0,2)).copy()
+            v2 = np.transpose(omega2,(1,3,0,2)).copy()
 
             # Compute equivariant features for the given structure
             for lam in range(1,lmax_max):
@@ -305,8 +303,7 @@ def build():
 
                 # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
                 featsize = nspe1*nspe2*nrad1*nrad2*llmax
-                p = antiequicombnonorm.antiequicombnonorm(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-                p = np.transpose(p,(2,0,1))
+                p = antiequicombnonorm(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
 
                 power = p.reshape(natoms[iconf],2*lam+1,featsize)
 

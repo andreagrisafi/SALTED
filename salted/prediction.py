@@ -10,7 +10,7 @@ from ase.io import read
 from scipy import special
 
 from salted import basis, sph_utils
-from salted.lib import equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
+from salted.sph_utils import equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
 from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
@@ -311,8 +311,7 @@ def build():
 
             # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
-            p = equicombnonorm.equicombnonorm(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-            p = np.transpose(p,(2,0,1))
+            p = equicombnonorm(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
 
             # Fill vector of equivariant descriptor
             if lam==0:
@@ -345,8 +344,7 @@ def build():
 
             # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
             featsize = nspe1*nspe2*nrad1*nrad2*llmax
-            p = antiequicombnonorm.antiequicombnonorm(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigdim,wigner3j,llmax,llvec.T,lam,c2r,featsize)
-            p = np.transpose(p,(2,0,1))
+            p = antiequicombnonorm(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
 
             # Fill vector of equivariant descriptor
             p = p.reshape(natoms_total,2*lam+1,featsize)
@@ -403,8 +401,8 @@ def build():
                 normfact = np.sqrt(np.sum(kernel_nn_diag**2,axis=(1,2)))
 
                 normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{0}.npy"))
-                knorm = kernelnorm.kernelnorm(natom_dict[(iconf,spe)],Mcut[0],3,normfact,normfact_sparse,np.real(kernel_nm).T)
-                kernel_nm = knorm.T
+                knorm = kernelnorm(natom_dict[(iconf,spe)],Mcut[0],3,normfact,normfact_sparse,np.real(kernel_nm))
+                kernel_nm = knorm
 
                 psi_nm[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
 
@@ -477,16 +475,16 @@ def build():
                         cgcoefs = np.loadtxt(os.path.join(saltedpath, "wigners", f"cg_response_lam-{lam}_L-{L}.dat"))
 
                         k0 = kernel0_nm**(zeta-1)
-                        cgkernel = kernelequicomb.kernelequicomb(natom_dict[(iconf,spe)],Mspe[spe],lam,1,L,Nsize,Msize,len(cgcoefs),cgcoefs,knm.T,k0.T)
-                        kernel_nm += cgkernel.T
+                        cgkernel = kernelequicomb(natom_dict[(iconf,spe)],Mspe[spe],lam,1,L,Nsize,Msize,len(cgcoefs),cgcoefs,knm,k0)
+                        kernel_nm += cgkernel
 
                         # compute complex K_nn kernel
                         pcmplx = pcmplx.reshape(natom_dict[(iconf,spe)],2*L+1,featsize)
                         knn_diag = pcmplx @ np.conj(pcmplx).transpose(0,2,1)
                         knn_diag = knn_diag.reshape(natom_dict[(iconf,spe)]*(2*L+1),2*L+1)
                         k0 = kernel0_nn_diag**(zeta-1) 
-                        cgkernel = kernelequicomb.kernelequicomb(natom_dict[(iconf,spe)],1,lam,1,L,Nsize,3*(2*lam+1),len(cgcoefs),cgcoefs,knn_diag.T,k0[:,np.newaxis].T)
-                        kernel_nn_diag += cgkernel.T
+                        cgkernel = kernelequicomb(natom_dict[(iconf,spe)],1,lam,1,L,Nsize,3*(2*lam+1),len(cgcoefs),cgcoefs,knn_diag,k0[:,np.newaxis])
+                        kernel_nn_diag += cgkernel
 
                     kernel_nm = kernel_nm[:,:Mcutsize[lam]]
 
@@ -515,8 +513,8 @@ def build():
                     normfact = np.sqrt(np.sum(kernel_nn_diag**2,axis=(1,2)))
 
                     normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"))
-                    knorm = kernelnorm.kernelnorm(natom_dict[(iconf,spe)],Mcut[lam],3*(2*lam+1),normfact,normfact_sparse,np.real(kernel_nm).T)
-                    kernel_nm = knorm.T
+                    knorm = kernelnorm(natom_dict[(iconf,spe)],Mcut[lam],3*(2*lam+1),normfact,normfact_sparse,np.real(kernel_nm))
+                    kernel_nm = knorm
 
                     # project kernel on the RKHS
                     psi_nm[(spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))

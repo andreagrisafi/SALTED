@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 from sympy.physics.wigner import wigner_3j
 
-from salted.lib import kernelequicomb, kernelnorm
+from salted.sph_utils import kernelequicomb, kernelnorm
 from salted import sph_utils
 from salted.sys_utils import ParseConfig, get_atom_idx, read_system, rkhs_proj
 
@@ -151,8 +151,8 @@ def build():
                         cgcoefs = np.loadtxt(os.path.join(saltedpath, "wigners", f"cg_response_lam-{lam}_L-{L}.dat"))
 
                         k0 = kernel0_mm**(zeta-1)
-                        cgkernel = kernelequicomb.kernelequicomb(Mspe,Mspe,lam,1,L,Msize,Msize,len(cgcoefs),cgcoefs,kmm.T,k0.T)
-                        kernel_mm += cgkernel.T
+                        cgkernel = kernelequicomb(Mspe,Mspe,lam,1,L,Msize,Msize,len(cgcoefs),cgcoefs,kmm,k0)
+                        kernel_mm += cgkernel
                                      
                     kernel_mm = kernel_mm[:Mcutsize[lam]][:,:Mcutsize[lam]]
 
@@ -177,8 +177,8 @@ def build():
                         normfact[i1] = np.sqrt(np.sum(np.real(kernel_mm)[i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)][:,i1*3*(2*lam+1):i1*3*(2*lam+1)+3*(2*lam+1)]**2))
                     np.save(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"), normfact)
 
-                    knorm = kernelnorm.kernelnorm(Mcut[lam],Mcut[lam],3*(2*lam+1),normfact,normfact,np.real(kernel_mm).T)
-                    kernel_mm = knorm.T
+                    knorm = kernelnorm(Mcut[lam],Mcut[lam],3*(2*lam+1),normfact,normfact,np.real(kernel_mm))
+                    kernel_mm = knorm
                     
                     V = rkhs_proj(kernel_mm)
                     h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)

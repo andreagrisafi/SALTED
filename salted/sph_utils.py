@@ -659,3 +659,172 @@ def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,
             for imu in range(2*lam+1):
                 p[iat,imu,ifeat] = ptemp[ifeat,imu] / normfact
     return p
+
+@njit(parallel=True, fastmath = True)
+def equicombfps(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, featsize):
+    p = np.zeros((featsize, natoms * (2*lam+1)), dtype=np.float64)
+    v2c  = np.conj(v2)
+    for iat in prange(natoms):
+        inner = 0.0
+        ptemp = np.zeros((featsize,2*lam+1), dtype=np.float64)
+        ifeat = 0
+        for n1 in range(nrad1):
+            for n2 in range(nrad2):
+                iwig = 0
+                for il in range(llmax):
+                    l1 = llvec[il,0]
+                    l2 = llvec[il,1]
+                    pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
+                    for imu in range(2*lam+1):
+                        mu = imu - lam
+                        for im1 in range(2*l1+1):
+                            m1 = im1 - l1
+                            m2 = m1 - mu
+                            if (abs(m2) <= l2):
+                                im2 = m2 + l2
+                                v2cv  = v2c[iat,n2,l2,im2]
+                                v1v = v1[iat,n1,l1,im1]
+                                pcmplx[imu] = pcmplx[imu] + w3j[iwig] * v1v * v2cv
+                                iwig = iwig + 1
+                    preal = np.zeros(2*lam+1, dtype=np.float64)
+                    for imu in range(2*lam+1):
+                        for im1 in range(2*lam+1):
+                            preal[imu] = preal[imu] + np.real(c2r[imu,im1] * pcmplx[im1])
+                        inner = inner + preal[imu]**2
+                        ptemp[ifeat, imu] = preal[imu]
+                    ifeat = ifeat + 1
+        normfact = np.sqrt(inner)
+        for ifeat in range(featsize):
+            for imu in range(2*lam+1):
+                p[ifeat, iat*(2*lam+1) + imu] = ptemp[ifeat, imu] / normfact
+    
+    return p
+
+@njit(parallel=True, fastmath = True)
+def equicombnonorm(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize):
+    p = np.zeros((natoms, 2*lam+1, featsize), dtype=np.float64)
+    v2c  = np.conj(v2)
+
+    for iat in prange(natoms):
+        ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
+        ifeat = 0
+        for n1 in range(nrad1):
+            for n2 in range(nrad2):
+                iwig = 0
+                for il in range(llmax):
+                    l1 = llvec[il,0]
+                    l2 = llvec[il,1]
+                    pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
+                    for imu in range(2*lam+1):
+                        mu = imu-lam
+                        for im1 in range(2*l1+1):
+                            m1 = im1-l1
+                            m2 = m1-mu
+                            if (abs(m2)<=l2):
+                               im2 = m2+l2
+                               v2cv  = v2c[iat,n2,l2,im2]
+                               v1v = v1[iat,n1,l1,im1]
+                               pcmplx[imu] = pcmplx[imu] + w3j[iwig] * v1v * v2cv
+                               iwig = iwig + 1
+                    preal = np.zeros(2*lam+1, dtype=np.float64)
+                    for imu in range(2*lam+1):
+                        for im1 in range(2*lam+1):
+                             preal[imu] = preal[imu] + np.real(c2r[imu,im1] * pcmplx[im1])
+                        ptemp[ifeat,imu] = preal[imu]
+                    ifeat = ifeat + 1
+        for ifeat in range(featsize):
+            for imu in range(2*lam+1):
+                p[iat,imu,ifeat] = ptemp[ifeat,imu]
+    return p
+
+@njit(parallel=True, fastmath = True)
+def antiequicombnonorm(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize):
+    p = np.zeros((natoms, 2*lam+1, featsize), dtype=np.float64)
+    v2c  = np.conj(v2)
+
+    for iat in prange(natoms):
+        ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
+        ifeat = 0
+        for n1 in range(nrad1):
+            for n2 in range(nrad2):
+                iwig = 0
+                for il in range(llmax):
+                    l1 = llvec[il,0]
+                    l2 = llvec[il,1]
+                    pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
+                    for imu in range(2*lam+1):
+                        mu = imu-lam
+                        for im1 in range(2*l1+1):
+                            m1 = im1-l1
+                            m2 = m1-mu
+                            if (abs(m2)<=l2):
+                               im2 = m2+l2
+                               v2cv  = v2c[iat,n2,l2,im2]
+                               v1v = v1[iat,n1,l1,im1]
+                               pcmplx[imu] = pcmplx[imu] + w3j[iwig] * v1v * v2cv
+                               iwig = iwig + 1
+                    pimag = np.zeros(2*lam+1, dtype=np.float64)
+                    for imu in range(2*lam+1):
+                        for im1 in range(2*lam+1):
+                             pimag[imu] = pimag[imu] + np.imag(c2r[imu,im1] * pcmplx[im1])
+                        ptemp[ifeat,imu] = pimag[imu]
+                    ifeat = ifeat + 1
+        for ifeat in range(featsize):
+            for imu in range(2*lam+1):
+                p[iat,imu,ifeat] = ptemp[ifeat,imu]
+    return p
+
+@njit(parallel=True, fastmath = True)
+def kernelequicomb(n1,n2,lam1,lam2,L,nsize,msize,cgsize,cgcoefs,knm,k0):
+    mu1size = 2*lam1+1
+    mu2size = 2*lam2+1
+    
+    kernel = np.zeros((nsize,msize), dtype=np.complex128)
+    iM1 = 0
+    idx1 = 0
+    for i1 in range(n1):
+        icg1 = 0
+        for imu1 in range(mu1size):
+            mu1 = imu1-lam1
+            for ik1 in range(mu2size):
+                k1 = ik1-lam2
+                M1 = mu1+k1
+                if (abs(M1) <= L):
+                    j1 = M1+L
+                    cg1 = cgcoefs[icg1]
+                    iM2 = 0
+                    idx2 = 0
+                    for i2 in range(n2):
+                        icg2 = 0
+                        for imu2 in range(mu1size):
+                            mu2 = imu2-lam1
+                            for ik2 in range(mu2size):
+                                k2 = ik2-lam2
+                                M2 = mu2+k2
+                                if (abs(M2) <= L):
+                                    j2 = M2+L
+                                    cg2 = cgcoefs[icg2]
+                                    kernel[iM1,iM2] = kernel[iM1,iM2] + cg1 * cg2 * knm[idx1+j1,idx2+j2] * k0[i1,i2]
+                                    icg2 = icg2 + 1
+                                iM2 = iM2 + 1
+                        idx2 = idx2 + 2*L+1
+                    icg1 = icg1 + 1
+                iM1 = iM1 + 1
+        idx1 = idx1 + 2*L+1
+    return kernel
+
+@njit(parallel=True, fastmath = True)
+def kernelnorm(n1,n2,msize,normfact1,normfact2,kernel):
+    
+    knorm = np.zeros((n1*msize,n2*msize))
+    j1 = 0
+    for i1 in range(n1):
+        for im1 in range(msize):
+            j2 = 0
+            for i2 in range(n2):
+                for im2 in range(msize):
+                    knorm[j1,j2] = kernel[j1,j2] / np.sqrt(normfact1[i1]*normfact2[i2])
+                    j2 = j2 + 1
+            j1 = j1 + 1
+    
+    return knorm
