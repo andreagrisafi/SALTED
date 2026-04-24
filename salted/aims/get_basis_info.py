@@ -85,7 +85,7 @@ def parse_file_basis_info(basis_info_fpath: str) -> list[SpeciesBasisData]:
      For atom            1 max L =            5
     ```
 
-    Return: in the format of List[SpeciesBasisData]
+    Return: in the format of list[SpeciesBasisData]
     ```python
     [
         {

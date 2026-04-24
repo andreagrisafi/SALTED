@@ -42,7 +42,7 @@ def load_from_pyscf(species_list: list[str], qmbasis: str):
         qmbasis: quantum chemistry basis set name, e.g. cc-pvdz
 
     Returns:
-        Dict[str, SpeciesBasisData]: species and basis data
+        dict[str, SpeciesBasisData]: species and basis data
     """
     ribasis = df.addons.DEFAULT_AUXBASIS[basis._format_basis_name(qmbasis)][0]  # get the proper DF basis name in PySCF
     print(f"{species_list=}, {qmbasis=}, and the parsed {ribasis=}")
@@ -68,15 +68,13 @@ def load_from_pyscf(species_list: list[str], qmbasis: str):
         ...
     ]
 
-    Extract the l numbers and compose the Dict[str, SpeciesBasisData] (species and basis data)
+    Extract the l numbers and compose the dict[str, SpeciesBasisData] (species and basis data)
     """
     basis_data = {spe: collect_l_nums(ribasis_info) for spe, ribasis_info in spe_ribasis_info.items()}
     return basis_data
 
 
-# def collect_l_nums(data:List[int, List[float]]) -> SpeciesBasisData:
-# use Annotated
-def collect_l_nums(data: List) -> SpeciesBasisData:
+def collect_l_nums(data: list) -> SpeciesBasisData:
     """collect l numbers for each species based on the data from PySCF
     input: above dict value,
         e.g.
