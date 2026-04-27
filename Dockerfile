@@ -60,8 +60,11 @@ RUN wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5
     && rm -rf hdf5-1.14.3 hdf5-1.14.3.tar.gz
 
 # h5py against parallel HDF5 + same MPI
-RUN HDF5_DIR=/usr/local/hdf5 CC=/usr/local/bin/mpicc HDF5_MPI=ON \
-    pip install --no-binary=h5py h5py
+RUN pip install cython \
+    && HDF5_DIR=/usr/local/hdf5 \
+    CC=/usr/local/bin/mpicc \
+    HDF5_MPI=ON \
+    pip install --no-build-isolation --no-binary=h5py h5py
 
 # Install Python dependencies
 RUN pip install meson packaging numba ase scipy pyyaml \
