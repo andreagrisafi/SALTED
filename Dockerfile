@@ -15,6 +15,10 @@ RUN apt-get update && apt-get install -y \
     ninja-build \
     libpmi2-0 \
     libpmi2-0-dev \
+    libpmix-dev \
+    libevent-dev \
+    libhwloc-dev \
+    slurm-wlm \
  && rm -rf /var/lib/apt/lists/*
 
 #Install Featomic
@@ -36,7 +40,7 @@ RUN ln -sf /usr/lib/x86_64-linux-gnu/libpmi2.so /usr/lib/libpmi2.so \
 RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.bz2 \
     && tar -xf openmpi-4.1.8.tar.bz2 \
     && cd openmpi-4.1.8 \
-    && ./configure --prefix=/usr/local --with-pmi=/usr/ \
+    && ./configure --prefix=/usr/local --with-slurm --with-pmix --with-libevent=external --with-hwloc=external\
     && make -j"$(nproc)" \
     && make install \
     && cd .. \
