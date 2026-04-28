@@ -4,17 +4,23 @@ FROM python:3.10-bookworm
 SHELL ["/bin/bash", "-c"] 
 WORKDIR /src/temp
 
-# Build prerequisites, including PMI2 headers/libs
+# Build prerequisites
 RUN apt-get update && apt-get install -y \
     build-essential \
-    wget \
+    wget curl\
     ca-certificates \
     python3-dev \
     python3-pip \
     gfortran \
     ninja-build  \
+    libpmi2-0 \
+    libpmi2-0-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+#Create symlinks for PMI2 libs, as Open MPI's configure script expects them in /usr/lib
+RUN ln -sf /usr/lib/x86_64-linux-gnu/libpmi2.so /usr/lib/libpmi2.so \
+ && ln -sf /usr/lib/x86_64-linux-gnu/libpmi2.a  /usr/lib/libpmi2.a
 
 #Install Featomic
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
@@ -31,7 +37,7 @@ ENV HDF5_DIR=/usr/local/hdf5
 RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.bz2 \
     && tar -xf openmpi-4.1.8.tar.bz2 \
     && cd openmpi-4.1.8 \
-    && ./configure --prefix=/usr/local \
+    && ./configure --prefix=/usr/local --with-pmi=/usr/\
     && make -j"$(nproc)" \
     && make install \
     && cd .. \
