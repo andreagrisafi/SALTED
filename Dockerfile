@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM python:3.10-bookworm
 
+ARG BUILD_CLUSTER=1
 SHELL ["/bin/bash", "-c"] 
 WORKDIR /src/temp
 
@@ -13,14 +14,13 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     gfortran \
     ninja-build  \
-    libpmi2-0 \
-    libpmi2-0-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && if [ "$BUILD_CLUSTER" = "1" ]; then \
+        apt-get install -y munge libmunge-dev libhwloc-dev libpsm2-dev; \
+    fi \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-#Create symlinks for PMI2 libs, as Open MPI's configure script expects them in /usr/lib
-RUN ln -sf /usr/lib/x86_64-linux-gnu/libpmi2.so /usr/lib/libpmi2.so \
- && ln -sf /usr/lib/x86_64-linux-gnu/libpmi2.a  /usr/lib/libpmi2.a
+ENV PATH=/usr/local/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:/usr/lib/x86_64-linux-gnu
 
 #Install Featomic
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
@@ -29,15 +29,26 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
     && source $HOME/.cargo/env \
     && pip install git+https://github.com/metatensor/featomic.git
 
-ENV PATH=/usr/local/bin:$PATH
-ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:/usr/lib/x86_64-linux-gnu
-ENV HDF5_DIR=/usr/local/hdf5
+RUN if [ "$BUILD_CLUSTER" = "1" ]; then \
+    wget https://github.com/openpmix/openpmix/releases/download/v6.1.0/pmix-6.1.0.tar.gz \
+    && tar -xf pmix-6.1.0.tar.gz && rm pmix-6.1.0.tar.gz && cd pmix-6.1.0 \
+    && ./configure --prefix=/usr/local/ \
+    && make -j"$(nproc)" && make install \
+    && cd .. && rm -rf pmix-6.1.0; \
+fi
 
 # Open MPI with PMI2 support
 RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.bz2 \
     && tar -xf openmpi-4.1.8.tar.bz2 \
     && cd openmpi-4.1.8 \
-    && ./configure --prefix=/usr/local --with-pmi=/usr/\
+    && if [ "$BUILD_CLUSTER" = "1" ]; then \
+        ./configure --prefix=/usr/local \
+        --enable-shared --disable-static --disable-debug --enable-builtin-atomics \
+        --with-slurm --with-psm2 --with-hwloc --with-libevent --with-pmix=/usr/local \
+        --with-zlib; \
+    else \
+        ./configure --prefix=/usr/local; \
+    fi \
     && make -j"$(nproc)" \
     && make install \
     && cd .. \
@@ -46,6 +57,7 @@ RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.b
 # Build mpi4py from source against this mpicc
 RUN MPICC=/usr/local/bin/mpicc pip install --no-binary=mpi4py mpi4py
 
+ENV HDF5_DIR=/usr/local/hdf5
 # HDF5 parallel
 RUN wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5/HDF5_1_14_3/src/hdf5-1.14.3.tar.gz \
     && tar -xf hdf5-1.14.3.tar.gz \
