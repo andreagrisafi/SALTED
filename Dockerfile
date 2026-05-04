@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 FROM python:3.10-bookworm
 
-ARG BUILD_CLUSTER=1
 SHELL ["/bin/bash", "-c"] 
 WORKDIR /src/temp
 
@@ -14,9 +13,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     gfortran \
     ninja-build  \
-    && if [ "$BUILD_CLUSTER" = "1" ]; then \
-        apt-get install -y libhwloc-dev libpsm2-dev libpmi2-0-dev; \
-    fi \
+    libhwloc-dev libpsm2-dev libpmi2-0-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ENV PATH=/usr/local/bin:$PATH
@@ -34,14 +31,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
 RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.bz2 \
     && tar -xf openmpi-4.1.8.tar.bz2 \
     && cd openmpi-4.1.8 \
-    && if [ "$BUILD_CLUSTER" = "1" ]; then \
-        ./configure --prefix=/usr/local \
-        --enable-shared --disable-static --disable-debug --enable-builtin-atomics \
-        --with-slurm --with-psm2 --with-hwloc --with-libevent --with-pmi \
-        --with-zlib; \
-    else \
-        ./configure --prefix=/usr/local; \
-    fi \
+    && ./configure --prefix=/usr/local \
+    --enable-shared --disable-static --disable-debug --enable-builtin-atomics \
+    --with-slurm --with-psm2 --with-hwloc --with-libevent --with-pmi \
+    --with-zlib \
     && make -j"$(nproc)" \
     && make install \
     && cd .. \
