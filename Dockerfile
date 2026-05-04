@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     gfortran \
     ninja-build  \
     && if [ "$BUILD_CLUSTER" = "1" ]; then \
-        apt-get install -y munge libmunge-dev libhwloc-dev libpsm2-dev; \
+        apt-get install -y libhwloc-dev libpsm2-dev libpmi2-0-dev; \
     fi \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -29,13 +29,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
     && source $HOME/.cargo/env \
     && pip install git+https://github.com/metatensor/featomic.git
 
-RUN if [ "$BUILD_CLUSTER" = "1" ]; then \
-    wget https://github.com/openpmix/openpmix/releases/download/v6.1.0/pmix-6.1.0.tar.gz \
-    && tar -xf pmix-6.1.0.tar.gz && rm pmix-6.1.0.tar.gz && cd pmix-6.1.0 \
-    && ./configure --prefix=/usr/local/ \
-    && make -j"$(nproc)" && make install \
-    && cd .. && rm -rf pmix-6.1.0; \
-fi
 
 # Open MPI with PMI2 support
 RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.bz2 \
@@ -44,7 +37,7 @@ RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.b
     && if [ "$BUILD_CLUSTER" = "1" ]; then \
         ./configure --prefix=/usr/local \
         --enable-shared --disable-static --disable-debug --enable-builtin-atomics \
-        --with-slurm --with-psm2 --with-hwloc --with-libevent --with-pmix=/usr/local \
+        --with-slurm --with-psm2 --with-hwloc --with-libevent --with-pmi \
         --with-zlib; \
     else \
         ./configure --prefix=/usr/local; \
