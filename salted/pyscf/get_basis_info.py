@@ -1,7 +1,5 @@
 """Translate basis info from PySCF calculation to SALTED basis info"""
 
-from typing import Dict, List
-
 from pyscf import df
 from pyscf.gto import basis
 
@@ -25,7 +23,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     qmbasis = inp.qm.qmbasis
 
     """load density fitting basis from pyscf module"""
-    basis_data: Dict[str, SpeciesBasisData] = load_from_pyscf(list(spe_set), qmbasis)
+    basis_data: dict[str, SpeciesBasisData] = load_from_pyscf(list(spe_set), qmbasis)
 
     """write to the database"""
     if dryrun:
@@ -36,7 +34,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
 
 
 
-def load_from_pyscf(species_list: List[str], qmbasis: str):
+def load_from_pyscf(species_list: list[str], qmbasis: str):
     """load the xxx-jkfit density fitting basis from PySCF
 
     Args:
@@ -44,7 +42,7 @@ def load_from_pyscf(species_list: List[str], qmbasis: str):
         qmbasis: quantum chemistry basis set name, e.g. cc-pvdz
 
     Returns:
-        Dict[str, SpeciesBasisData]: species and basis data
+        dict[str, SpeciesBasisData]: species and basis data
     """
     ribasis = df.addons.DEFAULT_AUXBASIS[basis._format_basis_name(qmbasis)][0]  # get the proper DF basis name in PySCF
     print(f"{species_list=}, {qmbasis=}, and the parsed {ribasis=}")
@@ -70,15 +68,13 @@ def load_from_pyscf(species_list: List[str], qmbasis: str):
         ...
     ]
 
-    Extract the l numbers and compose the Dict[str, SpeciesBasisData] (species and basis data)
+    Extract the l numbers and compose the dict[str, SpeciesBasisData] (species and basis data)
     """
     basis_data = {spe: collect_l_nums(ribasis_info) for spe, ribasis_info in spe_ribasis_info.items()}
     return basis_data
 
 
-# def collect_l_nums(data:List[int, List[float]]) -> SpeciesBasisData:
-# use Annotated
-def collect_l_nums(data: List) -> SpeciesBasisData:
+def collect_l_nums(data: list) -> SpeciesBasisData:
     """collect l numbers for each species based on the data from PySCF
     input: above dict value,
         e.g.

@@ -2,7 +2,6 @@ import argparse
 import os
 import os.path as osp
 import time
-from typing import Dict, List, Tuple, Union
 
 import numpy as np
 from ase.io import read
@@ -21,7 +20,7 @@ Make sure to provide the density matrix following this convention!
 
 
 def cal_df_coeffs(
-    atoms: List,
+    atoms: list,
     qmbasis: str,
     ribasis: str,
     dm: np.ndarray,
@@ -89,7 +88,7 @@ def cal_df_coeffs(
 #print >> f, e_Ne
 #f.close()
 
-def main(geom_indexes: Union[List[int], None], num_threads: int = None):
+def main(geom_indexes: list[int] | None, num_threads: int = None):
     # global reorder_time, pyscf_time
     inp = ParseConfig().parse_input()
     

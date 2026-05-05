@@ -1,6 +1,5 @@
 """Translate basis info from FHI-aims calculation to SALTED basis info"""
 import os
-from typing import Dict, List
 from ase.io import read
 
 from salted.basis_client import (
@@ -23,7 +22,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     spe_set = set(inp.system.species)
     geoms_list = read(inp.system.filename, ":")
     qmdata_dpath = os.path.join(inp.qm.path2qm, "data")
-    basis_data: Dict[str, SpeciesBasisData] = {}  # hold all species basis data
+    basis_data: dict[str, SpeciesBasisData] = {}  # hold all species basis data
 
     for iconf, geom in enumerate(geoms_list):
         """parse basis_info.out for this geometry"""
@@ -70,7 +69,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
         BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
-def parse_file_basis_info(basis_info_fpath: str) -> List[SpeciesBasisData]:
+def parse_file_basis_info(basis_info_fpath: str) -> list[SpeciesBasisData]:
     """Parse basis_info.out by FHI-aims.
     Parse by str.strip().split().
 
@@ -86,7 +85,7 @@ def parse_file_basis_info(basis_info_fpath: str) -> List[SpeciesBasisData]:
      For atom            1 max L =            5
     ```
 
-    Return: in the format of List[SpeciesBasisData]
+    Return: in the format of list[SpeciesBasisData]
     ```python
     [
         {
@@ -115,7 +114,7 @@ def parse_file_basis_info(basis_info_fpath: str) -> List[SpeciesBasisData]:
     #     print(f"{lines_by_atoms=}")
 
     """Step 2: derive SpeciesBasisData and do some checks (to ensure the file is not corrupted)"""
-    basis_data: List[SpeciesBasisData] = []
+    basis_data: list[SpeciesBasisData] = []
     for lines_atom in lines_by_atoms:
         err_msg = f"{basis_info_fpath=}, {lines_atom=}"
         assert lines_atom[0][0] == "atom", err_msg  # check the first line

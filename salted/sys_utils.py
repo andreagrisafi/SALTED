@@ -2,7 +2,7 @@
 import os
 import os.path as osp
 import re
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Literal
 import sys
 
 import h5py
@@ -14,12 +14,52 @@ from ase.io import read
 from salted import basis
 
 
-def read_system(filename: str = None, spelist: List[str] = None, dfbasis: str = None):
+def build_featomic_hyper_params(rep_cfg) -> dict:
+    """Return the featomic kwargs dict for a single representation config.
+
+    Args:
+        rep_cfg: a rep config object with fields type, rcut, sig, nrad, nang
+                 (as returned by inp.descriptor.rep1 / rep2).
+
+    Returns:
+        dict: hyperparameter dict ready to be passed to SphericalExpansion
+              (for type="rho") or LodeSphericalExpansion (for type="V").
+    """
+    if rep_cfg.type == "rho":
+        return {
+            "cutoff": {"radius": rep_cfg.rcut, "smoothing": {"type": "ShiftedCosine", "width": 0.1}},
+            "density": {"type": "Gaussian", "width": rep_cfg.sig},
+            "basis": {
+                "type": "TensorProduct",
+                "max_angular": rep_cfg.nang,
+                "radial": {"type": "Gto", "max_radial": rep_cfg.nrad - 1},
+                "spline_accuracy": 1e-06,
+            },
+        }
+    elif rep_cfg.type == "V":
+        return {
+            "density": {"type": "SmearedPowerLaw", "smearing": rep_cfg.sig, "exponent": 1},
+            "basis": {
+                "type": "TensorProduct",
+                "max_angular": rep_cfg.nang,
+                "radial": {
+                    "type": "Gto",
+                    "max_radial": rep_cfg.nrad - 1,
+                    "radius": rep_cfg.rcut,
+                },
+                "spline_accuracy": 1e-06,
+            },
+        }
+    else:
+        raise ValueError(f"Unknown representation type '{rep_cfg.type}': must be 'rho' or 'V'.")
+
+
+def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = None):
     """read a geometry file and return the formatted information
 
     Args:
         filename (str, optional): geometry file. Defaults to None.
-        spelist (List[str], optional): list of species. Defaults to None.
+        spelist (list[str], optional): list of species. Defaults to None.
         dfbasis (str, optional): density fitting basis. Defaults to None.
 
     Notes:
@@ -27,13 +67,13 @@ def read_system(filename: str = None, spelist: List[str] = None, dfbasis: str = 
         If one wants to read other files, please specify all the parameters (filename, spelist, dfbasis).
 
     Returns:
-        speclist (List[str]): list of species
-        lmax (Dict[str, int]): maximum l for each species
-        nmax (Dict[Tuple[str, int], int]): maximum n for each species and l
+        speclist (list[str]): list of species
+        lmax (dict[str, int]): maximum l for each species
+        nmax (dict[tuple[str, int], int]): maximum n for each species and l
         llmax (int): maximum l in the system
         nnmax (int): maximum n in the system
         ndata (int): number of configurations
-        atomic_symbols (List[List[str]]): list of atomic symbols for each configuration
+        atomic_symbols (list[list[str]]): list of atomic symbols for each configuration
         natoms (numpy.ndarray): number of atoms for each configuration, shape (ndata,)
         natmax (int): maximum number of atoms in the system
     """
@@ -202,7 +242,7 @@ def distribute_jobs(comm, jobs: list | np.ndarray, root: int = 0) -> list | np.n
 
     Args:
         comm: MPI communicator (can be None for serial execution)
-        jobs: List or array of jobs to distribute
+        jobs: list or array of jobs to distribute
         root: Root rank for scattering (default 0)
 
     Returns:
@@ -237,7 +277,7 @@ def distribute_jobs(comm, jobs: list | np.ndarray, root: int = 0) -> list | np.n
     return my_jobs
 
 
-def get_conf_range(rank, size, ntest, testrangetot) -> List[List[int]]:
+def get_conf_range(rank, size, ntest, testrangetot) -> list[list[int]]:
     """
     DEPRECATED: Please use `distribute_jobs` instead.
     This function was used to manually split a range of jobs for MPI scattering.
@@ -314,7 +354,7 @@ ARGHELP_INDEX_STR = """Indexes to calculate, start from 0. Format: 1,3-5,7-10. \
 Default is "all", which means all structures."""
 
 
-def parse_index_str(index_str: Union[str, Literal["all"]]) -> Union[None, Tuple]:
+def parse_index_str(index_str: str | Literal["all"]) -> tuple | None:
     """Parse index string, e.g. "1,3-5,7-10" -> (1,3,4,5,7,8,9,10)
 
     If index_str is "all", return None. (indicating all structures)
@@ -342,11 +382,11 @@ def parse_index_str(index_str: Union[str, Literal["all"]]) -> Union[None, Tuple]
         return tuple(indexes)
 
 
-def format_index_ranges(indexes: Optional[Union[tuple, list, np.ndarray]] = None, verbose=False) -> str:
+def format_index_ranges(indexes: tuple | list | np.ndarray | None = None, verbose=False) -> str:
     """Format a list of indexes into a compact string representation of ranges.
 
     Args:
-        indexes (Optional[Union[tuple, list, np.ndarray]]): Integers to format into ranges.
+        indexes (tuple | list | np.ndarray | None): Integers to format into ranges.
             Duplicates are removed and sorted. Defaults to None.
         verbose (bool): If True, always returns the full range string. If False, returns
             a summary string when result exceeds 80 characters. Defaults to False.
@@ -524,11 +564,11 @@ class ParseConfig:
     In our context, "input file" equals to "confiuration file", refers to the SALTED input file named `inp.yaml`.
     """
 
-    def __init__(self, _dev_inp_fpath: Optional[str] = None):
+    def __init__(self, _dev_inp_fpath: str | None = None):
         """Initialize configuration parser
 
         Args:
-            _dev_inp_fpath (Optional[str], optional): Path to the input file. Defaults to None.
+            _dev_inp_fpath (str | None, optional): Path to the input file. Defaults to None.
                 Don't use this argument, it's for testing only!!!
         """
         if _dev_inp_fpath is None:
@@ -555,7 +595,7 @@ class ParseConfig:
         inp = self.check_input(inp)
         return AttrDict(inp)
 
-    def get_all_params(self) -> Tuple:
+    def get_all_params(self) -> tuple:
         """return all parameters with a tuple
 
         About `sparsify` in the return tuple:
@@ -572,58 +612,19 @@ class ParseConfig:
          rep2, rcut2, sig2, nrad2, nang2, neighspe2,
          sparsify, nsamples, ncut,
          zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-         gradtol, restart, trainsel) = ParseConfig().get_all_params()
+         gradtol, restart, trainsel,
+         nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
         ```
+        HP1 and HP2 are the featomic hyperparameter dicts for rep1 and rep2,
+        built from their respective configs via build_featomic_hyper_params().
         """
         inp = self.parse_input()
         sparsify = False if inp.descriptor.sparsify.ncut <= 0 else True  # determine if sparsify by ncut
         nspe1 = len(inp.descriptor.rep1.neighspe)
         nspe2 = len(inp.descriptor.rep2.neighspe)
 
-        # HYPER_PARAMETERS_DENSITY = {
-        #    "cutoff": inp.descriptor.rep1.rcut,
-        #    "max_radial": inp.descriptor.rep1.nrad,
-        #    "max_angular": inp.descriptor.rep1.nang,
-        #    "atomic_gaussian_width": inp.descriptor.rep1.sig,
-        #    "center_atom_weight": 1.0,
-        #    "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
-        #    "cutoff_function": {"ShiftedCosine": {"width": 0.1}},
-        # }
-
-        HYPER_PARAMETERS_DENSITY = {
-            "cutoff": {"radius": inp.descriptor.rep1.rcut, "smoothing": {"type": "ShiftedCosine", "width": 0.1}},
-            "density": {"type": "Gaussian", "width": inp.descriptor.rep1.sig},
-            "basis": {
-                "type": "TensorProduct",
-                "max_angular": inp.descriptor.rep1.nang,
-                "radial": {"type": "Gto", "max_radial": inp.descriptor.rep1.nrad - 1},
-                "spline_accuracy": 1e-06,
-            },
-        }
-
-        # HYPER_PARAMETERS_POTENTIAL = {
-        #    "potential_exponent": 1,
-        #    "cutoff": inp.descriptor.rep2.rcut,
-        #    "max_radial": inp.descriptor.rep2.nrad,
-        #    "max_angular": inp.descriptor.rep2.nang,
-        #    "atomic_gaussian_width": inp.descriptor.rep2.sig,
-        #    "center_atom_weight": 1.0,
-        #    "radial_basis": {"Gto": {"spline_accuracy": 1e-6}},
-        # }
-
-        HYPER_PARAMETERS_POTENTIAL = {
-            "density": {"type": "SmearedPowerLaw", "smearing": inp.descriptor.rep2.sig, "exponent": 1},
-            "basis": {
-                "type": "TensorProduct",
-                "max_angular": inp.descriptor.rep2.nang,
-                "radial": {
-                    "type": "Gto",
-                    "max_radial": inp.descriptor.rep2.nrad - 1,
-                    "radius": inp.descriptor.rep2.rcut,
-                },
-                "spline_accuracy": 1e-06,
-            },
-        }
+        HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
+        HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
 
         return (
             inp.salted.saltedname,
@@ -666,11 +667,11 @@ class ParseConfig:
             inp.gpr.trainsel,
             nspe1,
             nspe2,
-            HYPER_PARAMETERS_DENSITY,
-            HYPER_PARAMETERS_POTENTIAL,
+            HP1,
+            HP2,
         )
 
-    def get_all_params_simple1(self) -> Tuple:
+    def get_all_params_simple1(self) -> tuple:
         """return all parameters with a tuple
 
         Please copy & paste:
@@ -717,7 +718,7 @@ class ParseConfig:
             inp.gpr.trainsel,
         )
 
-    def check_input(self, inp: Dict):
+    def check_input(self, inp: dict):
         """Check keys (required, optional, not allowed), and value types and ranges
 
 
@@ -969,7 +970,9 @@ class ParseConfig:
             },
         }
 
-        def rec_apply_default_vals(_inp: Dict, _inp_template: Dict[str, Union[Dict, Tuple]], _prev_key: str):
+        def rec_apply_default_vals(
+            _inp: dict, _inp_template: dict[str, dict | tuple], _prev_key: str
+        ):
             """apply default values if optional parameters are not found"""
 
             """check if the keys in inp exist in inp_template"""
@@ -996,7 +999,7 @@ class ParseConfig:
                     raise ValueError(f"Invalid input template: {val}. Did you changed the template for parsing?")
             return _inp
 
-        def rec_check_vals(_inp: Dict, _inp_template: Dict[str, Union[Dict, Tuple]], _prev_key: str):
+        def rec_check_vals(_inp: dict, _inp_template: dict[str, dict | tuple], _prev_key: str):
             """check values' type and range"""
             for key, template in _inp_template.items():
                 if isinstance(template, dict):
@@ -1060,7 +1063,7 @@ class ParseConfig:
         return loader
 
 
-def get_qmcode_checker(qmcode: Union[str, list[str]]) -> callable:
+def get_qmcode_checker(qmcode: str | list[str]) -> callable:
     """Factory that returns a checker function for a specific qmcode"""
     if isinstance(qmcode, str):
         qmcode = [qmcode]
@@ -1122,16 +1125,16 @@ def test_inp():
 class Irreps(tuple):
     """Handle irreducible representation arrays, like slices, multiplicities, etc."""
 
-    def __new__(cls, irreps: Union[str, List[int], Tuple[int]]) -> "Irreps":
+    def __new__(cls, irreps: str | list[int] | tuple[int]) -> "Irreps":
         """Create an Irreps object
 
         Args:
-            irreps (Union[str, List[int], Tuple[int]]): irreps info
+            irreps (str | list[int] | tuple[int]): irreps info
                 - str, e.g. `1x0+2x1+3x2+3x3+2x4+1x5`
                     - multiplicities and l values joined by `x`
-                - Tuple[Tuple[int]], e.g. ((1, 0), (2, 1), (3, 2), (3, 3), (2, 4), (1, 5),)
+                - tuple[tuple[int]], e.g. ((1, 0), (2, 1), (3, 2), (3, 3), (2, 4), (1, 5),)
                     - each tuple is (multiplicity, l)
-                - Tuple[int], e.g. (0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5,)
+                - tuple[int], e.g. (0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5,)
                     - list of l values, the multiplicities are calculated automatically
 
         Notes:
@@ -1161,7 +1164,7 @@ class Irreps(tuple):
                     f"Invalid irreps format: {irreps}"
                 )
                 this_l_cnt, this_l = 1, irreps[0]
-                mul_l_list: List[Tuple[int]] = []
+                mul_l_list: list[tuple[int, int]] = []
                 for l in irreps[1:]:
                     if l == this_l:
                         this_l_cnt += 1
@@ -1187,7 +1190,7 @@ class Irreps(tuple):
         return sum(mul for mul, _ in self)
 
     @property
-    def ls(self) -> List[int]:
+    def ls(self) -> tuple[int, ...]:
         """list of l values in the irreps"""
         return tuple(l for mul, l in self for _ in range(mul))
 
@@ -1202,7 +1205,7 @@ class Irreps(tuple):
     def __add__(self, other: "Irreps") -> "Irreps":
         return Irreps(super().__add__(other))
 
-    def slices(self) -> List[slice]:
+    def slices(self) -> tuple[slice, ...]:
         """return all the slices for each l"""
         if hasattr(self, "_slices"):
             return self._slices
@@ -1218,7 +1221,7 @@ class Irreps(tuple):
             self._slices = tuple(self._slices)
         return self._slices
 
-    def slices_l(self, l: int) -> List[slice]:
+    def slices_l(self, l: int) -> tuple[slice, ...]:
         """return all the slices for a specific l"""
         return tuple(sl for _l, sl in zip(self.ls, self.slices()) if l == _l)
 

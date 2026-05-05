@@ -1,7 +1,6 @@
 """Translate basis info from CP2K calculation to SALTED basis info"""
 
 from itertools import islice
-from typing import Dict, Tuple, List
 
 import os
 import os.path as osp
@@ -28,7 +27,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     lmax, nmax, alphas, contra = parse_files_basis_info(inp.system.species, inp.qm.dfbasis)
 
     """Convert to basis_client format"""
-    basis_data: Dict[str, SpeciesBasisData] = {}
+    basis_data: dict[str, SpeciesBasisData] = {}
     for spe in lmax.keys():
         assert lmax[spe] + 1 == len(
             [i for i in nmax.keys() if i[0] == spe]
@@ -59,8 +58,8 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
         BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
-def parse_files_basis_info(species:List[str], dfbasis:str) -> (
-    Tuple[Dict[str, int], Dict[Tuple[str, int], int], Dict[Tuple[str, int], np.ndarray]]
+def parse_files_basis_info(species: list[str], dfbasis: str) -> (
+    tuple[dict[str, int], dict[tuple[str, int], int], dict[tuple[str, int], np.ndarray]]
 ):
     """Parse the basis files of cp2k
     File naming convention: `[species]-[basis_name]`.
