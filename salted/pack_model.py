@@ -12,6 +12,7 @@ def f64(x):  return struct.pack('<d', x)
 def sbool(x): return struct.pack('<?', x)
 
 from salted.sys_utils import ParseConfig
+from salted import basis
 #EVERYTHING IS LITTLE ENDIAN!
 
 #FORMAT FOR SALTED FILE:
@@ -241,9 +242,7 @@ def pack_model_info(SALTED_file, inp, debug: bool = False):
         (b"speci", " ".join(inp.system.species)),   #str (and list str)
         (b"nspe1", " ".join(inp.descriptor.rep1.neighspe)),
         (b"nspe2", " ".join(inp.descriptor.rep2.neighspe)),
-        (b"dfbas", inp.qm.dfbasis),
-        (b"dflmx", lmax),
-        (b"dfnmx", nmax),
+        (b"dfbas", inp.qm.dfbasis)
     ]
     begin_of_block = SALTED_file.tell()
     for key, value in inputs:
@@ -390,6 +389,7 @@ HAS_PYSCF = False
 try:
     import pyscf
     HAS_PYSCF = True
+    print(f"PySCF version {pyscf.__version__} found, will include basis sets in SALTED file")
 except ImportError:
     HAS_PYSCF = False
 
@@ -417,7 +417,6 @@ def build(debug: bool = False):
         pack_weights(f, path, inp, debug)
         if HAS_PYSCF:
             pack_basis(f, inp, debug)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
