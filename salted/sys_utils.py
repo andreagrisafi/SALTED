@@ -54,13 +54,41 @@ def build_featomic_hyper_params(rep_cfg) -> dict:
         raise ValueError(f"Unknown representation type '{rep_cfg.type}': must be 'rho' or 'V'.")
 
 
-def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = None):
+def _basis_from_embedded_model(basis_data: dict[str, dict], spelist: list[str]):
+    """Convert embedded model basis data to the old (lmax, nmax) format."""
+    lmax = {}
+    nmax = {}
+
+    for spe in spelist:
+        if spe not in basis_data:
+            raise ValueError(f"Embedded basis data does not contain species {spe!r}")
+
+        spe_data = basis_data[spe]
+        angular_momenta = np.asarray(spe_data["angular_momenta"], dtype=int).ravel()
+        if angular_momenta.size == 0:
+            raise ValueError(f"Embedded basis data for species {spe!r} is empty")
+
+        spe_lmax = int(angular_momenta.max())
+        lmax[spe] = spe_lmax
+        for l in range(spe_lmax + 1):
+            nmax[(spe, l)] = int(np.count_nonzero(angular_momenta == l))
+
+    return lmax, nmax
+
+
+def read_system(
+    filename: str = None,
+    spelist: list[str] = None,
+    dfbasis: str = None,
+    basis_data: dict[str, dict] | None = None,
+):
     """read a geometry file and return the formatted information
 
     Args:
         filename (str, optional): geometry file. Defaults to None.
         spelist (list[str], optional): list of species. Defaults to None.
         dfbasis (str, optional): density fitting basis. Defaults to None.
+        basis_data (dict, optional): embedded basis data loaded from a .salted model.
 
     Notes:
         By default (all parameters are None), it reads the geometry file for training dataset.
@@ -78,9 +106,8 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
         natmax (int): maximum number of atoms in the system
     """
 
-    inp = ParseConfig().parse_input()
-
     if (filename is None) and (spelist is None) and (dfbasis is None):
+        inp = ParseConfig().parse_input()
         filename = inp.system.filename
         spelist = inp.system.species
         dfbasis = inp.qm.dfbasis
@@ -92,8 +119,11 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
             "please check the docstring for more details."
         )
 
-    # read basis
-    [lmax, nmax] = basis.basiset(dfbasis)
+    # read basis: prefer embedded model basis data when available, otherwise fall back to the named basis set
+    if basis_data is not None:
+        [lmax, nmax] = _basis_from_embedded_model(basis_data, spelist)
+    else:
+        [lmax, nmax] = basis.basiset(dfbasis)
     llist = []
     nlist = []
     for spe in spelist:
