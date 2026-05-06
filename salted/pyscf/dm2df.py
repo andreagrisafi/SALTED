@@ -62,10 +62,13 @@ def cal_df_coeffs(
     overlap_reordered[l1_indexes_to] = overlap[l1_indexes_from]
     overlap_reordered[:, l1_indexes_to] = overlap[:, l1_indexes_from]
 
+    # Compute density projections on auxiliary functions
+    proj_reordered = np.dot(overlap_reordered, coef_reordered)
     reorder_time = time.time() - reorder_time
 
     return {
         "coef": coef_reordered,
+        "proj": proj_reordered,
         "over": overlap_reordered,
         "pyscf_time": pyscf_time,
         "reorder_time": reorder_time,
@@ -95,7 +98,7 @@ def main(geom_indexes: list[int] | None, num_threads: int = None):
     """check if all subdirectories exist, if not create them"""
     sub_dirs = [
         osp.join(inp.salted.saltedpath, d)
-        for d in ("overlaps", "coefficients")
+        for d in ("overlaps", "coefficients", "projections")
     ]
     for sub_dir in sub_dirs:
         if not osp.exists(sub_dir):
@@ -134,6 +137,7 @@ def main(geom_indexes: list[int] | None, num_threads: int = None):
         dm = np.load(osp.join(inp.qm.path2qm, "density_matrices", f"dm_conf{geom_idx+1}.npy"))
         reordered_data = cal_df_coeffs(atoms, inp.qm.qmbasis, ribasis, dm, irreps)
         np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{geom_idx}.npy"), reordered_data["coef"])
+        np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{geom_idx}.npy"), reordered_data["proj"])
         np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{geom_idx}.npy"), reordered_data["over"])
         pyscf_time += reordered_data["pyscf_time"]
         reorder_time += reordered_data["reorder_time"]
