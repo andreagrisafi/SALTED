@@ -220,19 +220,19 @@ def detect_mpi():
     ]
     launched_with_mpi = any(var in os.environ for var in mpi_env_vars)
 
-    if not launched_with_mpi:
+    if launched_with_mpi:
+        try:
+            from mpi4py import MPI
+        except ImportError:
+            raise RuntimeError("Script was launched with mpirun but mpi4py is not installed.")
+        else:
+            comm = MPI.COMM_WORLD
+            size = comm.Get_size()
+            rank = comm.Get_rank()
+            parallel = size > 1
+            return comm, size, rank, parallel
+    else:
         return None, 1, 0, False
-    
-    try:
-        from mpi4py import MPI
-    except ImportError:
-        raise RuntimeError("Script was launched with mpirun but mpi4py is not installed.")
-    
-    comm = MPI.COMM_WORLD
-    size = comm.Get_size()
-    rank = comm.Get_rank()
-    parallel = size > 1
-    return comm, size, rank, parallel
         
 
 
