@@ -48,7 +48,7 @@ ENV HDF5_DIR=/usr/local/hdf5
 RUN wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5/HDF5_1_14_3/src/hdf5-1.14.3.tar.gz \
     && tar -xf hdf5-1.14.3.tar.gz \
     && cd hdf5-1.14.3 \
-    && CC=/usr/local/bin/mpicc ./configure --enable-shared --enable-parallel --prefix=/usr/local/hdf5 \
+    && HDF5_MPI="ON" CC=/usr/local/bin/mpicc ./configure --enable-shared --enable-parallel --prefix=/usr/local/hdf5 \
     && make -j"$(nproc)" \
     && make install \
     && cd .. \
@@ -56,9 +56,7 @@ RUN wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5
 
 # h5py against parallel HDF5 + same MPI
 RUN pip install cython \
-    && HDF5_DIR=/usr/local/hdf5 \
-    CC=/usr/local/bin/mpicc \
-    HDF5_MPI=ON \
+    && HDF5_DIR=/usr/local/hdf5 HDF5_MPI=ON CC=/usr/local/bin/mpicc \
     pip install --no-build-isolation --no-binary=h5py h5py
 
 # Install Python dependencies
