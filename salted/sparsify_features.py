@@ -76,7 +76,6 @@ def build():
     v1 = np.transpose(omega1,(1,3,0,2)).copy()
     v2 = np.transpose(omega2,(1,3,0,2)).copy()
 
-    del omega1, omega2
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     for lam in range(lmax_max+1):
 

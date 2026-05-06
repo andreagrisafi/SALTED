@@ -14,7 +14,6 @@ nav:
   - Docker: docker.md
   - Theory: theory.md
   - Workflow: workflow.md
-  - Binary Deployment: binary_models.md
   - Input: input.md
   - Tutorial:
     - Part 1 - Dataset: tutorial/dataset.md
