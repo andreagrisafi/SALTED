@@ -19,7 +19,7 @@ from salted.sys_utils import (
     detect_mpi,
     distribute_jobs,
     format_index_ranges,
-    get_atom_idx as sys_utils_get_atom_idx,
+    get_atom_idx,
     get_feats_projs,
     get_feats_projs_response,
     read_system,
@@ -34,29 +34,6 @@ from salted import read_model
 # ============================================================================
 # SHARED UTILITY FUNCTIONS
 # ============================================================================
-def get_atom_idx(ndata: int, natoms: np.ndarray, species: List[str], atomic_symbols: List[List[str]]):
-    """
-    Get indices of atoms by species for each configuration.
-    
-    Works for both config mode and standalone mode.
-    """
-    atom_idx = {}
-    natom_dict = {}
-    
-    for iconf in range(ndata):
-        for spe in species:
-            atom_idx[(iconf, spe)] = []
-            natom_dict[(iconf, spe)] = 0
-    
-    for iconf in range(ndata):
-        for iat in range(natoms[iconf]):
-            spe = atomic_symbols[iconf][iat]
-            atom_idx[(iconf, spe)].append(iat)
-            natom_dict[(iconf, spe)] += 1
-    
-    return atom_idx, natom_dict
-
-
 def compute_equivariant_descriptors(
     frames: List,
     conf_range: List[int],
@@ -328,7 +305,7 @@ def compute_equivariant_descriptors_response(
     return power, power_antisymm
 
 
-def compute_predictions_for_structure(
+def compute_density_predictions_for_structure(
     iconf: int,
     i_local: Optional[int],
     conf_range: List[int],
@@ -448,6 +425,228 @@ def compute_predictions_for_structure(
 
     return pred_coefs
 
+def compute_density_response_predictions_for_structure(
+    iconf: int,
+    i_local: Optional[int],
+    conf_range: List[int],
+    atom_idx: Dict,
+    natom_dict: Dict,
+    atomic_symbols: List[List[str]],
+    natoms: np.ndarray,
+    lmax: Dict,
+    nmax: Dict,
+    species: List[str],
+    zeta: float,
+    power: Dict[int, np.ndarray],
+    power_antisymm: Dict[int, np.ndarray],
+    power_env_sparse: Dict,
+    power_env_sparse_antisymm: Dict,
+    Vmat: Dict,
+    Mspe: Dict,
+    weights: np.ndarray,
+    average: bool = False,
+    av_coefs: Optional[Dict] = None
+):
+    
+    if i_local is None:
+        iconf_idx = conf_range.index(iconf) if isinstance(conf_range, list) else iconf
+    else:
+        iconf_idx = i_local
+    
+    psi_nm = {}
+    psi_nm_cart = {}
+
+    Tsize = 0
+    for iat in range(natoms[iconf_idx]):
+        spe = atomic_symbols[iconf_idx][iat]
+        for l in range(lmax[spe]+1):
+            for n in range(nmax[(spe,l)]):
+                Tsize += 2*l+1
+
+    # Compute kernels and RKHS descriptors
+    for ic in cart:
+        for spe in species:
+            for lam in range(lmax[spe]+1):
+                psi_nm_cart[(ic,spe,lam)] = np.zeros((natom_dict[(iconf_idx,spe)]*(2*lam+1),Vmat[(lam,spe)].shape[-1]))
+
+    for spe in species:
+
+        start_kernel_0 = time.time()
+
+        Mcut = {}
+        Mcutsize = {}
+        for lam in range(lmax[spe]+1):
+            frac = np.exp(-0.05*lam**2)
+            Mcut[lam] = int(round(Mspe[spe]*frac))
+            Mcutsize[lam] = Mcut[lam]*3*(2*lam+1)
+
+        # lam=0
+        kernel0_nm = np.dot(power[0][i,atom_idx[(iconf_idx,spe)]],power_env_sparse[(0,spe)].T)
+        kernel_nm = np.dot(power[1][i,atom_idx[(iconf_idx,spe)]].reshape(natom_dict[(iconf_idx,spe)]*3,power[1].shape[-1]),power_env_sparse[(1,spe)].T)
+
+        kernel_nm_blocks = kernel_nm.reshape(natom_dict[(iconf_idx,spe)], 3, Mspe[spe], 3)
+        kernel_nm_blocks *= kernel0_nm[:, np.newaxis, :, np.newaxis] ** (zeta - 1)
+        kernel_nm = kernel_nm_blocks.reshape(natom_dict[(iconf_idx,spe)] * 3, Mspe[spe] * 3)
+        kernel_nm = kernel_nm[:,:Mcutsize[0]]
+
+        kernel0_nn_diag = np.sum(power[0][i,atom_idx[(iconf_idx,spe)]]**2,axis=1)
+        kernel_nn_diag = power[1][i,atom_idx[(iconf_idx,spe)]] @ power[1][i,atom_idx[(iconf_idx,spe)]].transpose(0,2,1)
+        kernel_nn_diag = kernel_nn_diag * kernel0_nn_diag[:,np.newaxis,np.newaxis]**(zeta-1)
+        normfact = np.sqrt(np.sum(kernel_nn_diag**2,axis=(1,2)))
+
+        normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{0}.npy"))
+        knorm = kernelnorm(natom_dict[(iconf_idx,spe)],Mcut[0],3,normfact,normfact_sparse,np.real(kernel_nm))
+        kernel_nm = knorm
+
+        psi_nm[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
+
+        psi_nm_reshaped = psi_nm[(spe, 0)].reshape(natom_dict[(iconf_idx,spe)], 3, psi_nm[(spe, 0)].shape[-1])
+        for ik in range(3):
+            psi_nm_cart[(cart[ik], spe, 0)][:natom_dict[(iconf_idx,spe)]] = psi_nm_reshaped[:, ik]
+
+        if inp.salted.verbose:
+            print("kernel lam=0 time (sec) = ",time.time()-start_kernel_0,flush=True)
+        start_kernel_lam = time.time()
+
+        if alpha_only and qmcode=="cp2k":
+            lmax[spe] = 1
+
+        # lam>0
+        for lam in range(1,lmax[spe]+1):
+
+            Msize = Mspe[spe]*3*(2*lam+1)
+            Nsize = natom_dict[(iconf_idx,spe)]*3*(2*lam+1)
+            kernel_nm = np.zeros((Nsize,Msize),complex)
+            kernel_nn_diag = np.zeros((Nsize,3*(2*lam+1)),complex)
+
+            # Perform CG combination
+            for L in [lam-1,lam,lam+1]:
+
+                #print("L=", L)
+
+                c2r = sph_utils.complex_to_real_transformation([2*L+1])[0]
+
+                # compute complex descriptor for the given L
+                if L==lam:
+                    pimag = power_antisymm[L][i,atom_idx[(iconf_idx,spe)]]
+                    featsize = pimag.shape[-1]
+                    pimag = pimag.reshape(natom_dict[(iconf_idx,spe)],2*L+1,featsize)
+                    pimag = np.transpose(pimag,(1,0,2)).reshape(2*L+1,natom_dict[(iconf_idx,spe)]*featsize)
+                    preal = np.zeros_like(pimag)
+                else:
+                    preal = power[L][i,atom_idx[(iconf_idx,spe)]]
+                    featsize = preal.shape[-1]
+                    preal = preal.reshape(natom_dict[(iconf_idx,spe)],2*L+1,featsize)
+                    preal = np.transpose(preal,(1,0,2)).reshape(2*L+1,natom_dict[(iconf_idx,spe)]*featsize)
+                    pimag = np.zeros_like(preal)
+
+                ptemp = preal + 1j * pimag
+                pcmplx = np.dot(np.conj(c2r.T),ptemp).reshape(2*L+1,natom_dict[(iconf_idx,spe)],featsize)
+                pcmplx = np.transpose(pcmplx,(1,0,2)).reshape(natom_dict[(iconf_idx,spe)]*(2*L+1),featsize)
+
+                # compute complex sparse descriptor for the given L 
+                if L==lam:
+                    pimag = power_env_sparse_antisymm[(L,spe)]
+                    featsize = pimag.shape[-1]
+                    pimag = pimag.reshape(Mspe[spe],2*L+1,featsize)
+                    pimag = np.transpose(pimag,(1,0,2)).reshape(2*L+1,Mspe[spe]*featsize)
+                    preal = np.zeros_like(pimag)
+                else:
+                    preal = power_env_sparse[(L,spe)]
+                    featsize = preal.shape[-1]
+                    preal = preal.reshape(Mspe[spe],2*L+1,featsize)
+                    preal = np.transpose(preal,(1,0,2)).reshape(2*L+1,Mspe[spe]*featsize)
+                    pimag = np.zeros_like(preal)
+
+                ptemp = preal + 1j * pimag
+                pcmplx_sparse = np.dot(np.conj(c2r.T),ptemp).reshape(2*L+1,Mspe[spe],featsize)
+                pcmplx_sparse = np.transpose(pcmplx_sparse,(1,0,2)).reshape(Mspe[spe]*(2*L+1),featsize)
+
+                # compute complex K_nm kernel 
+                knm = np.dot(pcmplx,np.conj(pcmplx_sparse).T)
+
+                # load the relevant CG coefficients 
+                cgcoefs = np.loadtxt(os.path.join(saltedpath, "wigners", f"cg_response_lam-{lam}_L-{L}.dat"))
+
+                k0 = kernel0_nm**(zeta-1)
+                cgkernel = kernelequicomb(natom_dict[(iconf_idx,spe)],Mspe[spe],lam,1,L,Nsize,Msize,len(cgcoefs),cgcoefs,knm,k0)
+                kernel_nm += cgkernel
+
+                # compute complex K_nn kernel
+                pcmplx = pcmplx.reshape(natom_dict[(iconf_idx,spe)],2*L+1,featsize)
+                knn_diag = pcmplx @ np.conj(pcmplx).transpose(0,2,1)
+                knn_diag = knn_diag.reshape(natom_dict[(iconf_idx,spe)]*(2*L+1),2*L+1)
+                k0 = kernel0_nn_diag**(zeta-1) 
+                cgkernel = kernelequicomb(natom_dict[(iconf_idx,spe)],1,lam,1,L,Nsize,3*(2*lam+1),len(cgcoefs),cgcoefs,knn_diag,k0[:,np.newaxis])
+                kernel_nn_diag += cgkernel
+
+            kernel_nm = kernel_nm[:,:Mcutsize[lam]]
+
+            # compute complex to real transformation matrix for lam X 1 tensor product space
+            A = sph_utils.complex_to_real_transformation([2*lam+1])[0]
+            B = sph_utils.complex_to_real_transformation([3])[0]
+            c2r = np.zeros((3*(2*lam+1),3*(2*lam+1)),complex)
+            j1 = 0
+            for i1 in range(2*lam+1):
+                j2 = 0
+                for i2 in range(2*lam+1):
+                    c2r[j1:j1+3,j2:j2+3] = A[i1,i2] * B
+                    j2 += 3
+                j1 += 3
+
+            # make k_NM real
+            ktemp1 = np.dot(c2r,np.transpose(kernel_nm.reshape(natom_dict[(iconf_idx,spe)],3*(2*lam+1),Mcutsize[lam]),(1,0,2)).reshape(3*(2*lam+1),natom_dict[(iconf_idx,spe)]*Mcutsize[lam]))
+            ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),natom_dict[(iconf_idx,spe)],Mcutsize[lam]),(1,0,2)).reshape(Nsize,Mcutsize[lam])
+            kernel_nm = np.dot(ktemp2.reshape(Nsize,Mcut[lam],3*(2*lam+1)).reshape(Nsize*Mcut[lam],3*(2*lam+1)),np.conj(c2r).T).reshape(Nsize,Mcut[lam],3*(2*lam+1)).reshape(Nsize,Mcutsize[lam])
+
+
+            # make k_NN_diag real and compute normalization factor
+            ktemp1 = np.dot(c2r,np.transpose(kernel_nn_diag.reshape(natom_dict[(iconf_idx,spe)],3*(2*lam+1),3*(2*lam+1)),(1,0,2)).reshape(3*(2*lam+1),natom_dict[(iconf_idx,spe)]*3*(2*lam+1)))
+            ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),natom_dict[(iconf_idx,spe)],3*(2*lam+1)),(1,0,2)).reshape(Nsize,3*(2*lam+1))
+            kernel_nn_diag = np.real(np.dot(ktemp2,np.conj(c2r).T)).reshape(natom_dict[(iconf_idx,spe)],3*(2*lam+1),3*(2*lam+1))
+            normfact = np.sqrt(np.sum(kernel_nn_diag**2,axis=(1,2)))
+
+            normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"))
+            knorm = kernelnorm(natom_dict[(iconf_idx,spe)],Mcut[lam],3*(2*lam+1),normfact,normfact_sparse,np.real(kernel_nm))
+            kernel_nm = knorm
+
+            # project kernel on the RKHS
+            psi_nm[(spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))
+
+            psi_nm_reshaped = psi_nm[(spe, lam)].reshape(natom_dict[(iconf_idx,spe)]*(2*lam+1), 3, psi_nm[(spe, lam)].shape[-1])
+            for ik in range(3):
+                psi_nm_cart[(cart[ik], spe, lam)][:natom_dict[(iconf_idx,spe)]*(2*lam+1)] = psi_nm_reshaped[:, ik]
+
+        if inp.salted.verbose:
+            print("kernel lam>0 time (sec) = ",time.time()-start_kernel_lam,flush=True)
+
+    pred_coefs = {}
+    for icart in ["x","y","z"]:
+        
+        # compute predictions per channel
+        C = {}
+        ispe = {}
+        isize = 0
+        for spe in species:
+            ispe[spe] = 0
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    Mcut = psi_nm_cart[(icart,spe,l)].shape[1]
+                    C[(spe,l,n)] = np.dot(psi_nm_cart[(icart,spe,l)],weights[isize:isize+Mcut])
+                    isize += Mcut
+
+        # fill vector of predictions
+        i = 0
+        pred_coefs[icart] = np.zeros(Tsize)
+        for iat in range(natoms[iconf_idx]):
+            spe = atomic_symbols[iconf_idx][iat]
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    pred_coefs[icart][i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
+                    i += 2*l+1
+            ispe[spe] += 1
+    return pred_coefs
+    
 
 def save_pred_descriptor(
     data: Dict[int, np.ndarray],
@@ -478,7 +677,6 @@ def save_pred_descriptor(
 # ============================================================================
 # CONFIG MODE (Full SALTED workflow)
 # ============================================================================
-
 def predict_config_mode():
     """
     Full SALTED prediction workflow using config file.
@@ -512,7 +710,7 @@ def predict_config_mode():
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(
         filename_pred, species, dfbasis
     )
-    atom_idx, natom_dict = sys_utils_get_atom_idx(ndata, natoms, species, atomic_symbols)
+    atom_idx, natom_dict = get_atom_idx(ndata, natoms, species, atomic_symbols)
 
     if rank == 0:
         print(f"The dataset contains {ndata} frames.")
@@ -624,7 +822,7 @@ def predict_config_mode():
 
         # Compute predictions
         for i, iconf in enumerate(conf_range):
-            pred_coefs = compute_predictions_for_structure(
+            pred_coefs = compute_density_predictions_for_structure(
                 iconf, i, conf_range, atom_idx, natom_dict, atomic_symbols, natoms,
                 lmax, nmax, species, zeta, pvec, power_env_sparse, Vmat, Mspe, weights,
                 average=average, av_coefs=av_coefs_dict
@@ -642,10 +840,11 @@ def predict_config_mode():
 
     elif saltedtype == "density-response":
         # Load training features and RKHS projection matrix (response version)
-        Vmat, Mspe, power_env_sparse, power_env_sparse_antisymm = get_feats_projs_response(
-            species, lmax
-        )
-
+        Vmat, Mspe, power_env_sparse, power_env_sparse_antisymm = get_feats_projs_response(species, lmax)
+        
+        lmax_max += 1
+        cart = ["y","z","x"]
+        
         # Compute symmetric and antisymmetric equivariant descriptors
         power, power_antisymm = compute_equivariant_descriptors_response(
             frames, conf_range, natoms, atomic_symbols,
@@ -657,10 +856,38 @@ def predict_config_mode():
             rank=rank,
         )
 
-        # Compute predictions for density-response (simplified - core logic only)
-        if rank == 0:
-            print("Density-response prediction mode not fully implemented in unified script", flush=True)
-            print("Using original prediction.py for density-response", flush=True)
+        for i, iconf in enumerate(conf_range):
+            if rank == 0 or i % 10 == 0:
+                print(f"Predicting structure {iconf + 1}/{len(conf_range)}...", flush=True)
+            
+            start = time.time()
+            pred_coefs = compute_density_response_predictions_for_structure(
+                iconf, i, conf_range, atom_idx, natom_dict, atomic_symbols, natoms,
+                lmax, nmax, species, zeta,
+                power, power_antisymm, power_env_sparse, power_env_sparse_antisymm,
+                Vmat, Mspe, weights,
+                average=average
+            )
+            
+            for icart in ["x", "y", "z"]:
+                 np.savetxt(os.path.join(dirpath, icart, f"COEFFS-{iconf + 1}.dat"), pred_coefs[icart])
+            
+            if rank == 0 or i % 10 == 0:
+                print(f"done in {time.time() - start:.2f} seconds.", flush=True)
+
+
+        if qmcode=="cp2k":
+            # Compute polarizability
+            alpha = compute_polarizability(frames[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs)
+
+            # Save polarizabilities
+            print(iconf+1, alpha[("x","x")],    alpha[("x","y")],    alpha[("x","z")],
+                            alpha[("y","x")],    alpha[("y","y")],    alpha[("y","z")],
+                            alpha[("z","x")],    alpha[("z","y")],    alpha[("z","z")],
+                            file=pfile)
+
+        if inp.salted.verbose:
+            print("prediction time (sec) = ",time.time()-start_pred,flush=True)
 
     # Close property files
     if qmcode == "cp2k":
@@ -869,7 +1096,7 @@ def predict_standalone_mode(model_file: str, xyz_file: str, output_dir: str = No
             
             start = time.time()
 
-            pred_coefs = compute_predictions_for_structure(
+            pred_coefs = compute_density_predictions_for_structure(
                 iconf, i, conf_range, atom_idx, natom_dict, atomic_symbols, natoms,
                 lmax, nmax, species, zeta, pvec, power_env_sparse, Vmat, Mspe, weights,
                 average=use_average, av_coefs=averages if use_average else None
@@ -961,11 +1188,12 @@ Examples:
             print(f"Error in standalone mode: {e}")
 
     # As fallback, also allow running config mode if no model file is provided
-    try:
-        predict_config_mode()
-        exit()
-    except Exception as e:
-        print(f"Error in config mode: {e}")
+    predict_config_mode()
+    # try:
+    #     predict_config_mode()
+    #     exit()
+    # except Exception as e:
+    #     print(f"Error in config mode: {e}")
 
 
 if __name__ == "__main__":
