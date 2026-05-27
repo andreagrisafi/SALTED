@@ -13,8 +13,11 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     gfortran \
     ninja-build  \
-    libhwloc-dev libpsm2-dev libpmi2-0-dev \
+    libhwloc-dev libpmi2-0-dev \
+    libmunge-dev libmunge2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --upgrade pip setuptools wheel build
 
 ENV PATH=/usr/local/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:/usr/lib/x86_64-linux-gnu
@@ -26,20 +29,36 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
     && source $HOME/.cargo/env \
     && pip install git+https://github.com/metatensor/featomic.git
 
+RUN wget https://github.com/openpmix/openpmix/releases/download/v6.1.0/pmix-6.1.0.tar.gz \
+    && tar -xf pmix-6.1.0.tar.gz \
+    && cd pmix-6.1.0 \
+    && ./configure --prefix=/usr/local/pmix \
+    && make -j"$(nproc)" \
+    && make install \
+    && cd .. \
+    && rm -rf pmix-6.1.0 pmix-6.1.0.tar.gz
 
-# Open MPI with PMI2 support
 RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.bz2 \
     && tar -xf openmpi-4.1.8.tar.bz2 \
     && cd openmpi-4.1.8 \
     && ./configure --prefix=/usr/local \
-    --enable-shared --disable-static --disable-debug --enable-builtin-atomics \
-    --with-slurm --with-psm2 --with-hwloc --with-libevent --with-pmi \
-    --with-zlib \
+       --enable-shared --disable-static --disable-debug \
+       --enable-builtin-atomics \
+       --with-slurm \
+       --with-pmix=/usr/local/pmix \
+       --with-hwloc \
+       --with-libevent \
+       --with-zlib \
+       --without-psm \
+       --without-psm2 \
     && make -j"$(nproc)" \
     && make install \
     && cd .. \
     && rm -rf openmpi-4.1.8 openmpi-4.1.8.tar.bz2
-    
+
+ENV PATH=/usr/local/bin:/usr/local/pmix/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:/usr/local/pmix/lib:/usr/lib/x86_64-linux-gnu
+
 # Build mpi4py from source against this mpicc
 RUN MPICC=/usr/local/bin/mpicc pip install --no-binary=mpi4py mpi4py
 
@@ -60,7 +79,7 @@ RUN pip install cython \
     pip install --no-build-isolation --no-binary=h5py h5py
 
 # Install Python dependencies
-RUN pip install meson packaging numba ase scipy pyyaml \
+RUN pip install meson packaging numba ase scipy pyyaml sympy \
     && pip install --prefer-binary pyscf
 
 #Install SALTED
