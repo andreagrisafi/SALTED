@@ -964,7 +964,7 @@ class ParseConfig:
                     False,
                     "omp_sparse",
                     str,
-                    lambda inp, val: val in ("dense", "omp_sparse"),
+                    lambda inp, val: val in ("dense", "omp_sparse", "numba"),
                 ),
             },
         }

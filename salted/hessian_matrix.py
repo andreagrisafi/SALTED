@@ -127,6 +127,14 @@ def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
             print(f"Warning: OpenMP sparse operations failed ({e}), falling back to dense")
             # Fall through to dense computation
 
+    elif sparse_algorithm == "numba":
+        from salted.numba_sparse import get_hessian_engine
+        N_df, K_rkhs = psivec.shape
+        avec_contrib = psivec.T @ ref_projs               # O(nnz) vector multiply
+        engine       = get_hessian_engine(N_df, K_rkhs)
+        bmat_contrib = engine.compute(over, psivec).copy()
+        return avec_contrib, bmat_contrib, "numba"
+
     # Dense fallback (original behavior)
     psi_dense = psivec.toarray()
     avec_contrib = np.dot(psi_dense.T, ref_projs)
