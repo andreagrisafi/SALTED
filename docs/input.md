@@ -86,7 +86,7 @@ Remember to set `inp.predict` if one wants to predict densities.
 | `gradtol` | `float` | `1e-5` | Minimum gradient norm tolerance for CG minimization. |
 | `restart` | `bool` | `False` | Whether to restart from previous minimization checkpoint. |
 | `trainsel` | `Literal["sequential"] \| Literal["random"]` | `"random"` | Select the training set at random or sequentially from the entire dataset. |
-| `sparse_algorithm` | `Literal["dense"] \| Literal["omp_sparse"]` | `"omp_sparse"` | The algorithm to compute Hessian matrices, if making use of the RKHS vector sparsity. |
+| `sparse_algorithm` | `Literal["dense"] \| Literal["numba"] \| Literal["omp_sparse"]` | `"numba"` | The algorithm to compute Hessian matrices using RKHS vector sparsity. `"numba"` uses JIT-compiled kernels (default). `"omp_sparse"` uses OpenMP Fortran extensions (requires `make`; falls back to `"numba"` if unavailable). `"dense"` disables sparse operations. |
 
 ---
 
