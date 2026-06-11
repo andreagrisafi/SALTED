@@ -106,7 +106,7 @@ def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
         psivec: Sparse matrix (scipy.sparse)
         ref_projs: Dense vector/matrix
         over: Dense overlap matrix
-        sparse_algorithm: "omp_sparse" or "dense"
+        sparse_algorithm: "numba", "dense", or "omp_sparse"
 
     Returns:
         (avec_contrib, bmat_contrib, algorithm_used)
@@ -124,10 +124,10 @@ def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
             return avec_contrib, bmat_contrib, "omp_sparse"
 
         except Exception as e:
-            print(f"Warning: OpenMP sparse operations failed ({e}), falling back to dense")
-            # Fall through to dense computation
+            print(f"Warning: omp_sparse unavailable ({e}), falling back to numba", flush=True)
+            sparse_algorithm = "numba"
 
-    elif sparse_algorithm == "numba":
+    if sparse_algorithm == "numba":
         from salted.numba_sparse import get_hessian_engine
         N_df, K_rkhs = psivec.shape
         avec_contrib = psivec.T @ ref_projs               # O(nnz) vector multiply
