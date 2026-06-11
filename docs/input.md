@@ -88,6 +88,12 @@ Remember to set `inp.predict` if one wants to predict densities.
 | `trainsel` | `Literal["sequential"] \| Literal["random"]` | `"random"` | Select the training set at random or sequentially from the entire dataset. |
 | `sparse_algorithm` | `Literal["dense"] \| Literal["numba"] \| Literal["omp_sparse"]` | `"numba"` | The algorithm to compute Hessian matrices using RKHS vector sparsity. `"numba"` uses JIT-compiled kernels (default). `"omp_sparse"` uses OpenMP Fortran extensions (requires `make`; falls back to `"numba"` if unavailable). `"dense"` disables sparse operations. |
 
+!!! note "Tuning the Numba cache budget for Hessian computation"
+    When `sparse_algorithm: numba` is used, the L3 cache budget can be controlled via the environment variable `SALTED_NUMBA_CACHE_BYTES` (default: 32 MiB). For MPI runs, set it to approximately `total_L3 / ranks_per_node / 2`:
+    ```bash
+    export SALTED_NUMBA_CACHE_BYTES=$(( 512*1024*1024 / 16 / 2 ))  # 512 MiB L3, 16 ranks/node
+    ```
+
 ---
 
 ## API
