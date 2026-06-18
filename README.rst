@@ -127,7 +127,11 @@ In what follows, we report an example of a general command line workflow:
 
 Contact
 -------
-andrea.grisafi@ens.psl.eu
+andrea.grisafi@sorbonne-universite.fr
 
 alan.m.lewis@york.ac.uk
+
+Funding
+-------
+The development of SALTED has received support from the French National Research Agency under the France 2030 program (Grant No. ANR-22-PEBA-0002).
 
