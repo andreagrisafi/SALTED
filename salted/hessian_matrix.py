@@ -15,6 +15,7 @@ from salted.sys_utils import (
     distribute_jobs,
     format_index_ranges,
     get_atom_idx,
+
     read_system,
 )
 

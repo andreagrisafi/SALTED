@@ -15,6 +15,7 @@ from salted.sys_utils import (
     format_index_ranges,
     get_atom_idx,
     init_property_file,
+
     read_system,
 )
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
@@ -40,6 +41,7 @@ def build():
     vdir = f"validations_{saltedname}"
     rdir = f"regrdir_{saltedname}"
     fdir = f"rkhs-vectors_{saltedname}"
+
 
     # define test set
     trainrangetot = np.loadtxt(osp.join(

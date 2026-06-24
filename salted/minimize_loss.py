@@ -14,6 +14,7 @@ from salted.sys_utils import (
     distribute_jobs,
     format_index_ranges,
     get_atom_idx,
+
     read_system,
 )
 
@@ -67,6 +68,7 @@ def build():
     ) = ParseConfig().get_all_params()
 
     comm, size, rank, parallel = detect_mpi()
+
 
     fdir = f"rkhs-vectors_{saltedname}"
     rdir = f"regrdir_{saltedname}"

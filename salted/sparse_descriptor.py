@@ -176,8 +176,10 @@ def build():
             h5f = h5py.File(osp.join(sdir,  f"FEAT_M-{Menv}.h5"), 'w')
             for spe in species:
                 for lam in range(lmax[spe]+1):
-                    power_env_sparse[(spe,lam)] = power_env_sparse[(spe,lam)].reshape(Mspe[spe]*(2*lam+1),power_env_sparse[(spe,lam)].shape[-1])
-                    h5f.create_dataset(f"sparse_descriptors/{spe}/{lam}",data=power_env_sparse[(spe,lam)])
+                    power_env_sparse[(spe, lam)] = power_env_sparse[(spe, lam)].reshape(
+                        Mspe[spe] * (2 * lam + 1), power_env_sparse[(spe, lam)].shape[-1]
+                    )  # shape (Mspe[spe]*(2*lam+1), featsize)
+                    h5f.create_dataset(f"sparse_descriptors/{spe}/{lam}", data=power_env_sparse[(spe, lam)])
             h5f.close()
 
     elif saltedtype=="density-response":
@@ -250,7 +252,7 @@ def build():
             comm.Barrier()
             for spe in species:
                 for lam in range(lmax[spe]+1):
-                    power_env_sparse[(spe,lam)] = comm.allreduce(power_env_sparse[(spe,lam)])
+                    power_env_sparse[(spe,lam)] = comm.allreduce(power_env_sparse[(spe,lam)])  # shape (Mspe[spe],(2*lam+1), featsize)
     
         if rank==0:
             # reshape sparse vector and save

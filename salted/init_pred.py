@@ -20,6 +20,7 @@ def build(rank):
     Menv = inp.gpr.Menv
     zeta = inp.gpr.z
     reg = inp.gpr.regul
+
     ncut = inp.descriptor.sparsify.ncut
     sparsify = True if inp.descriptor.sparsify.ncut > 0 else False
   
