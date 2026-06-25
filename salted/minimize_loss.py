@@ -68,7 +68,6 @@ def build():
 
     comm, size, rank, parallel = detect_mpi()
 
-
     fdir = f"rkhs-vectors_{saltedname}"
     rdir = f"regrdir_{saltedname}"
 
