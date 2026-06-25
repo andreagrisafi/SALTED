@@ -61,7 +61,6 @@ def build():
 
     fdir = f"rkhs-vectors_{saltedname}"
 
-
     if (rank == 0):
         dirpath = os.path.join(saltedpath, fdir, f"M{Menv}_zeta{zeta}")
         if not os.path.exists(dirpath):

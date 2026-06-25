@@ -22,7 +22,6 @@ from salted.sys_utils import (
     get_atom_idx,
     get_feats_projs,
     get_feats_projs_response,
-
     read_system,
     init_property_file,
 )
@@ -40,8 +39,6 @@ def build():
     sparsify, nsamples, ncut,
     zeta, Menv, Ntrain, trainfrac, regul, eigcut,
     gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
-
-
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
         raise ValueError(
