@@ -11,11 +11,12 @@ from sympy.physics.wigner import wigner_3j
 
 from salted.sph_utils import kernelequicomb, kernelnorm
 from salted import sph_utils
-from salted.sys_utils import ParseConfig, get_atom_idx, read_system, rkhs_proj
+from salted.sys_utils import ParseConfig, compute_Mcut, get_atom_idx, read_system, rkhs_proj
 
 
 def build():
-    # inp = ParseConfig().parse_input()  # not used for now
+    inp = ParseConfig().parse_input()
+
 
     # salted parameters
     (saltedname, saltedpath, saltedtype,
@@ -41,17 +42,21 @@ def build():
         for spe in species:
             power_env_sparse = features['sparse_descriptors'][spe]['0'][:]
             Mspe = power_env_sparse.shape[0]
+            Mcut = compute_Mcut(inp.gpr.Mcut, Mspe, lmax[spe])
+            for lam in range(lmax[spe]+1):
+                print("spe=", spe, "lam=", lam, "Mcut=", Mcut[lam])
             kernel0_mm = np.dot(power_env_sparse,power_env_sparse.T)
-            k0 = kernel0_mm**zeta
+            k0 = kernel0_mm[:Mcut[0],:Mcut[0]]**zeta
             V = rkhs_proj(k0)
             h5f.create_dataset(f"projectors/{spe}/0",data=V)
             for lam in range(1,lmax[spe]+1):
                 power_env_sparse = features['sparse_descriptors'][spe][str(lam)][:]
                 kernel_mm = np.dot(power_env_sparse,power_env_sparse.T)
-                for i1 in range(Mspe):
-                    for i2 in range(Mspe):
+                kernel_mm = kernel_mm[: Mcut[lam] * (2 * lam + 1), : Mcut[lam] * (2 * lam + 1)]
+                for i1 in range(Mcut[lam]):
+                    for i2 in range(Mcut[lam]):
                         kernel_mm[i1*(2*lam+1):i1*(2*lam+1)+2*lam+1][:,i2*(2*lam+1):i2*(2*lam+1)+2*lam+1] *= kernel0_mm[i1,i2]**(zeta-1)
-                V = rkhs_proj(kernel_mm)
+                V = rkhs_proj(kernel_mm)  # shape (Mcut[lam]*(2*lam+1), rank_above_threshold)
                 h5f.create_dataset(f"projectors/{spe}/{lam}",data=V)
         h5f.close()
         features.close()
@@ -78,14 +83,11 @@ def build():
             Mspe = power_env_sparse.shape[0]
             kernel0_mm = np.dot(power_env_sparse,power_env_sparse.T)
 
-            Mcut = {}
+            Mcut = compute_Mcut(inp.gpr.Mcut, Mspe, lmax[spe])
             Mcutsize = {}
             for lam in range(lmax[spe]+1):
-                frac = np.exp(-0.05*lam**2)
-                Mcut[lam] = int(round(Mspe*frac))
                 Mcutsize[lam] = Mcut[lam]*3*(2*lam+1)
                 print("lam=",lam,"Mcut=",Mcut[lam],"Msize=",Mcutsize[lam])
-            #sys.exit(0)
 
             for lam in range(lmax[spe]+1):
 

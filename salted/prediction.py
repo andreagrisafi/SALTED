@@ -15,6 +15,7 @@ from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
     check_MPI_tasks_count,
+    compute_Mcut,
     detect_mpi,
     distribute_jobs,
     format_index_ranges,
@@ -215,12 +216,17 @@ def build():
 
             for spe in species:
 
+                Mcut = compute_Mcut(inp.gpr.Mcut, Mspe[spe], lmax[spe])
+                Mcutsize = {}
+                for lam in range(lmax[spe]+1):
+                    Mcutsize[lam] = Mcut[lam]*(2*lam+1)
+
                 # lam = 0
                 if zeta==1:
                     psi_nm[(spe,0)] = np.dot(pvec[0][i,atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
                 else:
                     kernel0_nm = np.dot(pvec[0][i,atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
-                    kernel_nm = kernel0_nm**zeta
+                    kernel_nm = kernel0_nm[:, :Mcutsize[0]]**zeta
                     psi_nm[(spe,0)] = np.dot(kernel_nm,Vmat[(0,spe)])
 
                 # lam > 0
@@ -234,6 +240,7 @@ def build():
                         kernel_nm_blocks = kernel_nm.reshape(natom_dict[(iconf,spe)], 2*lam+1, Mspe[spe], 2*lam+1)
                         kernel_nm_blocks *= kernel0_nm[:, np.newaxis, :, np.newaxis] ** (zeta - 1)
                         kernel_nm = kernel_nm_blocks.reshape(natom_dict[(iconf,spe)]*(2*lam+1), Mspe[spe]*(2*lam+1))
+                        kernel_nm = kernel_nm[:, :Mcutsize[lam]]
                         psi_nm[(spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
 
             # compute predictions per channel
@@ -244,9 +251,9 @@ def build():
                 ispe[spe] = 0
                 for l in range(lmax[spe]+1):
                     for n in range(nmax[(spe,l)]):
-                        Mcut = psi_nm[(spe,l)].shape[1]
-                        C[(spe,l,n)] = np.dot(psi_nm[(spe,l)],weights[isize:isize+Mcut])
-                        isize += Mcut
+                        psi_cols = psi_nm[(spe,l)].shape[1]
+                        C[(spe,l,n)] = np.dot(psi_nm[(spe,l)],weights[isize:isize+psi_cols])
+                        isize += psi_cols
 
             # init averages array if asked
             if average:
@@ -379,11 +386,9 @@ def build():
 
                 start_kernel_0 = time.time()
 
-                Mcut = {}
+                Mcut = compute_Mcut(inp.gpr.Mcut, Mspe[spe], lmax[spe])
                 Mcutsize = {}
                 for lam in range(lmax[spe]+1):
-                    frac = np.exp(-0.05*lam**2)
-                    Mcut[lam] = int(round(Mspe[spe]*frac))
                     Mcutsize[lam] = Mcut[lam]*3*(2*lam+1)
 
                 # lam=0
