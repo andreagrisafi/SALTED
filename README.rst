@@ -25,8 +25,11 @@ References
 
 Installation
 ------------
-In the SALTED directory, simply run :code:`make`, followed by :code:`pip install .`
-   
+In the SALTED directory, simply run :code:`pip install .`
+
+Optionally, Fortran extensions (f2py) can be compiled by running :code:`make` before installing.
+These are no longer required and Hessian construction uses Numba instead.
+
 Dependencies
 ------------
 
@@ -44,7 +47,7 @@ A parallel h5py installation is required to use MPI parellelisation. This can be
 :code:`HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
 provided HDF5 has been compiled with MPI support.
 
---> :code:`pip install meson ninja` to run f2py using meson backend following versions of Python >= 3.12.
+--> (Optional) :code:`pip install meson ninja`, only needed if compiling f2py extensions via :code:`make`.
 
 Input file
 ----------
@@ -124,7 +127,16 @@ In what follows, we report an example of a general command line workflow:
 
 Contact
 -------
-andrea.grisafi@ens.psl.eu
+andrea.grisafi@sorbonne-universite.fr
 
 alan.m.lewis@york.ac.uk
+
+mr2102@cam.ac.uk
+
+zekun.lou@mpsd.mpg.de
+
+Funding
+-------
+The development of SALTED has received support from the French National Research Agency under the France 2030 program (Grant No. ANR-22-PEBA-0002). 
+It also received partial support from the German Research Foundation (DFG) Project-ID 555467911 - CRC 1772 / TP A06.
 

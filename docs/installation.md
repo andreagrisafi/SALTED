@@ -5,7 +5,9 @@
 
 ## Install SALTED
 
-You can find the SALTED program on [GitHub](https://github.com/andreagrisafi/SALTED). In the SALTED directory, simply run `make`, followed by `pip install .`
+You can find the SALTED program on [GitHub](https://github.com/andreagrisafi/SALTED). In the SALTED directory, simply run `pip install .`
+
+Optionally, Fortran extensions (f2py) can be compiled by running `make` before installing. These are no longer required and Hessian construction uses Numba instead.
 
 ??? note "Editable python package"
     If you want to modify the code, you can install SALTED with the following command:
@@ -24,7 +26,7 @@ You can find the SALTED program on [GitHub](https://github.com/andreagrisafi/SAL
 
  - `mpi4py`: mpi4py is required to use MPI parallelisation; SALTED can nonetheless be run without this. A parallel h5py installation is required to use MPI parellelisation. This can be installed by running: `HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py` provided HDF5 has been compiled with MPI support.
 
- - `pip install meson ninja` to run f2py using meson backend following versions of Python > 3.12.
+ - (Optional) `pip install meson ninja`, only needed if compiling f2py extensions via `make`.
 
 ## Install electronic-structure codes 
 
