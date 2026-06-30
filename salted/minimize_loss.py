@@ -413,7 +413,7 @@ def build():
             r = np.load(rpath)
             s = np.multiply(P, r)
             delnew = np.dot(r, s)
-            loss = loss_func(w, ovlp_list, psi_list)
+            loss = loss_func(w, ovlp_list, psi_list, coef_list)
         else:
             # Print a warning and revert to the else behavior
             print(
@@ -465,11 +465,11 @@ def build():
             )
         if (i+1)%50==0:
             loss_old = loss.copy()
-            loss = loss_func(w, ovlp_list, psi_list)
+            loss = loss_func(w, ovlp_list, psi_list, coef_list)
             if loss>loss_old:
                 if rank == 0:
                     print(f"WARNING: loss function increased, search direction reset as the steepest descent.")
-                r = -grad_func(w, ovlp_list, psi_list)
+                r = -grad_func(w, ovlp_list, psi_list, coef_list)
                 if rank == 0:
                     print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
                 if np.linalg.norm(r) < gradtol:
