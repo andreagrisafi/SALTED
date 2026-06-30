@@ -11,8 +11,10 @@ site_url: https://github.com/andreagrisafi/SALTED
 nav:
   - Home: index.md
   - Installation: installation.md
+  - Docker: docker.md
   - Theory: theory.md
   - Workflow: workflow.md
+  - Binary Deployment: binary_models.md
   - Input: input.md
   - Tutorial:
     - Part 1 - Dataset: tutorial/dataset.md
