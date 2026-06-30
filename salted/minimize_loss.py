@@ -137,7 +137,7 @@ def build():
         trainrange = trainrangetot[:ntraintot]
     ntrain = int(len(trainrange))
 
-    def loss_func(weights, ovlp_list, psi_list):
+    def loss_func(weights, ovlp_list, psi_list, coef_list):
         """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
 
         #        global totsize
@@ -152,13 +152,7 @@ def build():
             # loop over training structures
             for iconf in range(ntrain):
 
-                ref_coefs = np.load(
-                    osp.join(
-                        saltedpath,
-                        "coefficients",
-                        f"coefficients_conf{trainrange[iconf]}.npy",
-                    )
-                )
+                ref_coefs = coef_list[iconf]
 
                 if average:
                     Av_coeffs = np.zeros(ref_coefs.shape[0])
@@ -227,7 +221,7 @@ def build():
 
         return loss
 
-    def grad_func(weights, ovlp_list, psi_list):
+    def grad_func(weights, ovlp_list, psi_list, coef_list):
         """
         Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function.
         """
@@ -243,10 +237,7 @@ def build():
             # loop over training structures
             for iconf in range(ntrain):
 
-                # load reference QM data
-                ref_coefs = np.load(osp.join(
-                    saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
-                ))
+                ref_coefs = coef_list[iconf]
 
                 if average:
                     Av_coeffs = np.zeros(ref_coefs.shape[0])
@@ -363,6 +354,7 @@ def build():
         print("loading matrices...")
     ovlp_list = []
     psi_list = []
+    coef_list = []
     for iconf in trainrange:
         ovlp_list.append(
             np.load(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf}.npy"))
@@ -371,6 +363,9 @@ def build():
         if saltedtype=="density":
             psi_list.append(sparse.load_npz(osp.join(
               saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+            )))
+            coef_list.append(np.load(osp.join(
+              saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
             )))
         elif saltedtype=="density-response":
             for icart in ["x","y","z"]:
@@ -427,8 +422,8 @@ def build():
 
     if init:
         w = np.ones(totsize) * 1e-04
-        loss = loss_func(w, ovlp_list, psi_list)
-        r = -grad_func(w, ovlp_list, psi_list)
+        loss = loss_func(w, ovlp_list, psi_list, coef_list)
+        r = -grad_func(w, ovlp_list, psi_list, coef_list)
         d = np.multiply(P, r)
         delnew = np.dot(r, d)
 

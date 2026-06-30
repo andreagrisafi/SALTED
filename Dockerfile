@@ -85,8 +85,9 @@ RUN pip install meson packaging numba ase scipy pyyaml sympy \
 #Install SALTED
 COPY . /src/temp/SALTED-master
 RUN cd /src/temp/SALTED-master \
-    && make \
-    && pip install . --no-deps
+    && pip install . \
+    && cd .. \
+    && rm -rf SALTED-master
 
 RUN rm -R /src/temp
 
