@@ -11,7 +11,7 @@ from scipy import sparse
 from salted import sph_utils
 from salted.sph_utils import equicomb_numba, equicombsparse_numba, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
 from salted.sys_utils import (
-    ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs,
+    ParseConfig, check_MPI_tasks_count, compute_Mcut, detect_mpi, distribute_jobs,
     format_index_ranges, get_atom_idx, get_feats_projs, get_feats_projs_response,
     read_system,
 )
@@ -155,13 +155,15 @@ def build():
                 else:
                     power[lam] = p.reshape(natoms[iconf],2*lam+1,featsize)
 
-            # Compute kernels and RKHS descriptors 
+            # Compute kernels and RKHS descriptors
             Psi:dict[tuple[int, str], np.ndarray] = {}
             ispe = {}
             Tsize = 0
             for spe in species:
 
                 ispe[spe] = 0
+
+                Mcut = compute_Mcut(inp.gpr.Mcut, Mspe[spe], lmax[spe])
 
                 # lam=0
                 if zeta == 1:
@@ -172,7 +174,7 @@ def build():
                 else:
 
                     kernel0_nm = np.dot(power[0][atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
-                    kernel_nm = kernel0_nm**zeta
+                    kernel_nm = kernel0_nm[:, :Mcut[0]]**zeta
                     Psi[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
 
                 Tsize += natom_dict[(iconf,spe)]*nmax[(spe,0)]
@@ -192,8 +194,9 @@ def build():
                         kernel_nm_blocks = kernel_nm.reshape(natom_dict[(iconf,spe)], 2*lam+1, Mspe[spe], 2*lam+1)
                         kernel_nm_blocks *= kernel0_nm[:, np.newaxis, :, np.newaxis] ** (zeta - 1)
                         kernel_nm = kernel_nm_blocks.reshape(natom_dict[(iconf,spe)]*(2*lam+1), Mspe[spe]*(2*lam+1))
+                        kernel_nm = kernel_nm[:, :Mcut[lam]*(2*lam+1)]
                         Psi[(spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))
-                
+
                     Tsize += natom_dict[(iconf,spe)]*nmax[(spe,lam)]*(2*lam+1)
 
             # build sparse feature-vector memory efficiently
@@ -338,11 +341,9 @@ def build():
             Tsize = 0
             for spe in species:
 
-                Mcut = {}
+                Mcut = compute_Mcut(inp.gpr.Mcut, Mspe[spe], lmax[spe])
                 Mcutsize = {}
                 for lam in range(lmax[spe]+1):
-                    frac = np.exp(-0.05*lam**2)
-                    Mcut[lam] = int(round(Mspe[spe]*frac))
                     Mcutsize[lam] = Mcut[lam]*3*(2*lam+1)
 
                 for icart in range(3):

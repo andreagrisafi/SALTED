@@ -3,12 +3,10 @@ import os
 import os.path as osp
 import re
 from typing import Literal
-import sys
 
 import h5py
 import numpy as np
 import yaml
-from ase import Atoms
 from ase.io import read
 
 from salted import basis
@@ -439,7 +437,37 @@ def sort_grid_data(data: np.ndarray) -> np.ndarray:
     return data
 
 
-def get_feats_projs(species, lmax):
+def compute_Mcut(mode: str | list[int], Mspe_value: int, lmax_for_spe: int) -> dict[int, int]:
+    """Return dict {lam: int} per the requested Mcut mode for one atomic species.
+
+    Args:
+        mode (str or list[int]): One of "fixed", "gaussian", or a list of per-lam basis sizes.
+        Mspe_value (int): Total sparsified environments available for this species
+            (upper bound; entries larger than this are clamped with a warning).
+        lmax_for_spe (int): Max angular momentum for the species; result has keys 0..lmax_for_spe.
+    """
+    Mcut = {}
+    if mode == "fixed":
+        for lam in range(lmax_for_spe + 1):
+            Mcut[lam] = Mspe_value
+    elif mode == "gaussian":
+        for lam in range(lmax_for_spe + 1):
+            frac = np.exp(-0.05 * lam**2)
+            Mcut[lam] = int(round(Mspe_value * frac))
+    elif isinstance(mode, list):
+        if len(mode) < lmax_for_spe + 1:
+            raise ValueError(
+                f"inp.gpr.Mcut list has length {len(mode)} but at least lmax+1={lmax_for_spe + 1} entries are required"
+            )
+        for lam in range(lmax_for_spe + 1):
+            Mcut[lam] = min(mode[lam], Mspe_value)
+    else:
+        raise ValueError(f"Invalid Mcut mode: {mode!r}")
+    return Mcut
+
+
+
+def get_feats_projs(species: str, lmax: dict[str, int]):
     """Load training features vectors and RKHS projection matrices"""
     inp = ParseConfig().parse_input()
     Vmat = {}
@@ -449,16 +477,19 @@ def get_feats_projs(species, lmax):
     features = h5py.File(os.path.join(sdir, f"FEAT_M-{inp.gpr.Menv}.h5"), "r")
     projectors = h5py.File(os.path.join(sdir, f"projector_M{inp.gpr.Menv}_zeta{inp.gpr.z}.h5"), "r")
     for spe in species:
+        # determine Mspe and per-lam Mcut from the lam=0 descriptor
+        Mspe[spe] = features["sparse_descriptors"][spe]["0"].shape[0]  # matrix shape: (Mspe[spe]*(2*lam+1), featsize)
+        Mcut_spe = compute_Mcut(inp.gpr.Mcut, Mspe[spe], lmax[spe])
         for lam in range(lmax[spe] + 1):
             # load RKHS projectors
             Vmat[(lam, spe)] = projectors["projectors"][spe][str(lam)][:]
             # load sparse equivariant descriptors
             power_env_sparse[(lam, spe)] = features["sparse_descriptors"][spe][str(lam)][:]
-            if lam == 0:
-                Mspe[spe] = power_env_sparse[(lam, spe)].shape[0]
             # precompute projection on RKHS if linear model
             if inp.gpr.z == 1:
-                power_env_sparse[(lam, spe)] = np.dot(Vmat[(lam, spe)].T, power_env_sparse[(lam, spe)])
+                power_env_sparse[(lam, spe)] = np.dot(
+                    Vmat[(lam, spe)].T, power_env_sparse[(lam, spe)][: (Mcut_spe[lam] * (2 * lam + 1))]
+                )
     features.close()
     projectors.close()
 
@@ -965,6 +996,19 @@ class ParseConfig:
                     "numba",
                     str,
                     lambda inp, val: val in ("dense", "omp_sparse", "numba"),
+                ),
+                "Mcut": (
+                    False,
+                    "fixed",
+                    (str, list),
+                    lambda inp, val: (
+                        (isinstance(val, str) and val in ("fixed", "gaussian"))
+                        or (
+                            isinstance(val, list)
+                            and len(val) > 0
+                            and all(isinstance(x, int) and x > 0 for x in val)
+                        )
+                    ),
                 ),
             },
         }
