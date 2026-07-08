@@ -30,12 +30,7 @@ RUN wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5
 #Install h5py
 RUN HDF5_DIR=/usr/local/hdf5 HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py
 
-RUN apt-get update && apt-get install -y \
-    ninja-build \
-    gfortran \
-	&& rm -rf /var/lib/apt/lists/*
-
-RUN pip install meson cython \
+RUN pip install cython \
     && pip install --prefer-binary pyscf
 
 #Install SALTED
