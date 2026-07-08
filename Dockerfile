@@ -4,14 +4,7 @@ FROM python:3.10-bookworm
 SHELL ["/bin/bash", "-c"] 
 WORKDIR /src/temp
 
-#Install Featomic
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
-    && chmod 700 installRust.sh \
-    && ./installRust.sh -y \
-    && source $HOME/.cargo/env \
-    && pip install git+https://github.com/metatensor/featomic.git
-                                                                            
-#Install OpenMP
+#Install OpenMPI
 RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.2.tar.bz2 \
     && tar -xf openmpi-5.0.2.tar.bz2 \
     && cd openmpi-5.0.2 \
@@ -48,7 +41,6 @@ RUN pip install meson cython \
 #Install SALTED
 COPY . /src/temp/SALTED-master
 RUN cd /src/temp/SALTED-master \
-    && make \
     && pip install .
 
 RUN rm -R /src/temp

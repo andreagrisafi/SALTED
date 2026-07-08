@@ -25,29 +25,10 @@ References
 
 Installation
 ------------
-In the SALTED directory, simply run :code:`pip install .`
+In the SALTED directory, simply run :code:`pip install .`.
+Note that this only allows serial usage.
 
-Optionally, Fortran extensions (f2py) can be compiled by running :code:`make` before installing.
-These are no longer required and Hessian construction uses Numba instead.
-
-Dependencies
-------------
-
-We strongly recommend using **Python >= 3.12** combined with **NumPy >= 1.26**.
-These versions use the modern **Meson** build backend, which is fully supported and more robust.
-Older Python versions (<= 3.11) relying on the deprecated ``distutils`` backend may require ``setuptools < 60.0``.
-
---> **featomic**: featomic installation requires a RUST compiler. To install a RUST compiler, run:
-:code:`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`
-featomic can then be installed using
-:code:`pip install git+https://github.com/metatensor/featomic.git`
-
---> **mpi4py**: mpi4py is required to use MPI parallelisation; SALTED can nonetheless be run without this.
-A parallel h5py installation is required to use MPI parellelisation. This can be installed by running:
-:code:`HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py`
-provided HDF5 has been compiled with MPI support.
-
---> (Optional) :code:`pip install meson ninja`, only needed if compiling f2py extensions via :code:`make`.
+For installing MPI-parallelized SALTED, please refer to the `Installation Documentation <https://salted.readthedocs.io/en/latest/installation/>`_.
 
 Input file
 ----------

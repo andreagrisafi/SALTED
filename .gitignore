@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+
+# Optional compiled Fortran extensions (built on demand via `make`)
+salted/lib/*.so
+*.mod
+
+# f2py / meson build leftovers
+.f2py_f2cmap
+src/*.so
+/meson_build/
+.mesonpy-*
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# MkDocs / docs build output
+site/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data information
+salted/basis_data.yaml

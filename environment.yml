@@ -1,0 +1,21 @@
+# To init the conda environment, run the following commands in a terminal:
+#
+#   conda env create -f environment.yml     # add `-n <env-name>` to choose the name, can override the default name "salted"
+#   conda activate salted
+#   pip install .                           # from the SALTED directory
+name: salted
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - openmpi
+  - mpi4py
+  - "h5py=*=mpi_openmpi_*"
+  - numpy
+  - numba
+  - scipy
+  - sympy
+  - pyyaml
+  - packaging
+  - ase
+  - pip
