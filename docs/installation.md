@@ -5,25 +5,11 @@
 
 ## Install SALTED
 
-### Quick setup (serial version)
+Install SALTED directly from [GitHub](https://github.com/andreagrisafi/SALTED):
 
-You can find the SALTED program on [GitHub](https://github.com/andreagrisafi/SALTED). In the SALTED directory, run `pip install .` for a serial-only installation.
-
-### Setup parallel version
-
-To use MPI parallelisation you need a parallel (MPI-enabled) h5py, either by `pip` or by `conda`:
-
-- **With pip**: requires a parallel HDF5 and an MPI compiler already available on your system:
-    ```bash
-    pip install mpi4py
-    # set CC to your MPI C compiler (e.g. mpicc)
-    HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py
-    ```
-- **With conda** — provides a parallel HDF5, no compiler needed:
-    ```bash
-    conda env create -f environment.yml   # add `-n <env-name>` to choose the name
-    conda activate salted
-    ```
+```bash
+pip install git+https://github.com/andreagrisafi/SALTED.git
+```
 
 
 ## Install electronic-structure codes

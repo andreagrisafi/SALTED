@@ -25,10 +25,11 @@ References
 
 Installation
 ------------
-In the SALTED directory, simply run :code:`pip install .`.
-Note that this only allows serial usage.
+Install SALTED directly from GitHub:
 
-For installing MPI-parallelized SALTED, please refer to the `Installation Documentation <https://salted.readthedocs.io/en/latest/installation/>`_.
+.. code:: bash
+
+   pip install git+https://github.com/andreagrisafi/SALTED.git
 
 Input file
 ----------

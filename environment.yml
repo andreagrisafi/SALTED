@@ -10,7 +10,7 @@ dependencies:
   - python>=3.10
   - openmpi
   - mpi4py
-  - "h5py=*=mpi_openmpi_*"
+  - h5py
   - numpy
   - numba
   - scipy

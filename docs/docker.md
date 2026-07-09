@@ -5,7 +5,6 @@ The container includes the following components:
 - Python 3.10 (Bookworm)
 - Featomic
 - OpenMPI 5.0.2
-- HDF5 + h5py
 - SALTED
 
 The **SALTED** installation is imported directly from the local repository, enabling the use of custom modifications without requiring a remote package rebuild.

@@ -15,20 +15,6 @@ RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.2.tar.b
 
 ENV PATH=/usr/local/openmpi5/lib/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/openmpi5/lib
-ENV HDF5_DIR=/usr/local/hdf5
-
-#Install HDF5
-RUN wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5/HDF5_1_14_3/src/hdf5-1.14.3.tar.gz \
-    && tar -xf hdf5-1.14.3.tar.gz \
-    && cd hdf5-1.14.3 \
-    && HDF5_MPI="ON" CC=mpicc ./configure --enable-shared --enable-parallel --prefix=/usr/local/hdf5 \
-    && HDF5_DIR=/usr/local/hdf5 make \
-    && HDF5_DIR=/usr/local/hdf5 make install \
-    && cd .. \
-	&& rm -R hdf5-1.14.3
-
-#Install h5py
-RUN HDF5_DIR=/usr/local/hdf5 HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py
 
 RUN pip install cython \
     && pip install --prefer-binary pyscf
