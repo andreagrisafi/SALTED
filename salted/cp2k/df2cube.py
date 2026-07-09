@@ -269,7 +269,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                                 ylm_real = np.zeros((2*l+1,nidx))
                                 lm = 0
                                 for m in range(-l,1):
-                                    ylm = special.sph_harm(m,l,lph,lth)
+                                    ylm = special.sph_harm_y(l,m,lth,lph)
                                     if m==0:
                                         ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
                                         lm += l+1
@@ -300,7 +300,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                             ylm_real = np.zeros((2*l+1,nidx))
                             lm = 0
                             for m in range(-l,1):
-                                ylm = special.sph_harm(m,l,lph,lth)
+                                ylm = special.sph_harm_y(l,m,lth,lph)
                                 if m==0:
                                     ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
                                     lm += l+1
@@ -327,7 +327,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                     ylm_real = np.zeros((2*l+1,nidx))
                     lm = 0
                     for m in range(-l,1):
-                        ylm = special.sph_harm(m,l,lph,lth)
+                        ylm = special.sph_harm_y(l,m,lth,lph)
                         if m==0:
                             ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
                             lm += l+1

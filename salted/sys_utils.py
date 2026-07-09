@@ -666,6 +666,7 @@ class ParseConfig:
             inp.qm.path2qm,
             inp.qm.qmcode,
             inp.qm.qmbasis,
+            inp.qm.dfmetric,
             inp.qm.dfbasis,
             inp.prediction.filename,
             inp.prediction.predname,
@@ -851,6 +852,7 @@ class ParseConfig:
                     str,
                     lambda inp, val: val.lower() in ("aims", "pyscf", "cp2k"),
                 ),  # quantum mechanical code
+                "dfmetric": (True, None, str, None),  # density fitting metric
                 "dfbasis": (True, None, str, None),  # density fitting basis
                 #### below are optional, but required for some qmcode ####
                 "qmbasis": (
@@ -871,6 +873,12 @@ class ParseConfig:
                     list,
                     get_qmcode_checker("cp2k"),
                 ),  # pseudo nuclear charge, only for CP2K
+                "cubefile": (
+                    False,
+                    PLACEHOLDER,
+                    str,
+                    get_qmcode_checker("cp2k"),
+                ),
                 "coeffile": (
                     False,
                     PLACEHOLDER,
