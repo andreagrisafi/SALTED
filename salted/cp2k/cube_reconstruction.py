@@ -14,7 +14,7 @@ from numba import get_num_threads, get_thread_id
 from mpi4py import MPI
 
 
-def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank,nx=0,ny=0,nz=0):
+def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
          
     inp = ParseConfig().parse_input()
 
@@ -84,12 +84,10 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank,nx=0,ny=0,
 
         nx, ny, nz = nside[0], nside[1], nside[2]
 
-    elif nx == 0 & ny == 0 & nz == 0:
-        nx , ny, nz = 100, 100, 100
- 
-        dx = float(structure.cell[0,0]/nx) / b2a
-        dy = float(structure.cell[1,1]/ny) / b2a
-        dz = float(structure.cell[2,2]/nz) / b2a
+    else:
+        nx = int(np.floor(structure.cell[0,0]/(0.111*b2a))+1)
+        ny = int(np.floor(structure.cell[1,1]/(0.111*b2a))+1)
+        nz = int(np.floor(structure.cell[2,2]/(0.111*b2a))+1)
 
     dx = float(structure.cell[0,0]/nx) / b2a
     dy = float(structure.cell[1,1]/ny) / b2a
@@ -292,7 +290,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank,nx=0,ny=0,
         
         if "e_density" in f_list:
             # print density on a cube file
-            cubef = open(saltedpath+"cubes/"+cubename + "e_density.cube","w")
+            cubef = open(saltedpath+"cubes/"+cubename + "_e_density.cube","w")
             print("Reconstructed electron density",file=cubef)
             print("CUBE FORMAT",file=cubef)
             print(natoms,file=cubef)
@@ -308,7 +306,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank,nx=0,ny=0,
 
         if "potential" in f_list:
             # print density on a cube file
-            cubef = open(saltedpath+"cubes/"+cubename + "potential.cube","w")
+            cubef = open(saltedpath+"cubes/"+cubename + "_potential.cube","w")
             print("Reconstructed electron density",file=cubef)
             print("CUBE FORMAT",file=cubef)
             print(natoms,file=cubef)
@@ -324,7 +322,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank,nx=0,ny=0,
 
         if "efield_x" in f_list:
             # print density on a cube file
-            cubef = open(saltedpath+"cubes/"+cubename + "efield_x.cube","w")
+            cubef = open(saltedpath+"cubes/"+cubename + "_efield_x.cube","w")
             print("Reconstructed electron density",file=cubef)
             print("CUBE FORMAT",file=cubef)
             print(natoms,file=cubef)
@@ -340,7 +338,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank,nx=0,ny=0,
 
         if "efield_y" in f_list:
             # print density on a cube file
-            cubef = open(saltedpath+"cubes/"+cubename + "efield_y.cube","w")
+            cubef = open(saltedpath+"cubes/"+cubename + "_efield_y.cube","w")
             print("Reconstructed electron density",file=cubef)
             print("CUBE FORMAT",file=cubef)
             print(natoms,file=cubef)
@@ -356,7 +354,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank,nx=0,ny=0,
 
         if "efield_z" in f_list:
             # print density on a cube file
-            cubef = open(saltedpath+"cubes/"+cubename + "efield_z.cube","w")
+            cubef = open(saltedpath+"cubes/"+cubename + "_efield_z.cube","w")
             print("Reconstructed electron density",file=cubef)
             print("CUBE FORMAT",file=cubef)
             print(natoms,file=cubef)

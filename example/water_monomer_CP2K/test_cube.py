@@ -30,6 +30,4 @@ rloc = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
 rloc["O"] = 0.24446328480160
 rloc["H"] = 0.20059317301776
 
-nx, ny, nz = 88,88,88
-
-cube_reconstruction.build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank,nx,ny,nz)
+cube_reconstruction.build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank)
