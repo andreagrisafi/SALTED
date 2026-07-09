@@ -3,7 +3,6 @@
 The container includes the following components:
 
 - Python 3.10 (Bookworm)
-- Featomic
 - OpenMPI 5.0.2
 - SALTED
 
