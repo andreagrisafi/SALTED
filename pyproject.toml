@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "salted"
+version = "3.0.0"
+description = "Symmetry-Adapted Learning of Three-Dimensional Electron Densities"
+readme = "README.rst"
+requires-python = ">=3.10"
+license = { text = "GNU General Public License v3 or later (GPLv3+)" }
+authors = [
+    { name = "Andrea Grisafi", email = "andrea.grisafi@ens.psl.eu" },
+    { name = "Alan Lewis", email = "alan.m.lewis@york.ac.uk" },
+]
+dependencies = [
+    "mpi4py",
+    "featomic>=0.6",
+    "ase",
+    "numpy",
+    "numba",
+    "scipy",
+    "h5py",
+    "sympy",
+    "pyyaml",
+    "packaging",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+]
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs",
+    "mkdocstrings[python]",
+    "markdown-include",
+    "pymdown-extensions",
+]
+
+[project.urls]
+Homepage = "https://github.com/andreagrisafi/SALTED"
+
+[tool.setuptools.packages.find]
+include = ["salted*"]
+exclude = ["salted.ortho*", "*_deprecated_*"]
+
+[tool.setuptools.package-data]
+# In case one needs the FORTRAN code again
+salted = ["lib/*.so"]
