@@ -5,7 +5,7 @@ import os
 import math
 from ase.io import read, write
 import os.path as osp
-from salted import init_pred
+from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
 from salted.cp2k.utils import build_matrices, gto_rec, get_reciprocal_grid, get_basis_set_info_numba
 from numba import types
@@ -65,7 +65,8 @@ else:
 # Initialize SALTED
 species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
-lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals = init_pred.build(rank)
+
+[lmax,nmax] = basis.basiset(dfbasis)
 
 bdir = osp.join(saltedpath,"basis")
 
