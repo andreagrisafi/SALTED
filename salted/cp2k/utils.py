@@ -525,14 +525,14 @@ def build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, pa
                 if icoefs != icoefs2:
                     S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]].T
             if df_metric == "coulomb":
-                S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = np.dot(obj1.real.T, obj2.real) + np.dot(obj1.imag.T, obj2.imag)
+                S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = 2*(np.dot(obj1.real.T, obj2.real) + np.dot(obj1.imag.T, obj2.imag))
                 S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]].T
             icoefs2 += nbasis[spe2]
         if df_metric == "identity":
             w[icoefs:icoefs+nbasis[spe]] = 2*(np.dot(obj1[1:,:].real.T, rho_KS_rec[1:].real) + np.dot(obj1[1:,:].imag.T, rho_KS_rec[1:].imag))
             w[icoefs:icoefs+nbasis[spe]] += obj1[0,:].real.T * rho_KS_rec[0].real + obj1[0,:].imag.T * rho_KS_rec[0].imag
         if df_metric == "coulomb":
-            w[icoefs:icoefs+nbasis[spe]] = np.dot(obj1.real.T, rho_KS_rec.real/knorm_vec) + np.dot(obj1.imag.T, rho_KS_rec.imag/knorm_vec)
+            w[icoefs:icoefs+nbasis[spe]] = 2*(np.dot(obj1.real.T, rho_KS_rec.real/knorm_vec) + np.dot(obj1.imag.T, rho_KS_rec.imag/knorm_vec))
         icoefs += nbasis[spe]
 
     S = np.real(S)*4*np.pi
