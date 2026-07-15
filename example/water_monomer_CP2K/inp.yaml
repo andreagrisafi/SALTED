@@ -14,6 +14,8 @@ qm:
   qmcode: cp2k
   periodic: 3D
   dfbasis: RI-basis
+  dfmetric: coulomb
+  cubefile: wat_mon-ELECTRON_DENSITY-1_0.cube
   coeffile: wat_mon-RI_DENSITY_COEFFS.dat
   ovlpfile: wat_mon-RI_2C_INTS.fm
   pseudocharge: [1.0, 6.0]

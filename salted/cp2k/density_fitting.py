@@ -2,8 +2,7 @@ import numpy as np
 import time
 import sys
 import os
-import math
-from ase.io import read, write
+from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
@@ -28,7 +27,6 @@ gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_para
 conf_start = int(sys.argv[1])
 conf_end = int(sys.argv[2])
 
-rank = 0
 
 comm, size, rank, parallel = detect_mpi()
 
@@ -46,7 +44,6 @@ if rank==0:
 
 xyzfile = read(inp.system.filename,":")[conf_start:conf_end+1]
 ndata = len(xyzfile)
-species = inp.system.species
 
 if parallel:
 
@@ -66,12 +63,9 @@ else:
 species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-[lmax,nmax] = basis.basiset(dfbasis)
-
 bdir = osp.join(saltedpath,"basis")
 
 lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, dfbasis, bdir)    
-
 
 structure = xyzfile[0]
 b2a = 0.529177249
@@ -92,7 +86,7 @@ for spe in species:
 
 volume = structure.get_volume()/(b2a**3)
 
-cubefile = open(os.path.join(inp.qm.path2qm, "dataset", f"conf_{conf_start+1}", inp.qm.cubefile),"r")
+cubefile = open(os.path.join(inp.qm.path2qm, f"conf_{conf_start+1}", inp.qm.cubefile),"r")
 lines = cubefile.readlines()
 nside = {}
 nside[0] = int(lines[3].split()[0])
@@ -144,7 +138,7 @@ for iconf in conf_range:
     cell = structure.cell/b2a
     coords  = structure.positions/b2a
 
-    cube_dir = os.path.join(inp.qm.path2qm, "dataset", f"conf_{conf_start+iconf+1}", inp.qm.cubefile)
+    cube_dir = os.path.join(inp.qm.path2qm, f"conf_{conf_start+iconf+1}", inp.qm.cubefile)
 
     cubefile = open(cube_dir,"r")
     lines = cubefile.readlines()
@@ -173,7 +167,7 @@ for iconf in conf_range:
     rho_KS = np.array(rho_qm)
 
     rho_KS = rho_KS.reshape((nside[0], nside[1], nside[2]))
-
+    
     rho_KS_rec = np.fft.fftn(rho_KS).ravel()* dx * dy * dz
     rho_KS_rec = rho_KS_rec[mask]
     if df_metric == "coulomb":
@@ -185,14 +179,7 @@ for iconf in conf_range:
 
     print(time.time()-start)
 
-    if parallel:
-        S = comm.reduce(S)
-        w = comm.reduce(w)
+    c = np.linalg.solve(S,w)
 
-    if rank == 0:
-
-        c = np.linalg.solve(S,w)
-
-        np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{conf_start + iconf}.npy"), c)
-        np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{conf_start + iconf}.npy"), S)
-
+    np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{conf_start + iconf}.npy"), c)
+    np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{conf_start + iconf}.npy"), S)
