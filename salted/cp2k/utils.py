@@ -494,7 +494,7 @@ def factorial(n):
    return f
 
 #@njit(parallel = False, fastmath = True)
-def build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_loc, df_metric, rank):
+def build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank):
     S = np.zeros((ncoefs, ncoefs), dtype=np.float64)
     w = np.zeros((ncoefs), dtype=np.float64)
 
@@ -505,7 +505,7 @@ def build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, pa
     icoefs = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        obj1 = np.zeros((nG_loc, nbasis[spe]), dtype = np.complex128)
+        obj1 = np.zeros((nG_half, nbasis[spe]), dtype = np.complex128)
         if df_metric == "identity":
             obj1 = (cos_k_coords - 1j * sin_k_coords)[:, iat, np.newaxis] * partial_wave_coefs[spe]
         if df_metric == "coulomb":
@@ -513,31 +513,24 @@ def build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, pa
         icoefs2 = 0
         for iat2 in range(iat+1):
             spe2 = atomic_symbols[iat2]
-            obj2 = np.zeros((nG_loc, nbasis[spe2]), dtype = np.complex128)
+            obj2 = np.zeros((nG_half, nbasis[spe2]), dtype = np.complex128)
             if df_metric == "identity":
                 obj2 = (cos_k_coords - 1j * sin_k_coords)[:, iat2, np.newaxis] * partial_wave_coefs[spe2]
             if df_metric == "coulomb":
                 obj2 = ((cos_k_coords - 1j * sin_k_coords)/ knorm_vec[:, np.newaxis] )[:, iat2, np.newaxis] * partial_wave_coefs[spe2]
 
             if df_metric == "identity":
-                if rank == 0:
-                    S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = 2*(np.dot(obj1[1:,:].real.T, obj2[1:,:].real) + np.dot(obj1[1:,:].imag.T, obj2[1:,:].imag))
-                    S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] += np.outer(obj1[0,:].real, obj2[0,:].real) + np.outer(obj1[0,:].imag, obj2[0,:].imag)
-                    if icoefs != icoefs2:
-                        S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]].T
-                else:
-                    S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = 2*(np.dot(obj1.real.T, obj2.real) + np.dot(obj1.imag.T, obj2.imag))
+                S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = 2*(np.dot(obj1[1:,:].real.T, obj2[1:,:].real) + np.dot(obj1[1:,:].imag.T, obj2[1:,:].imag))
+                S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] += np.outer(obj1[0,:].real, obj2[0,:].real) + np.outer(obj1[0,:].imag, obj2[0,:].imag)
+                if icoefs != icoefs2:
                     S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]].T
             if df_metric == "coulomb":
                 S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = np.dot(obj1.real.T, obj2.real) + np.dot(obj1.imag.T, obj2.imag)
                 S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]].T
             icoefs2 += nbasis[spe2]
         if df_metric == "identity":
-            if rank == 0:
-                w[icoefs:icoefs+nbasis[spe]] = 2*(np.dot(obj1[1:,:].real.T, rho_KS_rec[1:].real) + np.dot(obj1[1:,:].imag.T, rho_KS_rec[1:].imag))
-                w[icoefs:icoefs+nbasis[spe]] += obj1[0,:].real.T * rho_KS_rec[0].real + obj1[0,:].imag.T * rho_KS_rec[0].imag
-            else:
-                w[icoefs:icoefs+nbasis[spe]] = 2*(np.dot(obj1.real.T, rho_KS_rec.real) + np.dot(obj1.imag.T, rho_KS_rec.imag))
+            w[icoefs:icoefs+nbasis[spe]] = 2*(np.dot(obj1[1:,:].real.T, rho_KS_rec[1:].real) + np.dot(obj1[1:,:].imag.T, rho_KS_rec[1:].imag))
+            w[icoefs:icoefs+nbasis[spe]] += obj1[0,:].real.T * rho_KS_rec[0].real + obj1[0,:].imag.T * rho_KS_rec[0].imag
         if df_metric == "coulomb":
             w[icoefs:icoefs+nbasis[spe]] = np.dot(obj1.real.T, rho_KS_rec.real/knorm_vec) + np.dot(obj1.imag.T, rho_KS_rec.imag/knorm_vec)
         icoefs += nbasis[spe]
