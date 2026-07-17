@@ -13,7 +13,7 @@ def build():
     
     if rank == 0: print("WARNING! This script assumes you will use an AIMS version >= 240403 to read the predicted RI coefficients. If this is not true, please use move_data_in_reorder instead.")
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename=inp.prediction.filename,spelist = inp.system.species, dfbasis = inp.qm.dfbasis)
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system(filename=inp.prediction.filename,spelist = inp.system.species, dfbasis = inp.qm.dfbasis)
     
     pdir = f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}"
     
