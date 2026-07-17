@@ -125,7 +125,7 @@ def init_moments(inp,species,lmax,nmax,rank):
 #
 #    return [charge,dipole]
 
-def compute_charge_and_dipole(geom,pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
+def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
     """Compute total charge and dipole moment for the given configuration"""
 
     pseudocharge_dict = {}
@@ -204,14 +204,8 @@ def compute_charge_and_dipole(geom,pseudocharge,natoms,atoms_range_set,atomic_sy
 
     return [charge,dipole]
 
-def scale_grad_coefs(geom,pseudocharge,natoms,atoms_range_set,atomic_symbols,lmax,nmax,species,charge_integrals,coefs,grad_coefs,average,charge,parallel,comm):
+def scale_grad_coefs(pseudocharge,natoms,atoms_range_set,atomic_symbols,lmax,nmax,species,charge_integrals,coefs,grad_coefs,average,charge,parallel,comm):
     """Compute total charge and dipole moment for the given configuration"""
-
-    geom.wrap()
-    bohr2angs = 0.529177210670
-    coords = geom.get_positions()/bohr2angs
-    all_symbols = geom.get_chemical_symbols()
-    all_natoms = int(len(all_symbols))
 
     pseudocharge_dict = {}
     for i in range(len(species)):
@@ -245,9 +239,9 @@ def scale_grad_coefs(geom,pseudocharge,natoms,atoms_range_set,atomic_symbols,lma
     # Perform dipole calculation
     iaux = 0
     for iat in range(natoms):
+        spe = atomic_symbols[iat]
         if iat in atoms_range_set:
             i = 0
-            spe = atomic_symbols[iat]
             if spe in species:
                 for l in range(lmax[spe]+1):
                     for n in range(nmax[(spe,l)]):
@@ -267,7 +261,7 @@ def scale_grad_coefs(geom,pseudocharge,natoms,atoms_range_set,atomic_symbols,lma
 
     return
 
-def compute_polarizability(geom,natoms,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs):
+def compute_polarizability(natoms,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs):
     """Compute polarizability tensor for the given configuration"""
 
     # Compute unnormalized response integral

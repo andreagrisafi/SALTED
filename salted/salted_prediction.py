@@ -35,6 +35,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     
     # Define system excluding atoms that belong to species not listed in SALTED input 
     atomic_symbols = structure.get_chemical_symbols()
+    structure.wrap()
     atomic_coords = structure.get_positions()/bohr2angs
     natoms_tot = len(atomic_symbols)
     excluded_species = []
@@ -317,11 +318,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for spe in species:
             lcuts[spe] = min(lcut,lmax[spe])
  
-        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,atomic_coords,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
+        charge, dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,atomic_coords,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
         
         if gradient:
 
-            grad_charge = scale_grad_coefs(structure,inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge,parallel,comm)
+            grad_charge = scale_grad_coefs(inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge,parallel,comm)
 
             return [pred_coefs, grad_pred_coefs, charge, dipole] 
 
