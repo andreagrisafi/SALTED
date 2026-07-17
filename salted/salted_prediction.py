@@ -9,7 +9,7 @@ from ase.io import read
 from scipy import special
 
 from salted import basis, sph_utils
-from salted.cp2k.utils import compute_charge_and_dipole, scale_grad_coefs
+from salted.cp2k.utils import compute_charge_and_dipole_parallelized, scale_grad_coefs
 from salted.sys_utils import ParseConfig, check_MPI_tasks_count, compute_Mcut, distribute_jobs, format_index_ranges
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,gradient,structure):
@@ -302,12 +302,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     if average and rank==0:
         pred_coefs += Av_coeffs
     
-    if parallel:
-        comm.Barrier()
-        pred_coefs = comm.allreduce(pred_coefs)  
-        if gradient:
-            grad_pred_coefs = comm.allreduce(grad_pred_coefs)  
- 
     #print("pred time:", time.time()-predstart,flush=True)
     if inp.salted.verbose and rank==0:
         print(f"Total prediction time = {(time.time() - start_time):.2f} s", flush=True)
@@ -318,11 +312,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for spe in species:
             lcuts[spe] = min(lcut,lmax[spe])
  
-        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+        charge, dipole = compute_charge_and_dipole_parallelized(structure,inp.qm.pseudocharge,natoms,atoms_range_set,atomic_global_idx,atomic_symbols,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
         
         if gradient:
 
-            grad_charge = scale_grad_coefs(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge)
+            grad_charge = scale_grad_coefs(structure,inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge,parallel,comm)
 
             return [pred_coefs, grad_pred_coefs, charge, dipole] 
 

@@ -9,7 +9,7 @@ from salted import salted_prediction
 from salted.sys_utils import ParseConfig, detect_mpi
 inp = ParseConfig().parse_input()
 
-comm, size, rank, _ = detect_mpi()
+comm, size, rank, parallel = detect_mpi()
 
 (saltedname, saltedpath, saltedtype,
 filename, species, average,
@@ -36,7 +36,10 @@ gradient=False
 frames = read(inp.prediction.filename,":")
 for i in range(len(frames)):
     structure = frames[i]
-    [coefs] = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,gradient,structure) 
+    [coefs] = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,gradient,structure)
+    if parallel:
+        comm.Barrier()
+        coefs = comm.allreduce(coefs)
     if rank==0:
         ref_coefs = np.loadtxt(dirpath+"/COEFFS-"+str(Ntrain+i+1)+".dat")
         print("Conf", i+1, "Consistent prediction?", np.allclose(coefs,ref_coefs)) 
