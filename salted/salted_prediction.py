@@ -9,7 +9,7 @@ from ase.io import read
 from scipy import special
 
 from salted import basis, sph_utils
-from salted.cp2k.utils import compute_charge_and_dipole_parallelized, scale_grad_coefs
+from salted.cp2k.utils import compute_charge_and_dipole, scale_grad_coefs
 from salted.sys_utils import ParseConfig, check_MPI_tasks_count, compute_Mcut, distribute_jobs, format_index_ranges
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,gradient,structure):
@@ -30,9 +30,12 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
     # read system
     ndata = len(structure)
+
+    bohr2angs = 0.529177210670
     
     # Define system excluding atoms that belong to species not listed in SALTED input 
     atomic_symbols = structure.get_chemical_symbols()
+    atomic_coords = structure.get_positions()/bohr2angs
     natoms_tot = len(atomic_symbols)
     excluded_species = []
     atomic_global_idx = []
@@ -44,7 +47,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
             atomic_global_idx.append(iat)
     excluded_species = set(excluded_species)
     for spe in excluded_species:
+        mask = [s != spe for s in atomic_symbols]
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
+        atomic_coords = np.array(atomic_coords)[mask]
     natoms = int(len(atomic_symbols))
     atomic_global_idx = np.array(atomic_global_idx,int)
 
@@ -312,7 +317,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for spe in species:
             lcuts[spe] = min(lcut,lmax[spe])
  
-        charge, dipole = compute_charge_and_dipole_parallelized(structure,inp.qm.pseudocharge,natoms,atoms_range_set,atomic_global_idx,atomic_symbols,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
+        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,atomic_coords,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
         
         if gradient:
 

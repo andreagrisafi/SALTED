@@ -104,13 +104,18 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
     # read system
     xyzfile = read(filename, ":", parallel=False)
     ndata = len(xyzfile)
+    
+    bohr2angs = 0.529177210670
 
     # Define system excluding atoms that belong to species not listed in SALTED input
     atomic_symbols = []
+    atomic_coords  = []
     natoms = np.zeros(ndata, int)
     for iconf in range(len(xyzfile)):
         atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
         natoms_total = len(atomic_symbols[iconf])
+        xyzfile[iconf].wrap()
+        atomic_coords.append(xyzfile[iconf].get_positions()/bohr2angs)
         excluded_species = []
         for iat in range(natoms_total):
             spe = atomic_symbols[iconf][iat]
@@ -118,13 +123,15 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
                 excluded_species.append(spe)
         excluded_species = set(excluded_species)
         for spe in excluded_species:
+            mask = [s != spe for s in atomic_symbols[iconf]]
             atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
+            atomic_coords[iconf] = np.array(atomic_coords[iconf])[mask]
         natoms[iconf] = int(len(atomic_symbols[iconf]))
 
     # Define maximum number of atoms
     natmax = max(natoms)
 
-    return spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax
+    return spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax
 
 
 def get_atom_idx(ndata, natoms, spelist, atomic_symbols):

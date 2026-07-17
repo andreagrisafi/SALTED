@@ -48,7 +48,7 @@ def build():
 
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(filename_pred, species, dfbasis)
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system(filename_pred, species, dfbasis)
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     bohr2angs = 0.529177210670
@@ -278,7 +278,7 @@ def build():
 
             if qmcode=="cp2k":
                 # Compute charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(frames[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+                charge, dipole = compute_charge_and_dipole(frames[iconf],inp.qm.pseudocharge,natoms[iconf],np.arange(natoms),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
                 print(iconf+1,charge,file=qfile)
                 print(iconf+1,dipole["x"],dipole["y"],dipole["z"],file=dfile)
             

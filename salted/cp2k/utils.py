@@ -59,80 +59,74 @@ def init_moments(inp,species,lmax,nmax,rank):
 
     return [charge_integrals,dipole_integrals]
 
-def compute_charge_and_dipole(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average):
+#def compute_charge_and_dipole(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average):
+#    """Compute total charge and dipole moment for the given configuration"""
+#
+#    geom.wrap()
+#    bohr2angs = 0.529177210670
+#    coords = geom.get_positions()/bohr2angs
+#    all_symbols = geom.get_chemical_symbols()
+#    all_natoms = int(len(all_symbols))
+#    
+#    pseudocharge_dict = {}
+#    for i in range(len(species)):
+#        pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
+#
+#    # Compute unnormalized electron-density integral
+#    iaux = 0
+#    nele = 0.0
+#    charge = 0.0
+#    for iat in range(natoms):
+#        spe = atomic_symbols[iat]
+#        nele += pseudocharge_dict[spe]
+#        for l in range(lmax[spe]+1):
+#            for n in range(nmax[(spe,l)]):
+#                if l==0:
+#                    charge += charge_integrals[(spe,l,n)] * coefs[iaux]
+#                iaux += 2*l+1
+#
+#    # Initialize dipole 
+#    cart = ["y","z","x"]
+#    dipole = {}
+#    for icart in range(3):
+#        dipole[cart[icart]] = 0.0
+#    
+#    # Perform dipole calculation
+#    iaux = 0
+#    for iat in range(all_natoms):
+#        spe = all_symbols[iat]
+#        if spe in species:
+#            if average:
+#                # Add contribution of nuclear pseudocharge to the dipole
+#                dipole["x"] += pseudocharge_dict[spe] * coords[iat,0] 
+#                dipole["y"] += pseudocharge_dict[spe] * coords[iat,1] 
+#                dipole["z"] += pseudocharge_dict[spe] * coords[iat,2] 
+#            for l in range(lmax[spe]+1):
+#                for n in range(nmax[(spe,l)]):
+#                    for im in range(2*l+1):
+#                        if l==0:
+#                            if average:
+#                                # rescale isotropic coefficients to conserve the electronic charge
+#                                coefs[iaux] *= nele/charge
+#                            else:
+#                                # remove residual charge from the most diffuse isotropic function
+#                                if n==nmax[(spe,l)]-1:
+#                                    coefs[iaux] -= charge/(charge_integrals[(spe,l,n)]*natoms)
+#                            # Compute l=0 electronic contribution to the dipole 
+#                            # NB: this is ill-defined in a truly periodic system and/or for systems with a net charge
+#                            dipole["x"] -= coefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,0]
+#                            dipole["y"] -= coefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,1]
+#                            dipole["z"] -= coefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,2]
+#                        if l==1:
+#                            # Compute l=1 electronic contribution to the dipole 
+#                            # NB: this follows the correspondence between (-1,0,1) real spherical harmonics and (y,z,x) Cartesian coordinates 
+#                            dipole[cart[im]] -= coefs[iaux] * dipole_integrals[(spe,l,n)]
+#                        iaux += 1
+#
+#    return [charge,dipole]
+
+def compute_charge_and_dipole(geom,pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
     """Compute total charge and dipole moment for the given configuration"""
-
-    geom.wrap()
-    bohr2angs = 0.529177210670
-    coords = geom.get_positions()/bohr2angs
-    all_symbols = geom.get_chemical_symbols()
-    all_natoms = int(len(all_symbols))
-    
-    pseudocharge_dict = {}
-    for i in range(len(species)):
-        pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
-
-    # Compute unnormalized electron-density integral
-    iaux = 0
-    nele = 0.0
-    charge = 0.0
-    for iat in range(natoms):
-        spe = atomic_symbols[iat]
-        nele += pseudocharge_dict[spe]
-        for l in range(lmax[spe]+1):
-            for n in range(nmax[(spe,l)]):
-                if l==0:
-                    charge += charge_integrals[(spe,l,n)] * coefs[iaux]
-                iaux += 2*l+1
-
-    # Initialize dipole 
-    cart = ["y","z","x"]
-    dipole = {}
-    for icart in range(3):
-        dipole[cart[icart]] = 0.0
-    
-    # Perform dipole calculation
-    iaux = 0
-    for iat in range(all_natoms):
-        spe = all_symbols[iat]
-        if spe in species:
-            if average:
-                # Add contribution of nuclear pseudocharge to the dipole
-                dipole["x"] += pseudocharge_dict[spe] * coords[iat,0] 
-                dipole["y"] += pseudocharge_dict[spe] * coords[iat,1] 
-                dipole["z"] += pseudocharge_dict[spe] * coords[iat,2] 
-            for l in range(lmax[spe]+1):
-                for n in range(nmax[(spe,l)]):
-                    for im in range(2*l+1):
-                        if l==0:
-                            if average:
-                                # rescale isotropic coefficients to conserve the electronic charge
-                                coefs[iaux] *= nele/charge
-                            else:
-                                # remove residual charge from the most diffuse isotropic function
-                                if n==nmax[(spe,l)]-1:
-                                    coefs[iaux] -= charge/(charge_integrals[(spe,l,n)]*natoms)
-                            # Compute l=0 electronic contribution to the dipole 
-                            # NB: this is ill-defined in a truly periodic system and/or for systems with a net charge
-                            dipole["x"] -= coefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,0]
-                            dipole["y"] -= coefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,1]
-                            dipole["z"] -= coefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,2]
-                        if l==1:
-                            # Compute l=1 electronic contribution to the dipole 
-                            # NB: this follows the correspondence between (-1,0,1) real spherical harmonics and (y,z,x) Cartesian coordinates 
-                            dipole[cart[im]] -= coefs[iaux] * dipole_integrals[(spe,l,n)]
-                        iaux += 1
-
-    return [charge,dipole]
-
-def compute_charge_and_dipole_parallelized(geom,pseudocharge,natoms,atoms_range_set,atomic_global_idx,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
-    """Compute total charge and dipole moment for the given configuration"""
-
-    geom.wrap()
-    bohr2angs = 0.529177210670
-    coords = geom.get_positions()/bohr2angs
-    all_symbols = geom.get_chemical_symbols()
-    all_natoms = int(len(all_symbols))
 
     pseudocharge_dict = {}
     for i in range(len(species)):
@@ -159,7 +153,6 @@ def compute_charge_and_dipole_parallelized(geom,pseudocharge,natoms,atoms_range_
     if parallel:
         comm.Barrier()
         charge = comm.allreduce(charge)
-        comm.Barrier()
 
     # Initialize dipole
     cart = ["y","z","x"]
@@ -170,39 +163,44 @@ def compute_charge_and_dipole_parallelized(geom,pseudocharge,natoms,atoms_range_
     # Perform dipole calculation
     iaux = 0
     for iat in range(natoms):
+        spe = atomic_symbols[iat]
         if iat in atoms_range_set:
-            spe = all_symbols[atomic_global_idx[iat]]
-            if spe in species:
-                i = 0
-                if average:
-                    # Add contribution of nuclear pseudocharge to the dipole
-                    dipole["x"] += pseudocharge_dict[spe] * coords[atomic_global_idx[iat],0]
-                    dipole["y"] += pseudocharge_dict[spe] * coords[atomic_global_idx[iat],1]
-                    dipole["z"] += pseudocharge_dict[spe] * coords[atomic_global_idx[iat],2]
-                for l in range(lmax[spe]+1):
-                    for n in range(nmax[(spe,l)]):
-                        for im in range(2*l+1):
-                            if l==0:
-                                if average:
-                                    # rescale isotropic coefficients to conserve the electronic charge
-                                    coefs[iaux+i] *= nele/charge
-                                else:
-                                    # remove residual charge from the most diffuse isotropic function
-                                    if n==nmax[(spe,l)]-1:
-                                        coefs[iaux+i] -= charge/(charge_integrals[(spe,l,n)]*natoms)
-                                # Compute l=0 electronic contribution to the dipole
-                                # NB: this is ill-defined in a truly periodic system and/or for systems with a net charge
-                                dipole["x"] -= coefs[iaux+i] * charge_integrals[(spe,l,n)] * coords[iat,0]
-                                dipole["y"] -= coefs[iaux+i] * charge_integrals[(spe,l,n)] * coords[iat,1]
-                                dipole["z"] -= coefs[iaux+i] * charge_integrals[(spe,l,n)] * coords[iat,2]
-                            if l==1:
-                                # Compute l=1 electronic contribution to the dipole
-                                # NB: this follows the correspondence between (-1,0,1) real spherical harmonics and (y,z,x) Cartesian coordinates
-                                dipole[cart[im]] -= coefs[iaux+i] * dipole_integrals[(spe,l,n)]
-                            i += 1
+            i = 0
+            if average:
+                # Add contribution of nuclear pseudocharge to the dipole
+                dipole["x"] += pseudocharge_dict[spe] * coords[iat,0]
+                dipole["y"] += pseudocharge_dict[spe] * coords[iat,1]
+                dipole["z"] += pseudocharge_dict[spe] * coords[iat,2]
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    for im in range(2*l+1):
+                        if l==0:
+                            if average:
+                                # rescale isotropic coefficients to conserve the electronic charge
+                                coefs[iaux+i] *= nele/charge
+                            else:
+                                # remove residual charge from the most diffuse isotropic function
+                                if n==nmax[(spe,l)]-1:
+                                    coefs[iaux+i] -= charge/(charge_integrals[(spe,l,n)]*natoms)
+                            # Compute l=0 electronic contribution to the dipole
+                            # NB: this is ill-defined in a truly periodic system and/or for systems with a net charge
+                            dipole["x"] -= coefs[iaux+i] * charge_integrals[(spe,l,n)] * coords[iat,0]
+                            dipole["y"] -= coefs[iaux+i] * charge_integrals[(spe,l,n)] * coords[iat,1]
+                            dipole["z"] -= coefs[iaux+i] * charge_integrals[(spe,l,n)] * coords[iat,2]
+                        if l==1:
+                            # Compute l=1 electronic contribution to the dipole
+                            # NB: this follows the correspondence between (-1,0,1) real spherical harmonics and (y,z,x) Cartesian coordinates
+                            dipole[cart[im]] -= coefs[iaux+i] * dipole_integrals[(spe,l,n)]
+                        i += 1
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
                 iaux += 2*l+1
+
+    if parallel:
+        comm.Barrier()
+        dipole["x"] = comm.allreduce(dipole["x"])
+        dipole["y"] = comm.allreduce(dipole["y"])
+        dipole["z"] = comm.allreduce(dipole["z"])
 
     return [charge,dipole]
 
@@ -241,7 +239,6 @@ def scale_grad_coefs(geom,pseudocharge,natoms,atoms_range_set,atomic_symbols,lma
     if parallel:
         comm.Barrier()
         grad_charge = comm.allreduce(grad_charge)
-        comm.Barrier()
 
     #print(f"Reduce time gc = {(time.time() - time_red_gc):.2f} s", flush=True)
 
@@ -270,14 +267,8 @@ def scale_grad_coefs(geom,pseudocharge,natoms,atoms_range_set,atomic_symbols,lma
 
     return
 
-def compute_polarizability(geom,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,coefs):
+def compute_polarizability(geom,natoms,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs):
     """Compute polarizability tensor for the given configuration"""
-
-    geom.wrap()
-    bohr2angs = 0.529177210670
-    coords = geom.get_positions()/bohr2angs
-    all_symbols = geom.get_chemical_symbols()
-    all_natoms = int(len(all_symbols))
 
     # Compute unnormalized response integral
     charge = {} 
@@ -304,25 +295,24 @@ def compute_polarizability(geom,natoms,atomic_symbols,lmax,nmax,species,charge_i
     for cartrow in ["x","y","z"]:
         ccoefs = coefs[cartrow]
         iaux = 0
-        for iat in range(all_natoms):
-            spe = all_symbols[iat]
-            if spe in species:
-                for l in range(lmax[spe]+1):
-                    for n in range(nmax[(spe,l)]):
-                        for im in range(2*l+1):
-                            if l==0:
-                                # remove residual charge from the most diffuse isotropic function
-                                if n==nmax[(spe,l)]-1:
-                                    ccoefs[iaux] -= charge[cartrow]/(charge_integrals[(spe,l,n)]*natoms)
-                                # Compute l=0 electronic contribution to the linear moment of the density-response 
-                                # NB: this is ill-defined in a truly periodic system 
-                                alpha[(cartrow,"x")] -= ccoefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,0]
-                                alpha[(cartrow,"y")] -= ccoefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,1]
-                                alpha[(cartrow,"z")] -= ccoefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,2]
-                            if l==1:
-                                # Compute l=1 electronic contribution to the linear moment of the density-response  
-                                # NB: this follows the correspondence between (-1,0,1) real spherical harmonics and (y,z,x) Cartesian coordinates 
-                                alpha[(cartrow,cart[im])] -= ccoefs[iaux] * dipole_integrals[(spe,l,n)]
-                            iaux += 1
+        for iat in range(natoms):
+            spe = atomic_symbols[iat]
+            for l in range(lmax[spe]+1):
+                for n in range(nmax[(spe,l)]):
+                    for im in range(2*l+1):
+                        if l==0:
+                            # remove residual charge from the most diffuse isotropic function
+                            if n==nmax[(spe,l)]-1:
+                                ccoefs[iaux] -= charge[cartrow]/(charge_integrals[(spe,l,n)]*natoms)
+                            # Compute l=0 electronic contribution to the linear moment of the density-response 
+                            # NB: this is ill-defined in a truly periodic system 
+                            alpha[(cartrow,"x")] -= ccoefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,0]
+                            alpha[(cartrow,"y")] -= ccoefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,1]
+                            alpha[(cartrow,"z")] -= ccoefs[iaux] * charge_integrals[(spe,l,n)] * coords[iat,2]
+                        if l==1:
+                            # Compute l=1 electronic contribution to the linear moment of the density-response  
+                            # NB: this follows the correspondence between (-1,0,1) real spherical harmonics and (y,z,x) Cartesian coordinates 
+                            alpha[(cartrow,cart[im])] -= ccoefs[iaux] * dipole_integrals[(spe,l,n)]
+                        iaux += 1
 
     return alpha

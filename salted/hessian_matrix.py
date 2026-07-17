@@ -26,7 +26,7 @@ def build():
     saltedname, saltedpath = inp.salted.saltedname, inp.salted.saltedpath
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 
     rdir = f"regrdir_{saltedname}"
 

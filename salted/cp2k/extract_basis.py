@@ -6,7 +6,7 @@ from ase.io import read
 import copy
 import time
 
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx
+from salted.sys_utils import ParseConfig
 
 inp = ParseConfig().parse_input()
 

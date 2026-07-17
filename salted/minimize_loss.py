@@ -71,7 +71,7 @@ def build():
     fdir = f"rkhs-vectors_{saltedname}"
     rdir = f"regrdir_{saltedname}"
 
-    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = (
+    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = (
         read_system()
     )
 

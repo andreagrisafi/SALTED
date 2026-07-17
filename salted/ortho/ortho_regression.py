@@ -6,7 +6,7 @@ sys.path.insert(0, './')
 import inp
 from sys_utils import read_system, get_atom_idx
 
-spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,spelist,atomic_symbols)
 
 # number of sparse environments

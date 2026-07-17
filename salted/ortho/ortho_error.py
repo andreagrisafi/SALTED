@@ -8,7 +8,7 @@ from sys_utils import read_system
 sys.path.insert(0, './')
 import inp
 
-spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 
 # number of sparse environments
 M = inp.Menv
