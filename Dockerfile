@@ -17,17 +17,12 @@ RUN apt-get update && apt-get install -y \
     libmunge-dev libmunge2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --upgrade pip setuptools wheel build
+# #Install Featomic
+RUN pip install --upgrade pip setuptools wheel build \
+    && pip install featomic
 
 ENV PATH=/usr/local/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64:/usr/lib/x86_64-linux-gnu
-
-#Install Featomic
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > installRust.sh \
-    && chmod 700 installRust.sh \
-    && ./installRust.sh -y \
-    && source $HOME/.cargo/env \
-    && pip install git+https://github.com/metatensor/featomic.git
 
 RUN wget https://github.com/openpmix/openpmix/releases/download/v6.1.0/pmix-6.1.0.tar.gz \
     && tar -xf pmix-6.1.0.tar.gz \

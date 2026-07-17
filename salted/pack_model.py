@@ -356,7 +356,7 @@ def pack_basis(SALTED_file, inp, debug: bool = False):
     basis = {}
     for symbol in symbols:
         try:
-            basis[symbol] = gto.basis.load(basis_name, symb=symbol)
+            basis[symbol] = gto.uncontract(gto.basis.load(basis_name, symb=symbol))
         except gto.basis.BasisNotFoundError:
             try:
                 basis[symbol] = read_new_basis("additional_basis", symbol)
