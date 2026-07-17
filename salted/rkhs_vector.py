@@ -11,25 +11,31 @@ from scipy import sparse
 from salted import sph_utils
 from salted.sph_utils import equicomb_numba, equicombsparse_numba, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
 from salted.sys_utils import (
-    ParseConfig, check_MPI_tasks_count, compute_Mcut, detect_mpi, distribute_jobs,
-    format_index_ranges, get_atom_idx, get_feats_projs, get_feats_projs_response,
-    read_system,
+    ParseConfig, build_featomic_hyper_params, check_MPI_tasks_count, compute_Mcut,
+    detect_mpi, distribute_jobs, format_index_ranges, get_atom_idx, get_feats_projs,
+    get_feats_projs_response, read_system,
 )
 
 def build():
 
     inp = ParseConfig().parse_input()
 
-    # salted parameters
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedname = inp.salted.saltedname
+    saltedpath = inp.salted.saltedpath
+    saltedtype = inp.salted.saltedtype
+    zeta = inp.gpr.z
+    Menv = inp.gpr.Menv
+    rep1, rep2 = inp.descriptor.rep1.type, inp.descriptor.rep2.type
+    nrad1, nrad2 = inp.descriptor.rep1.nrad, inp.descriptor.rep2.nrad
+    nang1, nang2 = inp.descriptor.rep1.nang, inp.descriptor.rep2.nang
+    neighspe1, neighspe2 = inp.descriptor.rep1.neighspe, inp.descriptor.rep2.neighspe
+    nspe1 = len(inp.descriptor.rep1.neighspe)
+    nspe2 = len(inp.descriptor.rep2.neighspe)
+    ncut = inp.descriptor.sparsify.ncut
+    sparsify = ncut > 0
+    HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
+    HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
 
     comm, size, rank, parallel = detect_mpi()
 
@@ -77,7 +83,7 @@ def build():
     else:
         conf_range = list(range(ndata))
 
-    frames = read(filename,":")
+    frames = read(inp.system.filename,":")
 
     if saltedtype=="density":
 

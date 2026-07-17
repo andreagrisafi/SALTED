@@ -10,21 +10,27 @@ from scipy import special
 
 from salted import basis, sph_utils
 from salted.cp2k.utils import compute_charge_and_dipole, scale_grad_coefs
-from salted.sys_utils import ParseConfig, check_MPI_tasks_count, compute_Mcut, distribute_jobs, format_index_ranges
+from salted.sys_utils import ParseConfig, build_featomic_hyper_params, check_MPI_tasks_count, compute_Mcut, distribute_jobs, format_index_ranges
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,gradient,structure):
 
     inp = ParseConfig().parse_input()
 
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedpath = inp.salted.saltedpath
+    species = inp.system.species
+    average = inp.system.average
+    zeta = inp.gpr.z
+    rep1, rep2 = inp.descriptor.rep1.type, inp.descriptor.rep2.type
+    nrad1, nrad2 = inp.descriptor.rep1.nrad, inp.descriptor.rep2.nrad
+    nang1, nang2 = inp.descriptor.rep1.nang, inp.descriptor.rep2.nang
+    neighspe1, neighspe2 = inp.descriptor.rep1.neighspe, inp.descriptor.rep2.neighspe
+    nspe1 = len(inp.descriptor.rep1.neighspe)
+    nspe2 = len(inp.descriptor.rep2.neighspe)
+    ncut = inp.descriptor.sparsify.ncut
+    sparsify = ncut > 0
+    HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
+    HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
 
     start_time = time.time()
 
@@ -312,7 +318,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     if inp.salted.verbose and rank==0:
         print(f"Total prediction time = {(time.time() - start_time):.2f} s", flush=True)
     
-    if qmcode=="cp2k":
+    if inp.qm.qmcode=="cp2k":
 
         lcuts = {}
         for spe in species:
