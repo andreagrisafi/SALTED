@@ -16,7 +16,7 @@ def build(iconf,ref_coefs):
 
     inp = ParseConfig().parse_input()
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 
     if inp.qm.qmcode=="cp2k":
         from ase.io import read

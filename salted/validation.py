@@ -33,7 +33,7 @@ def build():
 
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     vdir = f"validations_{saltedname}"
@@ -155,9 +155,9 @@ def build():
             if qmcode=="cp2k":
 
                 # Compute reference total charges and dipole moments
-                ref_charge, ref_dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average)
+                ref_charge, ref_dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,parallel,comm)
                 # Compute predicted total charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+                charge, dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
 
 
                 # Save charges and dipole moments
@@ -214,8 +214,8 @@ def build():
             if qmcode=="cp2k":
 
                 # Compute reference and predicted polarizabilities
-                ref_alpha = compute_polarizability(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs)
-                alpha = compute_polarizability(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs)
+                ref_alpha = compute_polarizability(natoms[iconf],atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs)
+                alpha = compute_polarizability(natoms[iconf],atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs)
 
                 # Save polarizabilities
                 print(iconf+1,ref_alpha[("x","x")],ref_alpha[("x","y")],ref_alpha[("x","z")],

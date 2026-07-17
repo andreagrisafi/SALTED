@@ -36,9 +36,13 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
     # read system
     ndata = len(structure)
+
+    bohr2angs = 0.529177210670
     
     # Define system excluding atoms that belong to species not listed in SALTED input 
     atomic_symbols = structure.get_chemical_symbols()
+    structure.wrap()
+    atomic_coords = structure.get_positions()/bohr2angs
     natoms_tot = len(atomic_symbols)
     excluded_species = []
     atomic_global_idx = []
@@ -50,7 +54,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
             atomic_global_idx.append(iat)
     excluded_species = set(excluded_species)
     for spe in excluded_species:
+        mask = [s != spe for s in atomic_symbols]
         atomic_symbols = list(filter(lambda a: a != spe, atomic_symbols))
+        atomic_coords = np.array(atomic_coords)[mask]
     natoms = int(len(atomic_symbols))
     atomic_global_idx = np.array(atomic_global_idx,int)
 
@@ -308,12 +314,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     if average and rank==0:
         pred_coefs += Av_coeffs
     
-    if parallel:
-        comm.Barrier()
-        pred_coefs = comm.allreduce(pred_coefs)  
-        if gradient:
-            grad_pred_coefs = comm.allreduce(grad_pred_coefs)  
- 
     #print("pred time:", time.time()-predstart,flush=True)
     if inp.salted.verbose and rank==0:
         print(f"Total prediction time = {(time.time() - start_time):.2f} s", flush=True)
@@ -324,11 +324,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for spe in species:
             lcuts[spe] = min(lcut,lmax[spe])
  
-        charge, dipole = compute_charge_and_dipole(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+        charge, dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,atomic_coords,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
         
         if gradient:
 
-            grad_charge = scale_grad_coefs(structure,inp.qm.pseudocharge,natoms,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge)
+            grad_charge = scale_grad_coefs(inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge,parallel,comm)
 
             return [pred_coefs, grad_pred_coefs, charge, dipole] 
 

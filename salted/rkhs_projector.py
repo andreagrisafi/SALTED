@@ -25,7 +25,7 @@ def build():
     zeta = inp.gpr.z
     Menv = inp.gpr.Menv
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     sdir = os.path.join(saltedpath, f"equirepr_{saltedname}")
