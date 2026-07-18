@@ -15,21 +15,12 @@ def build(iconf,ref_coefs):
     """Compute polarizability tensor for the given structure and related set of density-response coefficients."""
 
     inp = ParseConfig().parse_input()
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 
-    if qmcode=="cp2k":
+    if inp.qm.qmcode=="cp2k":
         from ase.io import read
-        xyzfile = read(filename, ":")
+        xyzfile = read(inp.system.filename, ":")
         # Initialize calculation of density/density-response moments
         charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,0)
 

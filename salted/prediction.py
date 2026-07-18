@@ -14,6 +14,7 @@ from salted.sph_utils import equicombnonorm, antiequicombnonorm, kernelequicomb,
 from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
+    build_featomic_hyper_params,
     check_MPI_tasks_count,
     compute_Mcut,
     detect_mpi,
@@ -30,15 +31,26 @@ from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_p
 def build():
 
     inp = ParseConfig().parse_input()
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedname = inp.salted.saltedname
+    saltedpath = inp.salted.saltedpath
+    saltedtype = inp.salted.saltedtype
+    average = inp.system.average
+    qmcode = inp.qm.qmcode
+    filename_pred = inp.prediction.filename
+    predname = inp.prediction.predname
+    zeta = inp.gpr.z
+    Menv = inp.gpr.Menv
+    rep1, rep2 = inp.descriptor.rep1.type, inp.descriptor.rep2.type
+    nrad1, nrad2 = inp.descriptor.rep1.nrad, inp.descriptor.rep2.nrad
+    nang1, nang2 = inp.descriptor.rep1.nang, inp.descriptor.rep2.nang
+    neighspe1, neighspe2 = inp.descriptor.rep1.neighspe, inp.descriptor.rep2.neighspe
+    nspe1 = len(inp.descriptor.rep1.neighspe)
+    nspe2 = len(inp.descriptor.rep2.neighspe)
+    ncut = inp.descriptor.sparsify.ncut
+    sparsify = ncut > 0
+    HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
+    HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
         raise ValueError(
@@ -48,7 +60,7 @@ def build():
 
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system(filename_pred, species, dfbasis)
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system(filename_pred, inp.system.species, inp.qm.dfbasis)
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     bohr2angs = 0.529177210670
@@ -68,10 +80,10 @@ def build():
         conf_range = list(range(ndata))
     natoms_total = sum(natoms[conf_range])
 
-    reg_log10_intstr = str(int(np.log10(regul)))  # for consistency
+    reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))  # for consistency
 
     # load regression weights
-    ntrain = int(Ntrain * trainfrac)
+    ntrain = int(inp.gpr.Ntrain * inp.gpr.trainfrac)
     weights = np.load(osp.join(
         saltedpath,
         f"regrdir_{saltedname}",
@@ -419,7 +431,7 @@ def build():
                     print("kernel lam=0 time (sec) = ",time.time()-start_kernel_0,flush=True)
                 start_kernel_lam = time.time()
 
-                if alpha_only and qmcode=="cp2k":
+                if inp.prediction.alpha_only and qmcode=="cp2k":
                     lmax[spe] = 1
 
                 # lam>0
