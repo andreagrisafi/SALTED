@@ -40,6 +40,10 @@ docs = [
     "markdown-include",
     "pymdown-extensions",
 ]
+test = [
+    "pytest",
+]
+all = ["salted[docs,test]"]
 
 [project.urls]
 Homepage = "https://github.com/andreagrisafi/SALTED"
@@ -51,3 +55,15 @@ exclude = ["salted.ortho*", "*_deprecated_*"]
 [tool.setuptools.package-data]
 # In case one needs the FORTRAN code again
 salted = ["lib/*.so"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "example: end-to-end example pipeline test, needs the SALTED-datasets repository",
+    "mpi: needs mpirun; exercises the MPI-parallel code paths",
+    "aims: uses the water_monomer_aims dataset (fast)",
+    "pyscf: uses the water_monomer_PySCF dataset",
+    "cp2k: uses the water_monomer_CP2K dataset",
+    "slow: long-running test (minutes); skip with -m 'not slow' for quick runs",
+]

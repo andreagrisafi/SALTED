@@ -9,7 +9,7 @@ import numpy as np
 import yaml
 from ase.io import read
 
-from salted import basis
+from salted.basis_client import BasisClient
 
 
 def build_featomic_hyper_params(rep_cfg) -> dict:
@@ -90,8 +90,8 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
             "please check the docstring for more details."
         )
 
-    # read basis
-    [lmax, nmax] = basis.basiset(dfbasis)
+    # read basis (optionally from an external file, inp.qm.dfbasis_file)
+    [lmax, nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read_as_old_format(dfbasis)
     llist = []
     nlist = []
     for spe in spelist:
@@ -852,6 +852,12 @@ class ParseConfig:
                     lambda inp, val: val.lower() in ("aims", "pyscf", "cp2k"),
                 ),  # quantum mechanical code
                 "dfbasis": (True, None, str, None),  # density fitting basis
+                "dfbasis_file": (
+                    False,
+                    None,
+                    (str, type(None)),
+                    check_optional_path_exists,
+                ),  # optional path to an external basis dataset yaml file
                 #### below are optional, but required for some qmcode ####
                 "qmbasis": (
                     False,
@@ -1131,6 +1137,16 @@ def check_path_exists(_, path: str) -> bool:
 
 
 check_path_exists.parse_error_msg = "Path (value) does not exist."
+
+
+def check_optional_path_exists(_, path: str | None) -> bool:
+    """Check an optional path field whose "unset" value is None.
+    None (unset) is allowed; otherwise the path must exist.
+    """
+    return path is None or os.path.exists(path)
+
+
+check_optional_path_exists.parse_error_msg = "Path (value) does not exist."
 
 
 def check_conditions_alpha_only(inp: dict, val: bool) -> bool:

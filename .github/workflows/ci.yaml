@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:  # unit tests on every branch; integration tests only on master/dev_test_CI
+  pull_request:  # PRs into the main development branches: full suite
+    branches: [master, dev_test_CI]
+  workflow_dispatch:  # manual trigger from the GitHub Actions UI
+    inputs:
+      ntrain:
+        description: "Override gpr.Ntrain of the example pipelines (empty = default)"
+        required: false
+        default: ""
+
+# a new push to the same branch/PR supersedes the running check
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATASETS_REPO: andreagrisafi/SALTED-datasets
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install MPI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libopenmpi-dev openmpi-bin
+
+      - name: Install SALTED
+        run: |
+          python -m pip install --upgrade pip
+          # pyscf is only needed to cover salted.pyscf.get_basis_info
+          pip install -e . pytest pyscf
+
+      - name: Run unit tests
+        run: pytest tests/unit -v
+
+  example-tests:
+    needs: unit-tests
+    # Run integration tests on PRs, manual dispatches, and pushes to the core branches.
+    # Skips on pushes to feature branches (unit tests cover those).
+    if: |
+      github.event_name != 'push' ||
+      github.ref_name == 'master' ||
+      github.ref_name == 'dev_test_CI'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        marker: [aims, pyscf, cp2k]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: SALTED
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: SALTED/pyproject.toml
+
+      - name: Install MPI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libopenmpi-dev openmpi-bin
+
+      - name: Install SALTED
+        working-directory: SALTED
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pytest
+
+      - name: Resolve datasets revision
+        id: datasets-rev
+        run: |
+          sha=$(git ls-remote "https://github.com/${DATASETS_REPO}.git" HEAD | cut -f1)
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SALTED-datasets
+        id: cache-datasets
+        uses: actions/cache@v4
+        with:
+          path: SALTED-datasets
+          key: salted-datasets-${{ steps.datasets-rev.outputs.sha }}
+
+      - name: Checkout SALTED-datasets
+        if: steps.cache-datasets.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DATASETS_REPO }}
+          path: SALTED-datasets
+          fetch-depth: 1
+          sparse-checkout: |
+            water_monomer_aims
+            water_monomer_CP2K_subset100
+            water_monomer_PySCF_subset100
+          sparse-checkout-cone-mode: false
+
+      - name: Run example pipeline (${{ matrix.marker }})
+        working-directory: SALTED
+        run: |
+          NTRAIN="${{ github.event.inputs.ntrain }}"
+          pytest tests/integration -m "${{ matrix.marker }}" -v -s \
+            --datasets-path "$GITHUB_WORKSPACE/SALTED-datasets" \
+            ${NTRAIN:+--ntrain "$NTRAIN"}

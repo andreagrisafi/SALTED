@@ -7,7 +7,7 @@ from pyscf import gto
 from ase.io import read
 from scipy import special
 
-from salted import basis  # WARNING: relative import
+from salted.basis_client import BasisClient
 from salted.sys_utils import ParseConfig
 
 inp = ParseConfig().parse_input()
@@ -19,7 +19,7 @@ for i in range(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.qm.dfbasis)
+[lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read_as_old_format(inp.qm.dfbasis)
 llist = []
 nlist = []
 for spe in spelist:
