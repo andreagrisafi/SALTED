@@ -68,7 +68,11 @@ pytest -m aims --basetemp /scratch/salted-tests
 # -> /scratch/salted-tests/salted_water_monomer_aims_0/...
 ```
 
-## Reference data (100-structure subsets, Ntrain=40, 2026-07)
+## Reference Data
+
+The `unit` tests take very little time.
+
+For `integration tests`: 100-structure subsets, Ntrain=40, tested on 2026-07
 
 | example | nconf | Ntrain | % RMSE | threshold | time (1 core) |
 |---|---|---|---|---|---|
