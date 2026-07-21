@@ -9,7 +9,7 @@
   | Marker | Dataset | Description |
   |---|---|---|
   | `aims` | `water_monomer_aims` | Serial pipeline + MPI equivalence tests |
-  | `cp2k` | `water_monomer_CP2K_subset100` | Serial pipeline (+ `get_basis_info` prelude) |
+  | `cp2k` | `water_monomer_CP2K_subset100` | Serial pipeline |
   | `pyscf` | `water_monomer_PySCF_subset100` | Serial pipeline |
   | `mpi` | `water_monomer_aims` | Rerun under `mpirun -n 2`, verify matrices/weights/RMSE match serial |
 

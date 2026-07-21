@@ -78,8 +78,6 @@ EXAMPLES = {
     "water_monomer_cp2k": {
         "dataset_dir": "water_monomer_CP2K_subset100",
         "nconf": 100,
-        # CP2K ships no basis_data.yaml; it ships the RI basis files with ({species}-{dfbasis}, e.g. H-RI-basis)
-        "parse_basis": True,
         "inp": {
             "salted": {"saltedname": "test", "saltedpath": "./", "verbose": True},
             "system": {"filename": "./water_monomers_100.xyz", "species": ["H", "O"]},
@@ -234,39 +232,30 @@ class PipelineWorkspace:
         # inp.yaml: deep copy of the template, + external basis + optional Ntrain
         self.inp = yaml.safe_load(yaml.safe_dump(spec["inp"]))  # deep copy
 
-        # Density-fitting basis: SALTED reads/writes it via inp.qm.dfbasis_file or parse basis files
-        self.basis_prelude: list[str] = []
-        if spec.get("parse_basis"):
-            # CP2K: move RI basis files into the workspace, then SALTED can parse them.
-            # only supports CP2K, add other codes if needed
-            assert self.inp["qm"]["qmcode"] == "cp2k", (
-                f"parse_basis is only implemented for qmcode 'cp2k' "
-                f"(example {name} has qmcode {self.inp['qm']['qmcode']!r})"
+        # Density-fitting basis: every dataset ships a prepared basis_data.yaml
+        # carrying the lmax/nmax info of its density-fitting basis
+        self.basis_fpath = self.dataset / "basis_data.yaml"
+        if not self.basis_fpath.is_file():
+            skip_or_fail(
+                require_datasets,
+                f"dataset {self.dataset.name} does not ship basis_data.yaml "
+                f"(expected at {self.basis_fpath}); it must carry the lmax/nmax "
+                "info of its density-fitting basis",
             )
-            dfbasis = self.inp["qm"]["dfbasis"]
-            for spe in self.inp["system"]["species"]:
-                src = self.dataset / f"{spe}-{dfbasis}"
-                if not src.is_file():
-                    skip_or_fail(
-                        require_datasets,
-                        f"dataset {self.dataset.name} does not ship RI basis file "
-                        f"{src.name}; needed to derive the density-fitting basis",
-                    )
-                (root / src.name).write_bytes(src.read_bytes())
-            self.basis_fpath = root / "basis_data.yaml"
-            self.basis_fpath.write_text("")  # empty registry, populated by get_basis_info
-            self.basis_prelude = ["get_basis_info"]
-        else:
-            # aims / PySCF: load from the dataset's prepared basis_data.yaml
-            self.basis_fpath = self.dataset / "basis_data.yaml"
-            if not self.basis_fpath.is_file():
+        self.inp["qm"]["dfbasis_file"] = str(self.basis_fpath)
+
+        if self.inp["qm"]["qmcode"] == "cp2k":
+            # For CP2K validation step (related function: salted.cp2k.utils.init_moments)
+            # It needs the primitive Gaussian exponents and contraction # coefficients
+            src = self.dataset / "basis"
+            if not src.is_dir():
                 skip_or_fail(
                     require_datasets,
-                    f"dataset {self.dataset.name} does not ship basis_data.yaml "
-                    f"(expected at {self.basis_fpath}); it must carry the lmax/nmax "
-                    "info of its density-fitting basis",
+                    f"dataset {self.dataset.name} does not ship a basis/ directory "
+                    "with the alphas/contra .dat files of its density-fitting basis; "
+                    "needed for the charge/dipole moment integrals of the validation step",
                 )
-        self.inp["qm"]["dfbasis_file"] = str(self.basis_fpath)
+            (root / "basis").symlink_to(src)
 
         self.ntrain_reduced = ntrain is not None and ntrain != self.inp["gpr"]["Ntrain"]
         if ntrain is not None:
@@ -384,12 +373,8 @@ SERIAL_PIPELINE = [
 
 
 def run_full_pipeline(ws: PipelineWorkspace, mpi: list[str] | None = None, mpi_steps: tuple = ()) -> PipelineWorkspace:
-    """Run all pipeline steps; steps named in ``mpi_steps`` run under mpirun.
-
-    Any basis-prelude steps (e.g. ``get_basis_info`` for CP2K, which derives the
-    density-fitting basis from the shipped RI basis files) run first, serially.
-    """
-    for step in ws.basis_prelude + SERIAL_PIPELINE:
+    """Run all pipeline steps; steps named in ``mpi_steps`` run under mpirun."""
+    for step in SERIAL_PIPELINE:
         stdout = ws.run_step(step, mpi=mpi if step in mpi_steps else None)
         if step == "validation":
             ws.parse_rmse(stdout)
