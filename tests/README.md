@@ -3,8 +3,8 @@
 ## Tests and Markers
 
 - **Unit tests** in `tests/unit/`: fast, self-contained tests (no external data needed).
-- **Example tests** in `tests/integration/`: end-to-end runs of the example ML pipelines (`initialize` -> intermediate steps -> `validation`).
-  - Precomputed data from the [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository. Will be skipped automatically when the datasets are absent.
+- **Example tests** in `tests/integration/`: end-to-end runs of the example ML pipelines (`initialize` -> [intermediate steps] -> `validation`).
+  - Precomputed data from the [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository.
 
   | Marker | Dataset | Description |
   |---|---|---|
@@ -13,13 +13,21 @@
   | `pyscf` | `water_monomer_PySCF_subset100` | Serial pipeline |
   | `mpi` | `water_monomer_aims` | Rerun under `mpirun -n 2`, verify matrices/weights/RMSE match serial |
 
-  Timing for 1 core, approximate. Of the 100 structures, 40 are used for training and 60 for validation.
-  All integration tests are also marked `example`; MPI tests carry both `aims` and `mpi`.
+  - Reference data: 100-structures dataset, Ntrain=40, tested on 2026-07
 
-## Setup
+  | example | nconf | Ntrain | % RMSE | threshold | time (1 core) |
+  |---|---|---|---|---|---|
+  | `water_monomer_aims` | 100 | 40 | 9.680e-01 | 1.5 | ~ 4 min |
+  | `water_monomer_pyscf` | 100 | 40 | 7.990e-01 | 1.5 | ~ 4 min |
+  | `water_monomer_cp2k` | 100 | 40 | 1.497e+00 | 2.5 | ~ 6 min |
+  | `water_monomer_aims` (MPI) | 100 | 40 | 9.680e-01 | 1.5 | ~ 6 min |
 
-The unit tests need nothing beyond an editable install.
-The example tests need precomputed data from [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository.
+## Running the Tests Locally
+
+### Setup
+
+The unit tests only need an editable install, then you can run from the project root.
+The example tests need precomputed data from [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository, or they will be skipped automatically with a warning.
 
 ```bash
 # in the cloned SALTED directory:
@@ -29,7 +37,7 @@ git clone https://github.com/andreagrisafi/SALTED-datasets.git ../SALTED-dataset
 
 Or, point `pytest` elsewhere with `--datasets-path /path/to/SALTED-datasets` or the `SALTED_DATASETS_PATH` environment variable.
 
-## Running
+### Running Tests
 
 ```bash
 # Examples:
@@ -48,6 +56,7 @@ Options (see `pytest --help`, section "custom options"):
 | `--datasets-path PATH` | `$SALTED_DATASETS_PATH` or `../SALTED-datasets` | SALTED-datasets checkout |
 | `--ntrain N` | full example value | reduce the training-set size for faster runs |
 | `--mpi-np N` | 2 | MPI tasks for the MPI equivalence test |
+| `--require-datasets` | off | fail (instead of skip) when SALTED-datasets or `mpirun` are unavailable; used in CI so a missing dataset cannot silently pass |
 
 
 The `pyscf` unit tests are skipped unless `pyscf` is installed and importable.
@@ -68,15 +77,19 @@ pytest -m aims --basetemp /scratch/salted-tests
 # -> /scratch/salted-tests/salted_water_monomer_aims_0/...
 ```
 
-## Reference Data
 
-The `unit` tests take very little time.
+## Running the Tests in GitHub CI
 
-For `integration tests`: 100-structure subsets, Ntrain=40, tested on 2026-07
+The GitHub workflow [`.github/workflows/ci.yaml`](../.github/workflows/ci.yaml) runs this test suite:
 
-| example | nconf | Ntrain | % RMSE | threshold | time (1 core) |
-|---|---|---|---|---|---|
-| water_monomer_aims | 100 | 40 | 9.680e-01 | 1.5 | ~ 4 min |
-| water_monomer_pyscf | 100 | 40 | 7.990e-01 | 1.5 | ~ 4 min |
-| water_monomer_cp2k | 100 | 40 | 1.497e+00 | 2.5 | ~ 6 min |
-| water_monomer_aims (MPI) | 100 | 40 | 9.680e-01 | 1.5 | ~ 6 min |
+| Event | `unit-tests` | `example-tests` (aims, pyscf, cp2k) |
+|---|---|---|
+| push to `master` or `dev_test_CI` | yes | yes, all three in parallel |
+| push to any other branch | yes | skipped |
+| PR into `master` or `dev_test_CI` | yes | yes, all three in parallel |
+| manual dispatch (Actions tab, "Run workflow") | yes | yes, all three in parallel |
+
+Notes:
+
+- For SALTED-datasets, only fetch the required dataset directories and cached by the upstream HEAD commit.
+- CI always passes `--require-datasets`, so a missing dataset directory or `mpirun` fails the job instead of silently skipping, which is different from local behavior defaults.

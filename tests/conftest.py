@@ -8,15 +8,16 @@ Two kinds of tests live under ``tests/``:
   SALTED-datasets repository (https://github.com/andreagrisafi/SALTED-datasets).
 
 Integration tests are marked ``example`` and are skipped automatically when the
-datasets repository is not available. Point to it with::
+datasets repository is not available (with ``--require-datasets``, as used in
+CI, they fail loudly instead). Point to it with::
 
     pytest --datasets-path /path/to/SALTED-datasets
 
 or the ``SALTED_DATASETS_PATH`` environment variable (the default is a sibling
 directory ``../SALTED-datasets`` next to the SALTED repository).
 
-The training-set size of the integration runs can be reduced for quick runs or
-CI with ``--ntrain N`` (default: the full example value).
+The training-set size of the integration runs can be reduced for quick local
+runs with ``--ntrain N`` (default: each example's calibrated value).
 """
 
 import os
@@ -164,33 +165,45 @@ def pytest_addoption(parser):
         default=2,
         help="Number of MPI tasks for the MPI equivalence test (default: 2)",
     )
+    parser.addoption(
+        "--require-datasets",
+        action="store_true",
+        default=False,
+        help="Fail (instead of skip) integration tests when SALTED-datasets or "
+        "mpirun are unavailable. Meant for CI, where a missing dataset must be "
+        "a loud error, not a silently green job.",
+    )
 
 
-def pytest_configure(config):
-    config.addinivalue_line("markers", "example: end-to-end example pipeline test, needs SALTED-datasets")
-    config.addinivalue_line("markers", "mpi: needs mpirun; exercises the MPI-parallel code paths")
-    config.addinivalue_line("markers", "aims: uses the water_monomer_aims dataset (fast)")
-    config.addinivalue_line("markers", "pyscf: uses the water_monomer_PySCF dataset")
-    config.addinivalue_line("markers", "cp2k: uses the water_monomer_CP2K dataset")
+def skip_or_fail(require_datasets: bool, msg: str):
+    """Skip with proper message, or fail loudly when --require-datasets is set."""
+    if require_datasets:
+        pytest.fail(f"--require-datasets: {msg}")
+    pytest.skip(msg)
 
+
+# markers are declared once in pyproject.toml [tool.pytest.ini_options]
 
 @pytest.fixture(scope="session")
 def datasets_path(request) -> Path:
-    """Root of the SALTED-datasets checkout; skips dependent tests if absent."""
+    """Root of the SALTED-datasets checkout; skips (or fails) dependent tests if absent."""
     path = Path(request.config.getoption("--datasets-path")).resolve()
     if not path.is_dir():
-        pytest.skip(f"SALTED-datasets not found at {path} (use --datasets-path or $SALTED_DATASETS_PATH)")
+        skip_or_fail(
+            request.config.getoption("--require-datasets"),
+            f"SALTED-datasets not found at {path} (use --datasets-path or $SALTED_DATASETS_PATH)",
+        )
     return path
 
 
 @pytest.fixture(scope="session")
-def mpirun_cmd():
-    """Base mpirun command, skipping if no MPI launcher is available."""
+def mpirun_cmd(request):
+    """Base mpirun command; skips (or fails with --require-datasets) if no MPI launcher."""
     import shutil
 
     mpirun = shutil.which("mpirun")
     if mpirun is None:
-        pytest.skip("mpirun not available")
+        skip_or_fail(request.config.getoption("--require-datasets"), "mpirun not available")
     cmd = [mpirun]
     version = subprocess.run([mpirun, "--version"], capture_output=True, text=True).stdout
     if "Open MPI" in version or "OpenRTE" in version:
@@ -202,13 +215,13 @@ def mpirun_cmd():
 class PipelineWorkspace:
     """A temp working directory wired up to run one example's ML pipeline."""
 
-    def __init__(self, name: str, root: Path, datasets_path: Path, ntrain: int | None):
+    def __init__(self, name: str, root: Path, datasets_path: Path, ntrain: int | None, require_datasets: bool = False):
         self.name = name
         self.root = root
         spec = EXAMPLES[name]
         self.dataset = datasets_path / spec["dataset_dir"]
         if not self.dataset.is_dir():
-            pytest.skip(f"dataset {self.dataset} not found")
+            skip_or_fail(require_datasets, f"dataset {self.dataset} not found")
 
         # QM data: symlink (read-only use), xyz files: copy
         for sub in ("coefficients", "overlaps"):
@@ -224,14 +237,20 @@ class PipelineWorkspace:
         # Density-fitting basis: SALTED reads/writes it via inp.qm.dfbasis_file or parse basis files
         self.basis_prelude: list[str] = []
         if spec.get("parse_basis"):
-            # CP2K: move RI basis files into the workspace, then SALTED can parse them
+            # CP2K: move RI basis files into the workspace, then SALTED can parse them.
+            # only supports CP2K, add other codes if needed
+            assert self.inp["qm"]["qmcode"] == "cp2k", (
+                f"parse_basis is only implemented for qmcode 'cp2k' "
+                f"(example {name} has qmcode {self.inp['qm']['qmcode']!r})"
+            )
             dfbasis = self.inp["qm"]["dfbasis"]
             for spe in self.inp["system"]["species"]:
                 src = self.dataset / f"{spe}-{dfbasis}"
                 if not src.is_file():
-                    pytest.skip(
+                    skip_or_fail(
+                        require_datasets,
                         f"dataset {self.dataset.name} does not ship RI basis file "
-                        f"{src.name}; needed to derive the density-fitting basis"
+                        f"{src.name}; needed to derive the density-fitting basis",
                     )
                 (root / src.name).write_bytes(src.read_bytes())
             self.basis_fpath = root / "basis_data.yaml"
@@ -241,10 +260,11 @@ class PipelineWorkspace:
             # aims / PySCF: load from the dataset's prepared basis_data.yaml
             self.basis_fpath = self.dataset / "basis_data.yaml"
             if not self.basis_fpath.is_file():
-                pytest.skip(
+                skip_or_fail(
+                    require_datasets,
                     f"dataset {self.dataset.name} does not ship basis_data.yaml "
                     f"(expected at {self.basis_fpath}); it must carry the lmax/nmax "
-                    "info of its density-fitting basis"
+                    "info of its density-fitting basis",
                 )
         self.inp["qm"]["dfbasis_file"] = str(self.basis_fpath)
 
@@ -284,7 +304,7 @@ class PipelineWorkspace:
     @property
     def rmse_threshold(self) -> float:
         if self.ntrain_reduced:
-            # : loose sanity bound in percentage % for --ntrain reduced runs
+            # loose sanity bound (%) for --ntrain reduced runs
             return 20.0
         return EXAMPLES[self.name]["rmse_threshold"]
 
@@ -340,7 +360,13 @@ def make_workspace(request, datasets_path, tmp_path_factory):
 
     def _make(example: str) -> PipelineWorkspace:
         root = tmp_path_factory.mktemp(f"salted_{example}_")
-        return PipelineWorkspace(example, root, datasets_path, request.config.getoption("--ntrain"))
+        return PipelineWorkspace(
+            example,
+            root,
+            datasets_path,
+            request.config.getoption("--ntrain"),
+            require_datasets=request.config.getoption("--require-datasets"),
+        )
 
     return _make
 
