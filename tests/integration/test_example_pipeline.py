@@ -1,7 +1,7 @@
 """End-to-end tests of the SALTED ML pipeline on the example datasets.
 
-These reproduce the workflow of ``example/*/run_test_serial.sh`` using the
-precomputed density-fitting data from the SALTED-datasets repository:
+These reproduce the SALTED workflow using the precomputed density-fitting data
+from the SALTED-datasets repository:
 
     initialize -> sparse_selection -> sparse_descriptor -> rkhs_projector
     -> rkhs_vector -> hessian_matrix -> solve_regression -> validation

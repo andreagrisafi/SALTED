@@ -3,14 +3,16 @@
 ## Tests and Markers
 
 - **Unit tests** in `tests/unit/`: fast, self-contained tests (no external data needed).
-- **Example tests** in `tests/integration/`: end-to-end runs of the example ML pipelines (`initialize` -> [intermediate steps] -> `validation`).
+- **Example tests** in `tests/integration/`:
+  - End-to-end runs of the example ML pipelines, `initialize` -> [intermediate steps] -> `validation`, plus `salted_prediction` on the trained model for values and gradients.
   - Precomputed data from the [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository.
+  - Each example additionally tests the live-prediction API (`salted.salted_prediction`) on the trained model: predictions must reproduce the validation-step coefficients, and the analytical coefficient gradients must converge to central finite differences at second order.
 
   | Marker | Dataset | Description |
   |---|---|---|
-  | `aims` | `water_monomer_aims` | Serial pipeline + MPI equivalence tests |
-  | `cp2k` | `water_monomer_CP2K_subset100` | Serial pipeline |
-  | `pyscf` | `water_monomer_PySCF_subset100` | Serial pipeline |
+  | `aims` | `water_monomer_aims` | Serial pipeline + prediction tests + MPI equivalence tests |
+  | `cp2k` | `water_monomer_CP2K_subset100` | Serial pipeline + prediction tests |
+  | `pyscf` | `water_monomer_PySCF_subset100` | Serial pipeline + prediction tests |
   | `mpi` | `water_monomer_aims` | Rerun under `mpirun -n 2`, verify matrices/weights/RMSE match serial |
 
   - Reference data: 100-structures dataset, Ntrain=40, tested on 2026-07

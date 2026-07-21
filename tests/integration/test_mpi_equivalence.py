@@ -3,9 +3,9 @@
 SALTED's MPI-parallel code paths differ structurally from the serial ones
 (job partitioning via ``distribute_jobs``, hand-sliced ``allreduce``
 accumulation of the regression matrices in ``hessian_matrix``). Bugs there
-corrupt results silently rather than crash, so the strongest cheap check is:
-run the same small example twice - once serial, once under ``mpirun`` - and
-require bit-comparable regression matrices, weights, and validation RMSE.
+corrupt results might silently rather than crash, so a cheap check is:
+run the same small example twice, once serial and once with ``mpirun``, and
+require quantitatively similar regression matrices, weights, and validation RMSE.
 
 Uses the aims water-monomer example (smallest dataset).
 """
