@@ -54,7 +54,7 @@ Options (see `pytest --help`, section "custom options"):
 | Option | Default | Meaning |
 |---|---|---|
 | `--datasets-path PATH` | `$SALTED_DATASETS_PATH` or `../SALTED-datasets` | SALTED-datasets checkout |
-| `--ntrain N` | full example value | reduce the training-set size for faster runs |
+| `--ntrain N` | each example's calibrated value (40) | reduce the training-set size for faster runs; a reduced run checks a loose 20 % RMSE bound instead of the calibrated thresholds |
 | `--mpi-np N` | 2 | MPI tasks for the MPI equivalence test |
 | `--require-datasets` | off | fail (instead of skip) when SALTED-datasets or `mpirun` are unavailable; used in CI so a missing dataset cannot silently pass |
 
@@ -91,5 +91,6 @@ The GitHub workflow [`.github/workflows/ci.yaml`](../.github/workflows/ci.yaml) 
 
 Notes:
 
-- For SALTED-datasets, only fetch the required dataset directories and cached by the upstream HEAD commit.
+- For SALTED-datasets, CI fetches only the required dataset directories and caches them by the upstream HEAD commit.
 - CI always passes `--require-datasets`, so a missing dataset directory or `mpirun` fails the job instead of silently skipping, which is different from local behavior defaults.
+- Each `example-tests` job has a 10-minute timeout (covering dependency install, dataset fetch, and the pipeline itself); if a job times out flakily, raise `timeout-minutes` in the workflow.
