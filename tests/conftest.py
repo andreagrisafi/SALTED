@@ -172,7 +172,6 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "aims: uses the water_monomer_aims dataset (fast)")
     config.addinivalue_line("markers", "pyscf: uses the water_monomer_PySCF dataset")
     config.addinivalue_line("markers", "cp2k: uses the water_monomer_CP2K dataset")
-    config.addinivalue_line("markers", "slow: long-running test (minutes); skip with -m 'not slow'")
 
 
 @pytest.fixture(scope="session")
