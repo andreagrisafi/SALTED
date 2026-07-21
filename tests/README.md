@@ -6,7 +6,7 @@
 - **Example tests** in `tests/integration/`:
   - End-to-end runs of the example ML pipelines, `initialize` -> [intermediate steps] -> `validation`, plus `salted_prediction` on the trained model for values and gradients.
   - Precomputed data from the [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository.
-  - Each example additionally tests the live-prediction API (`salted.salted_prediction`) on the trained model: predictions must reproduce the validation-step coefficients, and the analytical coefficient gradients must converge to central finite differences at second order.
+  - Each example additionally tests the live-prediction API (`salted.salted_prediction`) on the trained model: predictions must reproduce the validation-step coefficients, and central finite differences must converge to the analytical coefficient gradients at second order.
 
   | Marker | Dataset | Description |
   |---|---|---|
