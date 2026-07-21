@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -56,11 +56,11 @@ jobs:
       matrix:
         marker: [aims, pyscf, cp2k]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: SALTED
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -85,14 +85,14 @@ jobs:
 
       - name: Cache SALTED-datasets
         id: cache-datasets
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: SALTED-datasets
           key: salted-datasets-${{ steps.datasets-rev.outputs.sha }}
 
       - name: Checkout SALTED-datasets
         if: steps.cache-datasets.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.DATASETS_REPO }}
           path: SALTED-datasets
