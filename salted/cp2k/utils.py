@@ -433,6 +433,63 @@ def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc):
 
    return partial_wave_coefs
 
+@njit(parallel = True, fastmath = True)
+def gto_rec_prim(lmax, species, npgf, alphas, Gvec, nG_loc):
+    # Fourier transform of primitive atom-centered basis functions
+    
+    partial_wave_coefs = Dict.empty(key_type=types.unicode_type, value_type=types.complex128[:, :, :]) # Dict with key as strings and values of type float array
+    
+    for spe in species:
+        for lam in range(lmax[spe]+1):
+            key = f"{spe}_{lam}"
+            # npgf[key]: number of individual Gaussians, each with its own alpha
+            nmu = 2*lam + 1  #number of m values (-lam,...,+lam) for this lam
+            partial_wave_coefs[key] = np.zeros((nG_loc, npgf[key], nmu), dtype=np.complex128)
+
+    for iG in prange(nG_loc):
+
+        kx = Gvec[iG, 0]
+        ky = Gvec[iG, 1]
+        kz = Gvec[iG, 2]
+
+        # Norm squared |G|^2 and norm |G| of the k-mode vector
+        knorm2 = kx*kx + ky*ky + kz*kz
+        knorm = np.sqrt(knorm2)
+        
+        # Direction of G in spherical angles (costheta, phi)
+        if knorm == 0.0:
+            costheta = 0.0
+        else:
+            costheta = kz/knorm
+            phi = np.arctan2(ky, kx)
+
+        for spe in species:
+            # Precompute partial wave coefficients <nlm|k> consisting in
+            # spherical harmonics and radial integrals evaluated at the given k
+            for lam in range(lmax[spe]+1):
+
+                key = f"{spe}_{lam}"
+
+                # Fourier transform prefactors
+                lamfactor = np.sqrt(np.pi/2.0) * knorm**lam
+                phase_lam = (-1.0j)**lam
+
+                # Orthonormalized real spherical harmonics Y_{lam,m}(G/|G|) with Condon-Shortley phase convention
+                harmonics = np.zeros((2*lmax[spe]+1))
+                for mu in range(2*lam+1):
+                    harmonics[mu] = spherical_harmonic(lam, mu-lam, costheta, phi)
+
+                for ipgf in range(npgf[key]):
+                    sigma2 = 1.0 / (2.0 * alphas[key][ipgf]) # Squared Gaussian width in reciprocal space
+                    sigma = np.sqrt(sigma2) # Gaussian width in reciprocal space
+                    
+                    # Radial integral
+                    radial = lamfactor * sigma2**lam * sigma**3.0 * np.exp(-0.5*knorm2*sigma2)
+                    for mu in range(2*lam+1):
+                        partial_wave_coefs[key][iG, ipgf, mu] = radial * harmonics[mu] * phase_lam
+
+    return partial_wave_coefs
+
 @njit
 def spherical_harmonic(l,m,costheta,phi):
    # Compute orthonormalized real spherical harmonics
@@ -539,3 +596,99 @@ def build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, pa
     w = np.real(w)
 
     return S, w
+
+#@njit(parallel = False, fastmath = True)
+def build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, rho_KS_rec, df_metric, rank):
+    # Build the primitive-basis overlap matrix Sp and density vector wp
+    
+    # Get the total size of the primitive basis
+    ncoefs_prim = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for lam in range(lmax[spe]+1):
+            key = f"{spe}_{lam}"
+            ncoefs_prim += npgf[key] * (2*lam + 1)
+
+    Sp = np.zeros((ncoefs_prim, ncoefs_prim), dtype=np.float64)
+    wp = np.zeros((ncoefs_prim), dtype=np.float64)
+
+    knorm_vec = np.linalg.norm(Gvec_half, axis=1).astype(np.float64) # |G|
+    phase = np.exp(-1j * np.dot(Gvec_half, coords.T)) # e^{-iG.r_iat}
+    if df_metric == "coulomb":
+        phase_over_knorm = phase / knorm_vec[:, np.newaxis] 
+
+    ipgf = 0
+    
+    # Outer loop over (iat, lam, mu) indexes rows of Sp and entries of wp.
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        
+        for lam in range(lmax[spe]+1):
+            key = f"{spe}_{lam}"
+            
+            # wp calculation
+            for mu in range(2*lam + 1):
+                if df_metric == "identity":
+                    obj1 = phase[:, iat, np.newaxis] * partial_wave_coefs[key][:, :, mu]
+                    wp[ipgf:ipgf+npgf[key]] = 2 * (np.dot(obj1[1:,:].real.T, rho_KS_rec[1:].real) + np.dot(obj1[1:,:].imag.T, rho_KS_rec[1:].imag))
+                    wp[ipgf:ipgf+npgf[key]] += obj1[0,:].real.T * rho_KS_rec[0].real + obj1[0,:].imag.T * rho_KS_rec[0].imag
+                if df_metric == "coulomb":
+                    obj1 = phase_over_knorm[:, iat, np.newaxis] * partial_wave_coefs[key][:, :, mu]
+                    wp[ipgf:ipgf+npgf[key]] = 2 * (np.dot(obj1.real.T, rho_KS_rec.real / knorm_vec) + np.dot(obj1.imag.T, rho_KS_rec.imag / knorm_vec))
+
+                # Sp calculation
+                # Inner loop over (iat2, lam2, mu2) indexes columns of Sp
+                ipgf2 = 0
+                for iat2 in range(iat+1):
+                    spe2 = atomic_symbols[iat2]
+                    for lam2 in range(lmax[spe2]+1):
+                        key2 = f"{spe2}_{lam2}"
+                        for mu2 in range(2*lam2 + 1):
+                            if df_metric == "identity":
+                                obj2 = phase[:, iat2, np.newaxis] * partial_wave_coefs[key2][:, :, mu2]
+                                Sp[ipgf:ipgf+npgf[key], ipgf2:ipgf2+npgf[key2]] = 2 * (np.dot(obj1[1:,:].real.T, obj2[1:,:].real) + np.dot(obj1[1:,:].imag.T, obj2[1:,:].imag))
+                                Sp[ipgf:ipgf+npgf[key], ipgf2:ipgf2+npgf[key2]] += np.outer(obj1[0,:].real, obj2[0,:].real) + np.outer(obj1[0,:].imag, obj2[0,:].imag)
+                                if ipgf != ipgf2:
+                                    Sp[ipgf2:ipgf2+npgf[key2], ipgf:ipgf+npgf[key]] = Sp[ipgf:ipgf+npgf[key], ipgf2:ipgf2+npgf[key2]].T
+                            if df_metric == "coulomb":
+                                obj2 = phase_over_knorm[:, iat2, np.newaxis] * partial_wave_coefs[key2][:, :, mu2]
+                                Sp[ipgf:ipgf+npgf[key], ipgf2:ipgf2+npgf[key2]] = 2 * (np.dot(obj1.real.T, obj2.real) + np.dot(obj1.imag.T, obj2.imag))
+                                Sp[ipgf2:ipgf2+npgf[key2], ipgf:ipgf+npgf[key]] = Sp[ipgf:ipgf+npgf[key], ipgf2:ipgf2+npgf[key2]].T
+                    
+                            ipgf2 += npgf[key2]
+                ipgf += npgf[key]
+
+    Sp = np.real(Sp)*4*np.pi
+    wp = np.real(wp)
+
+    return Sp, wp
+
+def build_contraction_matrix(natoms, atomic_symbols, lmax, nmax, npgf, contranorm):
+
+    ncoefs_prim = 0
+    ncoefs = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for lam in range(lmax[spe]+1):
+            key = f"{spe}_{lam}"
+            ncoefs_prim += npgf[key] * (2*lam + 1)
+            ncoefs      += nmax[key] * (2*lam + 1)
+
+    C = np.zeros((ncoefs_prim, ncoefs), dtype=np.float64)
+
+    ipgf = 0
+    icoef = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for lam in range(lmax[spe]+1):
+            key = f"{spe}_{lam}"
+            for irad in range(nmax[key]):
+                for mu in range(2*lam + 1):
+                    row_start = ipgf + mu*npgf[key]
+                    col = icoef + irad*(2*lam+1) + mu
+                    C[row_start:row_start+npgf[key], col] = contranorm[key][irad, :]
+
+            ipgf  += npgf[key]*(2*lam+1)
+            icoef += nmax[key]*(2*lam+1)
+
+    return C
