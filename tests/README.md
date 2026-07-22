@@ -14,13 +14,13 @@
   | `pyscf` | `water_monomer_PySCF_subset100` | Serial pipeline + prediction tests |
   | `mpi` | `water_monomer_aims` | Serial-vs-MPI equivalence tests (pipeline + predictions) |
 
-  - Reference data: 100-structures dataset, Ntrain=40, tested on 2026-07
+  - Reference data: 100-structures dataset, Ntrain=40, `trainsel: random` (the default), tested on 2026-07
 
   | example | nconf | Ntrain | % RMSE | threshold | time (1 core) |
   |---|---|---|---|---|---|
   | `water_monomer_aims` | 100 | 40 | 9.680e-01 | 1.5 | ~ 4 min |
-  | `water_monomer_pyscf` | 100 | 40 | 7.990e-01 | 1.5 | ~ 4 min |
-  | `water_monomer_cp2k` | 100 | 40 | 1.497e+00 | 2.5 | ~ 6 min |
+  | `water_monomer_pyscf` | 100 | 40 | 8.216e-01 | 1.5 | ~ 4 min |
+  | `water_monomer_cp2k` | 100 | 40 | 1.625e+00 | 2.5 | ~ 6 min |
   | `water_monomer_aims` (MPI) | 100 | 40 | 9.680e-01 | 1.5 | ~ 6 min |
 
 > For detailed information on the tests, see the bottom of this README:

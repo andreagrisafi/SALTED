@@ -104,11 +104,11 @@ EXAMPLES = {
                 "trainfrac": 1.0,
                 "regul": 1e-5,
                 "gradtol": 1e-6,
-                "trainsel": "sequential",
+                "trainsel": "random",
             },
         },
         # angreagrisafi/SALTED-datasets: water_monomer_CP2K_subset100/README.md
-        # 2026-07 Ntrain=40/validation=60 on 100-structure subset: % RMSE 1.497e+00
+        # 2026-07 Ntrain=40/validation=60 on 100-structure subset: % RMSE 1.625e+00
         "rmse_threshold": 2.5,
     },
     "water_monomer_pyscf": {
@@ -134,11 +134,11 @@ EXAMPLES = {
                 "Menv": 100,
                 "Ntrain": 40,
                 "trainfrac": 1.0,
-                "trainsel": "sequential",
+                "trainsel": "random",
             },
         },
         # angreagrisafi/SALTED-datasets: water_monomer_PySCF_subset100/README.md
-        # 2026-07 Ntrain=40/validation=60 on 100-structure subset: % RMSE 7.990e-01
+        # 2026-07 Ntrain=40/validation=60 on 100-structure subset: % RMSE 8.216e-01
         "rmse_threshold": 1.5,
     },
 }
