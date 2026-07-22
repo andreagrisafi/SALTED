@@ -25,6 +25,7 @@ import re
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -297,8 +298,62 @@ class PipelineWorkspace:
             return 20.0
         return EXAMPLES[self.name]["rmse_threshold"]
 
-    def run_step(self, module: str, mpi: list[str] | None = None, timeout: float = 7200):
-        """Run ``python -m salted.<module>`` in the workspace and time it.
+    @property
+    def validation_output_dir(self) -> Path:
+        """Where salted.validation writes its COEFFS-<iconf+1>.dat files
+        (1-based index into the full dataset)."""
+        return self.root / f"validations_{self.saltedname}" / self.mz / f"N{self.ntrain}_{self.reg_str}"
+
+    def prediction_output_dir(self, predname: str) -> Path:
+        """Where salted.prediction writes its COEFFS-<k+1>.dat files
+        (1-based position in the prediction xyz)."""
+        return (
+            self.root / f"predictions_{self.saltedname}_{predname}" / self.mz / f"N{self.ntrain}_{self.reg_str}"
+        )
+
+    def validation_indices(self) -> np.ndarray:
+        """Sorted 0-based indices of the validation structures.
+
+        Complement of the training set chosen by salted.hessian_matrix
+        (written to regrdir_<saltedname>/training_set_N<Ntrain>.txt); mirrors
+        the ``np.setdiff1d`` in salted.validation, so these are exactly the
+        structures the validation step predicted.
+        """
+        train_fpath = self.root / f"regrdir_{self.saltedname}" / f"training_set_N{self.inp['gpr']['Ntrain']}.txt"
+        trainrangetot = np.loadtxt(train_fpath, dtype=int)
+        return np.setdiff1d(np.arange(self.nconf), trainrangetot)
+
+    def write_prediction_from_validation(self) -> Path:
+        """Write the validation structures as a prediction xyz; return its path."""
+        from ase.io import read, write
+
+        frames = read(self.root / self.inp["system"]["filename"], ":")
+        fpath = self.root / "prediction_set_from_validation_set.xyz"
+        write(fpath, [frames[i] for i in self.validation_indices()])
+        return fpath
+
+    @contextmanager
+    def swap_prediction_inp(self, filename: str, predname: str):
+        """Temporarily retarget inp.prediction; always restore inp.yaml.
+
+        ParseConfig hard-codes ``<cwd>/inp.yaml``, so a differently-named inp
+        copy cannot be passed to a pipeline step; the modified copy must
+        temporarily *be* inp.yaml. The workspace is session-shared, hence the
+        guaranteed restore. ``self.inp`` is left untouched (it reflects the
+        original template used by path properties like ``mz``).
+        """
+        inp_fpath = self.root / "inp.yaml"
+        original = inp_fpath.read_text()
+        modified = yaml.safe_load(original)
+        modified.setdefault("prediction", {}).update(filename=filename, predname=predname)
+        try:
+            inp_fpath.write_text(yaml.safe_dump(modified, sort_keys=False))
+            yield
+        finally:
+            inp_fpath.write_text(original)
+
+    def run_python(self, args: list[str], label: str, mpi: list[str] | None = None, timeout: float = 7200):
+        """Run ``python <args...>`` in the workspace and time it.
 
         Runs with ``HDF5_USE_FILE_LOCKING=FALSE``: HDF5 guards file access
         with an advisory ``flock(2)``, which fails spuriously (EAGAIN /
@@ -309,23 +364,27 @@ class PipelineWorkspace:
         state the lock can be safely disabled when writes are not concurrent:
         https://support.hdfgroup.org/documentation/hdf5/latest/_file_lock.html
         """
-        cmd = [sys.executable, "-m", f"salted.{module}"]
+        cmd = [sys.executable] + args
         if mpi:
             cmd = mpi + cmd
+            label = f"{label}[mpi]"
         env = os.environ.copy()
         env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
         env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
         t0 = time.perf_counter()
         proc = subprocess.run(cmd, cwd=self.root, capture_output=True, text=True, timeout=timeout, env=env)
         elapsed = time.perf_counter() - t0
-        label = module if not mpi else f"{module}[mpi]"
         self.timings[label] = elapsed
         assert proc.returncode == 0, (
-            f"salted.{module} failed (exit {proc.returncode}) after {elapsed:.1f}s\n"
+            f"{label} failed (exit {proc.returncode}) after {elapsed:.1f}s\n"
             f"--- stdout (tail) ---\n{proc.stdout[-3000:]}\n"
             f"--- stderr (tail) ---\n{proc.stderr[-3000:]}"
         )
         return proc.stdout
+
+    def run_step(self, module: str, mpi: list[str] | None = None, timeout: float = 7200):
+        """Run ``python -m salted.<module>`` in the workspace and time it."""
+        return self.run_python(["-m", f"salted.{module}"], label=module, mpi=mpi, timeout=timeout)
 
     def parse_rmse(self, stdout: str) -> float:
         """Extract the final '% RMSE: x.xxxe+xx' printed by salted.validation."""

@@ -4,16 +4,17 @@
 
 - **Unit tests** in `tests/unit/`: fast, self-contained tests (no external data needed).
 - **Example tests** in `tests/integration/`:
-  - End-to-end runs of the example ML pipelines, `initialize` -> [intermediate steps] -> `validation`, plus `salted_prediction` on the trained model for values and gradients.
+  - End-to-end runs of the example ML pipelines, `initialize` -> [intermediate steps] -> `validation`, plus prediction tests on the trained model.
   - Precomputed data from the [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository.
   - Each example additionally tests the live-prediction API (`salted.salted_prediction`) on the trained model: predictions must reproduce the validation-step coefficients, and central finite differences must converge to the analytical coefficient gradients at second order.
+  - Each example also tests the prediction pipeline step (`salted.prediction`): the validation structures are sliced out of the dataset xyz (via the training-set file) into a prediction set, `inp.yaml` is temporarily retargeted at it (with a separate `predname`, restored afterwards), and the step's predicted coefficients must reproduce the validation step's.
 
   | Marker | Dataset | Description |
   |---|---|---|
   | `aims` | `water_monomer_aims` | Serial pipeline + prediction tests + MPI equivalence tests |
   | `cp2k` | `water_monomer_CP2K_subset100` | Serial pipeline + prediction tests |
   | `pyscf` | `water_monomer_PySCF_subset100` | Serial pipeline + prediction tests |
-  | `mpi` | `water_monomer_aims` | Rerun under `mpirun -n 2`, verify matrices/weights/RMSE match serial |
+  | `mpi` | `water_monomer_aims` | Rerun under `mpirun -n 2`, verify matrices/weights/RMSE match serial; also serial-vs-MPI equivalence of both prediction surfaces (`salted.prediction` splits structures across ranks; `salted_prediction` splits the atoms of one structure and allreduces, exercised via `tests/integration/_mpi_predict_driver.py`) |
 
   - Reference data: 100-structures dataset, Ntrain=40, tested on 2026-07
 
