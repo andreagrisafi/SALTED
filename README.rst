@@ -7,7 +7,7 @@ SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
    :width: 80%
 
 
-This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant learning and prediction of the electron density of molecular and condensed-phase systems, together with its static linear response function to applied electric fields. This is done by representing the continuous scalar (density) and vector (density-response) fields on a linear basis of atom-centered radial functions and spherical harmonics.
+This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant learning and prediction of the electron density of molecular [1-2] and condensed-phase [3-4] systems, together with its static linear response to applied electric fields [5]. This is done by representing the continuous scalar (density) and vector (density-response) fields on a linear basis of atom-centered radial functions and spherical harmonics.
 
 Documentation
 -------------
@@ -22,6 +22,8 @@ References
 3. Alan M. Lewis, Andrea Grisafi, Michele Ceriotti, Mariana Rossi, "Learning electron densities in the condensed-phase", *Journal of Chemical Theory and Computation* **17**, 7203 (2021) [https://pubs.acs.org/doi/10.1021/acs.jctc.1c00576]
 
 4. Andrea Grisafi, Alan M. Lewis, Mariana Rossi, Michele Ceriotti, "Electronic-Structure Properties from Atom-Centered Predictions of the Electron Density", *Journal of Chemical Theory and Computation* **19**, 4451 (2023) [https://pubs.acs.org/doi/10.1021/acs.jctc.2c00850]
+
+5. Mariana Rossi, Kevin Rossi, Alan M. Lewis, Mathieu Salanne, Andrea Grisafi, "Learning the Electrostatic Response of the Electron Density through a Symmetry-Adapted Vector Field Model", The Journal of Physical Chemistry Letters **16**, 2326-2332 (2025) [https://pubs.acs.org/doi/full/10.1021/acs.jpclett.5c00165]
 
 Installation
 ------------
