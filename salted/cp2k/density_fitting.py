@@ -6,7 +6,7 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import build_matrices, gto_rec, get_reciprocal_grid, get_basis_set_info_numba
+from salted.cp2k.utils import build_matrices, build_matrices_prim, gto_rec, gto_rec_prim, build_contraction_matrix, get_reciprocal_grid, get_basis_set_info_numba
 from numba import types
 from numba.typed import Dict
 from mpi4py import MPI
@@ -134,7 +134,12 @@ sort_idx = np.argsort(knorm_vec)
 Gvec_half = Gvec_half[sort_idx]
 knorm_vec = knorm_vec[sort_idx]
 
-partial_wave_coefs = gto_rec(lmax_numba,nmax_numba,nbasis,species,npgf, contranorm, alphas,Gvec_half, nG_half)
+# Compute primitive coefficients
+time_a = time.time()
+#partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, nG_half) # Contracted
+partial_wave_coefs_prim = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, nG_half) # Primitive
+time_b = time.time()
+print("Time to compute partial wave coefficients:", time_b-time_a)
 
 # init geometry
 for iconf in conf_range:
@@ -180,11 +185,20 @@ for iconf in conf_range:
         rho_KS_rec = rho_KS_rec[1:]
     rho_KS_rec = rho_KS_rec[sort_idx]
 
-    start = time.time()
+    # Build matrices
+    time_c = time.time()
+    #S, w = build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank)
+    Sp, wp = build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, rho_KS_rec, df_metric, rank)
 
-    S, w = build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank)
+    # Build contraction matrix
+    C = build_contraction_matrix(natoms, atomic_symbols, lmax, nmax_numba, npgf, contranorm)
 
-    print(time.time()-start)
+    # Contraction
+    S = C.T @ Sp @ C
+    w = C.T @ wp
+    
+    time_d = time.time()
+    print("Time to build matrices:", time_d-time_c)
 
     c = np.linalg.solve(S,w)
 
