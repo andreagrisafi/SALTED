@@ -128,6 +128,12 @@ if df_metric == "coulomb":
 
 nG_half=len(Gvec_half)
 
+# Sort G
+knorm_vec = np.linalg.norm(Gvec_half, axis=1)
+sort_idx = np.argsort(knorm_vec)
+Gvec_half = Gvec_half[sort_idx]
+knorm_vec = knorm_vec[sort_idx]
+
 partial_wave_coefs = gto_rec(lmax_numba,nmax_numba,nbasis,species,npgf, contranorm, alphas,Gvec_half, nG_half)
 
 # init geometry
@@ -172,6 +178,7 @@ for iconf in conf_range:
     rho_KS_rec = rho_KS_rec[mask]
     if df_metric == "coulomb":
         rho_KS_rec = rho_KS_rec[1:]
+    rho_KS_rec = rho_KS_rec[sort_idx]
 
     start = time.time()
 
