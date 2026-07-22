@@ -6,7 +6,7 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import build_matrices, build_matrices_prim, gto_rec, gto_rec_prim, build_contraction_matrix, get_reciprocal_grid, get_basis_set_info_numba
+from salted.cp2k.utils import build_ncutoff, build_matrices, build_matrices_prim, gto_rec, gto_rec_prim, build_contraction_matrix, get_reciprocal_grid, get_basis_set_info_numba
 from numba import types
 from numba.typed import Dict
 from mpi4py import MPI
@@ -60,6 +60,7 @@ else:
     conf_range = np.arange(ndata,dtype=int)
 
 # Initialize SALTED
+time_start = time.time()
 species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
@@ -134,6 +135,9 @@ sort_idx = np.argsort(knorm_vec)
 Gvec_half = Gvec_half[sort_idx]
 knorm_vec = knorm_vec[sort_idx]
 
+# Get G cutoffs
+gcut = build_ncutoff(alphas, npgf, species, lmax, knorm_vec, nG_half)
+
 # Compute primitive coefficients
 time_a = time.time()
 #partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, nG_half) # Contracted
@@ -188,7 +192,7 @@ for iconf in conf_range:
     # Build matrices
     time_c = time.time()
     #S, w = build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank)
-    Sp, wp = build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, rho_KS_rec, df_metric, rank)
+    Sp, wp = build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, rho_KS_rec, df_metric, gcut, rank)
 
     # Build contraction matrix
     C = build_contraction_matrix(natoms, atomic_symbols, lmax, nmax_numba, npgf, contranorm)
@@ -204,3 +208,7 @@ for iconf in conf_range:
 
     np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{conf_start + iconf}.npy"), c)
     np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{conf_start + iconf}.npy"), S)
+    #np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"w_conf{conf_start+iconf}.npy"), w)
+
+time_end = time.time()
+print("Total density fitting time:", time_end-time_start)
