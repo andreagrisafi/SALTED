@@ -21,15 +21,10 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
 
     inp = ParseConfig().parse_input()
 
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedpath = inp.salted.saltedpath
+    species = inp.system.species
+    dfbasis = inp.qm.dfbasis
 
     comm, size, rank, parallel = detect_mpi()
 
@@ -360,7 +355,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
         print("Integral = ", nele)
 
         # compute error as a fraction of electronic charge
-        if refcube and saltedtype=="density":
+        if refcube and inp.salted.saltedtype=="density":
             error = np.sum(abs(rhor-rho_qm))*dx*dy*dz/nele
             print("% MAE =", error*100)
         

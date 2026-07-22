@@ -13,23 +13,26 @@ from salted import sph_utils
 from salted import basis
 
 from salted.sph_utils import equicombfps
-from salted.sys_utils import ParseConfig, do_fps, get_atom_idx, read_system
+from salted.sys_utils import ParseConfig, build_featomic_hyper_params, do_fps, get_atom_idx, read_system
 
 def build():
 
     inp = ParseConfig().parse_input()
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedpath = inp.salted.saltedpath
+    rep1, rep2 = inp.descriptor.rep1.type, inp.descriptor.rep2.type
+    nrad1, nrad2 = inp.descriptor.rep1.nrad, inp.descriptor.rep2.nrad
+    nang1, nang2 = inp.descriptor.rep1.nang, inp.descriptor.rep2.nang
+    neighspe1, neighspe2 = inp.descriptor.rep1.neighspe, inp.descriptor.rep2.neighspe
+    nspe1 = len(inp.descriptor.rep1.neighspe)
+    nspe2 = len(inp.descriptor.rep2.neighspe)
+    ncut = inp.descriptor.sparsify.ncut
+    sparsify = ncut > 0
+    HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
+    HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
 
     # Generate directories for saving descriptors
-    sdir = osp.join(saltedpath, f"equirepr_{saltedname}")
+    sdir = osp.join(saltedpath, f"equirepr_{inp.salted.saltedname}")
     if not osp.exists(sdir):
         os.mkdir(sdir)
 
@@ -41,7 +44,7 @@ def build():
         )
         sys.exit(1)
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     start = time.time()
@@ -52,8 +55,8 @@ def build():
     conf_range = list(range(ndata_true))
     random.Random(3).shuffle(conf_range)
 
-    if nsamples <= ndata:
-        ndata = nsamples
+    if inp.descriptor.sparsify.nsamples <= ndata:
+        ndata = inp.descriptor.sparsify.nsamples
     else:
         print("ERROR: nsamples cannot be greater than ndata!")
         sys.exit(1)
@@ -61,7 +64,7 @@ def build():
     conf_range = conf_range[:ndata]
     print(f"Selected {ndata} frames.")
 
-    frames = read(filename,":")
+    frames = read(inp.system.filename,":")
     frames = list( frames[i] for i in conf_range )
     natoms = list( natoms[i] for i in conf_range )
     natoms_total = sum(natoms)

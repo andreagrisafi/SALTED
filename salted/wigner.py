@@ -15,7 +15,7 @@ def build():
     inp = ParseConfig().parse_input()
 
     from salted.sys_utils import read_system, get_atom_idx
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     nang1, nang2 = inp.descriptor.rep1.nang, inp.descriptor.rep2.nang

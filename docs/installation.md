@@ -5,30 +5,14 @@
 
 ## Install SALTED
 
-You can find the SALTED program on [GitHub](https://github.com/andreagrisafi/SALTED). In the SALTED directory, simply run `pip install .`
+Install SALTED directly from [GitHub](https://github.com/andreagrisafi/SALTED):
 
-Optionally, Fortran extensions (f2py) can be compiled by running `make` before installing. These are no longer required and Hessian construction uses Numba instead.
-
-??? note "Editable python package"
-    If you want to modify the code, you can install SALTED with the following command:
-
-    ```bash
-    python -m pip install -e .
-    ```
-
-    where `-e` means editable installation, which means you can modify the code and the changes will be reflected in the installed package.
-    This is useful for looking into the code / debugging.
+```bash
+pip install git+https://github.com/andreagrisafi/SALTED.git
+```
 
 
-### Dependencies
-
- - `featomic`: featomic installation requires a RUST compiler. To install a RUST compiler, run: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh && source "$HOME/.cargo/env"`. featomic can then be installed using `pip install git+https://github.com/metatensor/featomic.git`.
-
- - `mpi4py`: mpi4py is required to use MPI parallelisation; SALTED can nonetheless be run without this. A parallel h5py installation is required to use MPI parellelisation. This can be installed by running: `HDF5_MPI="ON" CC=mpicc pip install --no-cache-dir --no-binary=h5py h5py` provided HDF5 has been compiled with MPI support.
-
- - (Optional) `pip install meson ninja`, only needed if compiling f2py extensions via `make`.
-
-## Install electronic-structure codes 
+## Install electronic-structure codes
 
 SALTED is to date interfaced with the following electronic-structure codes: *CP2K*, *PySCF*, and *FHI-aims*. If you are interested in using SALTED in combination with other codes, please contact one of the developers.
 

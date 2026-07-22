@@ -11,7 +11,7 @@ from salted.sys_utils import ParseConfig, read_system, sort_grid_data
 def main():
     # load prediction dataset
     inp = ParseConfig().parse_input()
-    spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(
+    spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system(
         filename = inp.prediction.filename,
         spelist = inp.system.species,
         dfbasis = inp.qm.dfbasis,

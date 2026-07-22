@@ -21,57 +21,23 @@ from salted.sys_utils import (
 def build():
 
     inp = ParseConfig().parse_input()
-    (
-        saltedname,
-        saltedpath,
-        saltedtype,
-        filename,
-        species,
-        average,
-        path2qm,
-        qmcode,
-        qmbasis,
-        dfbasis,
-        filename_pred,
-        predname,
-        predict_data,
-        alpha_only,
-        rep1,
-        rcut1,
-        sig1,
-        nrad1,
-        nang1,
-        neighspe1,
-        rep2,
-        rcut2,
-        sig2,
-        nrad2,
-        nang2,
-        neighspe2,
-        sparsify,
-        nsamples,
-        ncut,
-        zeta,
-        Menv,
-        Ntrain,
-        trainfrac,
-        regul,
-        eigcut,
-        gradtol,
-        restart,
-        trainsel,
-        nspe1,
-        nspe2,
-        HP1,
-        HP2,
-    ) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedname = inp.salted.saltedname
+    saltedpath = inp.salted.saltedpath
+    saltedtype = inp.salted.saltedtype
+    average = inp.system.average
+    zeta = inp.gpr.z
+    Menv = inp.gpr.Menv
+    Ntrain = inp.gpr.Ntrain
+    regul = inp.gpr.regul
+    gradtol = inp.gpr.gradtol
 
     comm, size, rank, parallel = detect_mpi()
 
     fdir = f"rkhs-vectors_{saltedname}"
     rdir = f"regrdir_{saltedname}"
 
-    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = (
+    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = (
         read_system()
     )
 
@@ -110,13 +76,13 @@ def build():
         else:
             exit()
     dataset = list(range(ndata))
-    if trainsel == "sequential":
+    if inp.gpr.trainsel == "sequential":
         trainrangetot = dataset[:Ntrain]
-    elif trainsel == "random":
+    elif inp.gpr.trainsel == "random":
         random.Random(3).shuffle(dataset)
         trainrangetot = dataset[:Ntrain]
     else:
-        raise ValueError(f"training set selection {trainsel=} not available!")
+        raise ValueError(f"training set selection {inp.gpr.trainsel} not available!")
     if rank == 0:
         np.savetxt(
             osp.join(saltedpath, rdir, f"training_set_N{Ntrain}.txt"),
@@ -126,7 +92,7 @@ def build():
     # trainrangetot = np.loadtxt("training_set.txt",int)
 
     # Distribute structures to tasks
-    ntraintot = int(trainfrac * Ntrain)
+    ntraintot = int(inp.gpr.trainfrac * Ntrain)
 
     if parallel:
         check_MPI_tasks_count(comm, ntraintot, "training structures")
@@ -392,7 +358,7 @@ def build():
     reg_log10_intstr = str(int(np.log10(regul)))  # for consistency
 
     init = True
-    if restart == True:
+    if inp.gpr.restart:
         wpath = osp.join(
             saltedpath,
             rdir,

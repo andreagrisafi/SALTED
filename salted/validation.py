@@ -22,19 +22,18 @@ from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_p
 def build():
 
     inp = ParseConfig().parse_input()
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedname = inp.salted.saltedname
+    saltedpath = inp.salted.saltedpath
+    saltedtype = inp.salted.saltedtype
+    average = inp.system.average
+    qmcode = inp.qm.qmcode
+    zeta = inp.gpr.z
+    Menv = inp.gpr.Menv
 
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     vdir = f"validations_{saltedname}"
@@ -43,9 +42,9 @@ def build():
 
     # define test set
     trainrangetot = np.loadtxt(osp.join(
-        saltedpath, rdir, f"training_set_N{Ntrain}.txt"
+        saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
     ), int)
-    ntrain = round(trainfrac*len(trainrangetot))
+    ntrain = round(inp.gpr.trainfrac*len(trainrangetot))
     testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
     # Distribute structures to tasks
@@ -55,7 +54,7 @@ def build():
         if inp.salted.verbose:
             print(f"Task {rank} handles the following structures: {format_index_ranges(testrange,True)}", flush=True)
 
-    reg_log10_intstr = str(int(np.log10(regul)))
+    reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))
 
     # load regression weights
     weights = np.load(osp.join(
@@ -82,7 +81,7 @@ def build():
 
     if qmcode=="cp2k":
         from ase.io import read
-        xyzfile = read(filename, ":")
+        xyzfile = read(inp.system.filename, ":")
         # Initialize calculation of density/density-response moments
         charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
 
@@ -156,9 +155,9 @@ def build():
             if qmcode=="cp2k":
 
                 # Compute reference total charges and dipole moments
-                ref_charge, ref_dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average)
+                ref_charge, ref_dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,parallel,comm)
                 # Compute predicted total charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+                charge, dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
 
 
                 # Save charges and dipole moments
@@ -215,8 +214,8 @@ def build():
             if qmcode=="cp2k":
 
                 # Compute reference and predicted polarizabilities
-                ref_alpha = compute_polarizability(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs)
-                alpha = compute_polarizability(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs)
+                ref_alpha = compute_polarizability(natoms[iconf],atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs)
+                alpha = compute_polarizability(natoms[iconf],atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs)
 
                 # Save polarizabilities
                 print(iconf+1,ref_alpha[("x","x")],ref_alpha[("x","y")],ref_alpha[("x","z")],

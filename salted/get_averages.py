@@ -9,7 +9,7 @@ def build():
 
     inp = ParseConfig().parse_input()
 
-    spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 
     avcoefs = {}
     nat_per_species = {}

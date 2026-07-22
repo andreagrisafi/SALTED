@@ -104,13 +104,18 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
     # read system
     xyzfile = read(filename, ":", parallel=False)
     ndata = len(xyzfile)
+    
+    bohr2angs = 0.529177210670
 
     # Define system excluding atoms that belong to species not listed in SALTED input
     atomic_symbols = []
+    atomic_coords  = []
     natoms = np.zeros(ndata, int)
     for iconf in range(len(xyzfile)):
         atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
         natoms_total = len(atomic_symbols[iconf])
+        xyzfile[iconf].wrap()
+        atomic_coords.append(xyzfile[iconf].get_positions()/bohr2angs)
         excluded_species = []
         for iat in range(natoms_total):
             spe = atomic_symbols[iconf][iat]
@@ -118,13 +123,15 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
                 excluded_species.append(spe)
         excluded_species = set(excluded_species)
         for spe in excluded_species:
+            mask = [s != spe for s in atomic_symbols[iconf]]
             atomic_symbols[iconf] = list(filter(lambda a: a != spe, atomic_symbols[iconf]))
+            atomic_coords[iconf] = np.array(atomic_coords[iconf])[mask]
         natoms[iconf] = int(len(atomic_symbols[iconf]))
 
     # Define maximum number of atoms
     natmax = max(natoms)
 
-    return spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax
+    return spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax
 
 
 def get_atom_idx(ndata, natoms, spelist, atomic_symbols):
@@ -624,130 +631,6 @@ class ParseConfig:
             raise ValueError(f"Input file is empty, please check the input file at path {self.inp_fpath}")
         inp = self.check_input(inp)
         return AttrDict(inp)
-
-    def get_all_params(self) -> tuple:
-        """return all parameters with a tuple
-
-        About `sparsify` in the return tuple:
-            - If ncut <=0, sparsify = False.
-            - If ncut > 0, sparsify = True.
-
-        Please copy & paste:
-        ```python
-        (saltedname, saltedpath, saltedtype,
-         filename, species, average,
-         path2qm, qmcode, qmbasis, dfbasis,
-         filename_pred, predname, predict_data, alpha_only,
-         rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-         rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-         sparsify, nsamples, ncut,
-         zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-         gradtol, restart, trainsel,
-         nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
-        ```
-        HP1 and HP2 are the featomic hyperparameter dicts for rep1 and rep2,
-        built from their respective configs via build_featomic_hyper_params().
-        """
-        inp = self.parse_input()
-        sparsify = False if inp.descriptor.sparsify.ncut <= 0 else True  # determine if sparsify by ncut
-        nspe1 = len(inp.descriptor.rep1.neighspe)
-        nspe2 = len(inp.descriptor.rep2.neighspe)
-
-        HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
-        HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
-
-        return (
-            inp.salted.saltedname,
-            inp.salted.saltedpath,
-            inp.salted.saltedtype,
-            inp.system.filename,
-            inp.system.species,
-            inp.system.average,
-            inp.qm.path2qm,
-            inp.qm.qmcode,
-            inp.qm.qmbasis,
-            inp.qm.dfmetric,
-            inp.qm.dfbasis,
-            inp.prediction.filename,
-            inp.prediction.predname,
-            inp.prediction.predict_data,
-            inp.prediction.alpha_only,
-            inp.descriptor.rep1.type,
-            inp.descriptor.rep1.rcut,
-            inp.descriptor.rep1.sig,
-            inp.descriptor.rep1.nrad,
-            inp.descriptor.rep1.nang,
-            inp.descriptor.rep1.neighspe,
-            inp.descriptor.rep2.type,
-            inp.descriptor.rep2.rcut,
-            inp.descriptor.rep2.sig,
-            inp.descriptor.rep2.nrad,
-            inp.descriptor.rep2.nang,
-            inp.descriptor.rep2.neighspe,
-            sparsify,
-            inp.descriptor.sparsify.nsamples,
-            inp.descriptor.sparsify.ncut,
-            inp.gpr.z,
-            inp.gpr.Menv,
-            inp.gpr.Ntrain,
-            inp.gpr.trainfrac,
-            inp.gpr.regul,
-            inp.gpr.eigcut,
-            inp.gpr.gradtol,
-            inp.gpr.restart,
-            inp.gpr.trainsel,
-            nspe1,
-            nspe2,
-            HP1,
-            HP2,
-        )
-
-    def get_all_params_simple1(self) -> tuple:
-        """return all parameters with a tuple
-
-        Please copy & paste:
-        ```python
-        (
-            filename, species, average,
-            rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-            rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-            sparsify, nsamples, ncut,
-            z, Menv, Ntrain, trainfrac, regul, eigcut,
-            gradtol, restart, trainsel
-        ) = ParseConfig().get_all_params_simple1()
-        ```
-        """
-        inp = self.parse_input()
-        sparsify = False if inp.descriptor.sparsify.ncut == 0 else True
-        return (
-            inp.system.filename,
-            inp.system.species,
-            inp.system.average,
-            inp.descriptor.rep1.type,
-            inp.descriptor.rep1.rcut,
-            inp.descriptor.rep1.sig,
-            inp.descriptor.rep1.nrad,
-            inp.descriptor.rep1.nang,
-            inp.descriptor.rep1.neighspe,
-            inp.descriptor.rep2.type,
-            inp.descriptor.rep2.rcut,
-            inp.descriptor.rep2.sig,
-            inp.descriptor.rep2.nrad,
-            inp.descriptor.rep2.nang,
-            inp.descriptor.rep2.neighspe,
-            sparsify,
-            inp.descriptor.sparsify.nsamples,
-            inp.descriptor.sparsify.ncut,
-            inp.gpr.z,
-            inp.gpr.Menv,
-            inp.gpr.Ntrain,
-            inp.gpr.trainfrac,
-            inp.gpr.regul,
-            inp.gpr.eigcut,
-            inp.gpr.gradtol,
-            inp.gpr.restart,
-            inp.gpr.trainsel,
-        )
 
     def check_input(self, inp: dict):
         """Check keys (required, optional, not allowed), and value types and ranges

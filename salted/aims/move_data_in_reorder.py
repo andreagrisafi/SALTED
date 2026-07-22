@@ -12,7 +12,7 @@ def build():
     comm, size, rank, parallel = detect_mpi()
 
     
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     
     pdir = f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}"
     
