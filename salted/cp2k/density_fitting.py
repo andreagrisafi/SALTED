@@ -14,19 +14,8 @@ from salted.sys_utils import ParseConfig, detect_mpi
 
 inp = ParseConfig().parse_input()
 
-(saltedname, saltedpath, saltedtype,
-filename, species, average,
-path2qm, qmcode, qmbasis, dfmetric, dfbasis,
-filename_pred, predname, predict_data, alpha_only,
-rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-sparsify, nsamples, ncut,
-zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
-
 conf_start = int(sys.argv[1])
 conf_end = int(sys.argv[2])
-
 
 comm, size, rank, parallel = detect_mpi()
 
@@ -61,12 +50,12 @@ else:
 
 # Initialize SALTED
 time_start = time.time()
-species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-bdir = osp.join(saltedpath,"basis")
+bdir = osp.join(inp.salted.saltedpath,"basis")
 
-lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, dfbasis, bdir)    
+lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)    
 
 structure = xyzfile[0]
 b2a = 0.529177249
