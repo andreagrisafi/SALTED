@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        marker: [aims, pyscf, cp2k]
+        marker: [aims, pyscf, cp2k, mpi]
     steps:
       - uses: actions/checkout@v7
         with:

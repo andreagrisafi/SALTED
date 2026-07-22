@@ -16,9 +16,15 @@ prediction xyz built from the validation structures:
 - consistency: the step's ``COEFFS-<k+1>.dat`` (numbered by position in the
   prediction xyz) reproduce the validation step's ``COEFFS-<v[k]+1>.dat``
   (numbered by position in the full dataset).
+
+Serial-vs-MPI equivalence of both surfaces (``mpi``-marked, aims dataset):
+``salted.prediction`` distributes the prediction structures across ranks;
+``salted.salted_prediction`` distributes the atoms of one structure and
+allreduces the partial coefficients (via ``_mpi_predict_driver.py``).
 """
 
 import re
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -136,19 +142,41 @@ def test_prediction_gradient_finite_difference(load_predictor, example):
 
 
 VALSET_PREDNAME = "valset"
+# the MPI variants below run on the smallest dataset only; they carry only the
+# ``mpi`` marker (not ``aims``) so ``-m aims`` and ``-m mpi`` select disjoint sets
+MPI_EXAMPLE = "water_monomer_aims"
 
 
-@pytest.mark.parametrize("example", EXAMPLE_PARAMS)
-def test_prediction_step_matches_validation(serial_run, example):
-    """``salted.prediction`` on the validation structures must reproduce the
-    validation step's coefficients.
+@pytest.fixture(scope="module")
+def valset_prediction(serial_run):
+    """Run ``salted.prediction`` on an example's validation structures, once.
 
     The validation structures are sliced out of the dataset xyz (using the
     training-set file the pipeline wrote) into a prediction xyz, inp.yaml is
-    temporarily retargeted at it (ParseConfig hard-codes the inp.yaml name),
-    and the step runs on the already-trained model — no retraining.
+    temporarily retargeted at it (ParseConfig hard-codes the inp.yaml name;
+    a distinct predname keeps the outputs in their own directory), and the
+    step runs on the already-trained model — no retraining. Cached so the
+    serial run is shared between the consistency test and the MPI test.
     """
-    ws = serial_run(example)
+    cache = {}
+
+    def _get(example: str):
+        if example not in cache:
+            ws = serial_run(example)
+            xyz_fpath = ws.write_prediction_from_validation()
+            with ws.swap_prediction_inp(f"./{xyz_fpath.name}", VALSET_PREDNAME):
+                ws.run_step("prediction")
+            cache[example] = ws
+        return cache[example]
+
+    return _get
+
+
+@pytest.mark.parametrize("example", EXAMPLE_PARAMS)
+def test_prediction_step_matches_validation(valset_prediction, example):
+    """``salted.prediction`` on the validation structures must reproduce the
+    validation step's coefficients."""
+    ws = valset_prediction(example)
     vidx = ws.validation_indices()
     assert len(vidx) == ws.nconf - ws.ntrain
 
@@ -160,10 +188,6 @@ def test_prediction_step_matches_validation(serial_run, example):
         f"{example}: validation COEFFS indices disagree with the training-set "
         f"complement (train/validation split logic changed?)"
     )
-
-    xyz_fpath = ws.write_prediction_from_validation()
-    with ws.swap_prediction_inp(f"./{xyz_fpath.name}", VALSET_PREDNAME):
-        ws.run_step("prediction")
 
     pdir = ws.prediction_output_dir(VALSET_PREDNAME)
     failures = []
@@ -182,3 +206,49 @@ def test_prediction_step_matches_validation(serial_run, example):
         f"{example}: salted.prediction deviates from the validation output for "
         f"{len(failures)}/{len(vidx)} configurations:\n" + "\n".join(failures)
     )
+
+
+@pytest.mark.mpi
+def test_prediction_step_mpi_matches_serial(request, valset_prediction, mpirun_cmd):
+    """``salted.prediction`` splits the prediction structures across ranks;
+    an MPI rerun must agree with the cached serial valset run."""
+    ws = valset_prediction(MPI_EXAMPLE)
+    xyz_fpath = ws.write_prediction_from_validation()  # deterministic rewrite
+    np_tasks = request.config.getoption("--mpi-np")
+
+    with ws.swap_prediction_inp(f"./{xyz_fpath.name}", "valmpi"):
+        ws.run_step("prediction", mpi=mpirun_cmd + ["-n", str(np_tasks)])
+
+    sdir = ws.prediction_output_dir(VALSET_PREDNAME)
+    mdir = ws.prediction_output_dir("valmpi")
+    for k in range(1, len(ws.validation_indices()) + 1):
+        a = np.loadtxt(sdir / f"COEFFS-{k}.dat")
+        b = np.loadtxt(mdir / f"COEFFS-{k}.dat")
+        # each structure is computed entirely by one rank -> tiny noise at most
+        np.testing.assert_allclose(b, a, rtol=1e-8, atol=1e-10, err_msg=f"COEFFS-{k}.dat")
+
+
+@pytest.mark.mpi
+def test_salted_prediction_mpi_matches_serial(request, serial_run, mpirun_cmd):
+    """``salted.salted_prediction`` splits the atoms of one structure across
+    ranks and allreduces the partial coefficients; serial and MPI must agree.
+
+    Run through ``_mpi_predict_driver.py``: an in-process call cannot be
+    mpirun'd, so both runs go through the same driver subprocess.
+    """
+    ws = serial_run(MPI_EXAMPLE)
+    driver = Path(__file__).with_name("_mpi_predict_driver.py")
+    xyz = ws.inp["system"]["filename"]  # driver predicts its first structure
+    # the atom-parallel path caps the rank count at natoms
+    np_tasks = min(request.config.getoption("--mpi-np"), 2)
+
+    ws.run_python([str(driver), xyz, "pred_api_serial.npy"], label="salted_prediction")
+    ws.run_python(
+        [str(driver), xyz, "pred_api_mpi.npy"],
+        label="salted_prediction",
+        mpi=mpirun_cmd + ["-n", str(np_tasks)],
+    )
+
+    a = np.load(ws.root / "pred_api_serial.npy")
+    b = np.load(ws.root / "pred_api_mpi.npy")
+    np.testing.assert_allclose(b, a, rtol=1e-8, atol=1e-10)

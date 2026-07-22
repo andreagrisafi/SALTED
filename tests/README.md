@@ -2,19 +2,17 @@
 
 ## Tests and Markers
 
-- **Unit tests** in `tests/unit/`: fast, self-contained tests (no external data needed).
-- **Example tests** in `tests/integration/`:
-  - End-to-end runs of the example ML pipelines, `initialize` -> [intermediate steps] -> `validation`, plus prediction tests on the trained model.
-  - Precomputed data from the [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository.
-  - Each example additionally tests the live-prediction API (`salted.salted_prediction`) on the trained model: predictions must reproduce the validation-step coefficients, and central finite differences must converge to the analytical coefficient gradients at second order.
-  - Each example also tests the prediction pipeline step (`salted.prediction`): the validation structures are sliced out of the dataset xyz (via the training-set file) into a prediction set, `inp.yaml` is temporarily retargeted at it (with a separate `predname`, restored afterwards), and the step's predicted coefficients must reproduce the validation step's.
+- **Unit tests** in `tests/unit/`: fast, self-contained tests (no external data needed). Unmarked — select them by path (`pytest tests/unit`).
+- **Example tests** in `tests/integration/`: end-to-end runs of the example ML pipelines plus prediction tests on the trained model, driven by precomputed data from the [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository. All carry the `example` marker; see [Test scopes](#test-scopes) below.
+
+  The four sub-markers select **disjoint** test sets (`example` is their union):
 
   | Marker | Dataset | Description |
   |---|---|---|
-  | `aims` | `water_monomer_aims` | Serial pipeline + prediction tests + MPI equivalence tests |
+  | `aims` | `water_monomer_aims` | Serial pipeline + prediction tests |
   | `cp2k` | `water_monomer_CP2K_subset100` | Serial pipeline + prediction tests |
   | `pyscf` | `water_monomer_PySCF_subset100` | Serial pipeline + prediction tests |
-  | `mpi` | `water_monomer_aims` | Rerun under `mpirun -n 2`, verify matrices/weights/RMSE match serial; also serial-vs-MPI equivalence of both prediction surfaces (`salted.prediction` splits structures across ranks; `salted_prediction` splits the atoms of one structure and allreduces, exercised via `tests/integration/_mpi_predict_driver.py`) |
+  | `mpi` | `water_monomer_aims` | Serial-vs-MPI equivalence tests (pipeline + predictions) |
 
   - Reference data: 100-structures dataset, Ntrain=40, tested on 2026-07
 
@@ -24,6 +22,10 @@
   | `water_monomer_pyscf` | 100 | 40 | 7.990e-01 | 1.5 | ~ 4 min |
   | `water_monomer_cp2k` | 100 | 40 | 1.497e+00 | 2.5 | ~ 6 min |
   | `water_monomer_aims` (MPI) | 100 | 40 | 9.680e-01 | 1.5 | ~ 6 min |
+
+> For detailed information on the tests, see the bottom of this README:
+> [Test scopes](#test-scopes) and
+> [Fixture design](#fixture-design).
 
 ## Running the Tests Locally
 
@@ -43,13 +45,14 @@ Or, point `pytest` elsewhere with `--datasets-path /path/to/SALTED-datasets` or 
 ### Running Tests
 
 ```bash
-# Examples:
+# only unit tests (fastest)
 pytest tests/unit              # fast unit tests
-pytest -m example              # all example pipelines (needs SALTED-datasets)
-pytest -m aims                 # only the aims example + aims MPI tests
-pytest -m "aims and not mpi"   # only the aims serial pipeline
-pytest -m cp2k                 # only the cp2k subset100 pipeline
-pytest -m "example and not mpi"   # skip the MPI equivalence test
+# with SALTED-datasets
+pytest -m example              # all example pipelines
+pytest -m aims                 # only the aims serial tests
+pytest -m pyscf                # only the pyscf serial tests
+pytest -m cp2k                 # only the cp2k serial tests
+pytest -m mpi                  # only the serial-vs-MPI equivalence aims tests
 ```
 
 Options (see `pytest --help`, section "custom options"):
@@ -85,15 +88,68 @@ pytest -m aims --basetemp /scratch/salted-tests
 
 The GitHub workflow [`.github/workflows/ci.yaml`](../.github/workflows/ci.yaml) runs this test suite:
 
-| Event | `unit-tests` | `example-tests` (aims, pyscf, cp2k) |
+| Event | `unit-tests` | `example-tests` (aims, pyscf, cp2k, mpi) |
 |---|---|---|
-| push to `master` or `dev_test_CI` | yes | yes, all three in parallel |
+| push to `master` or `dev_test_CI` | yes | yes, all four in parallel |
 | push to any other branch | yes | skipped |
-| PR into `master` or `dev_test_CI` | yes | yes, all three in parallel |
-| manual dispatch (Actions tab, "Run workflow") | yes | yes, all three in parallel |
+| PR into `master` or `dev_test_CI` | yes | yes, all four in parallel |
+| manual dispatch (Actions tab, "Run workflow") | yes | yes, all four in parallel |
 
 Notes:
 
 - For SALTED-datasets, CI fetches only the required dataset directories and caches them by the upstream HEAD commit.
 - CI always passes `--require-datasets`, so a missing dataset directory or `mpirun` fails the job instead of silently skipping, which is different from local behavior defaults.
 - Each `example-tests` job has a 10-minute timeout (covering dependency install, dataset fetch, and the pipeline itself); if a job times out flakily, raise `timeout-minutes` in the workflow.
+
+## Test scopes
+
+### Serial tests (`aims`, `pyscf`, `cp2k`)
+
+Each per-example marker runs the **same four tests** on its dataset:
+
+1. **`test_example_pipeline`**
+    - the eight pipeline steps as subprocesses (`python -m salted.<step>`, exactly as a user would), asserting each step's artifacts and the calibrated % RMSE threshold above.
+2. **`test_prediction_matches_validation`**
+    - the live-prediction API (`init_pred` + `salted.salted_prediction`, in-process): predicting every validation structure must reproduce `salted.validation`'s COEFFS files.
+3. **`test_prediction_gradient_finite_difference`**
+    -  same API with `gradient=True`: central finite differences must converge to the analytical gradient at second order.
+4. **`test_prediction_step_matches_validation`**
+    - the prediction pipeline step (`python -m salted.prediction`) run on the validation structures (sliced from the dataset xyz; `inp.yaml` temporarily retargeted with a separate `predname`, then restored): its coefficients must reproduce the validation step's.
+
+Tests 2-4 reuse the trained model from test 1's workspace so that nothing is retrained.
+
+### MPI tests (`mpi`)
+
+SALTED's MPI tests verifies the following:
+
+- **Pipeline equivalence**
+    - rerun `sparse_descriptor`, `rkhs_vector`, `hessian_matrix`, `validation` under `mpirun -n 2`; regression matrices, weights, and RMSE must match the serial run with small differences.
+- **`test_prediction_step_mpi_matches_serial`**
+    - `salted.prediction` splits the prediction *structures* across ranks; an MPI prediction on validation set must match the cached serial run.
+- **`test_salted_prediction_mpi_matches_serial`**
+    - `salted.salted_prediction` splits the *atoms* of one structure across ranks; run via `_mpi_predict_driver.py`.
+
+## Fixture design
+
+Training a model costs 30 s - 2 min per backend, so the integration tests share trained workspaces through pytest fixtures (`tests/conftest.py`; injected by argument name, never imported). The dependency tree:
+
+```
+datasets_path (session)          locate SALTED-datasets, else skip (or fail in CI)
+  └─ make_workspace (session)    factory: tmp workspace per example
+       │                         (QM data symlinked read-only, xyz copied, inp.yaml generated)
+       └─ serial_run (session, cached per example)
+            │                    the full 8-step pipeline — runs ONCE per example
+            ├─ test_example_pipeline                    artifacts + RMSE
+            ├─ load_predictor (per-test)                trained model, in-process
+            │    ├─ test_prediction_matches_validation
+            │    └─ test_prediction_gradient_finite_difference
+            ├─ valset_prediction (cached per example)   salted.prediction on the
+            │    │                                      validation set — runs ONCE
+            │    ├─ test_prediction_step_matches_validation
+            │    └─ test_prediction_step_mpi_matches_serial   (mpi)
+            ├─ test_salted_prediction_mpi_matches_serial      (mpi)
+            └─ parallel_run (module)                    MPI rerun of the pipeline
+                 ├─ test_regression_matrices_match            (mpi)
+                 ├─ test_weights_match                        (mpi)
+                 └─ test_validation_rmse_matches              (mpi)
+```

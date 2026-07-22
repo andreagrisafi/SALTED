@@ -28,7 +28,7 @@ def main():
     # no angular truncation: predict every channel of the density-fitting
     # basis (lcut caps the output lambda channels at min(lmax, lcut))
     lcut = model[2]  # lmax_max
-    structure = read(xyz_fpath)
+    structure = read(xyz_fpath, 0)  # explicit: the first frame (ASE defaults to the last)
     out = salted_prediction.build(*model, comm, size, rank, lcut, False, structure)
     if rank == 0:
         np.save(out_fpath, out[0])

@@ -61,8 +61,8 @@ testpaths = ["tests"]
 addopts = "-ra"
 markers = [
     "example: end-to-end example pipeline test, needs the SALTED-datasets repository",
-    "mpi: needs mpirun; exercises the MPI-parallel code paths",
-    "aims: uses the water_monomer_aims dataset (fast)",
-    "pyscf: uses the water_monomer_PySCF dataset",
-    "cp2k: uses the water_monomer_CP2K dataset",
+    "mpi: serial-vs-MPI equivalence tests of the water_monomer_aims dataset, needs mpirun",
+    "aims: serial tests of the water_monomer_aims dataset",
+    "pyscf: serial tests of the water_monomer_PySCF dataset",
+    "cp2k: serial tests of the water_monomer_CP2K dataset",
 ]
