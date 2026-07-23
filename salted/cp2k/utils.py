@@ -373,9 +373,7 @@ def get_reciprocal_grid(nx, ny, nz, dx, dy, dz):
 @njit(parallel = True, fastmath = True)
 def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc):
 
-
-   # Dict with key as strings and values of type float array
-   partial_wave_coefs = Dict.empty(key_type=types.unicode_type,value_type=types.complex128[:,:])
+   partial_wave_coefs = Dict.empty(key_type=types.unicode_type,value_type=types.complex128[:,:]) # Dict with key as strings and values of type float array
    for spe in species:
       partial_wave_coefs[spe] = np.zeros((nG_loc, nbasis[spe]), dtype=np.complex128)
 
@@ -385,50 +383,50 @@ def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc):
       ky = Gvec[iG,1]
       kz = Gvec[iG,2]
 
-      # Norm square of the k-mode vector
+      # Norm squared |G|^2 and norm |G| of the k-mode vector
       knorm2 = kx*kx + ky*ky + kz*kz
+      knorm = np.sqrt(knorm2)
 
-
-      for spe in species:
-
-         knorm = np.sqrt(knorm2)
+      # Direction of G in spherical angles (costheta, phi)
+      for spe in species:       
          if knorm == 0.0:
             costheta = 0.0
          else:
             costheta = kz/knorm
          phi = np.arctan2(ky,kx)
+         
          ibasis = 0
-
          # Precompute partial wave coefficients <nlm|k> consisting in
          # spherical harmonics and radial integrals evaluated at the given k
          for lam in range(lmax[spe]+1):
 
             key = f"{spe}_{lam}"
 
-            harmonics = np.zeros((2*lmax[spe]+1))
-            radintk = np.zeros((max(nmax.values())))
-
+            # Fourier transform prefactors
             lamfactor = np.sqrt(np.pi/2.0) * knorm**lam
+            phase_lam = (-1.0j)**lam
 
-            # compute orthonormalized real spherical harmonics with Condon-Shortley phase convention
+            # Orthonormalized real spherical harmonics Y_{lam,m}(G/|G|) with Condon-Shortley phase convention
+            harmonics = np.zeros((2*lmax[spe]+1))
             for mu in range(2*lam+1):
-               harmonics[mu] = spherical_harmonic(lam,mu-lam,costheta,phi)
+               harmonics[mu] = spherical_harmonic(lam, mu-lam, costheta, phi)
                
+            # Primitive radial integrals
             pradintk = np.zeros((npgf[key]))
-
             for ipgf in range(npgf[key]):
-               # compute normalized radial integral
-               sigma = np.sqrt(1.0 / (2.0 * alphas[key][ipgf]))
-               pradintk[ipgf] = lamfactor * sigma**(2.0*lam+3.0) * np.exp(-0.5*knorm2*(sigma**2))
+               sigma2 = 1.0 / (2.0 * alphas[key][ipgf]) # Squared Gaussian width in reciprocal space
+               sigma = np.sqrt(sigma2) # Gaussian width in reciprocal space
+               pradintk[ipgf] = lamfactor * sigma2**lam * sigma**3.0 * np.exp(-0.5*knorm2*sigma2)
 
             # Precompute partial wave coefficients <nlm|k> consisting in
             # spherical harmonics and radial integrals evaluated at the given k
+            radintk = np.zeros((max(nmax.values())))
             for irad in range(nmax[key]):
                radintk[irad] = 0.0
                for ipgf in range(npgf[key]):
                   radintk[irad] += contranorm[key][irad,ipgf]*pradintk[ipgf]
                for mu in range(2*lam+1):
-                  partial_wave_coefs[spe][iG,ibasis] = radintk[irad] * harmonics[mu] * (( -1.0j)**(np.float64(lam)))
+                  partial_wave_coefs[spe][iG,ibasis] = radintk[irad] * harmonics[mu] * phase_lam
                   ibasis = ibasis + 1
 
    return partial_wave_coefs
