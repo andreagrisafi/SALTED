@@ -56,8 +56,8 @@ Training data consists in the expansion coefficients of the scalar/vector field 
 The electronic-structure codes that are to date interfaced with SALTED are:
     
    * `FHI-aims <https://gitlab.com/FHI-aims-club/tutorials/fhi-aims-with-salted>`_ 
-   * `CP2K  <https://github.com/andreagrisafi/SALTED/tree/master/example/water_monomer_CP2K>_`
-   * `PySCF <https://github.com/andreagrisafi/SALTED/tree/master/example/water_monomer_PySCF>_`
+   * `CP2K  <https://github.com/andreagrisafi/SALTED/tree/master/example/water_monomer_CP2K>`_
+   * `PySCF <https://github.com/andreagrisafi/SALTED/tree/master/example/water_monomer_PySCF>`_
 
 We refer to the code-specific examples for how to produce the required quantum-mechanical data. 
 
