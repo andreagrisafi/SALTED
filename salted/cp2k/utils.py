@@ -596,8 +596,82 @@ def build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, pa
     return S, w
 
 #@njit(parallel = False, fastmath = True)
-def build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, rho_KS_rec, df_metric, ncut, rank):
-    # Build the primitive-basis overlap matrix Sp and density vector wp
+def build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, df_metric, ncut, rank):
+    # Build the primitive-basis overlap matrix Sp
+    
+    offset = {}
+    ipgf = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for lam in range(lmax[spe]+1):
+            key = f"{spe}_{lam}"
+            for mu in range(2*lam+1):
+                offset[(iat, lam, mu)] = ipgf
+                ipgf += npgf[key]
+    ncoefs_prim = ipgf
+
+    Sp = np.zeros((ncoefs_prim, ncoefs_prim), dtype=np.float64)
+
+    knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half,axis=1)).astype(np.float64) # |G|
+    phase = np.exp(-1j * np.dot(Gvec_half, coords.T)) # e^{-iG.r_iat}
+
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for iat2 in range(iat+1):
+            spe2 = atomic_symbols[iat2]
+            same_atom = (iat2 == iat)
+
+            phase_pair = phase[:, iat] * np.conj(phase[:, iat2])
+            if df_metric == "coulomb":
+                phase_pair = phase_pair / (knorm_vec**2)
+
+            phase_pair_w = 2.0 * phase_pair
+            if df_metric == "identity":
+                phase_pair_w[0] = phase_pair[0]
+
+            phase_pair_w_real = phase_pair_w.real
+            phase_pair_w_imag = phase_pair_w.imag
+
+            for lam in range(lmax[spe]+1):
+                key = f"{spe}_{lam}"
+                for mu in range(2*lam+1):
+                    row_base = offset[(iat, lam, mu)]
+
+                    for lam2 in range(lmax[spe2]+1):
+                        if same_atom and lam2 < lam:
+                            continue  # this (lam2,lam) block already done from the other side
+                        key2 = f"{spe2}_{lam2}"
+                        for mu2 in range(2*lam2+1):
+                            if same_atom and lam2 == lam and mu2 < mu:
+                                continue
+                            col_base = offset[(iat2, lam2, mu2)]
+
+                            for ipgf1 in range(npgf[key]):
+                                n1 = ncut[key][ipgf1]
+                                pwc1 = partial_wave_coefs[key][:, ipgf1, mu]
+
+                                for ipgf2_local in range(npgf[key2]):
+                                    if same_atom and lam2 == lam and mu2 == mu and ipgf2_local < ipgf1:
+                                        continue
+                                    n2 = ncut[key2][ipgf2_local]
+                                    ncut_pair = min(n1, n2)
+
+                                    pwc2 = partial_wave_coefs[key2][:ncut_pair, ipgf2_local, mu2]
+                                    c = pwc1[:ncut_pair] * np.conj(pwc2)
+
+                                    val = (np.dot(phase_pair_w_real[:ncut_pair], c.real) - np.dot(phase_pair_w_imag[:ncut_pair], c.imag))
+
+                                    row = row_base + ipgf1
+                                    col = col_base + ipgf2_local
+                                    Sp[row, col] = val
+                                    if row != col:
+                                        Sp[col, row] = val
+
+    Sp = np.real(Sp) * 4 * np.pi
+    return Sp
+
+def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, rho_KS_rec, df_metric, ncut, rank):
+    # Build the primitive-basis density vector wp
     
     # Get the total size of the primitive basis
     ncoefs_prim = 0
@@ -607,75 +681,51 @@ def build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, p
             key = f"{spe}_{lam}"
             ncoefs_prim += npgf[key] * (2*lam + 1)
 
-    Sp = np.zeros((ncoefs_prim, ncoefs_prim), dtype=np.float64)
     wp = np.zeros((ncoefs_prim), dtype=np.float64)
 
     knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half,axis=1)).astype(np.float64) # |G|
     phase = np.exp(-1j * np.dot(Gvec_half, coords.T)) # e^{-iG.r_iat}
+    
+    # Precompute the G-weighting
+    if df_metric == "identity":
+        # weight 2 for G>0, weight 1 for G=0
+        rho_w = 2.0 * np.conj(rho_KS_rec)
+        rho_w[0] = np.conj(rho_KS_rec[0])
     if df_metric == "coulomb":
-        phase_over_knorm = phase / knorm_vec[:, np.newaxis] 
-
+        # weight always 2 here since Gvec_half already excludes G=0
+        rho_w = 2.0 * np.conj(rho_KS_rec) / (knorm_vec**2)
+    
+    # Precompute real/imag parts of partial_wave_coefs ONCE per key
+    pwc_real = {key: partial_wave_coefs[key].real for key in partial_wave_coefs}
+    pwc_imag = {key: partial_wave_coefs[key].imag for key in partial_wave_coefs}
+    
     # Outer loop over (iat, lam, mu) indexes rows of Sp and entries of wp.
     ipgf = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        
+
+        nmax_atom = 0
         for lam in range(lmax[spe]+1):
             key = f"{spe}_{lam}"
-            
-            # wp calculation
-            for mu in range(2*lam + 1):
+            nmax_atom = max(nmax_atom, max(ncut[key]))
 
-                obj1_list = []
+        z = phase[:nmax_atom, iat] * rho_w[:nmax_atom]
+        z_real = z.real
+        z_imag = z.imag
+
+        for lam in range(lmax[spe]+1):
+            key = f"{spe}_{lam}"
+
+            for mu in range(2*lam + 1):
                 for ipgf1 in range(npgf[key]):
                     n1 = ncut[key][ipgf1]
-                    if df_metric == "identity":
-                        obj1 = phase[:n1, iat] * partial_wave_coefs[key][:n1, ipgf1, mu]
-                        wp[ipgf+ipgf1] = 2 * (np.dot(obj1[1:].real, rho_KS_rec[1:n1].real) + np.dot(obj1[1:].imag, rho_KS_rec[1:n1].imag))
-                        wp[ipgf+ipgf1] += obj1[0].real * rho_KS_rec[0].real + obj1[0].imag * rho_KS_rec[0].imag
-                    if df_metric == "coulomb":
-                        obj1 = phase_over_knorm[:n1, iat] * partial_wave_coefs[key][:n1, ipgf1, mu]
-                        wp[ipgf+ipgf1] = 2 * (np.dot(obj1.real, rho_KS_rec[:n1].real / knorm_vec[:n1]) + np.dot(obj1.imag, rho_KS_rec[:n1].imag / knorm_vec[:n1]))
-                    obj1_list.append(obj1)
+                    wp[ipgf+ipgf1] = (np.dot(pwc_real[key][:n1, ipgf1, mu], z_real[:n1]) - np.dot(pwc_imag[key][:n1, ipgf1, mu], z_imag[:n1]))
 
-                # Sp calculation
-                # Inner loop over (iat2, lam2, mu2) indexes columns of Sp
-                ipgf2 = 0
-                for iat2 in range(iat+1):
-                    spe2 = atomic_symbols[iat2]
-                    for lam2 in range(lmax[spe2]+1):
-                        key2 = f"{spe2}_{lam2}"
-                        for mu2 in range(2*lam2 + 1):
-                            for ipgf2_local in range(npgf[key2]):
-                                n2 = ncut[key2][ipgf2_local]
-                                
-                                if df_metric == "identity":
-                                    obj2 = phase[:n2, iat2] * partial_wave_coefs[key2][:n2, ipgf2_local, mu2]
-                                if df_metric == "coulomb":
-                                    obj2 = phase_over_knorm[:n2, iat2] * partial_wave_coefs[key2][:n2, ipgf2_local, mu2]
-                                    
-                                for ipgf1 in range(npgf[key]):
-                                    obj1 = obj1_list[ipgf1]
-                                    n1 = ncut[key][ipgf1]
-                                    ncut_pair = min(n1, n2)
- 
-                                    if df_metric == "identity":
-                                        val = 2 * (np.dot(obj1[1:ncut_pair].real, obj2[1:ncut_pair].real) + np.dot(obj1[1:ncut_pair].imag, obj2[1:ncut_pair].imag))
-                                        val += obj1[0].real*obj2[0].real + obj1[0].imag*obj2[0].imag
-                                    if df_metric == "coulomb":
-                                        val = 2 * (np.dot(obj1[:ncut_pair].real, obj2[:ncut_pair].real) + np.dot(obj1[:ncut_pair].imag, obj2[:ncut_pair].imag))
- 
-                                    Sp[ipgf+ipgf1, ipgf2+ipgf2_local] = val
-                                    if ipgf+ipgf1 != ipgf2+ipgf2_local:
-                                        Sp[ipgf2+ipgf2_local, ipgf+ipgf1] = val
-
-                            ipgf2 += npgf[key2]
                 ipgf += npgf[key]
 
-    Sp = np.real(Sp)*4*np.pi
     wp = np.real(wp)
 
-    return Sp, wp
+    return wp
 
 def build_contraction_matrix(natoms, atomic_symbols, lmax, nmax, npgf, contranorm):
 
