@@ -1,0 +1,4 @@
+mkdocs>=1.6
+mkdocstrings[python]>=0.25
+markdown-include>=0.8
+pymdown-extensions>=10
