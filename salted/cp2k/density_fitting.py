@@ -7,7 +7,7 @@ import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
 from salted.cp2k.utils import gto_rec, gto_rec_prim, get_reciprocal_grid, get_basis_set_info_numba
-from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_matrices, build_matrices_prim, build_ncutoff
+from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_matrices, build_matrices_prim, build_ncutoff, setup_pyscf_species, pair_cutoffs, overlap_identity
 from numba import types
 from numba.typed import Dict
 from mpi4py import MPI
@@ -133,6 +133,11 @@ partial_wave_coefs_prim = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_h
 time_b = time.time()
 print("Time to compute partial wave coefficients:", time_b-time_a)
 
+# PySCF species setup
+rcut_pairs = pair_cutoffs(species, lmax, alphas, contranorm, eps=1e-10)
+if df_metric == "identity":
+    pyscf_data = setup_pyscf_species(species, lmax, nmax_numba, alphas, contranorm)
+
 # init geometry
 for iconf in conf_range:
     structure = xyzfile[iconf]
@@ -182,12 +187,18 @@ for iconf in conf_range:
     C = build_contraction_matrix(natoms, atomic_symbols, lmax, nmax_numba, npgf, contranorm) # Build contraction matrix
     time_c = time.time()
     #S, w = build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank)
+    # w: computed in reciprocal space with truncated Gvec_half
     wp = get_w_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, rho_KS_rec, df_metric, gcut, rank)
     w = C.T @ wp
     print("Time to build w:", time.time()-time_c)
     time_c = time.time()
-    Sp = build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, df_metric, gcut, rank)
-    S = C.T @ Sp @ C
+    if df_metric == "identity":
+        # S: analytic real-space periodic overlap
+        S = overlap_identity(np.asarray(cell), coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, rcut_pairs)
+    elif df_metric == "coulomb":
+        Sp = build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, df_metric, gcut, rank)
+        S = C.T @ Sp @ C
+        
     time_d = time.time()
     print("Time to build S:", time_d-time_c)
 

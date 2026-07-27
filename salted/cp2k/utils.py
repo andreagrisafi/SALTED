@@ -8,6 +8,7 @@ from scipy import special
 from numba import njit, prange
 from numba import types
 from numba.typed import Dict
+from pyscf import gto as _pyscf_gto
 
 def init_moments(inp,species,lmax,nmax,rank):
     """Compute basis function integrals relevant for computing total charge, dipole and polarizability tensor"""
@@ -727,8 +728,157 @@ def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wa
 
     return wp
 
-def build_contraction_matrix(natoms, atomic_symbols, lmax, nmax, npgf, contranorm):
+def setup_pyscf_species(species, lmax, nmax, alphas, contranorm):
+    #Build per-species PySCF Mole objects
 
+    mol_bra = {} # fixed (bra) side of overlap integrals
+    mol_ket = {} # movable (ket) side of overlap integrals
+    coord_slice = {} # ket (x,y,z) coordinate
+    perm = {}
+
+    for spe in species:
+        basis = []
+        idx = []
+        off = 0
+        for lam in range(lmax[spe] + 1):
+            key = f"{spe}_{lam}"
+            shell = [lam] # The first entry tells PySCF the angular momentum
+
+            for ipgf in range(len(alphas[key])):
+                # Each row expected by PySCF looks like:
+                #   [exponent, coeff_for_function_0, coeff_for_function_1, ...]
+                row = [float(alphas[key][ipgf])]
+                for irad in range(nmax[key]):
+                    row.append(float(contranorm[key][irad, ipgf]) / _pyscf_gto.gto_norm(lam, float(alphas[key][ipgf]))) # divide by PySCF's normalization factor (gto_norm) to avoid PySCF's automatic normalization of the primitive
+                shell.append(row)
+
+            basis.append(shell) # One entry per angular momentum shell
+
+            # Index map to fix ordering mismatch between PySCF and SALTED (only matters for lam=1)
+            mmap = [1, 2, 0] if lam == 1 else list(range(2 * lam + 1))
+            for irad in range(nmax[key]):
+                for mu in range(2 * lam + 1):
+                    idx.append(off + irad * (2 * lam + 1) + mmap[mu])
+            off += nmax[key] * (2 * lam + 1)
+
+        # PySCF molecule object builder
+        # "Ghost" atom sitting at the origin, carrying the basis assembled above.
+        def _make():
+            mol = _pyscf_gto.M(
+                atom=[[f"ghost-{spe}", (0.0, 0.0, 0.0)]],
+                basis={f"ghost-{spe}": basis},
+                spin=0,
+                cart=False,    # real spherical harmonics, not cartesian Gaussians
+                unit="Bohr",   # match SALTED units
+            )
+            return mol
+
+        mol_bra[spe] = _make()
+        mol_ket[spe] = _make()
+        ptr = mol_ket[spe]._atm[0, _pyscf_gto.PTR_COORD]
+        coord_slice[spe] = slice(ptr, ptr + 3)
+        perm[spe] = np.asarray(idx, dtype=int)
+
+    return {"mol_bra": mol_bra, "mol_ket": mol_ket, "perm": perm, "coord_slice": coord_slice}
+
+def pair_cutoffs(species, lmax, alphas, contranorm, eps=1.0e-12):
+    #Real-space cutoff (Bohr) per pair
+    amin, cmax = {}, {}
+
+    for spe in species:
+        amin[spe] = min(float(np.min(alphas[f"{spe}_{lam}"])) for lam in range(lmax[spe] + 1))
+        cmax[spe] = max(float(np.max(np.abs(contranorm[f"{spe}_{lam}"]))) for lam in range(lmax[spe] + 1))
+    rcut = {}
+
+    for spe1 in species:
+        for spe2 in species:
+            amin_pair = amin[spe1] * amin[spe2] / (amin[spe1] + amin[spe2])
+            A = cmax[spe1] * cmax[spe2] * (np.pi / (amin[spe1] + amin[spe2])) ** 1.5
+            #smax1 = np.sqrt((2.0 + lmax[spe1]) / (2.0 * amin[spe1]))
+            #smax2 = np.sqrt((2.0 + lmax[spe2]) / (2.0 * amin[spe2]))
+            #r = 4.0 * (smax1 + smax2)
+            r = 4.0 * np.sqrt(1.0 / (2.0 * amin_pair)) # Initial guess: r_cut = 4*sigma_pair
+            r = np.sqrt(max(np.log(max(A, 1.0) * max(r, 1.0) ** (lmax[spe1] + lmax[spe2]) / eps), 1.0) / amin_pair) # Optional refinement: fixed-point iteration
+            rcut[(spe1, spe2)] = r
+    return rcut
+
+def lattice_images(cell, rcut_max, volume):
+
+    cell = np.asarray(cell, dtype=float) # cell: (3,3) array, each row is one lattice vector (a1, a2, a3) in Bohr.
+
+    h = np.empty(3)
+    for i in range(3):
+        j, k = (i + 1) % 3, (i + 2) % 3 # cyclic: 0,1,2 -> 1,2,0 -> 2,0,1
+        face_area = np.linalg.norm(np.cross(cell[j], cell[k])) # |cell[j] x cell[k]| is the area of the parallelogram face spanned by lattice vectors j and k
+        h[i] = volume / face_area # how far apart are the periodic copies of the cell
+
+    nmax = np.ceil(rcut_max / h).astype(int) + 1 # Number of periodic images to include along each lattice vector direction
+
+    grids = [np.arange(-n, n + 1) for n in nmax]
+    n1, n2, n3 = np.meshgrid(*grids, indexing="ij")
+    ns = np.stack([n1.ravel(), n2.ravel(), n3.ravel()], axis=1) 
+
+    return ns @ cell # Return converted to a Cartesian translation
+
+def overlap_identity(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, rcut):
+    #Identity-metric overlap matrix in real space
+
+    natoms = len(atomic_symbols)
+
+    S = np.zeros((ncoefs, ncoefs))
+
+    # Unpack PySCF data
+    mol_bra = pyscf_data["mol_bra"]
+    mol_ket = pyscf_data["mol_ket"]
+    perm = pyscf_data["perm"]
+    cslice = pyscf_data["coord_slice"]
+
+    rcut_max = max(rcut.values()) # Pairs cutoff, to decided how many periodic images to include
+    periodic = cell is not None and volume > 1.0e-10
+    if periodic:
+        cell = np.asarray(cell, dtype=float)
+        inv_cell = np.linalg.inv(cell) # Cartesian to fractional coordinates
+        images = lattice_images(cell, rcut_max, volume) # Bring periodic images
+    else:
+        images = np.zeros((1, 3)) # No periodicity
+
+    icoefs = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        pbra = perm[spe]
+
+        icoefs2 = 0
+        for iat2 in range(iat + 1):
+            spe2 = atomic_symbols[iat2]
+            pket = perm[spe2]
+
+            rcut_ij = rcut[(spe, spe2)] # real-space cutoff to use for this specific pair
+
+            delta = coords[iat2] - coords[iat]
+
+            if periodic:
+                frac = delta @ inv_cell # Convert to fractional coordinates
+                delta = (frac - np.round(frac)) @ cell # Wrap and convert back to Cartesian
+
+            dvecs = delta + images
+            keep = np.einsum("ij,ij->i", dvecs, dvecs) <= rcut_ij * rcut_ij # Keep only the images whose distance falls within the pair cutoff
+
+            block = np.zeros((nbasis[spe], nbasis[spe2]))
+            for d in dvecs[keep]:
+                mol_ket[spe2]._env[cslice[spe2]] = d # Move the "ket" ghost atom
+                raw = _pyscf_gto.intor_cross("int1e_ovlp", mol_bra[spe], mol_ket[spe2]) # Ask PySCF for the raw overlap integrals
+                block += raw[np.ix_(pbra, pket)] # Reorder PySCF's rows/columns into SALTED's (n,m) ordering
+
+            S[icoefs:icoefs + nbasis[spe], icoefs2:icoefs2 + nbasis[spe2]] = block
+            if iat2 != iat:
+                S[icoefs2:icoefs2 + nbasis[spe2], icoefs:icoefs + nbasis[spe]] = block.T
+
+            icoefs2 += nbasis[spe2]
+        icoefs += nbasis[spe]
+
+    return S * volume / (4.0 * np.pi)
+
+def build_contraction_matrix(natoms, atomic_symbols, lmax, nmax, npgf, contranorm):
     ncoefs_prim = 0
     ncoefs = 0
     for iat in range(natoms):
