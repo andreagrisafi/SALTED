@@ -6,7 +6,8 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import build_ncutoff, build_matrices, build_matrices_prim, gto_rec, gto_rec_prim, build_contraction_matrix, get_reciprocal_grid, get_basis_set_info_numba
+from salted.cp2k.utils import gto_rec, gto_rec_prim, get_reciprocal_grid, get_basis_set_info_numba
+from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_matrices, build_matrices_prim, build_ncutoff
 from numba import types
 from numba.typed import Dict
 from mpi4py import MPI
@@ -74,8 +75,6 @@ ncoefs = 0
 for spe in species:
     ncoefs += nbasis[spe]*ntype[spe]
 
-volume = structure.get_volume()/(b2a**3)
-
 cubefile = open(os.path.join(inp.qm.path2qm, f"conf_{conf_start+1}", inp.qm.cubefile),"r")
 lines = cubefile.readlines()
 nside = {}
@@ -116,7 +115,7 @@ df_metric = inp.qm.dfmetric
 if df_metric == "coulomb":
     Gvec_half = Gvec_half[1:]
 
-nG_half=len(Gvec_half)
+nG_half = len(Gvec_half)
 
 # Sort G
 knorm_vec = np.linalg.norm(Gvec_half, axis=1)
@@ -141,7 +140,8 @@ for iconf in conf_range:
     natoms = len(atomic_symbols)
     cell = structure.cell/b2a
     coords  = structure.positions/b2a
-
+    volume = structure.get_volume()/(b2a**3)
+    
     cube_dir = os.path.join(inp.qm.path2qm, f"conf_{conf_start+iconf+1}", inp.qm.cubefile)
 
     cubefile = open(cube_dir,"r")
@@ -179,19 +179,17 @@ for iconf in conf_range:
     rho_KS_rec = rho_KS_rec[sort_idx]
 
     # Build matrices
+    C = build_contraction_matrix(natoms, atomic_symbols, lmax, nmax_numba, npgf, contranorm) # Build contraction matrix
     time_c = time.time()
     #S, w = build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank)
-    Sp, wp = build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, rho_KS_rec, df_metric, gcut, rank)
-
-    # Build contraction matrix
-    C = build_contraction_matrix(natoms, atomic_symbols, lmax, nmax_numba, npgf, contranorm)
-
-    # Contraction
-    S = C.T @ Sp @ C
+    wp = get_w_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, rho_KS_rec, df_metric, gcut, rank)
     w = C.T @ wp
-    
+    print("Time to build w:", time.time()-time_c)
+    time_c = time.time()
+    Sp = build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, df_metric, gcut, rank)
+    S = C.T @ Sp @ C
     time_d = time.time()
-    print("Time to build matrices:", time_d-time_c)
+    print("Time to build S:", time_d-time_c)
 
     c = np.linalg.solve(S,w)
 
