@@ -878,6 +878,81 @@ def overlap_identity(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf
 
     return S * volume / (4.0 * np.pi)
 
+def overlap_coulomb_rec(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, ncut, omega, rank):
+    # Reciprocal-space part of the Coulomb-metric overlap matrix
+
+    offset = {}
+    ipgf = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for lam in range(lmax[spe]+1):
+            key = f"{spe}_{lam}"
+            for mu in range(2*lam+1):
+                offset[(iat, lam, mu)] = ipgf
+                ipgf += npgf[key]
+    ncoefs_prim = ipgf
+    
+    Sp = np.zeros((ncoefs_prim, ncoefs_prim), dtype=np.float64)
+    
+    knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half, axis=1)).astype(np.float64)  # |G|
+    phase = np.exp(-1j * np.dot(Gvec_half, coords.T)) # e^{-iG.r_iat}
+     
+    # Ewald reciprocal-space screening factor exp(-G^2 / (4*omega^2))
+    ewald_screen = np.exp(-(knorm_vec*knorm_vec) / (4.0*omega*omega))
+    eps_gmax = 1e-10
+    gmax_omega = 2.0 * omega * np.sqrt(-np.log(eps_gmax))
+    nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64)
+    #print(f"nomega = {nomega} / nG_half = {len(Gvec_half)}  ({100*nomega/len(Gvec_half):.1f}%)")
+
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for iat2 in range(iat+1):
+            spe2 = atomic_symbols[iat2]
+            same_atom = (iat2 == iat)
+
+            phase_pair = phase[:, iat] * np.conj(phase[:, iat2]) / (knorm_vec**2)
+            phase_pair_w = 2.0 * phase_pair
+            phase_pair_w_real = phase_pair_w.real
+            phase_pair_w_imag = phase_pair_w.imag
+
+            for lam in range(lmax[spe]+1):
+                key = f"{spe}_{lam}"
+                for mu in range(2*lam+1):
+                    row_base = offset[(iat, lam, mu)]
+
+                    for lam2 in range(lmax[spe2]+1):
+                        if same_atom and lam2 < lam:
+                            continue  # this (lam2,lam) block already done from the other side
+                        key2 = f"{spe2}_{lam2}"
+                        for mu2 in range(2*lam2+1):
+                            if same_atom and lam2 == lam and mu2 < mu:
+                                continue
+                            col_base = offset[(iat2, lam2, mu2)]
+
+                            for ipgf1 in range(npgf[key]):
+                                n1 = ncut[key][ipgf1]
+                                pwc1 = partial_wave_coefs[key][:, ipgf1, mu] * ewald_screen
+
+                                for ipgf2_local in range(npgf[key2]):
+                                    if same_atom and lam2 == lam and mu2 == mu and ipgf2_local < ipgf1:
+                                        continue
+                                    n2 = ncut[key2][ipgf2_local]
+                                    ncut_pair = np.min([n1, n2, nomega])
+
+                                    pwc2 = partial_wave_coefs[key2][:ncut_pair, ipgf2_local, mu2]
+                                    c = pwc1[:ncut_pair] * np.conj(pwc2)
+
+                                    val = (np.dot(phase_pair_w_real[:ncut_pair], c.real) - np.dot(phase_pair_w_imag[:ncut_pair], c.imag))
+
+                                    row = row_base + ipgf1
+                                    col = col_base + ipgf2_local
+                                    Sp[row, col] = val
+                                    if row != col:
+                                        Sp[col, row] = val
+
+    Sp = np.real(Sp) * 4 * np.pi
+    return Sp
+
 def build_contraction_matrix(natoms, atomic_symbols, lmax, nmax, npgf, contranorm):
     ncoefs_prim = 0
     ncoefs = 0
