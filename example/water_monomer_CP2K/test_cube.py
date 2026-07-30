@@ -26,8 +26,4 @@ coefs = np.load("coefficients_conf"+str(iconf)+".npy")
 
 f_list = ["e_density", "potential", "efield_x", "efield_y", "efield_z"]
 
-rloc = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
-rloc["O"] = 0.24446328480160
-rloc["H"] = 0.20059317301776
-
-cube_reconstruction.build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank)
+cube_reconstruction.build(f_list,structure,coefs,cubename,refcube,comm,size,rank)

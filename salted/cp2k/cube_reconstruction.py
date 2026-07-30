@@ -14,7 +14,7 @@ from numba import get_num_threads, get_thread_id
 from mpi4py import MPI
 
 
-def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
+def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
          
     inp = ParseConfig().parse_input()
 
@@ -29,11 +29,16 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
     
     lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)            
 
-    pseudocharge = inp.qm.pseudocharge
+    bdir = osp.join(inp.salted.saltedpath,"basis")
+
+    rloc = np.loadtxt(bdir + "/rloc.txt")
+    pseudocharge = np.loadtxt(bdir + "/pseudocharge.txt")
+
     pseudocharge_numba = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
+    rloc_dict = {}
     for i in range(len(species)):
         pseudocharge_numba[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
-    print(type(pseudocharge_numba))
+        rloc_dict[species[i]] = rloc[i] # same
 
     b2a = 0.529177249
     atomic_symbols = structure.get_chemical_symbols()
@@ -44,7 +49,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
     volume = structure.get_volume()/(b2a**3)
 
     charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
-    charge, dipole = compute_charge_and_dipole(inp.qm.pseudocharge, natoms, range(natoms), atomic_symbols, coords, lmax, nmax, species, charge_integrals, dipole_integrals, coefs, True, False, False)
+    charge, dipole = compute_charge_and_dipole(pseudocharge, natoms, range(natoms), atomic_symbols, coords, lmax, nmax, species, charge_integrals, dipole_integrals, coefs, True, False, False)
     
     if len(refcube)==1:
 
@@ -113,13 +118,13 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
 
     gauss = {}
     for spe in species:
-        gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc[spe]**2))
+        gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc_dict[spe]**2))
 
     volfactor = 32.0*np.pi*np.pi/(volume)
 
     offset = 0
     rho_rec = np.zeros((nG_loc, natoms), dtype=np.complex128)
-    if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list:
+    if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list or "total_charge" in f_list:
         rho_n_rec = np.zeros((nG_loc, natoms), dtype=np.complex128)
 
     if "efield_x" in f_list:
@@ -136,7 +141,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
     for iat in range(natoms):
         spe = atomic_symbols[iat]
         rho_rec[:,iat] = -np.dot(partial_wave_coefs[spe],coefs[offset:offset + nbasis[spe]]) * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat])
-        if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list:
+        if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list or "total_charge" in f_list:
             rho_n_rec[:,iat] = +pseudocharge_numba[spe] * gauss[spe] * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat]) 
         offset += nbasis[spe]
 
@@ -170,6 +175,15 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
             rho_rec_half = np.sum(rho_rec, axis=1)
         rho_rec_half *= 4*np.pi/volume
         rho_rec_global = np.zeros((nG), dtype=np.complex128)
+
+    if "total_charge" in f_list:
+        rho_n_rec_half = np.zeros((nG_half), dtype=np.complex128)
+        if parallel :
+            comm.Allgatherv(np.sum(rho_n_rec, axis=1)/(4*np.pi), [rho_n_rec_half, count, dis, MPI.DOUBLE_COMPLEX])
+        else:
+            rho_n_rec_half = np.sum(rho_n_rec, axis=1)/(4*np.pi)
+        rho_n_rec_half *= 4*np.pi/volume
+        rho_n_rec_global = np.zeros((nG), dtype=np.complex128)
    
     if "potential" in f_list:
         ha_rec_half = np.zeros((nG_half), dtype=np.complex128)
@@ -233,6 +247,13 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
         rho_rec_global = rho_rec_global.reshape(nx,ny,nz)
         rho = np.real(np.fft.ifftn(rho_rec_global))*nx*ny*nz
         rho = rho.reshape(nx*ny*nz)
+    if "total_charge" in f_list:
+        rho_n_rec_global[idx_minus_k] = np.conj(rho_n_rec_half[valid_k_mask])
+        rho_n_rec_global[idx] = rho_n_rec_half
+        rho_n_rec_global[0] = + charge / volume + 0.0j
+        rho_n_rec_global = rho_n_rec_global.reshape(nx,ny,nz)
+        rho_n = np.real(np.fft.ifftn(rho_n_rec_global))*nx*ny*nz
+        rho_n = rho_n.reshape(nx*ny*nz)
     if "potential" in f_list:
         ha_rec_global[idx_minus_k] = np.conj(ha_rec_half[valid_k_mask])
         ha_rec_global[idx] = ha_rec_half
@@ -295,10 +316,26 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
                 print(rho[igrid],file=cubef)
             cubef.close()
 
+        if "total_charge" in f_list:
+            # print density on a cube file
+            cubef = open(inp.salted.saltedpath+"cubes/"+cubename + "_total_charge.cube","w")
+            print("Reconstructed total charge",file=cubef)
+            print("CUBE FORMAT",file=cubef)
+            print(natoms,file=cubef)
+            metric = np.array([[dx,0.0,0.0],[0.0,dy,0.0],[0.0,0.0,dz]])
+            print(nx, metric[0,0], metric[0,1], metric[0,2],file=cubef)
+            print(ny, metric[1,0], metric[1,1], metric[1,2],file=cubef)
+            print(nz, metric[2,0], metric[2,1], metric[2,2],file=cubef)
+            for iat in range(natoms):
+                print(valences[iat], float(valences[iat]), coords[iat][0], coords[iat][1], coords[iat][2],file=cubef)
+            for igrid in range(nx*ny*nz):
+                print(rho[igrid]+rho_n[igrid],file=cubef)
+            cubef.close()
+
         if "potential" in f_list:
             # print density on a cube file
             cubef = open(inp.salted.saltedpath+"cubes/"+cubename + "_potential.cube","w")
-            print("Reconstructed electron density",file=cubef)
+            print("Reconstructed hartree potential",file=cubef)
             print("CUBE FORMAT",file=cubef)
             print(natoms,file=cubef)
             metric = np.array([[dx,0.0,0.0],[0.0,dy,0.0],[0.0,0.0,dz]])
@@ -314,7 +351,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
         if "efield_x" in f_list:
             # print density on a cube file
             cubef = open(inp.salted.saltedpath+"cubes/"+cubename + "_efield_x.cube","w")
-            print("Reconstructed electron density",file=cubef)
+            print("Reconstructed electric field along x",file=cubef)
             print("CUBE FORMAT",file=cubef)
             print(natoms,file=cubef)
             metric = np.array([[dx,0.0,0.0],[0.0,dy,0.0],[0.0,0.0,dz]])
@@ -330,7 +367,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
         if "efield_y" in f_list:
             # print density on a cube file
             cubef = open(inp.salted.saltedpath+"cubes/"+cubename + "_efield_y.cube","w")
-            print("Reconstructed electron density",file=cubef)
+            print("Reconstructed electric field along y",file=cubef)
             print("CUBE FORMAT",file=cubef)
             print(natoms,file=cubef)
             metric = np.array([[dx,0.0,0.0],[0.0,dy,0.0],[0.0,0.0,dz]])
@@ -346,7 +383,7 @@ def build(f_list,structure,rloc,coefs,cubename,refcube,comm,size,rank):
         if "efield_z" in f_list:
             # print density on a cube file
             cubef = open(inp.salted.saltedpath+"cubes/"+cubename + "_efield_z.cube","w")
-            print("Reconstructed electron density",file=cubef)
+            print("Reconstructed electric field along z",file=cubef)
             print("CUBE FORMAT",file=cubef)
             print(natoms,file=cubef)
             metric = np.array([[dx,0.0,0.0],[0.0,dy,0.0],[0.0,0.0,dz]])

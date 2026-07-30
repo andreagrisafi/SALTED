@@ -2,6 +2,7 @@ import numpy as np
 import time
 import sys
 import os
+import glob
 from ase.io import read
 import os.path as osp
 from salted import basis
@@ -75,7 +76,8 @@ ncoefs = 0
 for spe in species:
     ncoefs += nbasis[spe]*ntype[spe]
 
-cubefile = open(os.path.join(inp.qm.path2qm, f"conf_{conf_start+1}", inp.qm.cubefile),"r")
+cubefile_pattern = os.path.join(inp.qm.path2qm, f"conf_{conf_start+1}", "*ELECTRON_DENSITY-1_0.cube")
+cubefile = open(glob.glob(cubefile_pattern)[0], "r")
 lines = cubefile.readlines()
 nside = {}
 nside[0] = int(lines[3].split()[0])
@@ -147,9 +149,8 @@ for iconf in conf_range:
     coords  = structure.positions/b2a
     volume = structure.get_volume()/(b2a**3)
     
-    cube_dir = os.path.join(inp.qm.path2qm, f"conf_{conf_start+iconf+1}", inp.qm.cubefile)
-
-    cubefile = open(cube_dir,"r")
+    cubefile_pattern = os.path.join(inp.qm.path2qm, f"conf_{conf_start+1}", "*ELECTRON_DENSITY-1_0.cube")
+    cubefile = open(glob.glob(cubefile_pattern)[0], "r")
     lines = cubefile.readlines()
     nside = {}
     nside[0] = int(lines[3].split()[0])

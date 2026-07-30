@@ -1,4 +1,5 @@
 import os
+import os.path as osp
 import sys
 import time
 
@@ -83,7 +84,9 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
            atom_idx[spe].append(iat)
            natom_dict[spe] += 1
 
-    pseudocharge = inp.qm.pseudocharge
+    bdir = osp.join(inp.salted.saltedpath,"basis")
+
+    pseudocharge = np.loadtxt(bdir + "/pseudocharge.txt")
     pseudocharge_dict = {}
     for i in range(len(species)):
         pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
@@ -324,11 +327,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         for spe in species:
             lcuts[spe] = min(lcut,lmax[spe])
  
-        charge, dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,atomic_coords,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
+        charge, dipole = compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,atomic_coords,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
         
         if gradient:
 
-            grad_charge = scale_grad_coefs(inp.qm.pseudocharge,natoms,atoms_range_set,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge,parallel,comm)
+            grad_charge = scale_grad_coefs(pseudocharge,natoms,atoms_range_set,atomic_symbols,lcuts,nmax,species,charge_integrals,pred_coefs,grad_pred_coefs,average,charge,parallel,comm)
 
             return [pred_coefs, grad_pred_coefs, charge, dipole] 
 
