@@ -37,11 +37,6 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
             "nmax": [nmax[(spe, l)] for l in range(lmax[spe] + 1)],
         }
 
-    # Generate directory for saving basis set info 
-    bdir = osp.join(inp.salted.saltedpath, "basis")
-    if not osp.exists(bdir):
-        os.mkdir(bdir)
-
     """write to the database"""
     if dryrun:
         print("Dryrun mode, not writing to the database")

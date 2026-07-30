@@ -7,6 +7,7 @@ import numpy as np
 from scipy import sparse
 
 from salted import basis
+from salted.cp2k.utils import elec_energy_forces
 from salted.sys_utils import (
     ParseConfig,
     check_MPI_tasks_count,
@@ -89,6 +90,7 @@ def build():
     efile = init_property_file("errors",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
     if qmcode=="cp2k": 
         if saltedtype=="density":
+            ufile = init_property_file("electrostatic_energy",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
             qfile = init_property_file("charges",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
             dfile = init_property_file("dipoles",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
         if saltedtype=="density-response":
@@ -154,12 +156,28 @@ def build():
 
             if qmcode=="cp2k":
 
+                bdir = osp.join(inp.salted.saltedpath,"basis")
+
+                rloc = np.loadtxt(bdir + "/rloc.txt")
+                pseudocharge = np.loadtxt(bdir + "/pseudocharge.txt")
+
+                structure = read(inp.system.filename,":")[iconf]
+
+                # Compute reference energy and forces
+                ref_U_ele, ref_forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc,structure,ref_coefs)
+                
+                # Compute predicted energy and forces
+                U_ele, forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc,structure,pred_coefs)
+
                 # Compute reference total charges and dipole moments
-                ref_charge, ref_dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,parallel,comm)
+                ref_charge, ref_dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,parallel,comm)
                 # Compute predicted total charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
+                charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
 
 
+                # Save electrostatic energy
+                print(iconf+1,ref_U_ele,
+                                  U_ele,file=ufile)
                 # Save charges and dipole moments
                 print(iconf+1,ref_charge,
                                   charge,file=qfile)
@@ -236,6 +254,7 @@ def build():
     efile.close()
     if qmcode == "cp2k":
         if saltedtype=="density":
+            ufile.close()
             qfile.close()
             dfile.close()
         if saltedtype=="density-response":

@@ -289,8 +289,13 @@ def build():
                 pred_coefs += Av_coeffs
 
             if qmcode=="cp2k":
+
+                bdir = osp.join(inp.salted.saltedpath,"basis")
+
+                pseudocharge = np.loadtxt(bdir + "/pseudocharge.txt")
+
                 # Compute charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
+                charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
                 print(iconf+1,charge,file=qfile)
                 print(iconf+1,dipole["x"],dipole["y"],dipole["z"],file=dfile)
             

@@ -433,6 +433,67 @@ def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc):
    return partial_wave_coefs
 
 @njit(parallel = True, fastmath = True)
+def gto_rec_ewald(lmax,lcut,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc, sigma_ewald):
+
+   partial_wave_coefs = Dict.empty(key_type=types.unicode_type,value_type=types.complex128[:,:]) # Dict with key as strings and values of type float array
+   for spe in species:
+      partial_wave_coefs[spe] = np.zeros((nG_loc, nbasis[spe]), dtype=np.complex128)
+
+   for iG in prange(nG_loc):
+
+      kx = Gvec[iG,0]
+      ky = Gvec[iG,1]
+      kz = Gvec[iG,2]
+
+      # Norm squared |G|^2 and norm |G| of the k-mode vector
+      knorm2 = kx*kx + ky*ky + kz*kz
+      knorm = np.sqrt(knorm2)
+
+      # Direction of G in spherical angles (costheta, phi)
+      for spe in species:
+         if knorm == 0.0:
+            costheta = 0.0
+         else:
+            costheta = kz/knorm
+         phi = np.arctan2(ky,kx)
+
+         ibasis = 0
+         # Precompute partial wave coefficients <nlm|k> consisting in
+         # spherical harmonics and radial integrals evaluated at the given k
+         for lam in range(min(lmax[spe]+1,lcut+1)):
+
+            key = f"{spe}_{lam}"
+
+            # Fourier transform prefactors
+            lamfactor = np.sqrt(np.pi/2.0) * knorm**lam
+            phase_lam = (-1.0j)**lam
+
+            # Orthonormalized real spherical harmonics Y_{lam,m}(G/|G|) with Condon-Shortley phase convention
+            harmonics = np.zeros((2*lmax[spe]+1))
+            for mu in range(2*lam+1):
+               harmonics[mu] = spherical_harmonic(lam, mu-lam, costheta, phi)
+
+            # Primitive radial integrals
+            pradintk = np.zeros((npgf[key]))
+            for ipgf in range(npgf[key]):
+               sigma2 = 1.0 / (2.0 * alphas[key][ipgf]) # Squared Gaussian width in reciprocal space
+               sigma = np.sqrt(sigma2) # Gaussian width in reciprocal space
+               pradintk[ipgf] = lamfactor * sigma2**lam * sigma**3.0 * np.exp(-0.5*knorm2*sigma_ewald**2)
+
+            # Precompute partial wave coefficients <nlm|k> consisting in
+            # spherical harmonics and radial integrals evaluated at the given k
+            radintk = np.zeros((max(nmax.values())))
+            for irad in range(nmax[key]):
+               radintk[irad] = 0.0
+               for ipgf in range(npgf[key]):
+                  radintk[irad] += contranorm[key][irad,ipgf]*pradintk[ipgf]
+               for mu in range(2*lam+1):
+                  partial_wave_coefs[spe][iG,ibasis] = radintk[irad] * harmonics[mu] * phase_lam
+                  ibasis = ibasis + 1
+
+   return partial_wave_coefs
+
+@njit(parallel = True, fastmath = True)
 def gto_rec_prim(lmax, species, npgf, alphas, Gvec, nG_loc):
     # Fourier transform of primitive atom-centered basis functions
     
@@ -995,3 +1056,173 @@ def build_ncutoff(alphas, npgf, species, lmax, knorm_vec, nG_half):
             ncut[key] = np.searchsorted(knorm_vec, gmax).astype(np.int64) #Find index where Gmax would be inserted to to maintain order.
             #ncut[key] = np.full(npgf[key], nG_half, dtype=np.int64) # For debugging purposes, set ncut to the full size of G.
     return ncut
+
+def elec_energy_forces(lmax,nmax,saltedpath,dfbasis,species,pseudocharge,rloc,structure,coefs):
+
+    bdir = osp.join(saltedpath,"basis")
+    lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, dfbasis, bdir)
+
+    pseudocharge_numba = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
+    rloc_dict = {}
+    for i in range(len(species)):
+       pseudocharge_numba[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
+       rloc_dict[species[i]] = rloc[i] # Warning: species and pseudocharge must have the same ordering
+
+    b2a = 0.529177249
+    atomic_symbols = structure.get_chemical_symbols()
+    natoms = len(atomic_symbols)
+    coords  = structure.positions/b2a
+
+    volume = structure.get_volume()/(b2a**3)
+
+    nx = int(np.floor(structure.cell[0,0]/(0.111*b2a))+1)
+    ny = int(np.floor(structure.cell[1,1]/(0.111*b2a))+1)
+    nz = int(np.floor(structure.cell[2,2]/(0.111*b2a))+1)
+
+    dx, dy, dz = structure.cell[0,0]/(b2a*nx), structure.cell[1,1]/(b2a*ny), structure.cell[2,2]/(b2a*nz)
+
+    Gvec = get_reciprocal_grid(nx,ny,nz,dx,dy,dz)
+
+    mask = (
+    (Gvec[:, 2] > 0) |
+    ((Gvec[:, 2] == 0) & (Gvec[:, 1] > 0)) |
+    ((Gvec[:, 2] == 0) & (Gvec[:, 1] == 0) & (Gvec[:, 0] >= 0))
+    )
+
+    Gvec_half = Gvec[mask][1:]  # Exclude G=0
+
+    nG_half=len(Gvec_half)
+
+
+    #time_pwc = time.time()
+    partial_wave_coefs = gto_rec(lmax_numba,nmax_numba,nbasis,species,npgf, contranorm, alphas,Gvec_half, nG_half)
+
+    #print(time.time()-time_pwc)
+
+    cos_k_coords = np.cos(np.dot(Gvec_half,coords.T))
+    sin_k_coords = np.sin(np.dot(Gvec_half,coords.T))
+
+    knorm2_vec = np.sum(Gvec_half*Gvec_half,axis=1)
+
+    gauss = {}
+    for spe in species:
+       gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc_dict[spe]**2))
+
+    volfactor = 32.0*np.pi*np.pi/(volume)
+
+    offset = 0
+    rho_rec = np.zeros((nG_half, natoms), dtype=np.complex128)
+    rho_n_rec = np.zeros((nG_half, natoms), dtype=np.complex128)
+    forces = np.zeros((natoms,3), dtype=np.complex128)
+
+    #time_coefs_dot = time.time()
+
+    for iat in range(natoms):
+       spe = atomic_symbols[iat]
+       rho_rec[:,iat] = -np.dot(partial_wave_coefs[spe],coefs[offset:offset + nbasis[spe]]) * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat])
+       rho_n_rec[:,iat] = +pseudocharge_numba[spe] * gauss[spe] * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat])
+       offset += nbasis[spe]
+
+    #print(time.time()-time_coefs_dot)
+
+    time_energy = time.time()
+
+    U_tot = np.dot(np.sum((rho_n_rec/(4*np.pi)) + rho_rec, axis = 1)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)), 1/knorm2_vec)
+    
+    forces[:,0] = np.dot(1/knorm2_vec, (1j *Gvec_half[:,0][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))+np.conj((1j *Gvec_half[:,0][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))))
+    forces[:,1] = np.dot(1/knorm2_vec, (1j *Gvec_half[:,1][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))+np.conj((1j *Gvec_half[:,1][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))))
+    forces[:,2] = np.dot(1/knorm2_vec, (1j *Gvec_half[:,2][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))+np.conj((1j *Gvec_half[:,2][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))))
+
+    #print(time.time()-time_energy)
+
+    U_tot = np.real(U_tot * 2*np.pi * volfactor)
+    forces = np.real(forces * 2*np.pi * volfactor)
+
+    return U_tot, forces
+
+def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocharge,rloc,structure,coefs):
+
+    b2a = 0.529177249
+
+    bdir = osp.join(saltedpath,"basis")
+
+    sigma_ewald = 1.0/b2a
+
+    lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, dfbasis, bdir)
+
+    pseudocharge_numba = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
+    rloc_dict = {}
+    for i in range(len(species)):
+       pseudocharge_numba[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
+       rloc_dict[species[i]] = rloc[i] # Warning: species and pseudocharge must have the same ordering
+
+    atomic_symbols = structure.get_chemical_symbols()
+    natoms = len(atomic_symbols)
+    coords  = structure.positions/b2a
+
+    volume = structure.get_volume()/(b2a**3)
+
+    nx = int(np.floor(structure.cell[0,0]/((np.pi*sigma_ewald/(2*np.sqrt(2)))*b2a))+1)
+    ny = int(np.floor(structure.cell[1,1]/((np.pi*sigma_ewald/(2*np.sqrt(2)))*b2a))+1)
+    nz = int(np.floor(structure.cell[2,2]/((np.pi*sigma_ewald/(2*np.sqrt(2)))*b2a))+1)
+
+    dx, dy, dz = structure.cell[0,0]/(b2a*nx), structure.cell[1,1]/(b2a*ny), structure.cell[2,2]/(b2a*nz)
+
+    Gvec = get_reciprocal_grid(nx,ny,nz,dx,dy,dz)
+
+    mask = (
+    (Gvec[:, 2] > 0) |
+    ((Gvec[:, 2] == 0) & (Gvec[:, 1] > 0)) |
+    ((Gvec[:, 2] == 0) & (Gvec[:, 1] == 0) & (Gvec[:, 0] >= 0))
+    )
+
+    Gvec_half = Gvec[mask][1:]  # Exclude G=0
+
+    nG_half=len(Gvec_half)
+
+
+    #time_pwc = time.time()
+    partial_wave_coefs = gto_rec_ewald(lmax_numba,lcut,nmax_numba,nbasis,species,npgf, contranorm, alphas,Gvec_half, nG_half, sigma_ewald)
+
+    #print(time.time()-time_pwc)
+
+    cos_k_coords = np.cos(np.dot(Gvec_half,coords.T))
+    sin_k_coords = np.sin(np.dot(Gvec_half,coords.T))
+
+    knorm2_vec = np.sum(Gvec_half*Gvec_half,axis=1)
+
+    gauss = {}
+    for spe in species:
+       gauss[spe] = np.exp(-0.5*knorm2_vec*(sigma_ewald**2))
+
+    volfactor = 32.0*np.pi*np.pi/(volume)
+
+    offset = 0
+    rho_rec = np.zeros((nG_half, natoms), dtype=np.complex128)
+    rho_n_rec = np.zeros((nG_half, natoms), dtype=np.complex128)
+    forces = np.zeros((natoms,3), dtype=np.complex128)
+
+    #time_coefs_dot = time.time()
+
+    for iat in range(natoms):
+       spe = atomic_symbols[iat]
+       rho_rec[:,iat] = -np.dot(partial_wave_coefs[spe],coefs[offset:offset + nbasis[spe]]) * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat])
+       rho_n_rec[:,iat] = +pseudocharge_numba[spe] * gauss[spe] * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat])
+       offset += nbasis[spe]
+
+    #print(time.time()-time_coefs_dot)
+
+    time_energy = time.time()
+
+    U_tot = np.dot(np.sum((rho_n_rec/(4*np.pi)) + rho_rec, axis = 1)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)), 1/knorm2_vec)
+    
+    forces[:,0] = np.dot(1/knorm2_vec, (1j *Gvec_half[:,0][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))+np.conj((1j *Gvec_half[:,0][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))))
+    forces[:,1] = np.dot(1/knorm2_vec, (1j *Gvec_half[:,1][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))+np.conj((1j *Gvec_half[:,1][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))))
+    forces[:,2] = np.dot(1/knorm2_vec, (1j *Gvec_half[:,2][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))+np.conj((1j *Gvec_half[:,2][:, np.newaxis]*((rho_n_rec/(4*np.pi)) + rho_rec)*np.conj(np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1)[:, np.newaxis]))))
+
+    #print(time.time()-time_energy)
+
+    U_tot = np.real(U_tot * 2*np.pi * volfactor)
+    forces = np.real(forces * 2*np.pi * volfactor)
+
+    return U_tot, forces

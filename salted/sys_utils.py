@@ -750,18 +750,6 @@ class ParseConfig:
                     str,
                     get_qmcode_checker("pyscf"),
                 ),  # quantum mechanical functional, only for PySCF
-                "pseudocharge": (
-                    False,
-                    PLACEHOLDER,
-                    list,
-                    get_qmcode_checker("cp2k"),
-                ),  # pseudo nuclear charge, only for CP2K
-                "cubefile": (
-                    False,
-                    PLACEHOLDER,
-                    str,
-                    get_qmcode_checker("cp2k"),
-                ),
                 "coeffile": (
                     False,
                     PLACEHOLDER,
