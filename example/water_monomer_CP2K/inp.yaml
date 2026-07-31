@@ -15,8 +15,6 @@ qm:
   periodic: 3D
   dfbasis: RI-basis
   dfmetric: coulomb
-  coeffile: wat_mon-RI_DENSITY_COEFFS.dat
-  ovlpfile: wat_mon-RI_2C_INTS.fm
 
 # descriptor parameters 
 descriptor:
