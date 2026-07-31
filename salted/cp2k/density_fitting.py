@@ -7,8 +7,8 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import gto_rec, gto_rec_prim, get_reciprocal_grid, get_basis_set_info_numba
-from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_matrices, build_matrices_prim, build_ncutoff, setup_pyscf_species, pair_cutoffs, overlap_identity
+from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba
+from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_ncutoff, setup_pyscf_species, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from numba import types
 from numba.typed import Dict
 from mpi4py import MPI
@@ -128,17 +128,23 @@ knorm_vec = knorm_vec[sort_idx]
 # Get G cutoffs
 gcut = build_ncutoff(alphas, npgf, species, lmax, knorm_vec, nG_half)
 
-# Compute primitive coefficients
-time_a = time.time()
-#partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, nG_half) # Contracted
-partial_wave_coefs_prim = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, nG_half) # Primitive
-time_b = time.time()
-print("Time to compute partial wave coefficients:", time_b-time_a)
-
 # PySCF species setup
-rcut_pairs = pair_cutoffs(species, lmax, alphas, contranorm, eps=1e-10)
-if df_metric == "identity":
-    pyscf_data = setup_pyscf_species(species, lmax, nmax_numba, alphas, contranorm)
+pyscf_data = setup_pyscf_species(species, lmax, nmax_numba, alphas, contranorm)
+
+# Real space cutoffs
+if df_metric =="identity":
+    rcut_pairs = pair_cutoffs(species, lmax, alphas, contranorm, eps=1e-10)
+    #for spe1 in species:
+    #    for spe2 in species:
+    #        print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
+if df_metric == "coulomb":
+    sigma_omega = 2/b2a # 2 angstrom, hard-coded
+    omega = 1 / sigma_omega
+    rcut_pairs = {}
+    for spe1 in species:
+        for spe2 in species:
+            rcut_pairs[(spe1, spe2)] = 4 * sigma_omega
+            #print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
 
 # init geometry
 for iconf in conf_range:
@@ -147,9 +153,8 @@ for iconf in conf_range:
     natoms = len(atomic_symbols)
     cell = structure.cell/b2a
     coords  = structure.positions/b2a
-    volume = structure.get_volume()/(b2a**3)
     
-    cubefile_pattern = os.path.join(inp.qm.path2qm, f"conf_{conf_start+1}", "*ELECTRON_DENSITY-1_0.cube")
+    cubefile_pattern = os.path.join(inp.qm.path2qm, f"conf_{conf_start+iconf+1}", "*ELECTRON_DENSITY-1_0.cube")
     cubefile = open(glob.glob(cubefile_pattern)[0], "r")
     lines = cubefile.readlines()
     nside = {}
@@ -163,6 +168,7 @@ for iconf in conf_range:
     dx = float(lines[3].split()[1])
     dy = float(lines[4].split()[2])
     dz = float(lines[5].split()[3])
+    volume = (nx*dx)*(ny*dy)*(nz*dz) # structure.get_volume()/(b2a**3)
     origin = np.asarray(lines[2].split(),dtype=float)[1:4]
     rho_qm = []
     for line in lines[6+natoms:]:
@@ -184,10 +190,17 @@ for iconf in conf_range:
         rho_KS_rec = rho_KS_rec[1:]
     rho_KS_rec = rho_KS_rec[sort_idx]
 
+    # Compute primitive coefficients
+    time_a = time.time()
+    partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, nG_half) # Contracted
+    partial_wave_coefs_prim = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, nG_half) # Primitive
+    time_b = time.time()
+    print("Time to compute partial wave coefficients:", time_b-time_a)
+
     # Build matrices
     C = build_contraction_matrix(natoms, atomic_symbols, lmax, nmax_numba, npgf, contranorm) # Build contraction matrix
     time_c = time.time()
-    #S, w = build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank)
+    #S, w = build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank) # Old method
     # w: computed in reciprocal space with truncated Gvec_half
     wp = get_w_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, rho_KS_rec, df_metric, gcut, rank)
     w = C.T @ wp
@@ -197,11 +210,13 @@ for iconf in conf_range:
         # S: analytic real-space periodic overlap
         S = overlap_identity(np.asarray(cell), coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, rcut_pairs)
     elif df_metric == "coulomb":
-        Sp = build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, df_metric, gcut, rank)
-        S = C.T @ Sp @ C
-        
-    time_d = time.time()
-    print("Time to build S:", time_d-time_c)
+        S_SR = overlap_coulomb_real(np.asarray(cell), coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, rcut_pairs, omega) # Short-range term (real space)
+        print("Time to build S_SR:", time.time()-time_c)
+        time_c = time.time()
+        S_LR = overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, nG_half, omega, rank) # Long-range term (reciprocal space)
+        print("Time to build S_LR:", time.time()-time_c)
+        pwc_g0 = gto_rec_g0(natoms, atomic_symbols, lmax, nmax_numba, npgf, alphas, contranorm, ncoefs)
+        S = S_SR + S_LR - (np.pi/omega**2) * np.outer(pwc_g0, pwc_g0)
 
     c = np.linalg.solve(S,w)
 
