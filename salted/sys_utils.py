@@ -750,18 +750,6 @@ class ParseConfig:
                     str,
                     get_qmcode_checker("pyscf"),
                 ),  # quantum mechanical functional, only for PySCF
-                "coeffile": (
-                    False,
-                    PLACEHOLDER,
-                    str,
-                    get_qmcode_checker("cp2k"),
-                ),
-                "ovlpfile": (
-                    False,
-                    PLACEHOLDER,
-                    str,
-                    get_qmcode_checker("cp2k"),
-                ),
                 "periodic": (
                     False,
                     PLACEHOLDER,
