@@ -86,11 +86,14 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
     bdir = osp.join(inp.salted.saltedpath,"basis")
 
-    pseudocharge = np.loadtxt(bdir + "/pseudocharge.txt")
+    pseudocharge = np.zeros((len(species)), dtype = np.float64)
     pseudocharge_dict = {}
     for i in range(len(species)):
-        pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
-    
+        spe = species[i]
+        pp = np.loadtxt(osp.join(bdir,f"{spe}-local_pseudo.dat"))
+        pseudocharge[i] = pp[0]
+        pseudocharge_dict[spe] = pp[0]
+
     if gradient:
     
         omega1, domega1 = sph_utils.get_representation_gradient_coeffs_atomrange(

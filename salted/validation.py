@@ -158,16 +158,21 @@ def build():
 
                 bdir = osp.join(inp.salted.saltedpath,"basis")
 
-                rloc = np.loadtxt(bdir + "/rloc.txt")
-                pseudocharge = np.loadtxt(bdir + "/pseudocharge.txt")
+                pseudocharge = np.zeros((len(species)), dtype = np.float64)
+                rloc_dict = {}
+                for i in range(len(species)):
+                    spe = species[i]
+                    pp = np.loadtxt(osp.join(bdir,f"{spe}-local_pseudo.dat"))
+                    pseudocharge[i] = pp[0]
+                    rloc_dict[spe] = pp[1] 
 
                 structure = read(inp.system.filename,":")[iconf]
 
                 # Compute reference energy and forces
-                ref_U_ele, ref_forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc,structure,ref_coefs)
+                ref_U_ele, ref_forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc_dict,structure,ref_coefs)
                 
                 # Compute predicted energy and forces
-                U_ele, forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc,structure,pred_coefs)
+                U_ele, forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc_dict,structure,pred_coefs)
 
                 # Compute reference total charges and dipole moments
                 ref_charge, ref_dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,parallel,comm)

@@ -33,11 +33,6 @@ for i in range(len(lines)):
             if index+1==len(lines):
                 f.write(lines[index])
 
-# Generate directory for saving basis set info 
-bdir = osp.join(inp.salted.saltedpath, "basis")
-if not osp.exists(bdir):
-    os.mkdir(bdir)
-
 pseudocharge = {}
 
 rloc = {}
@@ -75,14 +70,6 @@ for i in range(len(lines)):
                 rloc[spe] = float(lines[i+2].split()[0])
 i = 0
 for spe in inp.system.species:
-    if i == 0:
-        with open(osp.join(bdir,f"pseudocharge.txt"), "w") as f:
-            f.write(str(pseudocharge[spe])+"\n")
-        with open(osp.join(bdir,f"rloc.txt"), "w") as f:
-            f.write(str(rloc[spe])+"\n")
-    else:
-        with open(osp.join(bdir,f"pseudocharge.txt"), "a") as f:
-            f.write(str(pseudocharge[spe])+"\n")
-        with open(osp.join(bdir,f"rloc.txt"), "a") as f:
-            f.write(str(rloc[spe])+"\n")
-    i+=1
+    with open(osp.join("./",f"{spe}-local_pseudo.dat"), "w") as f:
+        f.write(str(pseudocharge[spe])+"\n")
+        f.write(str(rloc[spe])+"\n")

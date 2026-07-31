@@ -1057,16 +1057,14 @@ def build_ncutoff(alphas, npgf, species, lmax, knorm_vec, nG_half):
             #ncut[key] = np.full(npgf[key], nG_half, dtype=np.int64) # For debugging purposes, set ncut to the full size of G.
     return ncut
 
-def elec_energy_forces(lmax,nmax,saltedpath,dfbasis,species,pseudocharge,rloc,structure,coefs):
+def elec_energy_forces(lmax,nmax,saltedpath,dfbasis,species,pseudocharge,rloc_dict,structure,coefs):
 
     bdir = osp.join(saltedpath,"basis")
     lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, dfbasis, bdir)
 
     pseudocharge_numba = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
-    rloc_dict = {}
     for i in range(len(species)):
        pseudocharge_numba[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
-       rloc_dict[species[i]] = rloc[i] # Warning: species and pseudocharge must have the same ordering
 
     b2a = 0.529177249
     atomic_symbols = structure.get_chemical_symbols()
@@ -1140,7 +1138,7 @@ def elec_energy_forces(lmax,nmax,saltedpath,dfbasis,species,pseudocharge,rloc,st
 
     return U_tot, forces
 
-def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocharge,rloc,structure,coefs):
+def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocharge,rloc_dict,structure,coefs):
 
     b2a = 0.529177249
 
@@ -1151,10 +1149,8 @@ def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocha
     lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, dfbasis, bdir)
 
     pseudocharge_numba = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
-    rloc_dict = {}
     for i in range(len(species)):
        pseudocharge_numba[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
-       rloc_dict[species[i]] = rloc[i] # Warning: species and pseudocharge must have the same ordering
 
     atomic_symbols = structure.get_chemical_symbols()
     natoms = len(atomic_symbols)
