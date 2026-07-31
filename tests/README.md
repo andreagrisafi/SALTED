@@ -13,7 +13,7 @@ Concepts in the integration tests design:
 - **Model**: defined by a dataset and an `inp.yaml` that trains it (see  `ModelSpec` in [`tests/models.py`](models.py)). Each model has a unique **marker**. Each model will be trained as a pipeline test, and then used for different subsequent tests.
 
 | marker | dataset | `saltedtype`  | time (1 core) |
-|---|---|---|---|---|---|
+|---|---|---|---|
 | `aims_density` | `water_monomer_AIMS` | `density` | ~4 min, ~10 with MPI |
 | `pyscf_density` | `water_monomer_PySCF_subset100` | `density` | ~4 min |
 | `cp2k_density` | `water_monomer_CP2K_subset100` | `density` | ~6 min |
