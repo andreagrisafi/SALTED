@@ -550,6 +550,28 @@ def gto_rec_prim(lmax, species, npgf, alphas, Gvec, nG_loc):
 
     return partial_wave_coefs
 
+def gto_rec_g0(natoms, atomic_symbols, lmax, nmax, npgf, alphas, contranorm, ncoefs):
+    # G=0 Fourier component (monopole) of each contracted basis function.
+    # Needed for the Ewald G=0 correction.
+    pwc_g0 = np.zeros(ncoefs)
+ 
+    icoefs = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for lam in range(lmax[spe]+1):
+            key = f"{spe}_{lam}"
+            for irad in range(nmax[key]):
+                for mu in range(2*lam+1):
+                    if lam == 0:  # only l=0 has a nonzero monopole
+                        for ipgf in range(npgf[key]):
+                            sigma = 1.0 / np.sqrt(2.0 * alphas[key][ipgf])
+                            pradintk = np.sqrt(np.pi/2) * sigma**3
+                            harmonics = spherical_harmonic(0, 0, 0, 0) # 1/(2*sqrt(pi))
+                            pwc_g0[icoefs] += contranorm[key][irad, ipgf] * pradintk * harmonics
+                    icoefs += 1
+ 
+    return pwc_g0
+
 @njit
 def spherical_harmonic(l,m,costheta,phi):
    # Compute orthonormalized real spherical harmonics
@@ -612,6 +634,7 @@ def factorial(n):
 
 #@njit(parallel = False, fastmath = True)
 def build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank):
+    # Build the overlap matrix S in reciprocal space (DEPRECATED)
     S = np.zeros((ncoefs, ncoefs), dtype=np.float64)
     w = np.zeros((ncoefs), dtype=np.float64)
 
@@ -659,7 +682,7 @@ def build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, pa
 
 #@njit(parallel = False, fastmath = True)
 def build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, df_metric, ncut, rank):
-    # Build the primitive-basis overlap matrix Sp
+    # Build the primitive-basis overlap matrix Sp in reciprocal space (DEPRECATED)
     
     offset = {}
     ipgf = 0
@@ -853,13 +876,13 @@ def pair_cutoffs(species, lmax, alphas, contranorm, eps=1.0e-12):
 
     for spe1 in species:
         for spe2 in species:
-            amin_pair = amin[spe1] * amin[spe2] / (amin[spe1] + amin[spe2])
+            #amin_pair = amin[spe1] * amin[spe2] / (amin[spe1] + amin[spe2])
             A = cmax[spe1] * cmax[spe2] * (np.pi / (amin[spe1] + amin[spe2])) ** 1.5
-            #smax1 = np.sqrt((2.0 + lmax[spe1]) / (2.0 * amin[spe1]))
-            #smax2 = np.sqrt((2.0 + lmax[spe2]) / (2.0 * amin[spe2]))
-            #r = 4.0 * (smax1 + smax2)
-            r = 4.0 * np.sqrt(1.0 / (2.0 * amin_pair)) # Initial guess: r_cut = 4*sigma_pair
-            r = np.sqrt(max(np.log(max(A, 1.0) * max(r, 1.0) ** (lmax[spe1] + lmax[spe2]) / eps), 1.0) / amin_pair) # Optional refinement: fixed-point iteration
+            smax1 = np.sqrt((2.0 + lmax[spe1]) / (2.0 * amin[spe1]))
+            smax2 = np.sqrt((2.0 + lmax[spe2]) / (2.0 * amin[spe2]))
+            r = 4.0 * (smax1 + smax2)
+            #r = 4.0 * np.sqrt(1.0 / (2.0 * amin_pair)) # Initial guess: r_cut = 4*sigma_pair
+            #r = np.sqrt(max(np.log(max(A, 1.0) * max(r, 1.0) ** (lmax[spe1] + lmax[spe2]) / eps), 1.0) / amin_pair) # Optional refinement: fixed-point iteration
             rcut[(spe1, spe2)] = r
     return rcut
 
@@ -939,80 +962,103 @@ def overlap_identity(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf
 
     return S * volume / (4.0 * np.pi)
 
-def overlap_coulomb_rec(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, ncut, omega, rank):
-    # Reciprocal-space part of the Coulomb-metric overlap matrix
+def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, rcut, omega):
+    #Identity-metric overlap matrix in real space
 
-    offset = {}
-    ipgf = 0
+    natoms = len(atomic_symbols)
+
+    S = np.zeros((ncoefs, ncoefs))
+
+    # Unpack PySCF data
+    mol_bra = pyscf_data["mol_bra"]
+    mol_ket = pyscf_data["mol_ket"]
+    perm = pyscf_data["perm"]
+    cslice = pyscf_data["coord_slice"]
+
+    rcut_max = max(rcut.values()) # Pairs cutoff, to decided how many periodic images to include
+    periodic = cell is not None and volume > 1.0e-10
+    if periodic:
+        cell = np.asarray(cell, dtype=float)
+        inv_cell = np.linalg.inv(cell) # Cartesian to fractional coordinates
+        images = lattice_images(cell, rcut_max, volume) # Bring periodic images
+    else:
+        images = np.zeros((1, 3)) # No periodicity
+
+    icoefs = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        for lam in range(lmax[spe]+1):
-            key = f"{spe}_{lam}"
-            for mu in range(2*lam+1):
-                offset[(iat, lam, mu)] = ipgf
-                ipgf += npgf[key]
-    ncoefs_prim = ipgf
-    
-    Sp = np.zeros((ncoefs_prim, ncoefs_prim), dtype=np.float64)
-    
+        pbra = perm[spe]
+        mol_bra[spe].set_range_coulomb(-omega)  # negative omega = erfc (short-range) convention in PySCF
+
+        icoefs2 = 0
+        for iat2 in range(iat + 1):
+            spe2 = atomic_symbols[iat2]
+            pket = perm[spe2]
+
+            rcut_ij = rcut[(spe, spe2)] # real-space cutoff to use for this specific pair
+
+            delta = coords[iat2] - coords[iat]
+
+            if periodic:
+                frac = delta @ inv_cell # Convert to fractional coordinates
+                delta = (frac - np.round(frac)) @ cell # Wrap and convert back to Cartesian
+
+            dvecs = delta + images
+            keep = np.einsum("ij,ij->i", dvecs, dvecs) <= rcut_ij * rcut_ij # Keep only the images whose distance falls within the pair cutoff
+
+            block = np.zeros((nbasis[spe], nbasis[spe2]))
+            for d in dvecs[keep]:
+                mol_ket[spe2]._env[cslice[spe2]] = d # Move the "ket" ghost atom
+                raw = _pyscf_gto.intor_cross("int2c2e", mol_bra[spe], mol_ket[spe2]) # Ask PySCF for the raw overlap integrals
+                block += raw[np.ix_(pbra, pket)] # Reorder PySCF's rows/columns into SALTED's (n,m) ordering
+
+            S[icoefs:icoefs + nbasis[spe], icoefs2:icoefs2 + nbasis[spe2]] = block
+            if iat2 != iat:
+                S[icoefs2:icoefs2 + nbasis[spe2], icoefs:icoefs + nbasis[spe]] = block.T
+
+            icoefs2 += nbasis[spe2]
+        icoefs += nbasis[spe]
+
+    return S * volume / (4.0 * np.pi)**2
+
+def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, nG_half, omega, rank):
+    S = np.zeros((ncoefs, ncoefs), dtype=np.float64)
+
     knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half, axis=1)).astype(np.float64)  # |G|
+
+    # G vector truncation based on omega
+    gmax_omega = 2.0 * np.pi * omega
+    nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64)
+    print(f"nomega = {nomega} / nG_half = {len(Gvec_half)}  ({100*nomega/len(Gvec_half):.1f}%)")
+    knorm_vec = knorm_vec[:nomega]
+    Gvec_half = Gvec_half[:nomega]
+
     phase = np.exp(-1j * np.dot(Gvec_half, coords.T)) # e^{-iG.r_iat}
-     
+    phase_over_knorm = phase / knorm_vec[:, np.newaxis]
+
     # Ewald reciprocal-space screening factor exp(-G^2 / (4*omega^2))
     ewald_screen = np.exp(-(knorm_vec*knorm_vec) / (4.0*omega*omega))
-    eps_gmax = 1e-10
-    gmax_omega = 2.0 * omega * np.sqrt(-np.log(eps_gmax))
-    nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64)
-    #print(f"nomega = {nomega} / nG_half = {len(Gvec_half)}  ({100*nomega/len(Gvec_half):.1f}%)")
 
+    icoefs = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
+        obj1 = phase_over_knorm[:, iat, np.newaxis] * partial_wave_coefs[spe][:nomega] * ewald_screen[:, np.newaxis]
+        obj1_real = np.ascontiguousarray(obj1.real)
+        obj1_imag = np.ascontiguousarray(obj1.imag)
+
+        icoefs2 = 0
         for iat2 in range(iat+1):
             spe2 = atomic_symbols[iat2]
-            same_atom = (iat2 == iat)
+            obj2 = phase_over_knorm[:, iat2, np.newaxis] * partial_wave_coefs[spe2][:nomega]
 
-            phase_pair = phase[:, iat] * np.conj(phase[:, iat2]) / (knorm_vec**2)
-            phase_pair_w = 2.0 * phase_pair
-            phase_pair_w_real = phase_pair_w.real
-            phase_pair_w_imag = phase_pair_w.imag
+            S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = 2*(np.dot(obj1_real.T, obj2.real) + np.dot(obj1_imag.T, obj2.imag))
+            S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]].T
+            icoefs2 += nbasis[spe2]
+        icoefs += nbasis[spe]
 
-            for lam in range(lmax[spe]+1):
-                key = f"{spe}_{lam}"
-                for mu in range(2*lam+1):
-                    row_base = offset[(iat, lam, mu)]
+    S = np.real(S)*4*np.pi
 
-                    for lam2 in range(lmax[spe2]+1):
-                        if same_atom and lam2 < lam:
-                            continue  # this (lam2,lam) block already done from the other side
-                        key2 = f"{spe2}_{lam2}"
-                        for mu2 in range(2*lam2+1):
-                            if same_atom and lam2 == lam and mu2 < mu:
-                                continue
-                            col_base = offset[(iat2, lam2, mu2)]
-
-                            for ipgf1 in range(npgf[key]):
-                                n1 = ncut[key][ipgf1]
-                                pwc1 = partial_wave_coefs[key][:, ipgf1, mu] * ewald_screen
-
-                                for ipgf2_local in range(npgf[key2]):
-                                    if same_atom and lam2 == lam and mu2 == mu and ipgf2_local < ipgf1:
-                                        continue
-                                    n2 = ncut[key2][ipgf2_local]
-                                    ncut_pair = np.min([n1, n2, nomega])
-
-                                    pwc2 = partial_wave_coefs[key2][:ncut_pair, ipgf2_local, mu2]
-                                    c = pwc1[:ncut_pair] * np.conj(pwc2)
-
-                                    val = (np.dot(phase_pair_w_real[:ncut_pair], c.real) - np.dot(phase_pair_w_imag[:ncut_pair], c.imag))
-
-                                    row = row_base + ipgf1
-                                    col = col_base + ipgf2_local
-                                    Sp[row, col] = val
-                                    if row != col:
-                                        Sp[col, row] = val
-
-    Sp = np.real(Sp) * 4 * np.pi
-    return Sp
+    return S
 
 def build_contraction_matrix(natoms, atomic_symbols, lmax, nmax, npgf, contranorm):
     ncoefs_prim = 0
