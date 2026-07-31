@@ -41,7 +41,7 @@ jobs:
       - name: Run unit tests
         run: pytest tests/unit -v
 
-  example-tests:
+  integration-tests:
     needs: unit-tests
     # Run integration tests on PRs, manual dispatches, and pushes to the core branches.
     # Skips on pushes to feature branches (unit tests cover those).
@@ -50,11 +50,11 @@ jobs:
       github.ref_name == 'master' ||
       github.ref_name == 'dev_test_CI'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        marker: [aims, pyscf, cp2k, mpi]
+        marker: [aims_density, pyscf_density, cp2k_density, aims_response]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -98,12 +98,13 @@ jobs:
           path: SALTED-datasets
           fetch-depth: 1
           sparse-checkout: |
-            water_monomer_aims
+            water_monomer_AIMS
             water_monomer_CP2K_subset100
             water_monomer_PySCF_subset100
+            water_monomer_AIMS_response_subset100
           sparse-checkout-cone-mode: false
 
-      - name: Run example pipeline (${{ matrix.marker }})
+      - name: Run model pipeline (${{ matrix.marker }})
         working-directory: SALTED
         run: |
           pytest tests/integration -m "${{ matrix.marker }}" -v -s \

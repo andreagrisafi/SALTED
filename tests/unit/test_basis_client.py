@@ -11,7 +11,7 @@ BASIS_DATA = {
 }
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(tmp_path):
     """A BasisClient backed by a temp file (does not touch the package data)."""
     return BasisClient(data_fpath=str(tmp_path / "basis_data.yaml"))

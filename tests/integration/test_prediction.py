@@ -1,82 +1,68 @@
-"""Tests of SALTED's two prediction surfaces, on the serial run's trained model.
-
-Live-prediction API (``salted.salted_prediction``), called in-process via
-``init_pred`` + ``salted_prediction``:
-
-- consistency: predicting a validation structure reproduces the coefficients
-  that ``salted.validation`` wrote to ``COEFFS-<iconf+1>.dat``;
-- gradients: the analytical coefficient gradients (``gradient=True``) matches
-  the central finite differences when the finite-difference displacement is
-  small enough, and the finite-difference error converges quadratically with
-  the displacement, as expected for a correct gradient.
-
-Prediction pipeline step (``salted.prediction``), run as a subprocess on a
-prediction xyz built from the validation structures:
-
-- consistency: the step's ``COEFFS-<k+1>.dat`` (numbered by position in the
-  prediction xyz) reproduce the validation step's ``COEFFS-<v[k]+1>.dat``
-  (numbered by position in the full dataset).
-
-Serial-vs-MPI equivalence of both surfaces (``mpi``-marked, aims dataset):
-``salted.prediction`` distributes the prediction structures across ranks;
-``salted.salted_prediction`` distributes the atoms of one structure and
-allreduces the partial coefficients (via ``_mpi_predict_driver.py``).
+"""SALTED predicts through two surfaces:``salted.salted_prediction``
+and ``salted.prediction``.
 """
 
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
 import pytest
+from ase import Atoms
 from ase.io import read
+from conftest import PipelineWorkspace, WorkspaceBuilder
+from models import ALL_MODELS, LIVE_API_MODELS, LIVE_API_MPI_MODELS, MPI_MODELS
 
-pytestmark = pytest.mark.example
+pytestmark = pytest.mark.integration
 
-EXAMPLE_PARAMS = [
-    pytest.param("water_monomer_aims", marks=pytest.mark.aims),
-    pytest.param("water_monomer_pyscf", marks=pytest.mark.pyscf),
-    pytest.param("water_monomer_cp2k", marks=pytest.mark.cp2k),
-]
+VALSET_PREDNAME = "valset"
+
+# predict(structure, gradient=False) -> [coefs] or [coefs, grad]; Callable cannot
+# express the default argument, hence the ellipsis
+Predictor = Callable[..., list[np.ndarray]]
 
 
 @pytest.fixture
-def load_predictor(serial_run, monkeypatch):
-    """Load the trained model of an example's workspace; return (ws, predict).
+def predictor(serial_run: PipelineWorkspace, monkeypatch) -> Predictor:
+    """Returns ``predict(structure, gradient=False)``, giving the
+    ``salted_prediction`` output list ``[coefs]`` or ``[coefs, grad]``.
 
-    ``predict(structure, gradient=False)`` returns the ``salted_prediction``
-    output list: ``[coefs]``/``[coefs, grad]`` (+ charge, dipole).
-    Chdir into the workspace: SALTED reads ./inp.yaml from the cwd.
+    Chdirs into the workspace because SALTED reads ./inp.yaml from the cwd.
     """
+    monkeypatch.chdir(serial_run.root)
+    from salted import init_pred, salted_prediction
+    from salted.sys_utils import detect_mpi
 
-    def _load(example: str):
-        ws = serial_run(example)
-        monkeypatch.chdir(ws.root)
-        from salted import init_pred, salted_prediction
-        from salted.sys_utils import detect_mpi
+    comm, size, rank, _ = detect_mpi()
+    model = init_pred.build(rank)
+    lcut = model[2]  # lmax_max
 
-        comm, size, rank, _ = detect_mpi()
-        model = init_pred.build(rank)
-        # no angular truncation: predict every channel of the density-fitting
-        # basis (lcut caps the output lambda channels at min(lmax, lcut))
-        lcut = model[2]  # lmax_max
+    def predict(structure: Atoms, gradient: bool = False) -> list[np.ndarray]:
+        return salted_prediction.build(*model, comm, size, rank, lcut, gradient, structure)
 
-        def predict(structure, gradient=False):
-            return salted_prediction.build(
-                *model, comm, size, rank, lcut, gradient, structure
-            )
-
-        return ws, predict
-
-    return _load
+    return predict
 
 
-@pytest.mark.parametrize("example", EXAMPLE_PARAMS)
-def test_prediction_matches_validation(load_predictor, example):
+@pytest.fixture(scope="session")
+def valset_prediction(serial_run: PipelineWorkspace) -> Path:
+    """Run ``salted.prediction`` on the model's validation structures, once.
+    Returns the directory it wrote coefficients to.
+
+    ParseConfig hard-codes ``<cwd>/inp.yaml``, so the prediction target cannot
+    be passed in; the file itself is swapped and restored around the run.
+    """
+    xyz_fpath = serial_run.write_prediction_from_validation()
+    with serial_run.swap_prediction_inp(f"./{xyz_fpath.name}", VALSET_PREDNAME):
+        serial_run.run_step("prediction")
+    return serial_run.prediction_output_dir(VALSET_PREDNAME)
+
+
+@pytest.mark.parametrize("model_spec", LIVE_API_MODELS, indirect=True)
+def test_prediction_matches_validation(serial_run: PipelineWorkspace, predictor: Predictor):
     """Live prediction must reproduce the validation step's coefficients."""
-    ws, predict = load_predictor(example)
-    frames = read(ws.root / ws.inp["system"]["filename"], ":")
+    frames = read(serial_run.root / serial_run.inp["system"]["filename"], ":")
 
-    vdir = ws.validation_output_dir
+    vdir = serial_run.validation_output_dir
     # COEFFS-<n>.dat is named by the 1-based configuration index (works for
     # both sequential and random training-set selection)
     coeff_files = sorted(
@@ -89,7 +75,7 @@ def test_prediction_matches_validation(load_predictor, example):
     failures = []
     for fpath in coeff_files:
         iconf = int(re.fullmatch(r"COEFFS-(\d+)\.dat", fpath.name).group(1)) - 1
-        coefs = predict(frames[iconf].copy())[0]
+        coefs = predictor(frames[iconf].copy())[0]
         ref = np.loadtxt(fpath)
         assert coefs.shape == ref.shape
         if not np.allclose(coefs, ref):
@@ -100,19 +86,18 @@ def test_prediction_matches_validation(load_predictor, example):
                 f"relative = {rel_err:.3e}"
             )
     assert not failures, (
-        f"{example}: prediction deviates from the validation output for "
+        f"{serial_run.name}: prediction deviates from the validation output for "
         f"{len(failures)}/{len(coeff_files)} configurations:\n" + "\n".join(failures)
     )
 
 
-@pytest.mark.parametrize("example", EXAMPLE_PARAMS)
-def test_prediction_gradient_finite_difference(load_predictor, example):
+@pytest.mark.parametrize("model_spec", LIVE_API_MODELS, indirect=True)
+def test_prediction_gradient_finite_difference(serial_run: PipelineWorkspace, predictor: Predictor):
     """Analytical gradients must agree with second-order finite differences."""
-    ws, predict = load_predictor(example)
-    structure = read(ws.root / ws.inp["system"]["filename"], ":")[-1]
+    structure = read(serial_run.root / serial_run.inp["system"]["filename"], ":")[-1]
     iat, axis = 0, 1  # displace the zeroth atom along y
 
-    g_ana = predict(structure.copy(), gradient=True)[1][iat, axis, :]
+    g_ana = predictor(structure.copy(), gradient=True)[1][iat, axis, :]
     g_norm = np.linalg.norm(g_ana)
     assert np.all(np.isfinite(g_ana)) and g_norm > 0
 
@@ -122,131 +107,112 @@ def test_prediction_gradient_finite_difference(load_predictor, example):
         plus.positions[iat, axis] += d
         minus = structure.copy()
         minus.positions[iat, axis] -= d
-        g_fd = (predict(plus)[0] - predict(minus)[0]) / (2 * d)
+        g_fd = (predictor(plus)[0] - predictor(minus)[0]) / (2 * d)
         err[d] = np.linalg.norm(g_fd - g_ana)
 
     print(
-        f"\n{example}: |g_ana| = {g_norm:.3e}, "
+        f"\n{serial_run.name}: |g_ana| = {g_norm:.3e}, "
         f"FD error {err[0.01]:.3e} (d=0.01) -> {err[0.001]:.3e} (d=0.001), "
         f"ratio {err[0.01] / err[0.001]:.1f} (ideal 2nd order: 100)"
     )
     assert err[0.001] < err[0.01] / 30, (
-        f"{example}: finite-difference error does not converge at 2nd order "
+        f"{serial_run.name}: finite-difference error does not converge at 2nd order "
         f"(ratio {err[0.01] / err[0.001]:.1f}, expected ~100): the analytical "
         "gradient disagrees with the predicted coefficients"
     )
     assert err[0.001] < 1e-3 * g_norm, (
-        f"{example}: gradient relative error {err[0.001] / g_norm:.3e} at "
+        f"{serial_run.name}: gradient relative error {err[0.001] / g_norm:.3e} at "
         "d=0.001 exceeds 1e-3"
     )
 
 
-VALSET_PREDNAME = "valset"
-# the MPI variants below run on the smallest dataset only; they carry only the
-# ``mpi`` marker (not ``aims``) so ``-m aims`` and ``-m mpi`` select disjoint sets
-MPI_EXAMPLE = "water_monomer_aims"
-
-
-@pytest.fixture(scope="module")
-def valset_prediction(serial_run):
-    """Run ``salted.prediction`` on an example's validation structures, once.
-
-    The validation structures are sliced out of the dataset xyz (using the
-    training-set file the pipeline wrote) into a prediction xyz, inp.yaml is
-    temporarily retargeted at it (ParseConfig hard-codes the inp.yaml name;
-    a distinct predname keeps the outputs in their own directory), and the
-    step runs on the already-trained model — no retraining. Cached so the
-    serial run is shared between the consistency test and the MPI test.
-    """
-    cache = {}
-
-    def _get(example: str):
-        if example not in cache:
-            ws = serial_run(example)
-            xyz_fpath = ws.write_prediction_from_validation()
-            with ws.swap_prediction_inp(f"./{xyz_fpath.name}", VALSET_PREDNAME):
-                ws.run_step("prediction")
-            cache[example] = ws
-        return cache[example]
-
-    return _get
-
-
-@pytest.mark.parametrize("example", EXAMPLE_PARAMS)
-def test_prediction_step_matches_validation(valset_prediction, example):
-    """``salted.prediction`` on the validation structures must reproduce the
-    validation step's coefficients."""
-    ws = valset_prediction(example)
+@pytest.mark.parametrize("model_spec", ALL_MODELS, indirect=True)
+def test_prediction_step_matches_validation(serial_run: PipelineWorkspace, valset_prediction: Path):
+    """Every COEFFS file, and for ``density-response`` every Cartesian
+    component, must match what the validation step wrote."""
+    ws = serial_run
     vidx = ws.validation_indices()
     assert len(vidx) == ws.nconf - ws.ntrain
 
     vdir = ws.validation_output_dir
-    # guard: the validation step must have predicted exactly these structures,
+    # the validation step must have predicted exactly these structures,
     # else the training-set selection logic changed and the mapping below is wrong
-    written = {int(f.stem.split("-")[1]) - 1 for f in vdir.glob("COEFFS-*.dat")}
+    written = {int(f.stem.split("-")[1]) - 1 for f in ws.coeff_dirs(vdir)[0].glob("COEFFS-*.dat")}
     assert written == set(vidx.tolist()), (
-        f"{example}: validation COEFFS indices disagree with the training-set "
+        f"{ws.name}: validation COEFFS indices disagree with the training-set "
         f"complement (train/validation split logic changed?)"
     )
 
-    pdir = ws.prediction_output_dir(VALSET_PREDNAME)
     failures = []
+    n_checked = 0
     for k, iconf in enumerate(vidx):
-        pred = np.loadtxt(pdir / f"COEFFS-{k + 1}.dat")
-        ref = np.loadtxt(vdir / f"COEFFS-{iconf + 1}.dat")
-        assert pred.shape == ref.shape
-        if not np.allclose(pred, ref):
-            abs_err = np.max(np.abs(pred - ref))
-            rel_err = np.linalg.norm(pred - ref) / np.linalg.norm(ref)
-            failures.append(
-                f"  conf {iconf} (COEFFS-{k + 1}.dat vs COEFFS-{iconf + 1}.dat): "
-                f"max|diff| = {abs_err:.3e}, relative = {rel_err:.3e}"
-            )
+        # one file per structure for density, one per Cartesian component for
+        # density-response; both lists come back in the same component order
+        for pred_f, ref_f in zip(
+            ws.coeff_files(valset_prediction, k + 1), ws.coeff_files(vdir, iconf + 1)
+        ):
+            pred = np.loadtxt(pred_f)
+            ref = np.loadtxt(ref_f)
+            assert pred.shape == ref.shape
+            n_checked += 1
+            if not np.allclose(pred, ref):
+                abs_err = np.max(np.abs(pred - ref))
+                rel_err = np.linalg.norm(pred - ref) / np.linalg.norm(ref)
+                failures.append(
+                    f"  conf {iconf} ({pred_f.relative_to(valset_prediction)} vs "
+                    f"{ref_f.relative_to(vdir)}): "
+                    f"max|diff| = {abs_err:.3e}, relative = {rel_err:.3e}"
+                )
     assert not failures, (
-        f"{example}: salted.prediction deviates from the validation output for "
-        f"{len(failures)}/{len(vidx)} configurations:\n" + "\n".join(failures)
+        f"{ws.name}: salted.prediction deviates from the validation output for "
+        f"{len(failures)}/{n_checked} coefficient files:\n" + "\n".join(failures)
     )
 
 
-@pytest.mark.mpi
-def test_prediction_step_mpi_matches_serial(request, valset_prediction, mpirun_cmd):
+@pytest.mark.parametrize("model_spec", MPI_MODELS, indirect=True)
+def test_prediction_step_mpi_matches_serial(
+    serial_run: PipelineWorkspace, valset_prediction: Path, workspaces: WorkspaceBuilder
+):
     """``salted.prediction`` splits the prediction structures across ranks;
     an MPI rerun must agree with the cached serial valset run."""
-    ws = valset_prediction(MPI_EXAMPLE)
+    ws = serial_run
     xyz_fpath = ws.write_prediction_from_validation()  # deterministic rewrite
-    np_tasks = request.config.getoption("--mpi-np")
 
     with ws.swap_prediction_inp(f"./{xyz_fpath.name}", "valmpi"):
-        ws.run_step("prediction", mpi=mpirun_cmd + ["-n", str(np_tasks)])
+        ws.run_step("prediction", mpi=workspaces.mpi_cmd)
 
-    sdir = ws.prediction_output_dir(VALSET_PREDNAME)
     mdir = ws.prediction_output_dir("valmpi")
     for k in range(1, len(ws.validation_indices()) + 1):
-        a = np.loadtxt(sdir / f"COEFFS-{k}.dat")
-        b = np.loadtxt(mdir / f"COEFFS-{k}.dat")
-        # each structure is computed entirely by one rank -> tiny noise at most
-        np.testing.assert_allclose(b, a, rtol=1e-8, atol=1e-10, err_msg=f"COEFFS-{k}.dat")
+        # one file per structure for density, one per Cartesian component for
+        # density-response; both lists come back in the same component order
+        for serial_f, mpi_f in zip(ws.coeff_files(valset_prediction, k), ws.coeff_files(mdir, k)):
+            a = np.loadtxt(serial_f)
+            b = np.loadtxt(mpi_f)
+            # each structure is computed entirely by one rank -> tiny noise at most
+            np.testing.assert_allclose(
+                b, a, rtol=1e-8, atol=1e-10, err_msg=str(mpi_f.relative_to(mdir))
+            )
 
 
-@pytest.mark.mpi
-def test_salted_prediction_mpi_matches_serial(request, serial_run, mpirun_cmd):
-    """``salted.salted_prediction`` splits the atoms of one structure across
-    ranks and allreduces the partial coefficients; serial and MPI must agree.
-
-    Run through ``_mpi_predict_driver.py``: an in-process call cannot be
-    mpirun'd, so both runs go through the same driver subprocess.
+@pytest.mark.parametrize("model_spec", LIVE_API_MPI_MODELS, indirect=True)
+def test_salted_prediction_mpi_matches_serial(
+    serial_run: PipelineWorkspace, workspaces: WorkspaceBuilder
+):
+    """An in-process call cannot be mpirun'd, so both runs go through the same
+    ``_mpi_predict_driver.py`` subprocess. One model suffices: this exercises
+    SALTED's atom partitioning, not anything dataset-specific.
     """
-    ws = serial_run(MPI_EXAMPLE)
+    ws = serial_run
     driver = Path(__file__).with_name("_mpi_predict_driver.py")
     xyz = ws.inp["system"]["filename"]  # driver predicts its first structure
     # the atom-parallel path caps the rank count at natoms
-    np_tasks = min(request.config.getoption("--mpi-np"), 2)
+    np_tasks = min(workspaces.np_tasks, 2)
 
     ws.run_python([str(driver), xyz, "pred_api_serial.npy"], label="salted_prediction")
     ws.run_python(
         [str(driver), xyz, "pred_api_mpi.npy"],
         label="salted_prediction",
-        mpi=mpirun_cmd + ["-n", str(np_tasks)],
+        mpi=workspaces.mpirun + ["-n", str(np_tasks)],
     )
 
     a = np.load(ws.root / "pred_api_serial.npy")

@@ -58,11 +58,11 @@ salted = ["lib/*.so"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+addopts = "-ra --strict-markers"
 markers = [
-    "example: end-to-end example pipeline test, needs the SALTED-datasets repository",
-    "mpi: serial-vs-MPI equivalence tests of the water_monomer_aims dataset, needs mpirun",
-    "aims: serial tests of the water_monomer_aims dataset",
-    "pyscf: serial tests of the water_monomer_PySCF dataset",
-    "cp2k: serial tests of the water_monomer_CP2K dataset",
+    "integration: end-to-end test of a model's pipeline, needs the SALTED-datasets repository",
+    "aims_density: tests of the water_monomer_AIMS dataset (serial + MPI equivalence)",
+    "pyscf_density: tests of the water_monomer_PySCF dataset (serial)",
+    "cp2k_density: tests of the water_monomer_CP2K dataset (serial)",
+    "aims_response: density-response tests of the water_monomer_AIMS_response_subset100 dataset (serial + MPI)",
 ]

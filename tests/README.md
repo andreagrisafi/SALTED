@@ -1,155 +1,113 @@
 # SALTED test suite
 
-## Tests and Markers
+## Design
 
-- **Unit tests** in `tests/unit/`: fast, self-contained tests (no external data needed). Unmarked — select them by path (`pytest tests/unit`).
-- **Example tests** in `tests/integration/`: end-to-end runs of the example ML pipelines plus prediction tests on the trained model, driven by precomputed data from the [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository. All carry the `example` marker; see [Test scopes](#test-scopes) below.
+Two tiers of tests:
 
-  The four sub-markers select **disjoint** test sets (`example` is their union):
+- **Unit tests** (`tests/unit/`): fast, self-contained, no external data.
+- **Integration tests** (`tests/integration/`): end-to-end runs of the ML pipeline on precomputed QM data from [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets). Skipped automatically when that repository is absent.
 
-  | Marker | Dataset | Description |
-  |---|---|---|
-  | `aims` | `water_monomer_aims` | Serial pipeline + prediction tests |
-  | `cp2k` | `water_monomer_CP2K_subset100` | Serial pipeline + prediction tests |
-  | `pyscf` | `water_monomer_PySCF_subset100` | Serial pipeline + prediction tests |
-  | `mpi` | `water_monomer_aims` | Serial-vs-MPI equivalence tests (pipeline + predictions) |
+Concepts in the integration tests design:
 
-  - Reference data: 100-structures dataset, Ntrain=40, `trainsel: random` (the default), tested on 2026-07
+- **Dataset**: from GitHub repo [andreagrisafi/SALTED-datasets](http://github.com/andreagrisafi/SALTED-datasets). Provides the QM data for a model pipeline.
+- **Model**: defined by a dataset and an `inp.yaml` that trains it (see  `ModelSpec` in [`tests/models.py`](models.py)). Each model has a unique **marker**. Each model will be trained as a pipeline test, and then used for different subsequent tests.
 
-  | example | nconf | Ntrain | % RMSE | threshold | time (1 core) |
-  |---|---|---|---|---|---|
-  | `water_monomer_aims` | 100 | 40 | 9.680e-01 | 1.5 | ~ 4 min |
-  | `water_monomer_pyscf` | 100 | 40 | 8.216e-01 | 1.5 | ~ 4 min |
-  | `water_monomer_cp2k` | 100 | 40 | 1.625e+00 | 2.5 | ~ 6 min |
-  | `water_monomer_aims` (MPI) | 100 | 40 | 9.680e-01 | 1.5 | ~ 6 min |
+| marker | dataset | `saltedtype`  | time (1 core) |
+|---|---|---|---|---|---|
+| `aims_density` | `water_monomer_AIMS` | `density` | ~4 min, ~10 with MPI |
+| `pyscf_density` | `water_monomer_PySCF_subset100` | `density` | ~4 min |
+| `cp2k_density` | `water_monomer_CP2K_subset100` | `density` | ~6 min |
+| `aims_response` | `water_monomer_AIMS_response_subset100` | `density-response` | ~20 min with MPI |
 
-> For detailed information on the tests, see the bottom of this README:
-> [Test scopes](#test-scopes) and
-> [Fixture design](#fixture-design).
+The four markers select **disjoint** sets and `integration` is their union, so CI runs every test exactly once.
 
-## Running the Tests Locally
+Two conventions worth knowing before reading the code:
 
-### Setup
+- **`PipelineWorkspace` (`ws`) holds the state**: temp directory, artifact layout, per-step timings, RMSE. Ask `ws` for a path or an array (`ws.regression_array("Bmat")`) rather than rebuilding path strings, or for test results (`ws.validation_rmse`).
+- **Fixtures are parametrized, not factories**: everything hangs off `model_spec` with `indirect=True`, so pytest caches each trained model per session and builds only what `-m` selects.
 
-The unit tests only need an editable install, then you can run from the project root.
-The example tests need precomputed data from [SALTED-datasets](https://github.com/andreagrisafi/SALTED-datasets) repository, or they will be skipped automatically with a warning.
+Rationale for individual tests and tolerances lives in their docstrings; `tests/conftest.py` and `tests/models.py` document the fixture and registry design.
+
+## Running the tests
 
 ```bash
-# in the cloned SALTED directory:
-pip install -e ".[test]"  # from the SALTED repository root
-git clone https://github.com/andreagrisafi/SALTED-datasets.git ../SALTED-datasets  # put it aside the SALTED dir
+pip install -e ".[test]"  # in the SALTED directory
+git clone https://github.com/andreagrisafi/SALTED-datasets.git ../SALTED-datasets
 ```
 
-Or, point `pytest` elsewhere with `--datasets-path /path/to/SALTED-datasets` or the `SALTED_DATASETS_PATH` environment variable.
-
-### Running Tests
+Or point elsewhere with `--datasets-path /path/to/SALTED-datasets` or set env var `$SALTED_DATASETS_PATH`.
 
 ```bash
-# only unit tests (fastest)
-pytest tests/unit              # fast unit tests
-# with SALTED-datasets
-pytest -m example              # all example pipelines
-pytest -m aims                 # only the aims serial tests
-pytest -m pyscf                # only the pyscf serial tests
-pytest -m cp2k                 # only the cp2k serial tests
-pytest -m mpi                  # only the serial-vs-MPI equivalence aims tests
+pytest tests/unit                     # fast, no data needed
+pytest -m integration                 # every model
+pytest -m aims_density                # one model
+pytest -m aims_density -k mpi         # just its serial-vs-MPI checks
+pytest -m aims_density -k "not mpi"   # just its serial checks
 ```
 
-Options (see `pytest --help`, section "custom options"):
-
-| Option | Default | Meaning |
+| option | default | meaning |
 |---|---|---|
 | `--datasets-path PATH` | `$SALTED_DATASETS_PATH` or `../SALTED-datasets` | SALTED-datasets checkout |
-| `--ntrain N` | each example's calibrated value (40) | reduce the training-set size for faster runs; a reduced run checks a loose 20 % RMSE bound instead of the calibrated thresholds |
-| `--mpi-np N` | 2 | MPI tasks for the MPI equivalence test |
-| `--require-datasets` | off | fail (instead of skip) when SALTED-datasets or `mpirun` are unavailable; used in CI so a missing dataset cannot silently pass |
+| `--ntrain N` | 40 | smaller training set for faster runs; checks a loose 20 % RMSE bound instead of the calibrated threshold |
+| `--mpi-np N` | 2 | MPI tasks for the equivalence tests |
+| `--require-datasets` | off | fail instead of skip when SALTED-datasets is missing; used in CI |
 
+Each model runs in a fresh temp workspace under `/tmp/pytest-of-<user>/pytest-<N>/salted_<model>_0/`. Use `--basetemp /some/dir` to put them somewhere predictable. The `pyscf` unit tests are skipped unless `pyscf` is installed.
 
-The `pyscf` unit tests are skipped unless `pyscf` is installed and importable.
+Do not run a marker's tests concurrently (no `pytest-xdist`): the prediction tests write into the shared trained workspace.
 
-### Output Files
+## Coverage
 
-Each example pipeline runs in a fresh temporary workspace (dataset files are symlinked/copied in, `inp.yaml` is generated, all outputs are written there).
-By default this lives under pytest's temp root:
+Which `salted.*` modules the integration tests exercise. `+MPI` means the module is also rerun under `mpirun` and compared against the serial result.
 
-```
-/tmp/pytest-of-<user>/pytest-<N>/salted_<example>_0/
-```
+| `salted.*` | aims_density | pyscf_density | cp2k_density | aims_response |
+|---|:--:|:--:|:--:|:--:|
+| `initialize` → `wigner`, `scalar_vector` | y | y | y | y +antisymm |
+| `sparsify_features` | n/a | y | y | n/a |
+| `sparse_selection` | y | y | y | y |
+| `sparse_descriptor` | y +MPI | y | y | y +MPI |
+| `rkhs_projector` | y | y | y | y response variant |
+| `rkhs_vector` | y +MPI | y | y | y +MPI |
+| `hessian_matrix` → `numba_sparse`, `get_averages` | y +MPI | y | y | y +MPI, no averages |
+| `solve_regression` | y | y | y | y |
+| `validation` | y +MPI | y | y | y +MPI |
+| `prediction` | y +MPI | y | y | y +MPI |
+| `init_pred` + `salted_prediction` | y +MPI | y | y | n (density-only API)
 
-pytest keeps the last 3 runs there for inspection. To run in a **designated directory** instead (e.g. more disk space, a faster scratch mount, or a predictable path to inspect outputs) use pytest's built-in `--basetemp`:
+The `n/a` entries follow from the model configuration, not from implementation gaps.
+`salted.minimize_loss` is deliberately not covered.
 
-```bash
-pytest -m aims --basetemp /scratch/salted-tests
-# -> /scratch/salted-tests/salted_water_monomer_aims_0/...
-```
+## Continuous integration
 
+[`.github/workflows/ci.yaml`](../.github/workflows/ci.yaml), one job per model:
 
-## Running the Tests in GitHub CI
-
-The GitHub workflow [`.github/workflows/ci.yaml`](../.github/workflows/ci.yaml) runs this test suite:
-
-| Event | `unit-tests` | `example-tests` (aims, pyscf, cp2k, mpi) |
+| event | `unit-tests` | `integration-tests` |
 |---|---|---|
 | push to `master` or `dev_test_CI` | yes | yes, all four in parallel |
 | push to any other branch | yes | skipped |
 | PR into `master` or `dev_test_CI` | yes | yes, all four in parallel |
-| manual dispatch (Actions tab, "Run workflow") | yes | yes, all four in parallel |
+| manual dispatch (Actions tab) | yes | yes, all four in parallel |
 
-Notes:
+CI fetches only the dataset directories it needs and caches them by upstream HEAD. It always passes `--require-datasets`, so a missing dataset fails the job rather than silently skipping, unlike local runs.
 
-- For SALTED-datasets, CI fetches only the required dataset directories and caches them by the upstream HEAD commit.
-- CI always passes `--require-datasets`, so a missing dataset directory or `mpirun` fails the job instead of silently skipping, which is different from local behavior defaults.
-- Each `example-tests` job has a 10-minute timeout (covering dependency install, dataset fetch, and the pipeline itself); if a job times out flakily, raise `timeout-minutes` in the workflow.
+## Adding a model
 
-## Test scopes
+1. a `ModelSpec` in [`tests/models.py`](models.py): dataset directory, marker, `inp.yaml`, calibrated `validation_rmse_threshold`
+2. its marker in `pyproject.toml` under `[tool.pytest.ini_options] markers`
+3. its marker in the `ci.yaml` job matrix, and its dataset in that workflow's sparse-checkout
 
-### Serial tests (`aims`, `pyscf`, `cp2k`)
+`ModelSpec.steps` defaults to the shared `TRAINING_PIPELINE`, so every model provably runs the same code path unless it says otherwise in one visible line. Both the runner (`ws.run_pipeline`) and the artifact checks (`STEP_CHECKS` in `test_pipeline.py`) read that list, so a model that skips a step also skips its artifact check, which is how an alternative like `minimize_loss` would slot in.
 
-Each per-example marker runs the **same four tests** on its dataset:
+## Adding a test
 
-1. **`test_example_pipeline`**
-    - the eight pipeline steps as subprocesses (`python -m salted.<step>`, exactly as a user would), asserting each step's artifacts and the calibrated % RMSE threshold above.
-2. **`test_prediction_matches_validation`**
-    - the live-prediction API (`init_pred` + `salted.salted_prediction`, in-process): predicting every validation structure must reproduce `salted.validation`'s COEFFS files.
-3. **`test_prediction_gradient_finite_difference`**
-    -  same API with `gradient=True`: central finite differences must converge to the analytical gradient at second order.
-4. **`test_prediction_step_matches_validation`**
-    - the prediction pipeline step (`python -m salted.prediction`) run on the validation structures (sliced from the dataset xyz; `inp.yaml` temporarily retargeted with a separate `predname`, then restored): its coefficients must reproduce the validation step's.
+Pick a model group from [`models.py`](models.py), parametrize on `model_spec` with `indirect=True`, and ask for `serial_run`, or for `mpi_run` too if you are comparing the two:
 
-Tests 2-4 reuse the trained model from test 1's workspace so that nothing is retrained.
+```python
+from models import ALL_MODELS
 
-### MPI tests (`mpi`)
-
-SALTED's MPI tests verifies the following:
-
-- **Pipeline equivalence**
-    - rerun `sparse_descriptor`, `rkhs_vector`, `hessian_matrix`, `validation` under `mpirun -n 2`; regression matrices, weights, and RMSE must match the serial run with small differences.
-- **`test_prediction_step_mpi_matches_serial`**
-    - `salted.prediction` splits the prediction *structures* across ranks; an MPI prediction on validation set must match the cached serial run.
-- **`test_salted_prediction_mpi_matches_serial`**
-    - `salted.salted_prediction` splits the *atoms* of one structure across ranks; run via `_mpi_predict_driver.py`.
-
-## Fixture design
-
-Training a model costs 30 s - 2 min per backend, so the integration tests share trained workspaces through pytest fixtures (`tests/conftest.py`; injected by argument name, never imported). The dependency tree:
-
+@pytest.mark.parametrize("model_spec", ALL_MODELS, indirect=True)
+def test_weights_are_finite(serial_run):
+    assert np.all(np.isfinite(serial_run.regression_array("weights")))
 ```
-datasets_path (session)          locate SALTED-datasets, else skip (or fail in CI)
-  └─ make_workspace (session)    factory: tmp workspace per example
-       │                         (QM data symlinked read-only, xyz copied, inp.yaml generated)
-       └─ serial_run (session, cached per example)
-            │                    the full 8-step pipeline — runs ONCE per example
-            ├─ test_example_pipeline                    artifacts + RMSE
-            ├─ load_predictor (per-test)                trained model, in-process
-            │    ├─ test_prediction_matches_validation
-            │    └─ test_prediction_gradient_finite_difference
-            ├─ valset_prediction (cached per example)   salted.prediction on the
-            │    │                                      validation set — runs ONCE
-            │    ├─ test_prediction_step_matches_validation
-            │    └─ test_prediction_step_mpi_matches_serial   (mpi)
-            ├─ test_salted_prediction_mpi_matches_serial      (mpi)
-            └─ parallel_run (module)                    MPI rerun of the pipeline
-                 ├─ test_regression_matrices_match            (mpi)
-                 ├─ test_weights_match                        (mpi)
-                 └─ test_validation_rmse_matches              (mpi)
-```
+
+The group carries each model's marker, so the test needs none of its own and reuses the model that marker's CI job already trained. Get paths and arrays from `ws` instead of building path strings.

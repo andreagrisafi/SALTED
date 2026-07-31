@@ -2,7 +2,7 @@
 
 ``salted_prediction`` parallelises over the atoms of a single structure and
 ``allreduce``s the partial coefficient vectors, so its MPI path can only be
-exercised in a real ``mpirun`` process — hence this driver instead of an
+exercised in a real ``mpirun`` process, hence this driver instead of an
 in-process pytest call. Run it inside a trained SALTED workspace (the cwd
 must contain inp.yaml):
 

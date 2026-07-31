@@ -1,61 +1,49 @@
-"""Serial-vs-MPI equivalence test of the training pipeline.
+"""Serial-vs-MPI equivalence of the training pipeline.
 
-SALTED's MPI-parallel code paths differ structurally from the serial ones
-(job partitioning via ``distribute_jobs``, hand-sliced ``allreduce``
-accumulation of the regression matrices in ``hessian_matrix``). Bugs there
-corrupt results might silently rather than crash, so a cheap check is:
-run the same small example twice, once serial and once with ``mpirun``, and
-require quantitatively similar regression matrices, weights, and validation RMSE.
+Bugs in the MPI paths corrupt results silently rather than crash -- job
+partitioning and the hand-sliced allreduce in ``hessian_matrix`` have no serial
+counterpart. So train the same ``ModelSpec`` twice, once serially and once
+under mpirun, and require the results to agree.
 
-The prediction surfaces' MPI equivalence lives in ``test_prediction.py``.
+``density-response`` earns its own run: ``hessian_matrix`` accumulates over the
+three Cartesian components in a branch the density models never reach.
 
-Uses the aims water-monomer example (smallest dataset). Carries only the
-``mpi`` marker (not ``aims``) so ``-m aims`` and ``-m mpi`` select disjoint sets.
+Prediction-side MPI equivalence lives in ``test_prediction.py``.
 """
 
 import numpy as np
 import pytest
+from conftest import PipelineWorkspace
+from models import MPI_MODELS
 
-pytestmark = [pytest.mark.example, pytest.mark.mpi]
-
-MPI_STEPS = ("sparse_descriptor", "rkhs_vector", "hessian_matrix", "validation")
-
-EXAMPLE = "water_monomer_aims"
+pytestmark = pytest.mark.integration
 
 
-@pytest.fixture(scope="module")
-def parallel_run(request, make_workspace, mpirun_cmd, serial_run, pipeline_runner):
-    # ensure the serial reference exists first (also warms numba caches)
-    serial_ws = serial_run(EXAMPLE)
-    np_tasks = request.config.getoption("--mpi-np")
-    ws = make_workspace(EXAMPLE)
-    pipeline_runner(ws, mpi=mpirun_cmd + ["-n", str(np_tasks)], mpi_steps=MPI_STEPS)
-    print("\n" + ws.timing_report())
-    return serial_ws, ws
-
-
-def _load(ws, relpath):
-    return np.load(ws.root / relpath)
-
-
-def test_regression_matrices_match(parallel_run):
-    serial, par = parallel_run
-    rel = f"regrdir_{serial.saltedname}/{serial.mz}"
-    for fname in (f"Avec_N{serial.ntrain}.npy", f"Bmat_N{serial.ntrain}.npy"):
-        a = _load(serial, f"{rel}/{fname}")
-        b = _load(par, f"{rel}/{fname}")
+@pytest.mark.parametrize("model_spec", MPI_MODELS, indirect=True)
+def test_regression_matrices_match(serial_run: PipelineWorkspace, mpi_run: PipelineWorkspace):
+    for name in ("Avec", "Bmat"):
+        a, b = serial_run.regression_array(name), mpi_run.regression_array(name)
         assert a.shape == b.shape
         # summation order differs across ranks -> allow tiny float noise only
-        np.testing.assert_allclose(a, b, rtol=1e-8, atol=1e-10, err_msg=fname)
+        np.testing.assert_allclose(b, a, rtol=1e-8, atol=1e-10, err_msg=name)
 
 
-def test_weights_match(parallel_run):
-    serial, par = parallel_run
-    rel = f"regrdir_{serial.saltedname}/{serial.mz}/weights_N{serial.ntrain}_{serial.reg_str}.npy"
-    np.testing.assert_allclose(_load(serial, rel), _load(par, rel), rtol=1e-6, atol=1e-8)
+@pytest.mark.parametrize("model_spec", MPI_MODELS, indirect=True)
+def test_weights_match(serial_run: PipelineWorkspace, mpi_run: PipelineWorkspace):
+    """Relative L2 norm, not element-wise: ``Bmat`` can be ill-conditioned,
+    so regression weights can drift even if the regression matrices are identical.
+    Change ``ModelSpec.weights_rtol`` for each model if necessary.
+    """
+    a, b = serial_run.regression_array("weights"), mpi_run.regression_array("weights")
+    assert a.shape == b.shape
+    deviation = np.linalg.norm(a - b) / np.linalg.norm(a)
+    assert deviation < serial_run.weights_rtol, (
+        f"{serial_run.name}: serial and MPI weights differ by {deviation:.3e} "
+        f"in relative L2 norm, above the {serial_run.weights_rtol:.0e} tolerance"
+    )
 
 
-def test_validation_rmse_matches(parallel_run):
-    serial, par = parallel_run
-    assert serial.rmse is not None and par.rmse is not None
-    assert par.rmse == pytest.approx(serial.rmse, rel=1e-6)
+@pytest.mark.parametrize("model_spec", MPI_MODELS, indirect=True)
+def test_validation_rmse_matches(serial_run: PipelineWorkspace, mpi_run: PipelineWorkspace):
+    assert serial_run.validation_rmse is not None and mpi_run.validation_rmse is not None
+    assert mpi_run.validation_rmse == pytest.approx(serial_run.validation_rmse, rel=1e-6)

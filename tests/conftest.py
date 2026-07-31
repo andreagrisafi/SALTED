@@ -1,147 +1,27 @@
-"""Shared pytest fixtures and helpers for the SALTED test suite.
+"""Shared pytest fixtures for the SALTED test suite. See tests/README.md.
 
-Two kinds of tests live under ``tests/``:
-
-- ``tests/unit``: fast, self-contained tests of individual functions.
-- ``tests/integration``: end-to-end runs of the example ML pipelines, using
-  precomputed QM data (density-fitting coefficients and overlaps) from the
-  SALTED-datasets repository (https://github.com/andreagrisafi/SALTED-datasets).
-
-Integration tests are marked ``example`` and are skipped automatically when the
-datasets repository is not available (with ``--require-datasets``, as used in
-CI, they fail loudly instead). Point to it with::
-
-    pytest --datasets-path /path/to/SALTED-datasets
-
-or the ``SALTED_DATASETS_PATH`` environment variable (the default is a sibling
-directory ``../SALTED-datasets`` next to the SALTED repository).
-
-The training-set size of the integration runs can be reduced for quick local
-runs with ``--ntrain N`` (default: each example's calibrated value).
+Integration tests need a SALTED-datasets checkout and skip without one, or fail under
+``--require-datasets`` (CI, where a missing dataset must not pass quietly).
 """
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import pytest
 import yaml
+from models import MODELS, ModelSpec
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-
-DESCRIPTOR_TEMPLATE = {
-    "rep1": {
-        "type": "rho",
-        "rcut": 4.0,
-        "sig": 0.3,
-        "nrad": 8,
-        "nang": 6,
-        "neighspe": ["H", "O"],
-    },
-    "rep2": {
-        "type": "rho",
-        "rcut": 4.0,
-        "sig": 0.3,
-        "nrad": 8,
-        "nang": 6,
-        "neighspe": ["H", "O"],
-    },
-}
-
-EXAMPLES = {
-    "water_monomer_aims": {
-        "dataset_dir": "water_monomer_aims",
-        "nconf": 100,
-        "inp": {
-            "salted": {"saltedname": "test", "saltedpath": "./", "verbose": True},
-            "system": {"filename": "./water_monomers_100.xyz", "species": ["H", "O"]},
-            "qm": {"path2qm": "./", "qmcode": "aims", "dfbasis": "FHI-aims-light"},
-            "prediction": {"filename": "./water_dimers_10.xyz", "predname": "prediction"},
-            "descriptor": DESCRIPTOR_TEMPLATE,
-            "gpr": {
-                "z": 2.0,
-                "Menv": 100,
-                "Ntrain": 40,
-                "trainfrac": 1.0,
-                "trainsel": "random",
-            },
-        },
-        # angreagrisafi/SALTED-datasets: water_monomer_aims/README.md
-        # validation RMSE 9.680e-01 %
-        "rmse_threshold": 1.5,
-    },
-    "water_monomer_cp2k": {
-        "dataset_dir": "water_monomer_CP2K_subset100",
-        "nconf": 100,
-        "inp": {
-            "salted": {"saltedname": "test", "saltedpath": "./", "verbose": True},
-            "system": {"filename": "./water_monomers_100.xyz", "species": ["H", "O"]},
-            "qm": {
-                "path2qm": "./",
-                "qmcode": "cp2k",
-                "periodic": "3D",
-                "dfbasis": "RI-basis",
-                "coeffile": "dummy-RI_DENSITY_COEFFS.dat",
-                "ovlpfile": "dummy-RI_2C_INTS.fm",
-                "pseudocharge": [1.0, 6.0],
-            },
-            "prediction": {"filename": "./water_dimers_10.xyz", "predname": "prediction"},
-            "descriptor": {
-                "rep1": DESCRIPTOR_TEMPLATE["rep1"],
-                "rep2": {**DESCRIPTOR_TEMPLATE["rep2"], "type": "V"},  # potential rep
-                "sparsify": {"nsamples": 10, "ncut": 1000},
-            },
-            "gpr": {
-                "z": 1.0,
-                "Menv": 50,
-                "Ntrain": 40,
-                "trainfrac": 1.0,
-                "regul": 1e-5,
-                "gradtol": 1e-6,
-                "trainsel": "random",
-            },
-        },
-        # angreagrisafi/SALTED-datasets: water_monomer_CP2K_subset100/README.md
-        # 2026-07 Ntrain=40/validation=60 on 100-structure subset: % RMSE 1.625e+00
-        "rmse_threshold": 2.5,
-    },
-    "water_monomer_pyscf": {
-        "dataset_dir": "water_monomer_PySCF_subset100",
-        "nconf": 100,
-        "inp": {
-            "salted": {"saltedname": "test", "saltedpath": "./", "verbose": True},
-            "system": {"filename": "./water_monomers_100.xyz", "species": ["H", "O"]},
-            "qm": {
-                "path2qm": "./",
-                "qmcode": "pyscf",
-                "dfbasis": "RI-cc-pvqz",
-                "qmbasis": "cc-pvqz",
-                "functional": "b3lyp",
-            },
-            "prediction": {"filename": "./water_dimers_10.xyz", "predname": "dimer"},
-            "descriptor": {
-                **DESCRIPTOR_TEMPLATE,
-                "sparsify": {"nsamples": 100, "ncut": 1000},
-            },
-            "gpr": {
-                "z": 2.0,
-                "Menv": 100,
-                "Ntrain": 40,
-                "trainfrac": 1.0,
-                "trainsel": "random",
-            },
-        },
-        # angreagrisafi/SALTED-datasets: water_monomer_PySCF_subset100/README.md
-        # 2026-07 Ntrain=40/validation=60 on 100-structure subset: % RMSE 8.216e-01
-        "rmse_threshold": 1.5,
-    },
-}
+MPI_STEPS = ("sparse_descriptor", "rkhs_vector", "hessian_matrix", "validation")
 
 
 def pytest_addoption(parser):
@@ -155,22 +35,22 @@ def pytest_addoption(parser):
         "--ntrain",
         type=int,
         default=None,
-        help="Override gpr.Ntrain of the example pipelines (smaller = faster). "
-        "Default: the full value from each example's inp.yaml.",
+        help="Override gpr.Ntrain of the model pipelines (smaller = faster). "
+        "Default: the full value from each model's spec.",
     )
     parser.addoption(
         "--mpi-np",
         type=int,
         default=2,
-        help="Number of MPI tasks for the MPI equivalence test (default: 2)",
+        help="Number of MPI tasks for the MPI equivalence tests (default: 2)",
     )
     parser.addoption(
         "--require-datasets",
         action="store_true",
         default=False,
-        help="Fail (instead of skip) integration tests when SALTED-datasets or "
-        "mpirun are unavailable. Meant for CI, where a missing dataset must be "
-        "a loud error, not a silently green job.",
+        help="Fail (instead of skip) integration tests when SALTED-datasets is "
+        "unavailable. Meant for CI, where a missing dataset must be a loud "
+        "error, not a silently green job.",
     )
 
 
@@ -183,58 +63,76 @@ def skip_or_fail(require_datasets: bool, msg: str):
 
 # markers are declared once in pyproject.toml [tool.pytest.ini_options]
 
-@pytest.fixture(scope="session")
-def datasets_path(request) -> Path:
-    """Root of the SALTED-datasets checkout; skips (or fails) dependent tests if absent."""
-    path = Path(request.config.getoption("--datasets-path")).resolve()
-    if not path.is_dir():
-        skip_or_fail(
-            request.config.getoption("--require-datasets"),
-            f"SALTED-datasets not found at {path} (use --datasets-path or $SALTED_DATASETS_PATH)",
+
+def pytest_configure(config):
+    """Fail at startup if a model's marker was never declared in pyproject.toml"""
+    declared = {entry.split(":")[0].strip() for entry in config.getini("markers")}
+    missing = sorted({spec.marker for spec in MODELS.values()} - declared)
+    if missing:
+        raise pytest.UsageError(
+            f"model markers not declared in pyproject.toml [tool.pytest.ini_options] "
+            f"markers: {missing}"
         )
-    return path
-
-
-@pytest.fixture(scope="session")
-def mpirun_cmd(request):
-    """Base mpirun command; skips (or fails with --require-datasets) if no MPI launcher."""
-    import shutil
-
-    mpirun = shutil.which("mpirun")
-    if mpirun is None:
-        skip_or_fail(request.config.getoption("--require-datasets"), "mpirun not available")
-    cmd = [mpirun]
-    version = subprocess.run([mpirun, "--version"], capture_output=True, text=True).stdout
-    if "Open MPI" in version or "OpenRTE" in version:
-        # allow more ranks than cores on small CI runners
-        cmd.append("--oversubscribe")
-    return cmd
 
 
 class PipelineWorkspace:
-    """A temp working directory wired up to run one example's ML pipeline."""
+    """A temp working directory wired up to run one model's ML pipeline.
 
-    def __init__(self, name: str, root: Path, datasets_path: Path, ntrain: int | None, require_datasets: bool = False):
-        self.name = name
+    Owns the model spec, the staged inputs, the SALTED output layout, and the
+    results of running it (timings, metrics).
+    """
+
+    def __init__(
+        self,
+        spec: ModelSpec,
+        root: Path,
+        datasets_path: Path,
+        ntrain: int | None,
+        require_datasets: bool = False,
+    ):
+        self.spec = spec
         self.root = root
-        spec = EXAMPLES[name]
-        self.dataset = datasets_path / spec["dataset_dir"]
+        self.dataset = datasets_path / spec.dataset_dir
         if not self.dataset.is_dir():
             skip_or_fail(require_datasets, f"dataset {self.dataset} not found")
 
-        # QM data: symlink (read-only use), xyz files: copy
+        self._stage_qm_data(require_datasets)
+        self._write_inp(ntrain, require_datasets)
+
+        self.timings: dict[str, float] = {}
+        self.validation_rmse: float | None = None
+
+    def _stage_qm_data(self, require_datasets: bool):
+        """Link the dataset's QM data into the workspace, copy its xyz files.
+        """
         for sub in ("coefficients", "overlaps"):
             src = self.dataset / sub
             assert src.is_dir(), f"missing {src}"
-            (root / sub).symlink_to(src)
+            dst = self.root / sub
+            dst.mkdir()
+            for f in src.iterdir():
+                if f.name == "averages":  # exclude
+                    continue
+                (dst / f.name).symlink_to(f)  # Entries are linked whether they are files or directories
+
         for xyz in self.dataset.glob("*.xyz"):
-            (root / xyz.name).write_bytes(xyz.read_bytes())
+            (self.root / xyz.name).write_bytes(xyz.read_bytes())
 
-        # inp.yaml: deep copy of the template, + external basis + optional Ntrain
-        self.inp = yaml.safe_load(yaml.safe_dump(spec["inp"]))  # deep copy
+        if self.spec.inp["qm"]["qmcode"] == "cp2k":
+            src = self.dataset / "basis"
+            if not src.is_dir():
+                skip_or_fail(
+                    require_datasets,
+                    f"dataset {self.dataset.name} does not ship a basis/ directory "
+                    "with the alphas/contra .dat files of its density-fitting basis; "
+                    "needed for the charge/dipole moment integrals of the validation step",
+                )
+            (self.root / "basis").symlink_to(src)
 
-        # Density-fitting basis: every dataset ships a prepared basis_data.yaml
-        # carrying the lmax/nmax info of its density-fitting basis
+    def _write_inp(self, ntrain: int | None, require_datasets: bool):
+        """Build inp.yaml from the spec: deep copy + external basis + Ntrain."""
+        self.inp = yaml.safe_load(yaml.safe_dump(self.spec.inp))  # deep copy
+
         self.basis_fpath = self.dataset / "basis_data.yaml"
         if not self.basis_fpath.is_file():
             skip_or_fail(
@@ -245,28 +143,44 @@ class PipelineWorkspace:
             )
         self.inp["qm"]["dfbasis_file"] = str(self.basis_fpath)
 
-        if self.inp["qm"]["qmcode"] == "cp2k":
-            # For CP2K validation step (related function: salted.cp2k.utils.init_moments)
-            # It needs the primitive Gaussian exponents and contraction # coefficients
-            src = self.dataset / "basis"
-            if not src.is_dir():
-                skip_or_fail(
-                    require_datasets,
-                    f"dataset {self.dataset.name} does not ship a basis/ directory "
-                    "with the alphas/contra .dat files of its density-fitting basis; "
-                    "needed for the charge/dipole moment integrals of the validation step",
-                )
-            (root / "basis").symlink_to(src)
-
         self.ntrain_reduced = ntrain is not None and ntrain != self.inp["gpr"]["Ntrain"]
         if ntrain is not None:
             self.inp["gpr"]["Ntrain"] = ntrain
-        inp_text = yaml.safe_dump(self.inp, sort_keys=False)
-        (root / "inp.yaml").write_text(inp_text)
-        print(f"\n=== {name}: inp.yaml (workspace {root}) ===\n{inp_text}=== end inp.yaml ===")
 
-        self.timings: dict[str, float] = {}
-        self.rmse: float | None = None
+        inp_text = yaml.safe_dump(self.inp, sort_keys=False)
+        (self.root / "inp.yaml").write_text(inp_text)
+        print(f"\n=== {self.name}: inp.yaml (workspace {self.root}) ===\n{inp_text}=== end inp.yaml ===")
+
+    @property
+    def name(self) -> str:
+        return self.spec.key
+
+    @property
+    def nconf(self) -> int:
+        return self.spec.nconf
+
+    @property
+    def saltedtype(self) -> str:
+        return self.spec.saltedtype
+
+    @property
+    def is_response(self) -> bool:
+        return self.spec.is_response
+
+    @property
+    def cart_components(self) -> tuple[str, ...]:
+        return self.spec.cart_components
+
+    @property
+    def weights_rtol(self) -> float:
+        return self.spec.weights_rtol
+
+    @property
+    def validation_rmse_threshold(self) -> float:
+        if self.ntrain_reduced:
+            # loose sanity bound (%) for --ntrain reduced runs
+            return 20.0
+        return self.spec.validation_rmse_threshold
 
     @property
     def ntrain(self) -> int:
@@ -288,15 +202,29 @@ class PipelineWorkspace:
         return f"reg{int(np.log10(regul))}"
 
     @property
-    def nconf(self) -> int:
-        return EXAMPLES[self.name]["nconf"]
+    def equirepr_dir(self) -> Path:
+        """Where the descriptors, sparse selection and projectors are written."""
+        return self.root / f"equirepr_{self.saltedname}"
 
     @property
-    def rmse_threshold(self) -> float:
-        if self.ntrain_reduced:
-            # loose sanity bound (%) for --ntrain reduced runs
-            return 20.0
-        return EXAMPLES[self.name]["rmse_threshold"]
+    def rkhs_vector_dir(self) -> Path:
+        """Where salted.rkhs_vector writes its psi-nm_conf*.npz files."""
+        return self.root / f"rkhs-vectors_{self.saltedname}" / self.mz
+
+    @property
+    def regression_dir(self) -> Path:
+        """Where the regression matrices and GPR weights are written."""
+        return self.root / f"regrdir_{self.saltedname}" / self.mz
+
+    def regression_path(self, name: str) -> Path:
+        """Path of a regression artifact: 'Avec', 'Bmat' or 'weights'."""
+        if name == "weights":
+            return self.regression_dir / f"weights_N{self.ntrain}_{self.reg_str}.npy"
+        return self.regression_dir / f"{name}_N{self.ntrain}.npy"
+
+    def regression_array(self, name: str) -> np.ndarray:
+        """Load a regression artifact: 'Avec', 'Bmat' or 'weights'."""
+        return np.load(self.regression_path(name))
 
     @property
     def validation_output_dir(self) -> Path:
@@ -311,58 +239,43 @@ class PipelineWorkspace:
             self.root / f"predictions_{self.saltedname}_{predname}" / self.mz / f"N{self.ntrain}_{self.reg_str}"
         )
 
-    def validation_indices(self) -> np.ndarray:
-        """Sorted 0-based indices of the validation structures.
+    def coeff_dirs(self, base: Path) -> list[Path]:
+        """COEFFS directories under ``base``: ``base`` itself for ``density``,
+        one per Cartesian component of dn/dE for ``density-response``."""
+        if self.is_response:
+            return [base / icart for icart in self.cart_components]
+        return [base]
 
-        Complement of the training set chosen by salted.hessian_matrix
-        (written to regrdir_<saltedname>/training_set_N<Ntrain>.txt); mirrors
-        the ``np.setdiff1d`` in salted.validation, so these are exactly the
-        structures the validation step predicted.
+    def coeff_files(self, base: Path, index: int) -> list[Path]:
+        """COEFFS paths for structure ``index`` (1-based) under ``base``.
         """
+        return [d / f"COEFFS-{index}.dat" for d in self.coeff_dirs(base)]
+
+    def validation_indices(self) -> np.ndarray:
+        """Sorted 0-based indices of the validation structures."""
         train_fpath = self.root / f"regrdir_{self.saltedname}" / f"training_set_N{self.inp['gpr']['Ntrain']}.txt"
         trainrangetot = np.loadtxt(train_fpath, dtype=int)
         return np.setdiff1d(np.arange(self.nconf), trainrangetot)
 
-    def write_prediction_from_validation(self) -> Path:
-        """Write the validation structures as a prediction xyz; return its path."""
-        from ase.io import read, write
-
-        frames = read(self.root / self.inp["system"]["filename"], ":")
-        fpath = self.root / "prediction_set_from_validation_set.xyz"
-        write(fpath, [frames[i] for i in self.validation_indices()])
-        return fpath
-
-    @contextmanager
-    def swap_prediction_inp(self, filename: str, predname: str):
-        """Temporarily retarget inp.prediction; always restore inp.yaml.
-
-        ParseConfig hard-codes ``<cwd>/inp.yaml``, so a differently-named inp
-        copy cannot be passed to a pipeline step; the modified copy must
-        temporarily *be* inp.yaml. The workspace is session-shared, hence the
-        guaranteed restore. ``self.inp`` is left untouched (it reflects the
-        original template used by path properties like ``mz``).
-        """
-        inp_fpath = self.root / "inp.yaml"
-        original = inp_fpath.read_text()
-        modified = yaml.safe_load(original)
-        modified.setdefault("prediction", {}).update(filename=filename, predname=predname)
-        try:
-            inp_fpath.write_text(yaml.safe_dump(modified, sort_keys=False))
-            yield
-        finally:
-            inp_fpath.write_text(original)
-
     def run_python(self, args: list[str], label: str, mpi: list[str] | None = None, timeout: float = 7200):
-        """Run ``python <args...>`` in the workspace and time it.
+        """Run ``python <args...>`` in the workspace and time it. Returns stdout.
 
-        Runs with ``HDF5_USE_FILE_LOCKING=FALSE``: HDF5 guards file access
-        with an advisory ``flock(2)``, which fails spuriously (EAGAIN /
-        ``BlockingIOError``, or ENOLCK "No locks available") on filesystems
-        with broken or absent lock support (NFS, some parallel/CI
-        filesystems), even with a single writer. SALTED already serialises
-        HDF5 access via MPI barriers and rank-0 guards, and the HDF5 docs
-        state the lock can be safely disabled when writes are not concurrent:
-        https://support.hdfgroup.org/documentation/hdf5/latest/_file_lock.html
+        Args:
+            args: arguments after the interpreter, e.g. ``["-m", "salted.validation"]``.
+            label: key under which the elapsed time is recorded in ``self.timings``,
+                suffixed ``[mpi]`` when launched under mpirun.
+            mpi: launcher prefix to prepend, e.g. ``["mpirun", "-n", "2"]``.
+            timeout: seconds before the subprocess is killed.
+
+        Notes:
+            Runs with ``HDF5_USE_FILE_LOCKING=FALSE``: HDF5 guards file access
+            with an advisory ``flock(2)``, which fails spuriously (EAGAIN /
+            ``BlockingIOError``, or ENOLCK "No locks available") on filesystems
+            with broken or absent lock support (NFS, some parallel/CI
+            filesystems), even with a single writer. SALTED already serialises
+            HDF5 access via MPI barriers and rank-0 guards, and the HDF5 docs
+            state the lock can be safely disabled when writes are not concurrent:
+            https://support.hdfgroup.org/documentation/hdf5/latest/_file_lock.html
         """
         cmd = [sys.executable] + args
         if mpi:
@@ -383,80 +296,151 @@ class PipelineWorkspace:
         return proc.stdout
 
     def run_step(self, module: str, mpi: list[str] | None = None, timeout: float = 7200):
-        """Run ``python -m salted.<module>`` in the workspace and time it."""
+        """Run ``python -m salted.<module>`` in the workspace and time it.
+
+        Args:
+            module: submodule of ``salted`` to run, e.g. ``"validation"``. Also
+                the timing label.
+            mpi: launcher prefix, or None to run serially. See ``run_python``.
+            timeout: seconds before the subprocess is killed.
+        """
         return self.run_python(["-m", f"salted.{module}"], label=module, mpi=mpi, timeout=timeout)
 
-    def parse_rmse(self, stdout: str) -> float:
+    def run_pipeline(self, mpi: list[str] | None = None, mpi_steps: tuple[str, ...] = ()):
+        """Run the model's pipeline steps in order, taken from the spec.
+
+        Args:
+            mpi: launcher prefix, e.g. ``["mpirun", "-n", "2"]``. None runs
+                everything serially, whatever ``mpi_steps`` says.
+            mpi_steps: which steps to launch with it. Only some steps have an
+                MPI code path, so the whole pipeline cannot go under mpirun;
+                pass the ``MPI_STEPS`` constant.
+        """
+        assert set(mpi_steps) <= set(self.spec.steps), (
+            f"{self.name}: mpi_steps {sorted(set(mpi_steps) - set(self.spec.steps))} "
+            f"are not part of this model's pipeline"
+        )
+        for step in self.spec.steps:
+            stdout = self.run_step(step, mpi=mpi if step in mpi_steps else None)
+            if step == "validation":
+                self.parse_validation_rmse(stdout)
+        print("\n" + self.timing_report())
+        return self
+
+    def parse_validation_rmse(self, stdout: str) -> float:
         """Extract the final '% RMSE: x.xxxe+xx' printed by salted.validation."""
         matches = re.findall(r"%\s*RMSE:\s*([0-9.eE+-]+)", stdout)
         assert matches, f"no '% RMSE' line found in validation output:\n{stdout[-2000:]}"
-        self.rmse = float(matches[-1])
-        return self.rmse
+        self.validation_rmse = float(matches[-1])
+        return self.validation_rmse
 
     def timing_report(self) -> str:
         lines = [f"--- {self.name} pipeline timings (Ntrain={self.ntrain}) ---"]
         lines += [f"{k:>24s}: {v:8.1f} s" for k, v in self.timings.items()]
         lines.append(f"{'total':>24s}: {sum(self.timings.values()):8.1f} s")
-        if self.rmse is not None:
-            lines.append(f"{'% RMSE':>24s}: {self.rmse:.3e}")
+        if self.validation_rmse is not None:
+            lines.append(f"{'% RMSE':>24s}: {self.validation_rmse:.3e}")
         return "\n".join(lines)
 
+    def write_prediction_from_validation(self) -> Path:
+        """Write the validation structures as a prediction xyz; return its path."""
+        from ase.io import read, write
+
+        frames = read(self.root / self.inp["system"]["filename"], ":")
+        fpath = self.root / "prediction_set_from_validation_set.xyz"
+        write(fpath, [frames[i] for i in self.validation_indices()])
+        return fpath
+
+    @contextmanager
+    def swap_prediction_inp(self, filename: str, predname: str):
+        """Temporarily retarget inp.prediction; always restore inp.yaml.
+
+        ParseConfig hard-codes ``<cwd>/inp.yaml``, so the modified copy must
+        temporarily *be* inp.yaml. The workspace is session-shared, hence the
+        guaranteed restore. ``self.inp`` is left untouched.
+        """
+        inp_fpath = self.root / "inp.yaml"
+        original = inp_fpath.read_text()
+        modified = yaml.safe_load(original)
+        modified.setdefault("prediction", {}).update(filename=filename, predname=predname)
+        try:
+            inp_fpath.write_text(yaml.safe_dump(modified, sort_keys=False))
+            yield
+        finally:
+            inp_fpath.write_text(original)
+
+
+@dataclass(frozen=True)
+class WorkspaceBuilder:
+    """Builds a fresh workspace per call, with the session's CLI options baked in."""
+
+    datasets_path: Path
+    tmp_factory: pytest.TempPathFactory
+    ntrain: int | None
+    np_tasks: int
+    require_datasets: bool
+    mpirun: list[str]
+
+    def build(self, spec: ModelSpec) -> PipelineWorkspace:
+        root = self.tmp_factory.mktemp(f"salted_{spec.key}_")
+        return PipelineWorkspace(spec, root, self.datasets_path, self.ntrain, self.require_datasets)
+
+    @property
+    def mpi_cmd(self) -> list[str]:
+        return self.mpirun + ["-n", str(self.np_tasks)]
+
 
 @pytest.fixture(scope="session")
-def make_workspace(request, datasets_path, tmp_path_factory):
-    """Factory building a ready-to-run pipeline workspace for an example."""
-
-    def _make(example: str) -> PipelineWorkspace:
-        root = tmp_path_factory.mktemp(f"salted_{example}_")
-        return PipelineWorkspace(
-            example,
-            root,
-            datasets_path,
-            request.config.getoption("--ntrain"),
-            require_datasets=request.config.getoption("--require-datasets"),
+def workspaces(request, tmp_path_factory) -> WorkspaceBuilder:
+    """Session-wide workspace builder; skips integration tests without datasets."""
+    require = request.config.getoption("--require-datasets")
+    datasets_path = Path(request.config.getoption("--datasets-path")).resolve()
+    if not datasets_path.is_dir():
+        skip_or_fail(
+            require,
+            f"SALTED-datasets not found at {datasets_path} "
+            "(use --datasets-path or $SALTED_DATASETS_PATH)",
         )
 
-    return _make
+    mpirun = shutil.which("mpirun")
+    assert mpirun is not None, (
+        "mpirun not found on PATH; the integration tests require an MPI launcher"
+    )
+    cmd = [mpirun]
+    version = subprocess.run([mpirun, "--version"], capture_output=True, text=True).stdout
+    if "Open MPI" in version or "OpenRTE" in version:
+        # allow more ranks than cores on small CI runners
+        cmd.append("--oversubscribe")
 
-
-SERIAL_PIPELINE = [
-    "initialize",
-    "sparse_selection",
-    "sparse_descriptor",
-    "rkhs_projector",
-    "rkhs_vector",
-    "hessian_matrix",
-    "solve_regression",
-    "validation",
-]
-
-
-def run_full_pipeline(ws: PipelineWorkspace, mpi: list[str] | None = None, mpi_steps: tuple = ()) -> PipelineWorkspace:
-    """Run all pipeline steps; steps named in ``mpi_steps`` run under mpirun."""
-    for step in SERIAL_PIPELINE:
-        stdout = ws.run_step(step, mpi=mpi if step in mpi_steps else None)
-        if step == "validation":
-            ws.parse_rmse(stdout)
-    return ws
+    return WorkspaceBuilder(
+        datasets_path=datasets_path,
+        tmp_factory=tmp_path_factory,
+        ntrain=request.config.getoption("--ntrain"),
+        np_tasks=request.config.getoption("--mpi-np"),
+        require_datasets=require,
+        mpirun=cmd,
+    )
 
 
 @pytest.fixture(scope="session")
-def pipeline_runner():
-    """Expose run_full_pipeline to test modules (avoids importing conftest)."""
-    return run_full_pipeline
+def model_spec(request) -> ModelSpec:
+    """The model under test, supplied by ``indirect=True`` parametrization.
+    """
+    return MODELS[request.param]
 
 
 @pytest.fixture(scope="session")
-def serial_run(make_workspace):
-    """Run each example's full pipeline serially, once per session, on demand."""
-    cache: dict[str, PipelineWorkspace] = {}
+def serial_run(model_spec, workspaces) -> PipelineWorkspace:
+    """Train the model serially, once per session. The reference for everything."""
+    return workspaces.build(model_spec).run_pipeline()
 
-    def _get(example: str) -> PipelineWorkspace:
-        if example not in cache:
-            ws = make_workspace(example)
-            run_full_pipeline(ws)  # raises on failure -> only successes cached
-            print("\n" + ws.timing_report())
-            cache[example] = ws
-        return cache[example]
 
-    return _get
+@pytest.fixture(scope="session")
+def mpi_run(model_spec, workspaces) -> PipelineWorkspace:
+    """Train the same model again with the MPI-parallel steps under mpirun.
+
+    A second workspace from the same spec, so any difference is attributable
+    to the MPI code alone.
+    """
+    ws = workspaces.build(model_spec)
+    return ws.run_pipeline(mpi=workspaces.mpi_cmd, mpi_steps=MPI_STEPS)
