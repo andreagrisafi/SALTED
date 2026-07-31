@@ -292,7 +292,11 @@ def build():
 
                 bdir = osp.join(inp.salted.saltedpath,"basis")
 
-                pseudocharge = np.loadtxt(bdir + "/pseudocharge.txt")
+                pseudocharge = np.zeros((len(species)), dtype = np.float64)
+                for i in range(len(species)):
+                    spe = species[i]
+                    pp = np.loadtxt(osp.join(bdir,f"{spe}-local_pseudo.dat"))
+                    pseudocharge[i] = pp[0]
 
                 # Compute charges and dipole moments
                 charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)

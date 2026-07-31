@@ -31,14 +31,15 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
 
     bdir = osp.join(inp.salted.saltedpath,"basis")
 
-    rloc = np.loadtxt(bdir + "/rloc.txt")
-    pseudocharge = np.loadtxt(bdir + "/pseudocharge.txt")
-
+    pseudocharge = np.zeros((len(species)), dtype = np.float64)
     pseudocharge_numba = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
     rloc_dict = {}
     for i in range(len(species)):
-        pseudocharge_numba[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
-        rloc_dict[species[i]] = rloc[i] # same
+        spe = species[i]
+        pp = np.loadtxt(osp.join(bdir,f"{spe}-local_pseudo.dat"))
+        pseudocharge[i] = pp[0]
+        pseudocharge_numba[spe] = pp[0] 
+        rloc_dict[spe] = pp[1] 
 
     b2a = 0.529177249
     atomic_symbols = structure.get_chemical_symbols()
