@@ -63,5 +63,5 @@ A detailed description of how to generate the training data for SALTED using FHI
     ```
 6. Perform the density fitting for the selected range of configurations:
     ```bash
-    python3 -m salted.cp2k.density_fitting conf_start conf_end
+    mpirun -np $ntasks python3 -m salted.cp2k.density_fitting conf_start conf_end 
     ```

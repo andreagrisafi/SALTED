@@ -35,6 +35,6 @@ In what follows, we describe how to generate training electron densities to be u
 
 6. Run the density fitting script for the required configurations.
 
-   :code:`python3 -m salted.cp2k.density_fitting conf_start conf_end`
+   :code:`python3 -m salted.cp2k.density_fitting conf_start conf_end` (MPI parallelizible)
 
 The resulting fitting coefficients and overlap matrices are saved in the :code:`coefficients` and :code:`overlaps` folders of :code:`inp.salted.saltedpath`.
