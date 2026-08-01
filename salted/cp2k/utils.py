@@ -1030,7 +1030,7 @@ def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbol
     # G vector truncation based on omega
     gmax_omega = 2.0 * np.pi * omega
     nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64)
-    print(f"nomega = {nomega} / nG_half = {len(Gvec_half)}  ({100*nomega/len(Gvec_half):.1f}%)")
+    #print(f"nomega = {nomega} / nG_half = {len(Gvec_half)}  ({100*nomega/len(Gvec_half):.1f}%)")
     knorm_vec = knorm_vec[:nomega]
     Gvec_half = Gvec_half[:nomega]
 
@@ -1104,20 +1104,25 @@ def build_ncutoff(alphas, npgf, species, lmax, knorm_vec, nG_half):
             #ncut[key] = np.full(npgf[key], nG_half, dtype=np.int64) # For debugging purposes, set ncut to the full size of G.
     return ncut
 
-def elec_energy_forces(lmax,nmax,saltedpath,dfbasis,species,pseudocharge,rloc_dict,structure,coefs):
+def elec_energy_forces(lmax,nmax,saltedpath,dfbasis,species,structure,coefs):
 
     bdir = osp.join(saltedpath,"basis")
     lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, dfbasis, bdir)
 
+    pseudocharge = np.zeros((len(species)), dtype = np.float64)
     pseudocharge_numba = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
+    rloc_dict = {}
     for i in range(len(species)):
-       pseudocharge_numba[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
+        spe = species[i]
+        pp = np.loadtxt(osp.join(bdir,f"{spe}-local_pseudo.dat"))
+        pseudocharge[i] = pp[0]
+        pseudocharge_numba[spe] = pp[0]
+        rloc_dict[spe] = pp[1]
 
     b2a = 0.529177249
     atomic_symbols = structure.get_chemical_symbols()
     natoms = len(atomic_symbols)
     coords  = structure.positions/b2a
-
     volume = structure.get_volume()/(b2a**3)
 
     nx = int(np.floor(structure.cell[0,0]/(0.111*b2a))+1)
