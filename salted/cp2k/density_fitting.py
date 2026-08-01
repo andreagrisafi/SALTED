@@ -202,7 +202,7 @@ for iconf in conf_range:
     time_c = time.time()
     #S, w = build_matrices(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_KS_rec, nG_half, df_metric, rank) # Old method
     # w: computed in reciprocal space with truncated Gvec_half
-    wp = get_w_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, rho_KS_rec, df_metric, gcut, rank)
+    wp = get_w_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, partial_wave_coefs_prim, volume, rho_KS_rec, df_metric, gcut, rank)
     w = C.T @ wp
     print("Time to build w:", time.time()-time_c)
     time_c = time.time()
@@ -213,10 +213,10 @@ for iconf in conf_range:
         S_SR = overlap_coulomb_real(np.asarray(cell), coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, rcut_pairs, omega) # Short-range term (real space)
         print("Time to build S_SR:", time.time()-time_c)
         time_c = time.time()
-        S_LR = overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, nG_half, omega, rank) # Long-range term (reciprocal space)
+        S_LR = overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, volume, omega, rank) # Long-range term (reciprocal space)
         print("Time to build S_LR:", time.time()-time_c)
         pwc_g0 = gto_rec_g0(natoms, atomic_symbols, lmax, nmax_numba, npgf, alphas, contranorm, ncoefs)
-        S = S_SR + S_LR - (np.pi/omega**2) * np.outer(pwc_g0, pwc_g0)
+        S = S_SR + S_LR - ((np.pi/omega**2) * np.outer(pwc_g0, pwc_g0) * (4.0 * np.pi) / volume)
 
     c = np.linalg.solve(S,w)
 
