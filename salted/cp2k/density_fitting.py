@@ -8,7 +8,7 @@ import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
 from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba
-from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_ncutoff, setup_pyscf_species, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
+from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_gcutoff, setup_pyscf_species, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from numba import types
 from numba.typed import Dict
 from mpi4py import MPI
@@ -146,7 +146,7 @@ for iconf in conf_range:
     knorm_vec = knorm_vec[sort_idx]
     
     # Get flexible G-cutoffs for full primitive basis function representation
-    gcuts = build_ncutoff(alphas, npgf, species, lmax, knorm_vec, nG_half)
+    gcuts = build_gcutoff(alphas, npgf, species, lmax, knorm_vec, nG_half)
 
     if df_metric == "coulomb":
         # G-vector truncation based on omega
