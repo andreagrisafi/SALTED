@@ -494,19 +494,27 @@ def gto_rec_ewald(lmax,lcut,nmax,nbasis,species, npgf, contranorm, alphas, Gvec,
    return partial_wave_coefs
 
 @njit(parallel = True, fastmath = True)
-def gto_rec_prim(lmax, species, npgf, alphas, Gvec, nG_loc):
+def gto_rec_prim(lmax, species, npgf, alphas, Gvec, gcuts):
     # Fourier transform of primitive atom-centered basis functions
     
+    # Determine maximum relevant G-vector index
+    gmax = 0
+    for key in gcuts:
+        gmax_key = gcuts[key].max()
+        if gmax_key > gmax:
+            gmax = gmax_key
+
+    # Initialize partial wave coefficients
     partial_wave_coefs = Dict.empty(key_type=types.unicode_type, value_type=types.complex128[:, :, :]) # Dict with key as strings and values of type float array
-    
     for spe in species:
         for lam in range(lmax[spe]+1):
             key = f"{spe}_{lam}"
             # npgf[key]: number of individual Gaussians, each with its own alpha
             nmu = 2*lam + 1  #number of m values (-lam,...,+lam) for this lam
-            partial_wave_coefs[key] = np.zeros((nG_loc, npgf[key], nmu), dtype=np.complex128)
+            partial_wave_coefs[key] = np.empty((gmax, npgf[key], nmu), dtype=np.complex128)
 
-    for iG in prange(nG_loc):
+    # Loop over G-vectors and compute partial wave coefficients
+    for iG in prange(gmax):
 
         kx = Gvec[iG, 0]
         ky = Gvec[iG, 1]
@@ -540,6 +548,10 @@ def gto_rec_prim(lmax, species, npgf, alphas, Gvec, nG_loc):
                     harmonics[mu] = spherical_harmonic(lam, mu-lam, costheta, phi)
 
                 for ipgf in range(npgf[key]):
+
+                    if iG >= gcuts[key][ipgf]:
+                        break # Do not calculate partial wave coefficients for G-vectors beyond the cutoff for this primitive
+
                     sigma2 = 1.0 / (2.0 * alphas[key][ipgf]) # Squared Gaussian width in reciprocal space
                     sigma = np.sqrt(sigma2) # Gaussian width in reciprocal space
                     
