@@ -164,7 +164,7 @@ for iconf in conf_range:
 
     # Compute partial-wave coefs as basis set fourier transform
     time_c = time.time()
-    partial_wave_coefs_prim = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, nG_half) # Primitive
+    partial_wave_coefs_prim = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, gcuts) # Primitive
     if inp.salted.verbose: print("Time to compute primitive pw coeffs:", time.time()-time_c)
 
     # Compute primitive density projections <phi|O|rho> fully in reciprocal space with flexible G-cutoffs
