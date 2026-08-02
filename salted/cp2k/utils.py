@@ -372,13 +372,13 @@ def get_reciprocal_grid(nx, ny, nz, dx, dy, dz):
     return Gvec
 
 @njit(parallel = True, fastmath = True)
-def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc):
+def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nomega):
 
    partial_wave_coefs = Dict.empty(key_type=types.unicode_type,value_type=types.complex128[:,:]) # Dict with key as strings and values of type float array
    for spe in species:
-      partial_wave_coefs[spe] = np.zeros((nG_loc, nbasis[spe]), dtype=np.complex128)
+      partial_wave_coefs[spe] = np.zeros((nomega, nbasis[spe]), dtype=np.complex128)
 
-   for iG in prange(nG_loc):
+   for iG in prange(nomega):
 
       kx = Gvec[iG,0]
       ky = Gvec[iG,1]
@@ -1027,7 +1027,7 @@ def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbol
 
     knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half, axis=1)).astype(np.float64)  # |G|
 
-    # G vector truncation based on omega
+    # G-vector truncation based on omega
     gmax_omega = 2.0 * np.pi * omega
     nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64)
     #print(f"nomega = {nomega} / nG_half = {len(Gvec_half)}  ({100*nomega/len(Gvec_half):.1f}%)")

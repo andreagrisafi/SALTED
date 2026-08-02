@@ -148,6 +148,11 @@ for iconf in conf_range:
     # Get flexible G-cutoffs for full primitive basis function representation
     gcuts = build_ncutoff(alphas, npgf, species, lmax, knorm_vec, nG_half)
 
+    if df_metric == "coulomb":
+        # G-vector truncation based on omega
+        gmax_omega = 2.0 * np.pi * omega
+        nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64) # Index of the last G-vector below the cutoff
+
     # Compute density Fourier-components
     rho_KS = np.array(rho_qm)
     rho_KS = rho_KS.reshape((nside[0], nside[1], nside[2]))
@@ -158,11 +163,9 @@ for iconf in conf_range:
     rho_KS_rec = rho_KS_rec[sort_idx]
 
     # Compute partial-wave coefs as basis set fourier transform
-    time_a = time.time()
-    partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, nG_half) # Contracted
-    if inp.salted.verbose: print("Time to compute contracted pw coeffs:", time.time()-time_a)
+    time_c = time.time()
     partial_wave_coefs_prim = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, nG_half) # Primitive
-    if inp.salted.verbose: print("Time to compute primitive pw coeffs:", time.time()-time_a)
+    if inp.salted.verbose: print("Time to compute primitive pw coeffs:", time.time()-time_c)
 
     # Compute primitive density projections <phi|O|rho> fully in reciprocal space with flexible G-cutoffs
     time_c = time.time()
@@ -188,6 +191,9 @@ for iconf in conf_range:
         if inp.salted.verbose: print("Time to build S_SR:", time.time()-time_c)
         time_c = time.time()
         # Long-range term in reciprocal space as <Phi_i|erf(omega*|r-r'|)/|r-r'||Phi_j>
+        partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, nomega) # Contracted
+        if inp.salted.verbose: print("Time to compute G-truncated contracted pw coeffs:", time.time()-time_c)
+        time_c = time.time()
         S_LR = overlap_coulomb_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, volume, omega, rank) 
         if inp.salted.verbose: print("Time to build S_LR:", time.time()-time_c)
         # Collect SR and LR terms 
