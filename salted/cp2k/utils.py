@@ -756,7 +756,7 @@ def build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, p
     Sp = np.real(Sp) * 4 * np.pi
     return Sp
 
-def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, volume, rho_KS_rec, df_metric, ncut, rank):
+def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, volume, rho_KS_rec, df_metric, gcuts, rank):
     # Build the primitive-basis density vector wp
     
     # Get the total size of the primitive basis
@@ -793,7 +793,7 @@ def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wa
         nmax_atom = 0
         for lam in range(lmax[spe]+1):
             key = f"{spe}_{lam}"
-            nmax_atom = max(nmax_atom, max(ncut[key]))
+            nmax_atom = max(nmax_atom, max(gcuts[key]))
 
         z = phase[:nmax_atom, iat] * rho_w[:nmax_atom]
         z_real = z.real
@@ -804,7 +804,7 @@ def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wa
 
             for mu in range(2*lam + 1):
                 for ipgf1 in range(npgf[key]):
-                    n1 = ncut[key][ipgf1]
+                    n1 = gcuts[key][ipgf1]
                     wp[ipgf+ipgf1] = (np.dot(pwc_real[key][:n1, ipgf1, mu], z_real[:n1]) - np.dot(pwc_imag[key][:n1, ipgf1, mu], z_imag[:n1]))
 
                 ipgf += npgf[key]
@@ -1094,15 +1094,15 @@ def gmax_for_prim(alpha):
     sigma = np.sqrt(1.0 / (2.0 * alpha))
     return 2 * np.pi / sigma
 
-def build_ncutoff(alphas, npgf, species, lmax, knorm_vec, nG_half):
-    ncut = Dict.empty(key_type=types.unicode_type, value_type=types.int64[:])
+def build_gcutoff(alphas, npgf, species, lmax, knorm_vec, nG_half):
+    gcuts = Dict.empty(key_type=types.unicode_type, value_type=types.int64[:])
     for spe in species:
         for lam in range(lmax[spe]+1):
             key = f"{spe}_{lam}"
             gmax = gmax_for_prim(alphas[key])
-            ncut[key] = np.searchsorted(knorm_vec, gmax).astype(np.int64) #Find index where Gmax would be inserted to to maintain order.
-            #ncut[key] = np.full(npgf[key], nG_half, dtype=np.int64) # For debugging purposes, set ncut to the full size of G.
-    return ncut
+            gcuts[key] = np.searchsorted(knorm_vec, gmax).astype(np.int64) #Find index where Gmax would be inserted to to maintain order.
+            #gcuts[key] = np.full(npgf[key], nG_half, dtype=np.int64) # For debugging purposes, set gcuts to the full size of G.
+    return gcuts
 
 def elec_energy_forces(lmax,nmax,saltedpath,dfbasis,species,structure,coefs):
 
