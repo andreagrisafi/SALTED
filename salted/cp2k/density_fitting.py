@@ -160,9 +160,9 @@ for iconf in conf_range:
     # Compute partial-wave coefs as basis set fourier transform
     time_a = time.time()
     partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, nG_half) # Contracted
+    if inp.salted.verbose: print("Time to compute contracted pw coeffs:", time.time()-time_a)
     partial_wave_coefs_prim = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, nG_half) # Primitive
-    time_b = time.time()
-    if inp.salted.verbose: print("Time to compute partial wave coefficients:", time_b-time_a)
+    if inp.salted.verbose: print("Time to compute primitive pw coeffs:", time.time()-time_a)
 
     # Compute primitive density projections <phi|O|rho> fully in reciprocal space with flexible G-cutoffs
     time_c = time.time()
@@ -183,12 +183,12 @@ for iconf in conf_range:
         time_c = time.time()
         # Short-range term in real space via PySCF calculation of <Phi_i|erfc(omega*|r-r'|)/|r-r'||Phi_j>
         S_SR = overlap_coulomb_real(cell, atomic_coords[iconf], atomic_symbols[iconf], nbasis, ncoefs, volume, pyscf_data, rcut_pairs, omega) 
+        pwc_g0 = gto_rec_g0(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, alphas, contranorm, ncoefs)
+        S_SR -= ((np.pi/omega**2) * np.outer(pwc_g0, pwc_g0) * (4.0 * np.pi)**2 / volume)
         if inp.salted.verbose: print("Time to build S_SR:", time.time()-time_c)
         time_c = time.time()
         # Long-range term in reciprocal space as <Phi_i|erf(omega*|r-r'|)/|r-r'||Phi_j>
         S_LR = overlap_coulomb_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, volume, omega, rank) 
-        pwc_g0 = gto_rec_g0(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, alphas, contranorm, ncoefs)
-        S_LR -= ((np.pi/omega**2) * np.outer(pwc_g0, pwc_g0) * (4.0 * np.pi) / volume)
         if inp.salted.verbose: print("Time to build S_LR:", time.time()-time_c)
         # Collect SR and LR terms 
         S = S_SR + S_LR 

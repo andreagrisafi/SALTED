@@ -779,7 +779,7 @@ def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wa
         rho_w[0] = np.conj(rho_KS_rec[0])
     if df_metric == "coulomb":
         # weight always 2 here since Gvec_half already excludes G=0
-        rho_w = 2.0 * np.conj(rho_KS_rec) / (knorm_vec**2)
+        rho_w = 2.0 * np.conj(rho_KS_rec) * (4.0 * np.pi) / (knorm_vec**2)
     
     # Precompute real/imag parts of partial_wave_coefs ONCE per key
     pwc_real = {key: partial_wave_coefs[key].real for key in partial_wave_coefs}
@@ -1020,7 +1020,7 @@ def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, p
             icoefs2 += nbasis[spe2]
         icoefs += nbasis[spe]
 
-    return S / (4.0 * np.pi)
+    return S
 
 def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, volume, omega, rank):
     S = np.zeros((ncoefs, ncoefs), dtype=np.float64)
@@ -1057,7 +1057,7 @@ def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbol
             icoefs2 += nbasis[spe2]
         icoefs += nbasis[spe]
 
-    S = np.real(S) * (4.0 * np.pi)**2 / volume
+    S = np.real(S) * (4.0 * np.pi)**3 / volume
 
     return S
 
