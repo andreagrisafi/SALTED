@@ -527,6 +527,7 @@ def gto_rec_prim(lmax, species, npgf, alphas, Gvec, gcuts):
         # Direction of G in spherical angles (costheta, phi)
         if knorm == 0.0:
             costheta = 0.0
+            phi = 0.0
         else:
             costheta = kz/knorm
             phi = np.arctan2(ky, kx)
