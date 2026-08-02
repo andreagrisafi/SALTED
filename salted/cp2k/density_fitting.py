@@ -194,7 +194,9 @@ for iconf in conf_range:
         S = S_SR + S_LR 
 
     # Solve density-fitting linear system 
+    time_c = time.time()
     c = np.linalg.solve(S,w)
+    if inp.salted.verbose: print("Time to solve linear system:", time.time()-time_c)
 
     # Save data
     np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{conf_start + iconf}.npy"), c)
