@@ -130,6 +130,15 @@ def init_moments(inp,species,lmax,nmax,rank):
 #
 #    return [charge,dipole]
 
+def read_local_pseudo(species, bdir):
+    # Charge and radius of the local pseudopotential
+    pseudocharge, rloc = {}, {}
+    for spe in species:
+        pp = np.loadtxt(osp.join(bdir, f"{spe}-local_pseudo.dat"))
+        pseudocharge[spe] = pp[0]
+        rloc[spe] = pp[1]
+    return pseudocharge, rloc
+
 def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
     """Compute total charge and dipole moment for the given configuration"""
 
@@ -1287,3 +1296,18 @@ def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocha
     forces = np.real(forces * 2*np.pi * volfactor)
 
     return U_tot, forces
+
+def get_rho_n_rec(Gvec_half, knorm_vec, natoms, coords, atomic_symbols, pseudocharge, rloc):
+    # Fourier components of the Gaussian core charge distribution
+    rho_n_rec = np.zeros(len(Gvec_half), dtype=np.complex128)
+    knorm2_vec = knorm_vec * knorm_vec
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        phase = np.exp(-1j * np.dot(Gvec_half, coords[iat]))
+        rho_n_rec += pseudocharge[spe] * np.exp(-0.5 * knorm2_vec * rloc[spe]**2) * phase
+    return rho_n_rec
+
+def overlap_coulomb_rho(rho1_rec, rho2_rec, knorm_vec, volume):
+    # Coulomb-metric overlap (rho1|rho2) in reciprocal space
+    ovlp = np.sum((np.conj(rho1_rec)*rho2_rec).real * (4.0*np.pi) / knorm_vec**2)
+    return 2 * ovlp / volume

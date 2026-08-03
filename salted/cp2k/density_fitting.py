@@ -7,7 +7,7 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba
+from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n_rec, overlap_coulomb_rho
 from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_gcutoff, setup_pyscf_species, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from numba import types
 from numba.typed import Dict
@@ -208,5 +208,27 @@ for iconf in conf_range:
     np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{conf_start + iconf}.npy"), c)
     np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{conf_start + iconf}.npy"), S)
 
+    # Hartree energy calculation
+    time_c = time.time()
+    if df_metric == "coulomb":
+        # Core charge density in reciprocal space
+        pseudocharge, rloc = read_local_pseudo(species, bdir)
+        rho_n_rec = get_rho_n_rec(Gvec_half, knorm_vec, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
+        
+        # Electron-electron term: E_ee = 1/2 c^T.S.c = 1/2 c^T.w
+        e_ee = 0.5 * np.dot(c, w)
+        
+        # Electron-nucleus term: E_en = -sum_i c_i (Phi_i|rho_n)
+        wnp = get_w_prim(Gvec_half, natoms[iconf], atomic_coords[iconf], npgf, lmax_numba, atomic_symbols[iconf], partial_wave_coefs_prim, volume, rho_n_rec, df_metric, gcuts, rank)
+        wn = C.T @ wnp
+        e_en = -np.dot(c, wn)
+        
+        # Nucleus-nucleus term: E_nn = 1/2 (rho_n|rho_n)
+        e_nn = 0.5 * overlap_coulomb_rho(rho_n_rec, rho_n_rec, knorm_vec, volume)
+
+        print(f"conf {conf_start+iconf+1}: Hartree energy = {e_ee+e_en+e_nn:.8f} Ha", flush=True)
+        if inp.salted.verbose: print(f"conf {conf_start+iconf+1}: E_ee = {e_ee:.8f} Ha, E_en = {e_en:.8f} Ha, E_nn = {e_nn:.8f} Ha", flush=True)
+        if inp.salted.verbose: print('Time to compute Hartree energy:', time.time() - time_c)
+    
 time_end = time.time()
 if inp.salted.verbose: print("Total density fitting time:", time_end-time_start)
