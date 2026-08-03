@@ -783,31 +783,34 @@ def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wa
     
     # Get the total size of the primitive basis
     ncoefs_prim = 0
+    gmax = 0
+    gmax_key = {}
     for iat in range(natoms):
         spe = atomic_symbols[iat]
         for lam in range(lmax[spe]+1):
             key = f"{spe}_{lam}"
             ncoefs_prim += npgf[key] * (2*lam + 1)
+            gmax_key[key] = gcuts[key].max()
+            gmax = max(gmax, gmax_key[key])
 
     wp = np.zeros((ncoefs_prim), dtype=np.float64)
 
-    knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half,axis=1)).astype(np.float64) # |G|
-    phase = np.exp(-1j * np.dot(Gvec_half, coords.T)) # e^{-iG.r_iat}
+    Gvec_half = Gvec_half[:gmax]
+    knorm2_vec = np.einsum('ij,ij->i', Gvec_half, Gvec_half) # |G|^2
     
     # Precompute the G-weighting
     if df_metric == "identity":
         # weight 2 for G>0, weight 1 for G=0
-        rho_w = 2.0 * np.conj(rho_KS_rec)
+        rho_w = 2.0 * np.conj(rho_KS_rec[:gmax])
         rho_w[0] = np.conj(rho_KS_rec[0])
     if df_metric == "coulomb":
         # weight always 2 here since Gvec_half already excludes G=0
-        rho_w = 2.0 * np.conj(rho_KS_rec) * (4.0 * np.pi) / (knorm_vec**2)
+        rho_w = 2.0 * np.conj(rho_KS_rec[:gmax]) * (4.0 * np.pi) / knorm2_vec
     
     # Precompute real/imag parts of partial_wave_coefs ONCE per key
-    pwc_real = {key: partial_wave_coefs[key].real for key in partial_wave_coefs}
-    pwc_imag = {key: partial_wave_coefs[key].imag for key in partial_wave_coefs}
+    pwc_real = {key: partial_wave_coefs[key][:gmax_key[key],:,:].real for key in partial_wave_coefs}
+    pwc_imag = {key: partial_wave_coefs[key][:gmax_key[key],:,:].imag for key in partial_wave_coefs}
     
-    # Outer loop over (iat, lam, mu) indexes rows of Sp and entries of wp.
     ipgf = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
@@ -815,11 +818,11 @@ def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wa
         nmax_atom = 0
         for lam in range(lmax[spe]+1):
             key = f"{spe}_{lam}"
-            nmax_atom = max(nmax_atom, max(gcuts[key]))
+            nmax_atom = max(nmax_atom, gmax_key[key])
 
-        z = phase[:nmax_atom, iat] * rho_w[:nmax_atom]
-        z_real = z.real
-        z_imag = z.imag
+        z = np.exp(-1j * np.dot(Gvec_half[:nmax_atom], coords[iat])) * rho_w[:nmax_atom]
+        z_real = np.ascontiguousarray(z.real)
+        z_imag = np.ascontiguousarray(z.imag)
 
         for lam in range(lmax[spe]+1):
             key = f"{spe}_{lam}"
@@ -831,7 +834,7 @@ def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wa
 
                 ipgf += npgf[key]
 
-    wp = np.real(wp) * (4.0 * np.pi) / volume
+    wp = wp * (4.0 * np.pi) / volume
 
     return wp
 
