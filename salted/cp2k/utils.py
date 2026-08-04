@@ -1300,8 +1300,39 @@ def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocha
 
     return U_tot, forces
 
+def get_rho_n(nside, dx, dy, dz, origin, natoms, coords, atomic_symbols, pseudocharge, rloc, nsigma=6.0):
+    # Gaussian core charge on the cube grid
+
+    rho_n = np.zeros((nside[0], nside[1], nside[2]), dtype=np.float64)
+    dr = np.array([dx, dy, dz]) # grid spacing along x, y, z
+
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        sigma = rloc[spe] # Gaussian widths
+        rcut = nsigma * sigma # radius beyond which the Gaussian is negligible (default 6 sigma)
+
+        gauss = [] # List of 1D Gaussians along each axis
+        idx = [] # List of grid indices along each axis
+
+        for i in range(3): # Loop over x, y, z
+            imin = int(np.floor((coords[iat,i] - origin[i] - rcut)/dr[i]))
+            imax = int(np.ceil((coords[iat,i] - origin[i] + rcut)/dr[i]))
+            ivec = np.arange(imin, imax+1)
+            r = origin[i] + ivec*dr[i] - coords[iat,i] # Physical position of the grid points relative to the atom position
+
+            gauss.append(np.exp(-0.5*(r/sigma)**2)) # 1D Gaussian
+            idx.append(ivec % nside[i]) # Wrap indices for periodic boundary conditions
+
+        # Normalize the Gaussian with the correct pseudocharge
+        norm = pseudocharge[spe] / ((2.0*np.pi)**1.5 * sigma**3)
+        
+        # Build 3D Gaussian as the outer product of the 1D Gaussians along each axis, and add to the total density
+        rho_n[np.ix_(idx[0], idx[1], idx[2])] += norm * gauss[0][:,None,None] * gauss[1][None,:,None] * gauss[2][None,None,:]
+
+    return rho_n
+
 def get_rho_n_rec(Gvec_half, knorm_vec, natoms, coords, atomic_symbols, pseudocharge, rloc):
-    # Fourier components of the Gaussian core charge distribution
+    # Fourier transform of the Gaussian core charge distribution (DEPRECATED)
     rho_n_rec = np.zeros(len(Gvec_half), dtype=np.complex128)
     knorm2_vec = knorm_vec * knorm_vec
     for iat in range(natoms):
