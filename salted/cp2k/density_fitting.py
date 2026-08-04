@@ -7,7 +7,7 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n, overlap_coulomb_rho, setup_pyscf_species, setup_pyscf_core
+from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n, overlap_coulomb_rho, setup_pyscf_species, setup_pyscf_core, get_rho_n_rec
 from salted.cp2k.utils import build_contraction_matrix, get_w_prim, get_wn_rec, get_wn_real, build_gcutoff, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from numba import types
 from numba.typed import Dict
@@ -72,11 +72,11 @@ if df_metric =="identity":
     #        print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
 if df_metric == "coulomb":
     sigma_omega = 2.0 / b2a # 2 angstrom, hard-coded
-    omega = 1.0 / sigma_omega
+    omega = 1.0 / (np.sqrt(2) * sigma_omega)
     rcut_pairs = {}
     for spe1 in species:
         for spe2 in species:
-            rcut_pairs[(spe1, spe2)] = 4.0 * sigma_omega
+            rcut_pairs[(spe1, spe2)] = 5.0 * sigma_omega
             #print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
 
 # init geometry
@@ -150,7 +150,7 @@ for iconf in conf_range:
 
     if df_metric == "coulomb":
         # G-vector truncation based on omega
-        gmax_omega = 2.5 * np.pi * omega
+        gmax_omega = 2 * np.pi / sigma_omega
         nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64) # Index of the last G-vector below the cutoff
 
     # Compute density Fourier-components
@@ -217,7 +217,7 @@ for iconf in conf_range:
         rho_n = get_rho_n(nside, dx, dy, dz, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
         rho_n_rec = np.fft.fftn(rho_n).ravel() * dx * dy * dz
         rho_n_rec = rho_n_rec[mask][1:][sort_idx]
-        
+
         # Electron-electron term: E_ee = 1/2 c^T.S.c = 1/2 c^T.w
         e_ee = 0.5 * np.dot(c, w)
         
@@ -225,6 +225,7 @@ for iconf in conf_range:
         wn = get_wn_real(cell, atomic_coords[iconf], atomic_symbols[iconf], nbasis, ncoefs, volume, pyscf_data, pyscf_core, rcut_pairs, omega)
         wn -= (np.pi/omega**2) * pwc_g0 * sum(pseudocharge[spe] for spe in atomic_symbols[iconf]) * (4.0 * np.pi) / volume
         wn += get_wn_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, rho_n_rec, volume, omega, nomega)
+
         e_en = -np.dot(c, wn)
         
         # Nucleus-nucleus term: E_nn = 1/2 (rho_n|rho_n)
