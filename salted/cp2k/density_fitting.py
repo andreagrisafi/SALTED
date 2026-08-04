@@ -7,7 +7,7 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n, overlap_coulomb_rho, setup_pyscf_species, setup_pyscf_core, get_rho_n_rec
+from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n, overlap_coulomb_rho, setup_pyscf_species, setup_pyscf_core
 from salted.cp2k.utils import build_contraction_matrix, get_w_prim, get_wn_rec, get_wn_real, build_gcutoff, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from numba import types
 from numba.typed import Dict
@@ -150,7 +150,7 @@ for iconf in conf_range:
 
     if df_metric == "coulomb":
         # G-vector truncation based on omega
-        gmax_omega = 2 * np.pi / sigma_omega
+        gmax_omega = 2.0 * np.pi / sigma_omega
         nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64) # Index of the last G-vector below the cutoff
 
     # Compute density Fourier-components
