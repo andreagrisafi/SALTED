@@ -150,7 +150,7 @@ for iconf in conf_range:
 
     if df_metric == "coulomb":
         # G-vector truncation based on omega
-        gmax_omega = 2.0 * np.pi * omega
+        gmax_omega = 2.5 * np.pi * omega
         nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64) # Index of the last G-vector below the cutoff
 
     # Compute density Fourier-components
@@ -194,7 +194,7 @@ for iconf in conf_range:
         partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, nomega) # Contracted
         if inp.salted.verbose: print("Time to compute G-truncated contracted pw coeffs:", time.time()-time_c)
         time_c = time.time()
-        S_LR = overlap_coulomb_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, volume, omega, rank) 
+        S_LR = overlap_coulomb_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, volume, omega, nomega, rank) 
         if inp.salted.verbose: print("Time to build S_LR:", time.time()-time_c)
         # Collect SR and LR terms 
         S = S_SR + S_LR 

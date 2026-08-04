@@ -1047,17 +1047,12 @@ def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, p
 
     return S
 
-def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, volume, omega, rank):
+def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, volume, omega, nomega, rank):
     S = np.zeros((ncoefs, ncoefs), dtype=np.float64)
 
-    knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half, axis=1)).astype(np.float64)  # |G|
-
-    # G-vector truncation based on omega
-    gmax_omega = 2.0 * np.pi * omega
-    nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64)
-    #print(f"nomega = {nomega} / nG_half = {len(Gvec_half)}  ({100*nomega/len(Gvec_half):.1f}%)")
-    knorm_vec = knorm_vec[:nomega]
+   # G-vector truncation based on omega
     Gvec_half = Gvec_half[:nomega]
+    knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half, axis=1)).astype(np.float64)  # |G|
 
     phase = np.exp(-1j * np.dot(Gvec_half, coords.T)) # e^{-iG.r_iat}
     phase_over_knorm = phase / knorm_vec[:, np.newaxis]
@@ -1082,7 +1077,7 @@ def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbol
             icoefs2 += nbasis[spe2]
         icoefs += nbasis[spe]
 
-    S = np.real(S) * (4.0 * np.pi)**3 / volume
+    S = S * (4.0 * np.pi)**3 / volume
 
     return S
 
