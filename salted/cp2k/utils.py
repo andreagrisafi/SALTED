@@ -891,6 +891,34 @@ def setup_pyscf_species(species, lmax, nmax, alphas, contranorm):
 
     return {"mol_bra": mol_bra, "mol_ket": mol_ket, "perm": perm, "coord_slice": coord_slice}
 
+def setup_pyscf_core(species, pseudocharge, rloc):
+    # Build per-species PySCF Mole objects for the Gaussian core charge distribution (a single s function)
+
+    mol_core = {}
+    coord_slice = {}
+    scale = {}
+
+    for spe in species:
+        sigma = rloc[spe]
+        alpha = 1.0 / (2.0 * sigma**2)
+
+        # "Ghost" atom sitting at the origin, carrying the basis assembled above
+        mol = _pyscf_gto.M(
+            atom=[[f"ghost-{spe}", (0.0, 0.0, 0.0)]],
+            basis={f"ghost-{spe}": [[0, [float(alpha), 1.0]]]},
+            spin=0,
+            cart=False,    # real spherical harmonics, not cartesian Gaussians
+            unit="Bohr",   # match SALTED units
+        )
+
+        # Rescale to have the correct pseudocharge
+        mol_core[spe] = mol
+        scale[spe] = (pseudocharge[spe] / ((2.0*np.pi)**1.5 * sigma**3)) / mol.eval_gto("GTOval_sph", np.zeros((1,3)))[0,0]
+        ptr = mol._atm[0, _pyscf_gto.PTR_COORD]
+        coord_slice[spe] = slice(ptr, ptr + 3)
+
+    return {"mol_core": mol_core, "coord_slice": coord_slice, "scale": scale}
+
 def pair_cutoffs(species, lmax, alphas, contranorm, eps=1.0e-12):
     #Real-space cutoff (Bohr) per pair
     amin, cmax = {}, {}
@@ -1335,6 +1363,82 @@ def get_rho_n_rec(Gvec_half, knorm_vec, natoms, coords, atomic_symbols, pseudoch
         phase = np.exp(-1j * np.dot(Gvec_half, coords[iat]))
         rho_n_rec += pseudocharge[spe] * np.exp(-0.5 * knorm2_vec * rloc[spe]**2) * phase
     return rho_n_rec
+
+def get_wn_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, pyscf_core, rcut, omega):
+    # Short-range part of w_n = (Phi_i|rho_n), i.e. <Phi_i|erfc(omega*|r-r'|)/|r-r'||rho_n>
+
+    natoms = len(atomic_symbols)
+
+    wn = np.zeros((ncoefs), dtype=np.float64)
+
+    # Unpack PySCF data
+    mol_bra = pyscf_data["mol_bra"]
+    perm = pyscf_data["perm"]
+    mol_core = pyscf_core["mol_core"]
+    cslice = pyscf_core["coord_slice"]
+    scale = pyscf_core["scale"]
+    
+    rcut_max = max(rcut.values()) # Pairs cutoff, to decided how many periodic images to include
+    periodic = cell is not None and volume > 1.0e-10
+    if periodic:
+        cell = np.asarray(cell, dtype=float)
+        inv_cell = np.linalg.inv(cell)
+        images = lattice_images(cell, rcut_max, volume)
+    else:
+        images = np.zeros((1, 3))
+
+    icoefs = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        pbra = perm[spe]
+        mol_bra[spe].set_range_coulomb(-omega) # negative omega = erfc (short-range) convention in PySCF
+
+        block = np.zeros((nbasis[spe]), dtype=np.float64)
+        for iat2 in range(natoms):
+            spe2 = atomic_symbols[iat2]
+
+            rcut_ij = rcut[(spe, spe2)] # real-space cutoff to use for this specific pair
+
+            delta = coords[iat2] - coords[iat]
+
+            if periodic:
+                frac = delta @ inv_cell # Convert to fractional coordinates
+                delta = (frac - np.round(frac)) @ cell # Wrap and convert back to Cartesian
+
+            dvecs = delta + images
+            keep = np.einsum("ij,ij->i", dvecs, dvecs) <= rcut_ij * rcut_ij # Keep only the images whose distance falls within the pair cutoff
+
+            for d in dvecs[keep]:
+                mol_core[spe2]._env[cslice[spe2]] = d # Move the core charge "ghost" atom
+                raw = _pyscf_gto.intor_cross("int2c2e", mol_bra[spe], mol_core[spe2]) # Ask PySCF for the raw overlap integrals
+                block += raw[pbra, 0] * scale[spe2] # Reorder PySCF's rows/columns into SALTED's (n,m) ordering and restore the core charge
+
+        wn[icoefs:icoefs + nbasis[spe]] = block
+        icoefs += nbasis[spe]
+
+    return wn
+
+def get_wn_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_n_rec, volume, omega, nomega):
+    # Long-range part of w_n = (Phi_i|rho_n), i.e. <Phi_i|erf(omega*|r-r'|)/|r-r'||rho_n>
+
+    wn = np.zeros((ncoefs), dtype=np.float64)
+
+    Gvec_half = Gvec_half[:nomega]
+    knorm2_vec = np.einsum('ij,ij->i', Gvec_half, Gvec_half)
+
+    # Core charge density with Ewald-screened Coulomb kernel
+    rho_n_screened = rho_n_rec[:nomega] * np.exp(-knorm2_vec/(4.0*omega**2)) / knorm2_vec
+
+    icoefs = 0
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        phase = np.exp(-1j * np.dot(Gvec_half, coords[iat])) # e^{-iG.r_iat}
+        obj = partial_wave_coefs[spe] * phase[:, np.newaxis]
+
+        wn[icoefs:icoefs + nbasis[spe]] = (np.dot(obj.real.T, rho_n_screened.real) + np.dot(obj.imag.T, rho_n_screened.imag))
+        icoefs += nbasis[spe]
+
+    return wn * 2 * (4*np.pi)**2 / volume
 
 def overlap_coulomb_rho(rho1_rec, rho2_rec, knorm_vec, volume):
     # Coulomb-metric overlap (rho1|rho2) in reciprocal space

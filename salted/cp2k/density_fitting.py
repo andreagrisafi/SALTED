@@ -7,8 +7,8 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n, overlap_coulomb_rho
-from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_gcutoff, setup_pyscf_species, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
+from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n, overlap_coulomb_rho, setup_pyscf_species, setup_pyscf_core
+from salted.cp2k.utils import build_contraction_matrix, get_w_prim, get_wn_rec, get_wn_real, build_gcutoff, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from numba import types
 from numba.typed import Dict
 from mpi4py import MPI
@@ -213,6 +213,7 @@ for iconf in conf_range:
     if df_metric == "coulomb":
         # Core charge density in reciprocal space
         pseudocharge, rloc = read_local_pseudo(species, bdir)
+        pyscf_core = setup_pyscf_core(species, pseudocharge, rloc)
         rho_n = get_rho_n(nside, dx, dy, dz, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
         rho_n_rec = np.fft.fftn(rho_n).ravel() * dx * dy * dz
         rho_n_rec = rho_n_rec[mask][1:][sort_idx]
@@ -221,8 +222,9 @@ for iconf in conf_range:
         e_ee = 0.5 * np.dot(c, w)
         
         # Electron-nucleus term: E_en = -sum_i c_i (Phi_i|rho_n)
-        wnp = get_w_prim(Gvec_half, natoms[iconf], atomic_coords[iconf], npgf, lmax_numba, atomic_symbols[iconf], partial_wave_coefs_prim, volume, rho_n_rec, df_metric, gcuts, rank)
-        wn = C.T @ wnp
+        wn = get_wn_real(cell, atomic_coords[iconf], atomic_symbols[iconf], nbasis, ncoefs, volume, pyscf_data, pyscf_core, rcut_pairs, omega)
+        wn -= (np.pi/omega**2) * pwc_g0 * sum(pseudocharge[spe] for spe in atomic_symbols[iconf]) * (4.0 * np.pi) / volume
+        wn += get_wn_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, rho_n_rec, volume, omega, nomega)
         e_en = -np.dot(c, wn)
         
         # Nucleus-nucleus term: E_nn = 1/2 (rho_n|rho_n)
