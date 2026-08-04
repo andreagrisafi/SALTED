@@ -7,7 +7,7 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n_rec, overlap_coulomb_rho
+from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n, overlap_coulomb_rho
 from salted.cp2k.utils import build_contraction_matrix, get_w_prim, build_gcutoff, setup_pyscf_species, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from numba import types
 from numba.typed import Dict
@@ -213,7 +213,9 @@ for iconf in conf_range:
     if df_metric == "coulomb":
         # Core charge density in reciprocal space
         pseudocharge, rloc = read_local_pseudo(species, bdir)
-        rho_n_rec = get_rho_n_rec(Gvec_half, knorm_vec, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
+        rho_n = get_rho_n(nside, dx, dy, dz, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
+        rho_n_rec = np.fft.fftn(rho_n).ravel() * dx * dy * dz
+        rho_n_rec = rho_n_rec[mask][1:][sort_idx]
         
         # Electron-electron term: E_ee = 1/2 c^T.S.c = 1/2 c^T.w
         e_ee = 0.5 * np.dot(c, w)
