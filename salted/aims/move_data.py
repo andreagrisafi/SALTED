@@ -16,6 +16,12 @@ def build():
             osp.join(inp.salted.saltedpath, d)
             for d in ("overlaps", "coefficients", "projections")
         ]
+        if inp.system.collinear:
+            sub_dirs = [
+            osp.join(inp.salted.saltedpath, d)
+            for d in ("overlaps", "coefficients_avgs", "projections_avgs", "coefficients_diff", "projections_diff")
+        ]
+
         for sub_dir in sub_dirs:
             if not osp.exists(sub_dir):
                 os.mkdir(sub_dir)
@@ -67,10 +73,20 @@ def build():
         o = np.loadtxt(osp.join(dirpath, 'ri_projections.out')).reshape(-1)
         t = np.loadtxt(osp.join(dirpath, 'ri_restart_coeffs_df.out')).reshape(-1)
         ovlp = np.loadtxt(osp.join(dirpath, 'ri_ovlp.out')).reshape(-1)
-        
+        o_beta = []
+        t_beta = []
+        if inp.system.collinear:
+            o_beta = np.loadtxt(osp.join(dirpath, 'ri_projections_beta.out')).reshape(-1)
+            t_beta = np.loadtxt(osp.join(dirpath, 'ri_restart_coeffs_beta.out')).reshape(-1)
+
         n = len(o)
         ovlp = ovlp.reshape(n,n)
         
+        o_avgs = []
+        t_avgs = []
+        o_diff = []
+        t_diff = []
+
         if reorder:
             idx = np.loadtxt(osp.join(dirpath, 'idx_prodbas.out')).astype(int)
             cs_list = np.loadtxt(osp.join(dirpath, 'prodbas_condon_shotley_list.out')).astype(int)
@@ -91,9 +107,26 @@ def build():
             ovlp = ovlp[idx,:]
             ovlp = ovlp[:,idx]
         
-        np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
-        np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{i}.npy"), o)
-        np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
+        if inp.system.collinear:
+            for k in range(n):
+
+                """finding the average"""
+                o_avgs.append((o[k] + o_beta[k]) / 2)
+                t_avgs.append((t[k] + t_beta[k]) / 2)
+
+                """finding the difference"""
+                o_diff.append(o[k] - o_beta[k])
+                t_diff.append(t[k] - t_beta[k])
+            """saves to new location with new name"""
+            np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
+            np.save(osp.join(inp.salted.saltedpath, "projections_avgs", f"projections_conf{i}.npy"), o_avgs)
+            np.save(osp.join(inp.salted.saltedpath, "coefficients_avgs", f"coefficients_conf{i}.npy"), t_avgs)
+            np.save(osp.join(inp.salted.saltedpath, "projections_diff", f"projections_conf{i}.npy"), o_diff)
+            np.save(osp.join(inp.salted.saltedpath, "coefficients_diff", f"coefficients_conf{i}.npy"), t_diff)
+        else:
+            np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
+            np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{i}.npy"), o)
+            np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
     
     if parallel:
         comm.Barrier()
@@ -104,6 +137,8 @@ def build():
         dirpath = osp.join(inp.qm.path2qm, 'data', str(i+1))
         os.remove(osp.join(dirpath, 'ri_ovlp.out'))
         os.remove(osp.join(dirpath, 'ri_projections.out'))
+        if inp.system.collinear:
+            os.remove(osp.join(dirpath, 'ri_projections_beta.out'))
 
 if __name__ == "__main__":
     build()

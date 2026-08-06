@@ -5,7 +5,7 @@ import os.path as osp
 
 from salted.sys_utils import ParseConfig, read_system
 
-def build():
+def build(end=""):
 
     inp = ParseConfig().parse_input()
 
@@ -20,7 +20,7 @@ def build():
     print("computing averages...")
     for iconf in range(ndata):
         atoms = atomic_symbols[iconf]
-        coefs = np.load(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"))
+        coefs = np.load(os.path.join(inp.salted.saltedpath, "coefficients{end}", f"coefficients_conf{iconf}.npy"))
         i = 0
         for iat in range(natoms[iconf]):
             spe = atoms[iat]
@@ -32,15 +32,19 @@ def build():
                            avcoefs[spe][n] += coefs[i]
                         i += 1
 
-    adir = os.path.join(inp.salted.saltedpath, "coefficients", "averages")
+    adir = os.path.join(inp.salted.saltedpath, "coefficients{end}", "averages")
     if not osp.exists(adir):
         os.mkdir(adir)
 
     for spe in spelist:
         avcoefs[spe] /= nat_per_species[spe]
-        np.save(os.path.join(inp.salted.saltedpath, "coefficients", "averages", f"averages_{spe}.npy"), avcoefs[spe])
+        np.save(os.path.join(inp.salted.saltedpath, "coefficients{end}", "averages", f"averages_{spe}.npy"), avcoefs[spe])
 
     return
 
 if __name__ == "__main__":
-    build()
+    if inp.system.collinear:
+        bulid(end='_avgs')
+        build(end='_diff')
+    else:
+        build()

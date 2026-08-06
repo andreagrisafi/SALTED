@@ -18,7 +18,7 @@ from salted.sys_utils import (
 )
 
 
-def build():
+def build(end=""):
 
     inp = ParseConfig().parse_input()
     # frequently used parameters
@@ -35,7 +35,7 @@ def build():
     comm, size, rank, parallel = detect_mpi()
 
     fdir = f"rkhs-vectors_{saltedname}"
-    rdir = f"regrdir_{saltedname}"
+    rdir = f"regrdir_{saltedname}{end}"
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = (
         read_system()
@@ -55,7 +55,7 @@ def build():
         for spe in species:
             av_coefs[spe] = np.load(
                 os.path.join(
-                    saltedpath, "coefficients", "averages", f"averages_{spe}.npy"
+                    saltedpath, "coefficients{end}", "averages", f"averages_{spe}.npy"
                 )
             )
 
@@ -121,7 +121,7 @@ def build():
                 ref_coefs = np.load(
                     osp.join(
                         saltedpath,
-                        "coefficients",
+                        "coefficients{end}",
                         f"coefficients_conf{trainrange[iconf]}.npy",
                     )
                 )
@@ -211,7 +211,7 @@ def build():
 
                 # load reference QM data
                 ref_coefs = np.load(osp.join(
-                    saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
+                    saltedpath, "coefficients{end}", f"coefficients_conf{trainrange[iconf]}.npy"
                 ))
 
                 if average:
@@ -505,4 +505,8 @@ def build():
 
 
 if __name__ == "__main__":
-    build()
+    if inp.system.collinear:
+        build(end='_avgs')
+        build(end='_diff')
+    else:
+        build()
