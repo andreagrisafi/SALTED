@@ -165,7 +165,7 @@ def build(end=""):
         if average:
             av_coefs = {}
             for spe in species:
-                av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients{end}", "averages", f"averages_{spe}.npy"))
+                av_coefs[spe] = np.load(os.path.join(saltedpath, f"coefficients{end}", "averages", f"averages_{spe}.npy"))
 
         # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
         pvec = {}
@@ -634,8 +634,9 @@ def save_pred_descriptor(data: dict[int, np.ndarray], config_range: list[int], n
 
 
 if __name__ == "__main__":
+    inp = ParseConfig().parse_input()
     if inp.system.collinear:
         build(end='_avgs')
-        bulid(end='_diff')
+        build(end='_diff')
     else:
         build()

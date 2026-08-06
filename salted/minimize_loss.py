@@ -47,7 +47,12 @@ def build(end=""):
     if average:
         # compute average density coefficients
         if rank == 0:
-            get_averages.build()
+            if end == '_avgs':
+                get_averages.build(end='_avgs')
+            elif end == '_diff':
+                get_averages.build(end='_diff')
+            else:
+                get_averages.build()
         if parallel:
             comm.Barrier()
         # load average density coefficients
@@ -55,7 +60,7 @@ def build(end=""):
         for spe in species:
             av_coefs[spe] = np.load(
                 os.path.join(
-                    saltedpath, "coefficients{end}", "averages", f"averages_{spe}.npy"
+                    saltedpath, f"coefficients{end}", "averages", f"averages_{spe}.npy"
                 )
             )
 
@@ -121,7 +126,7 @@ def build(end=""):
                 ref_coefs = np.load(
                     osp.join(
                         saltedpath,
-                        "coefficients{end}",
+                        f"coefficients{end}",
                         f"coefficients_conf{trainrange[iconf]}.npy",
                     )
                 )
@@ -211,7 +216,7 @@ def build(end=""):
 
                 # load reference QM data
                 ref_coefs = np.load(osp.join(
-                    saltedpath, "coefficients{end}", f"coefficients_conf{trainrange[iconf]}.npy"
+                    saltedpath, f"coefficients{end}", f"coefficients_conf{trainrange[iconf]}.npy"
                 ))
 
                 if average:
@@ -250,7 +255,7 @@ def build(end=""):
 
                     # load reference QM data
                     ref_coefs = np.load(osp.join(
-                        saltedpath, "coefficients", f"{icart}/coefficients_conf{trainrange[iconf]}.npy"
+                        saltedpath, f"coefficients", f"{icart}/coefficients_conf{trainrange[iconf]}.npy"
                     ))
 
                     # rebuild predicted coefficients
@@ -505,6 +510,7 @@ def build(end=""):
 
 
 if __name__ == "__main__":
+    inp = ParseConfig().parse_input()
     if inp.system.collinear:
         build(end='_avgs')
         build(end='_diff')

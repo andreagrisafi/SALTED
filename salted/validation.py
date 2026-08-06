@@ -77,7 +77,7 @@ def build(end=""):
         # Load spherical averages 
         av_coefs = {}
         for spe in species:
-            av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients{end}", "averages", f"averages_{spe}.npy"))
+            av_coefs[spe] = np.load(os.path.join(saltedpath, f"coefficients{end}", "averages", f"averages_{spe}.npy"))
 
     if qmcode=="cp2k":
         from ase.io import read
@@ -106,7 +106,7 @@ def build(end=""):
 
             # Load reference coefficients
             ref_coefs = np.load(osp.join(
-                saltedpath, "coefficients{end}", f"coefficients_conf{iconf}.npy"
+                saltedpath, f"coefficients{end}", f"coefficients_conf{iconf}.npy"
             ))
             ref_projs = np.dot(overl,ref_coefs)
             Tsize = len(ref_coefs)
@@ -252,6 +252,7 @@ def build(end=""):
             print(f"\n % RMSE for {end[-4:]}: {(100*np.sqrt(error_density/variance)):.3e}", flush=True)
 
 if __name__ == "__main__":
+    inp = ParseConfig().parse_input()
     if inp.system.collinear:
         build(end='_avgs')
         build(end='_diff')
