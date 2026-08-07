@@ -1438,16 +1438,16 @@ def get_rho_n_rec(Gvec_half, knorm_vec, natoms, coords, atomic_symbols, pseudoch
         rho_n_rec += pseudocharge[spe] * np.exp(-0.5 * knorm2_vec * rloc[spe]**2) * phase
     return rho_n_rec
 
-def get_wn_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, pyscf_core, rcut, omega):
-    # Short-range part of w_n = (Phi_i|rho_n), i.e. <Phi_i|erfc(omega*|r-r'|)/|r-r'||rho_n>
+def get_wn_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_ewald, pyscf_core, rcut):
+    # Short-range part of w_n = (Phi_i|rho_n)
 
     natoms = len(atomic_symbols)
 
     wn = np.zeros((ncoefs), dtype=np.float64)
 
     # Unpack PySCF data
-    mol_bra = pyscf_data["mol_bra"]
-    perm = pyscf_data["perm"]
+    mol_bra = pyscf_ewald["mol_bra"]
+    perm = pyscf_ewald["perm"]
     mol_core = pyscf_core["mol_core"]
     cslice = pyscf_core["coord_slice"]
     scale = pyscf_core["scale"]
@@ -1465,8 +1465,7 @@ def get_wn_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data
     for iat in range(natoms):
         spe = atomic_symbols[iat]
         pbra = perm[spe]
-        mol_bra[spe].set_range_coulomb(-omega) # negative omega = erfc (short-range) convention in PySCF
-
+ 
         block = np.zeros((nbasis[spe]), dtype=np.float64)
         for iat2 in range(natoms):
             spe2 = atomic_symbols[iat2]
@@ -1492,24 +1491,26 @@ def get_wn_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data
 
     return wn
 
-def get_wn_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, rho_n_rec, volume, omega, nomega):
-    # Long-range part of w_n = (Phi_i|rho_n), i.e. <Phi_i|erf(omega*|r-r'|)/|r-r'||rho_n>
+def get_wn_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs_ewald, rho_n_rec, volume, gcut):
+    # Long-range part of w_n = (Phi_i|rho_n)
 
     wn = np.zeros((ncoefs), dtype=np.float64)
 
-    Gvec_half = Gvec_half[:nomega]
+    Gvec_half = Gvec_half[:gcut]
     knorm2_vec = np.einsum('ij,ij->i', Gvec_half, Gvec_half)
 
-    # Core charge density with Ewald-screened Coulomb kernel
-    rho_n_screened = rho_n_rec[:nomega] * np.exp(-knorm2_vec/(4.0*omega**2)) / knorm2_vec
+    # Core charge density with Coulomb kernel
+    rho_krnl = rho_n_rec[:gcut] / knorm2_vec
+    rho_krnl_real = np.ascontiguousarray(rho_krnl.real)
+    rho_krnl_imag = np.ascontiguousarray(rho_krnl.imag)
 
     icoefs = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
         phase = np.exp(-1j * np.dot(Gvec_half, coords[iat])) # e^{-iG.r_iat}
-        obj = partial_wave_coefs[spe] * phase[:, np.newaxis]
+        obj = partial_wave_coefs_ewald[spe] * phase[:, np.newaxis]
 
-        wn[icoefs:icoefs + nbasis[spe]] = (np.dot(obj.real.T, rho_n_screened.real) + np.dot(obj.imag.T, rho_n_screened.imag))
+        wn[icoefs:icoefs + nbasis[spe]] = (np.dot(obj.real.T, rho_krnl_real) + np.dot(obj.imag.T, rho_krnl_imag))
         icoefs += nbasis[spe]
 
     return wn * 2 * (4*np.pi)**2 / volume

@@ -74,7 +74,9 @@ if df_metric == "coulomb":
     rcut_pairs = {}
     for spe1 in species:
         for spe2 in species:
-            rcut_pairs[(spe1, spe2)] = 12 * sigma_ewald
+            rcut_pairs[(spe1, spe2)] = 4 * (sigma_ewald + sigma_ewald)
+            #print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
+            #rcut_pairs[(spe1, spe2)] = 4 * np.sqrt(2 + max(lmax[spe1], lmax[spe2])) * sigma_ewald # More strict criterion, if needed
             #print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
 
 # init geometry
@@ -230,11 +232,13 @@ for iconf in conf_range:
         rho_n_rec = rho_n_rec[mask][1:][sort_idx]
 
         # Electron-electron term: E_ee = 1/2 c^T.S.c = 1/2 c^T.w
-        e_ee = 0.5 * np.dot(c, w)
+        e_ee = 0.5 * np.dot(c, w - lagmult * q)
         
         # Electron-nucleus term: E_en = -sum_i c_i (Phi_i|rho_n)
-        wnp = get_w_prim(Gvec_half, natoms[iconf], atomic_coords[iconf], npgf, lmax_numba, atomic_symbols[iconf], partial_wave_coefs_prim, volume, rho_n_rec, df_metric, gcuts, rank)
-        wn = C.T @ wnp
+        wn = get_wn_real(cell, atomic_coords[iconf], atomic_symbols[iconf], nbasis, ncoefs, volume, pyscf_ewald, pyscf_core, rcut_pairs)
+        ztot = sum(pseudocharge[spe] for spe in atomic_symbols[iconf])
+        wn -= (4.0*np.pi)**2 / (2.0*volume) * ztot * (sigma_ewald**2 * pwc_g0 - pwc_spread) # G = 0 correction
+        wn += get_wn_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs_ewald, rho_n_rec, volume, gmax_ewald_idx)
         e_en = -np.dot(c, wn)
         
         # Nucleus-nucleus term: E_nn = 1/2 (rho_n|rho_n)
