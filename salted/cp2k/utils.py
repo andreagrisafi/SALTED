@@ -381,13 +381,13 @@ def get_reciprocal_grid(nx, ny, nz, dx, dy, dz):
     return Gvec
 
 @njit(parallel = True, fastmath = True)
-def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nomega):
+def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc):
 
    partial_wave_coefs = Dict.empty(key_type=types.unicode_type,value_type=types.complex128[:,:]) # Dict with key as strings and values of type float array
    for spe in species:
-      partial_wave_coefs[spe] = np.zeros((nomega, nbasis[spe]), dtype=np.complex128)
+      partial_wave_coefs[spe] = np.zeros((nG_loc, nbasis[spe]), dtype=np.complex128)
 
-   for iG in prange(nomega):
+   for iG in prange(nG_loc):
 
       kx = Gvec[iG,0]
       ky = Gvec[iG,1]
