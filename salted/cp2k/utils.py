@@ -576,7 +576,8 @@ def gto_rec_g0(natoms, atomic_symbols, lmax, nmax, npgf, alphas, contranorm, nco
     # G=0 Fourier component (monopole) of each contracted basis function.
     # Needed for the Ewald G=0 correction.
     pwc_g0 = np.zeros(ncoefs)
- 
+    pwc_spread = np.zeros(ncoefs)
+
     icoefs = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
@@ -590,9 +591,10 @@ def gto_rec_g0(natoms, atomic_symbols, lmax, nmax, npgf, alphas, contranorm, nco
                             pradintk = np.sqrt(np.pi/2) * sigma**3
                             harmonics = spherical_harmonic(0, 0, 0, 0) # 1/(2*sqrt(pi))
                             pwc_g0[icoefs] += contranorm[key][irad, ipgf] * pradintk * harmonics
+                            pwc_spread[icoefs] += contranorm[key][irad, ipgf] * pradintk * harmonics * sigma**2
                     icoefs += 1
  
-    return pwc_g0
+    return pwc_g0, pwc_spread
 
 @njit
 def spherical_harmonic(l,m,costheta,phi):
@@ -919,6 +921,74 @@ def setup_pyscf_core(species, pseudocharge, rloc):
 
     return {"mol_core": mol_core, "coord_slice": coord_slice, "scale": scale}
 
+   # add next to the existing pyscf import
+
+def setup_pyscf_ewald(species, lmax, nmax, alphas, contranorm, sigma_ewald):
+    # Build per-species PySCF Mole objects carrying the Ewald-corrected radial functions
+    #     R_nl(r) - R_nl^ewald(r),   R_nl^ewald(r) = d_nl * r^lam * exp(-alpha_ewald*r^2)
+
+    alpha_ewald = 1.0 / (2.0 * sigma_ewald**2)
+
+    mol_bra = {} # fixed (bra) side of overlap integrals
+    mol_ket = {} # movable (ket) side of overlap integrals
+    coord_slice = {} # ket (x,y,z) coordinate
+    perm = {}
+
+    for spe in species:
+        basis = []
+        idx = []
+        off = 0
+        for lam in range(lmax[spe] + 1):
+            key = f"{spe}_{lam}"
+            shell = [lam] # The first entry tells PySCF the angular momentum
+
+            for ipgf in range(len(alphas[key])):
+                # Each row expected by PySCF looks like:
+                #   [exponent, coeff_for_function_0, coeff_for_function_1, ...]
+                row = [float(alphas[key][ipgf])]
+                for irad in range(nmax[key]):
+                    row.append(float(contranorm[key][irad, ipgf]) / _pyscf_gto.gto_norm(lam, float(alphas[key][ipgf]))) # divide by PySCF's normalization factor (gto_norm) to avoid PySCF's automatic normalization of the primitive
+                shell.append(row)
+
+            # Extra primitive carrying -R_nl^ewald
+            row = [float(alpha_ewald)]
+            for irad in range(nmax[key]):
+                dnl = np.sum(contranorm[key][irad, :] * (alpha_ewald / alphas[key])**(lam + 1.5))
+                row.append(-float(dnl) / _pyscf_gto.gto_norm(lam, float(alpha_ewald)))
+            shell.append(row)
+            
+            basis.append(shell) # One entry per angular momentum shell
+
+            # Index map to fix ordering mismatch between PySCF and SALTED (only matters for lam=1)
+            mmap = [1, 2, 0] if lam == 1 else list(range(2 * lam + 1))
+            for irad in range(nmax[key]):
+                for mu in range(2 * lam + 1):
+                    idx.append(off + irad * (2 * lam + 1) + mmap[mu])
+            off += nmax[key] * (2 * lam + 1)
+
+        # PySCF molecule object builder
+        # "Ghost" atom sitting at the origin, carrying the basis assembled above.
+        def _make():
+            normalize_gto = _pyscf_gto.mole.NORMALIZE_GTO
+            _pyscf_gto.mole.NORMALIZE_GTO = False # disable normalization to build R_nl - R_nl^ewald
+            mol = _pyscf_gto.M(
+                atom=[[f"ghost-{spe}", (0.0, 0.0, 0.0)]],
+                basis={f"ghost-{spe}": basis},
+                spin=0,
+                cart=False,    # real spherical harmonics, not cartesian Gaussians
+                unit="Bohr",   # match SALTED units
+            )
+            _pyscf_gto.mole.NORMALIZE_GTO = normalize_gto
+            return mol
+
+        mol_bra[spe] = _make()
+        mol_ket[spe] = _make()
+        ptr = mol_ket[spe]._atm[0, _pyscf_gto.PTR_COORD]
+        coord_slice[spe] = slice(ptr, ptr + 3)
+        perm[spe] = np.asarray(idx, dtype=int)
+
+    return {"mol_bra": mol_bra, "mol_ket": mol_ket, "perm": perm, "coord_slice": coord_slice}
+
 def pair_cutoffs(species, lmax, alphas, contranorm, eps=1.0e-12):
     #Real-space cutoff (Bohr) per pair
     amin, cmax = {}, {}
@@ -1016,7 +1086,7 @@ def overlap_identity(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf
 
     return S
 
-def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, rcut, omega):
+def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_data, pyscf_ewald, pwc_g0, pwc_spread, sigma_ewald, rcut):
     #Identity-metric overlap matrix in real space
 
     natoms = len(atomic_symbols)
@@ -1025,7 +1095,7 @@ def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, p
 
     # Unpack PySCF data
     mol_bra = pyscf_data["mol_bra"]
-    mol_ket = pyscf_data["mol_ket"]
+    mol_ket = pyscf_ewald["mol_ket"]
     perm = pyscf_data["perm"]
     cslice = pyscf_data["coord_slice"]
 
@@ -1042,7 +1112,6 @@ def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, p
     for iat in range(natoms):
         spe = atomic_symbols[iat]
         pbra = perm[spe]
-        mol_bra[spe].set_range_coulomb(-omega)  # negative omega = erfc (short-range) convention in PySCF
 
         icoefs2 = 0
         for iat2 in range(iat + 1):
@@ -1066,6 +1135,12 @@ def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, p
                 raw = _pyscf_gto.intor_cross("int2c2e", mol_bra[spe], mol_ket[spe2]) # Ask PySCF for the raw overlap integrals
                 block += raw[np.ix_(pbra, pket)] # Reorder PySCF's rows/columns into SALTED's (n,m) ordering
 
+            # G=0 correction
+            a_bra = pwc_g0[icoefs:icoefs + nbasis[spe]]
+            a_ket = pwc_g0[icoefs2:icoefs2 + nbasis[spe2]]
+            b_ket = pwc_spread[icoefs2:icoefs2 + nbasis[spe2]]
+            block -= (4.0*np.pi)**3 / (2.0*volume) * np.outer(a_bra, sigma_ewald**2 * a_ket - b_ket)
+
             S[icoefs:icoefs + nbasis[spe], icoefs2:icoefs2 + nbasis[spe2]] = block
             if iat2 != iat:
                 S[icoefs2:icoefs2 + nbasis[spe2], icoefs:icoefs + nbasis[spe]] = block.T
@@ -1075,33 +1150,32 @@ def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, p
 
     return S
 
-def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, volume, omega, nomega, rank):
+def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, partial_wave_coefs_ewald, volume, gcut, rank):
+    # Long-range Coulomb metric in reciprocal space: (Phi_i | R_j^ewald)
     S = np.zeros((ncoefs, ncoefs), dtype=np.float64)
 
-   # G-vector truncation based on omega
-    Gvec_half = Gvec_half[:nomega]
+    # G-vector truncation based on sigma_ewald
+    Gvec_half = Gvec_half[:gcut]
     knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half, axis=1)).astype(np.float64)  # |G|
 
     phase = np.exp(-1j * np.dot(Gvec_half, coords.T)) # e^{-iG.r_iat}
     phase_over_knorm = phase / knorm_vec[:, np.newaxis]
 
-    # Ewald reciprocal-space screening factor exp(-G^2 / (4*omega^2))
-    ewald_screen = np.exp(-(knorm_vec*knorm_vec) / (4.0*omega*omega))
-
     icoefs = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        obj1 = phase_over_knorm[:, iat, np.newaxis] * partial_wave_coefs[spe][:nomega] * ewald_screen[:, np.newaxis]
+        obj1 = phase_over_knorm[:, iat, np.newaxis] * partial_wave_coefs[spe][:gcut]
         obj1_real = np.ascontiguousarray(obj1.real)
         obj1_imag = np.ascontiguousarray(obj1.imag)
 
         icoefs2 = 0
         for iat2 in range(iat+1):
             spe2 = atomic_symbols[iat2]
-            obj2 = phase_over_knorm[:, iat2, np.newaxis] * partial_wave_coefs[spe2][:nomega]
+            obj2 = phase_over_knorm[:, iat2, np.newaxis] * partial_wave_coefs_ewald[spe2][:gcut]  # Ewald ket
 
             S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = 2*(np.dot(obj1_real.T, obj2.real) + np.dot(obj1_imag.T, obj2.imag))
-            S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]].T
+            if iat2 != iat:
+                S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]].T
             icoefs2 += nbasis[spe2]
         icoefs += nbasis[spe]
 
