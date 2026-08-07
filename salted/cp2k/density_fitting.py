@@ -7,8 +7,8 @@ from ase.io import read
 import os.path as osp
 from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n, overlap_coulomb_rho, setup_pyscf_species, setup_pyscf_core
-from salted.cp2k.utils import build_contraction_matrix, get_w_prim, get_wn_rec, get_wn_real, build_gcutoff, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
+from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, gto_rec_ewald, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, get_rho_n, setup_pyscf_species, setup_pyscf_core, setup_pyscf_ewald
+from salted.cp2k.utils import build_contraction_matrix, get_w_prim, get_wn_rec, get_wn_real, build_gcutoff, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real, overlap_coulomb_rho
 from numba import types
 from numba.typed import Dict
 from mpi4py import MPI
@@ -61,22 +61,20 @@ atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 bdir = osp.join(inp.salted.saltedpath,"basis")
 lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)    
 
-# PySCF species setup
+# PySCF setup and cutoffs
 pyscf_data = setup_pyscf_species(species, lmax, nmax_numba, alphas, contranorm)
-
-# Real space cutoffs
 if df_metric =="identity":
     rcut_pairs = pair_cutoffs(species, lmax, alphas, contranorm, eps=1e-10)
     #for spe1 in species:
     #    for spe2 in species:
     #        print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
 if df_metric == "coulomb":
-    sigma_omega = 2.0 / b2a # 2 angstrom, hard-coded
-    omega = 1.0 / (np.sqrt(2) * sigma_omega)
+    sigma_ewald = 2.0 / b2a # 2 angstrom, hard-coded
+    pyscf_ewald = setup_pyscf_ewald(species, lmax, nmax_numba, alphas, contranorm, sigma_ewald)
     rcut_pairs = {}
     for spe1 in species:
         for spe2 in species:
-            rcut_pairs[(spe1, spe2)] = 5.0 * sigma_omega
+            rcut_pairs[(spe1, spe2)] = 12 * sigma_ewald
             #print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
 
 # init geometry
@@ -84,17 +82,18 @@ for iconf in conf_range:
 
     if inp.salted.verbose: print("conf:", iconf+1)
  
-    # Get cell
     structure = xyzfile[iconf]
-    cell = np.asarray(structure.cell/b2a)
 
-    # Compute coefs array size
+    # Compute coefs array size and number of electrons
+    pseudocharge, rloc = read_local_pseudo(species, bdir)
     ntype = {}
+    n_elec = 0.0
     for spe in species:
         ntype[spe] = 0
     for iat in range(natoms[iconf]):
         spe = atomic_symbols[iconf][iat]
         ntype[spe] += 1
+        n_elec += pseudocharge[spe]
     ncoefs = 0
     for spe in species:
         ncoefs += nbasis[spe]*ntype[spe]
@@ -127,7 +126,13 @@ for iconf in conf_range:
         
     nx,ny,nz = nside[0], nside[1], nside[2]
     volume = (nx*dx)*(ny*dy)*(nz*dz) 
-    
+
+    # Get cell
+    cell = np.zeros((3,3))
+    cell[0,0] = nx*dx
+    cell[1,1] = ny*dy
+    cell[2,2] = nz*dz
+
     # Generate G-vectors for the half-space Z>0
     Gvec = get_reciprocal_grid(nx,ny,nz,dx,dy,dz)
     mask = (
@@ -150,8 +155,8 @@ for iconf in conf_range:
 
     if df_metric == "coulomb":
         # G-vector truncation based on omega
-        gmax_omega = 2.0 * np.pi / sigma_omega
-        nomega = np.searchsorted(knorm_vec, gmax_omega).astype(np.int64) # Index of the last G-vector below the cutoff
+        gmax_ewald = 2.0 * np.pi / sigma_ewald
+        gmax_ewald_idx = np.searchsorted(knorm_vec, gmax_ewald).astype(np.int64) # Index of the last G-vector below the cutoff
 
     # Compute density Fourier-components
     rho_KS = np.array(rho_qm)
@@ -178,30 +183,37 @@ for iconf in conf_range:
     if df_metric == "identity":
 
         # Compute overlap matrix S_ij = <Phi_i|Phi_j> fully in real space using PySCF int2c routines 
+        time_c = time.time()
         S = overlap_identity(cell, atomic_coords[iconf], atomic_symbols[iconf], nbasis, ncoefs, volume, pyscf_data, rcut_pairs)
-    
+        if inp.salted.verbose: print("Time to build S:", time.time()-time_c)
+        
     elif df_metric == "coulomb":
 
         # Compute 2-center Coulomb integral matrix J_ij = <Phi_i|1/|r-r'||Phi_j> via Ewald sums 
         time_c = time.time()
-        # Short-range term in real space via PySCF calculation of <Phi_i|erfc(omega*|r-r'|)/|r-r'||Phi_j>
-        S_SR = overlap_coulomb_real(cell, atomic_coords[iconf], atomic_symbols[iconf], nbasis, ncoefs, volume, pyscf_data, rcut_pairs, omega) 
-        pwc_g0 = gto_rec_g0(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, alphas, contranorm, ncoefs)
-        S_SR -= ((np.pi/omega**2) * np.outer(pwc_g0, pwc_g0) * (4.0 * np.pi)**2 / volume)
+        # Short-range term in real space with PySCF
+        pwc_g0, pwc_spread = gto_rec_g0(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, alphas, contranorm, ncoefs) # Needed for the G=0 correction
+        S_SR = overlap_coulomb_real(cell, atomic_coords[iconf], atomic_symbols[iconf], nbasis, ncoefs, volume, pyscf_data, pyscf_ewald, pwc_g0, pwc_spread, sigma_ewald, rcut_pairs)
         if inp.salted.verbose: print("Time to build S_SR:", time.time()-time_c)
         time_c = time.time()
-        # Long-range term in reciprocal space as <Phi_i|erf(omega*|r-r'|)/|r-r'||Phi_j>
-        partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, nomega) # Contracted
+        # Long-range term in reciprocal space
+        partial_wave_coefs = gto_rec(lmax_numba, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, gmax_ewald_idx)
+        partial_wave_coefs_ewald = gto_rec_ewald(lmax_numba, lmax_max, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, gmax_ewald_idx, sigma_ewald)
         if inp.salted.verbose: print("Time to compute G-truncated contracted pw coeffs:", time.time()-time_c)
         time_c = time.time()
-        S_LR = overlap_coulomb_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, volume, omega, nomega, rank) 
+        S_LR = overlap_coulomb_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, partial_wave_coefs_ewald, volume, gmax_ewald_idx, rank) 
         if inp.salted.verbose: print("Time to build S_LR:", time.time()-time_c)
         # Collect SR and LR terms 
         S = S_SR + S_LR 
 
     # Solve density-fitting linear system 
     time_c = time.time()
-    c = np.linalg.solve(S,w)
+    q = 4.0 * np.pi * pwc_g0
+    Sinv_w = np.linalg.solve(S, w)
+    Sinv_q = np.linalg.solve(S, q)
+    lagmult = (np.dot(q, Sinv_w) - n_elec) / np.dot(q, Sinv_q) # Lagrange multiplier
+    c = Sinv_w - lagmult * Sinv_q
+
     if inp.salted.verbose: print("Time to solve linear system:", time.time()-time_c)
 
     # Save data
@@ -212,7 +224,6 @@ for iconf in conf_range:
     time_c = time.time()
     if df_metric == "coulomb":
         # Core charge density in reciprocal space
-        pseudocharge, rloc = read_local_pseudo(species, bdir)
         pyscf_core = setup_pyscf_core(species, pseudocharge, rloc)
         rho_n = get_rho_n(nside, dx, dy, dz, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
         rho_n_rec = np.fft.fftn(rho_n).ravel() * dx * dy * dz
@@ -222,10 +233,8 @@ for iconf in conf_range:
         e_ee = 0.5 * np.dot(c, w)
         
         # Electron-nucleus term: E_en = -sum_i c_i (Phi_i|rho_n)
-        wn = get_wn_real(cell, atomic_coords[iconf], atomic_symbols[iconf], nbasis, ncoefs, volume, pyscf_data, pyscf_core, rcut_pairs, omega)
-        wn -= (np.pi/omega**2) * pwc_g0 * sum(pseudocharge[spe] for spe in atomic_symbols[iconf]) * (4.0 * np.pi) / volume
-        wn += get_wn_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, rho_n_rec, volume, omega, nomega)
-
+        wnp = get_w_prim(Gvec_half, natoms[iconf], atomic_coords[iconf], npgf, lmax_numba, atomic_symbols[iconf], partial_wave_coefs_prim, volume, rho_n_rec, df_metric, gcuts, rank)
+        wn = C.T @ wnp
         e_en = -np.dot(c, wn)
         
         # Nucleus-nucleus term: E_nn = 1/2 (rho_n|rho_n)
