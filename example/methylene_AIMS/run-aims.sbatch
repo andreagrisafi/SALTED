@@ -13,7 +13,7 @@ export OMP_NUM_THREADS=1
 ulimit -s unlimited
 
 QMDIR='qmdata'
-AIMS='aims_new.x'
+AIMS='aims.x'
 
 DATADIR=${QMDIR}data
 

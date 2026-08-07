@@ -18,8 +18,8 @@ export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi2.so
 export OMP_NUM_THREADS=1
 ulimit -s unlimited
 
-DATADIR='qmdata'/aims_pred_data
-AIMS='aims_new.x'
+DATADIR='qmdata/aims_pred_data'
+AIMS='aims.x'
 
 mkdir $DATADIR
 
