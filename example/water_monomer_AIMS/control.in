@@ -10,7 +10,6 @@
   spin               none
   relativistic       none
   charge             0.
-  k_grid 	     1 1 1
   ri_density_restart write
   ri_full_output .True.
   ri_output_density_only .True.

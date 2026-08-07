@@ -73,8 +73,7 @@ def build():
         o = np.loadtxt(osp.join(dirpath, 'ri_projections.out')).reshape(-1)
         t = np.loadtxt(osp.join(dirpath, 'ri_restart_coeffs_df.out')).reshape(-1)
         ovlp = np.loadtxt(osp.join(dirpath, 'ri_ovlp.out')).reshape(-1)
-        o_beta = []
-        t_beta = []
+
         if inp.system.collinear:
             o_beta = np.loadtxt(osp.join(dirpath, 'ri_projections_beta.out')).reshape(-1)
             t_beta = np.loadtxt(osp.join(dirpath, 'ri_restart_coeffs_beta.out')).reshape(-1)
@@ -82,10 +81,6 @@ def build():
         n = len(o)
         ovlp = ovlp.reshape(n,n)
         
-        o_avgs = []
-        t_avgs = []
-        o_diff = []
-        t_diff = []
 
         if reorder:
             idx = np.loadtxt(osp.join(dirpath, 'idx_prodbas.out')).astype(int)
@@ -106,17 +101,17 @@ def build():
             t = t[idx]
             ovlp = ovlp[idx,:]
             ovlp = ovlp[:,idx]
-        
+                
         if inp.system.collinear:
-            for k in range(n):
+            
+            """finding the average"""
+            o_avgs = (o + o_beta)*0.5
+            t_avgs = (t + t_beta)*0.5
 
-                """finding the average"""
-                o_avgs.append((o[k] + o_beta[k]) / 2)
-                t_avgs.append((t[k] + t_beta[k]) / 2)
-
-                """finding the difference"""
-                o_diff.append(o[k] - o_beta[k])
-                t_diff.append(t[k] - t_beta[k])
+            """finding the difference"""
+            o_diff = o - o_beta
+            t_diff = t - t_beta
+            
             """saves to new location with new name"""
             np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
             np.save(osp.join(inp.salted.saltedpath, "projections_avgs", f"projections_conf{i}.npy"), o_avgs)

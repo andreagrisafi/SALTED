@@ -46,12 +46,8 @@ def build():
                 f"COEFFS-{i+1}.dat",
             ))
 
-            alpha = []
-            beta = []
-
-            for k in range(n):
-                alpha.append(ta[k] + td[k]/2)
-                beta.append(ta[k] - td[k]/2)
+            alpha = ta + td*0.5
+            beta = ta - td*0.5
 
             dirpath = os.path.join(inp.qm.path2qm, inp.prediction.predict_data, f"{i+1}")
             if not os.path.exists(dirpath):
