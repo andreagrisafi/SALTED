@@ -64,6 +64,66 @@ def init_moments(inp,species,lmax,nmax,rank):
 
     return [charge_integrals,dipole_integrals]
 
+def compute_hartree_energy(coefs, S, cell, coords, atomic_symbols, species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald, origin, nside):
+
+    natoms = len(atomic_symbols)
+    ncoefs = len(coefs)
+
+    # Real-space grid
+    nx, ny, nz = nside[0], nside[1], nside[2]
+    dx, dy, dz = cell[0,0]/nx, cell[1,1]/ny, cell[2,2]/nz
+    volume = (nx*dx) * (ny*dy) * (nz*dz)
+
+    # G-vectors for the half-space, G=0 excluded, sorted by |G|
+    Gvec = get_reciprocal_grid(nx, ny, nz, dx, dy, dz)
+    mask = (
+        (Gvec[:, 2] > 0) |
+        ((Gvec[:, 2] == 0) & (Gvec[:, 1] > 0)) |
+        ((Gvec[:, 2] == 0) & (Gvec[:, 1] == 0) & (Gvec[:, 0] >= 0)))
+    Gvec_half = Gvec[mask][1:]
+    knorm_vec = np.linalg.norm(Gvec_half, axis=1)
+    sort_idx = np.argsort(knorm_vec)
+    Gvec_half = Gvec_half[sort_idx]
+    knorm_vec = knorm_vec[sort_idx]
+
+    # Reciprocal space cutoff
+    gmax_ewald = 2.0 * np.pi / sigma_ewald
+    gmax_ewald_idx = np.searchsorted(knorm_vec, gmax_ewald).astype(np.int64)  # Index of the last G-vector below the cutoff  
+
+    # Real space cutoff
+    rcut_pairs = {}
+    for spe1 in species:
+        for spe2 in species:
+            rcut_pairs[(spe1, spe2)] = 4 * (sigma_ewald + sigma_ewald)
+
+    # PySCF objects: Ewald-corrected basis (bra) and core pseudocharge (ket)
+    pyscf_ewald = setup_pyscf_ewald(species, lmax_numba, nmax_numba, alphas, contranorm, sigma_ewald)
+    pyscf_core = setup_pyscf_core(species, pseudocharge, rloc)
+
+    # Compute partial-wave coefs as basis set fourier transform
+    partial_wave_coefs_ewald = gto_rec_ewald(lmax_numba, lmax_max, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, gmax_ewald_idx, sigma_ewald)
+    pwc_g0, pwc_spread = gto_rec_g0(natoms, atomic_symbols, lmax_numba, nmax_numba, npgf, alphas, contranorm, ncoefs)
+
+    # Core charge density in reciprocal space
+    rho_n = get_rho_n(nside, dx, dy, dz, origin, natoms, coords, atomic_symbols, pseudocharge, rloc)
+    rho_n_rec = np.fft.fftn(rho_n).ravel() * dx * dy * dz
+    rho_n_rec = rho_n_rec[mask][1:][sort_idx]
+
+    # Electron-electron term: E_ee = 1/2 c^T.S.c
+    e_ee = 0.5 * np.dot(coefs, S @ coefs)
+
+    # Electron-nucleus term: E_en = -sum_i c_i (Phi_i|rho_n)
+    wn = get_wn_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_ewald, pyscf_core, rcut_pairs)
+    ztot = sum(pseudocharge[spe] for spe in atomic_symbols)
+    wn -= (4.0*np.pi)**2 / (2.0*volume) * ztot * (sigma_ewald**2 * pwc_g0 - pwc_spread)  # G=0 correction
+    wn += get_wn_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs_ewald, rho_n_rec, volume, gmax_ewald_idx)
+    e_en = -np.dot(coefs, wn)
+
+    # Nucleus-nucleus term: E_nn = 1/2 (rho_n|rho_n)
+    e_nn = 0.5 * overlap_coulomb_rho(rho_n_rec, rho_n_rec, knorm_vec, volume)
+
+    return e_ee + e_en + e_nn, e_ee, e_en, e_nn
+
 #def compute_charge_and_dipole(geom,pseudocharge,natoms,atomic_symbols,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average):
 #    """Compute total charge and dipole moment for the given configuration"""
 #
