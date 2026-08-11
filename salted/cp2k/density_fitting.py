@@ -202,8 +202,8 @@ for iconf in conf_range:
     # Solve density-fitting linear system 
     time_c = time.time()
     q = 4.0 * np.pi * pwc_g0
-    Sinv_w = np.linalg.solve(S, w)
-    Sinv_q = np.linalg.solve(S, q)
+    Sinv = np.linalg.solve(S, np.column_stack([w, q]))
+    Sinv_w, Sinv_q = Sinv[:, 0], Sinv[:, 1]
     lagmult = (np.dot(q, Sinv_w) - n_elec) / np.dot(q, Sinv_q) # Lagrange multiplier
     c = Sinv_w - lagmult * Sinv_q
 
