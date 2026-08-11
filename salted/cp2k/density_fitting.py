@@ -79,12 +79,9 @@ if df_metric == "coulomb":
             #rcut_pairs[(spe1, spe2)] = 4 * np.sqrt(2 + max(lmax[spe1], lmax[spe2])) * sigma_ewald # More strict criterion, if needed
             #print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
 
-# init geometry
 for iconf in conf_range:
 
     if inp.salted.verbose: print("conf:", iconf+1)
- 
-    structure = xyzfile[iconf]
 
     # Compute coefs array size and number of electrons
     pseudocharge, rloc = read_local_pseudo(species, bdir)
@@ -102,31 +99,27 @@ for iconf in conf_range:
 
     # Read in electron density from cube files
     cubefile_pattern = os.path.join(inp.qm.path2qm, f"conf_{conf_start+iconf+1}", "*ELECTRON_DENSITY-1_0.cube")
-    cubefile = open(glob.glob(cubefile_pattern)[0], "r")
-    lines = cubefile.readlines()
-    nside = {}
-    nside[0] = int(lines[3].split()[0])
-    nside[1] = int(lines[4].split()[0])
-    nside[2] = int(lines[5].split()[0])
-    npoints = 1
-    for i in range(3):
-        npoints *= nside[i]
-    if inp.salted.verbose: print("Number of grid points:", npoints)
-    dx = float(lines[3].split()[1])
-    dy = float(lines[4].split()[2])
-    dz = float(lines[5].split()[3])
-    origin = np.asarray(lines[2].split(),dtype=float)[1:4]
-    rho_qm = []
-    for line in lines[6+natoms[iconf]:]:
-        rhovals = np.asarray(line.split(),float)
-        for rhoval in rhovals:
-            rho_qm.append(rhoval)
-    cubefile.close()
-    if npoints!=len(rho_qm):
-        print("ERROR: inconsistent number of grid points!")
+    with open(glob.glob(cubefile_pattern)[0], "r") as cubefile:
+        # Header: 2 comment lines + origin line + 3 lattice lines + atom lines
+        header = [cubefile.readline() for _ in range(6 + natoms[iconf])]
+        line_ori, line_x, line_y, line_z = (header[i].split() for i in range(2, 6))
+        nside = {}
+        nx = int(line_x[0])
+        ny = int(line_y[0])
+        nz = int(line_z[0])
+        dx = float(line_x[1])
+        dy = float(line_y[2])
+        dz = float(line_z[3])
+        origin = np.asarray(line_ori[1:4], dtype=float)
+        npoints = nx * ny * nz
+        if inp.salted.verbose: print("Number of grid points:", npoints)
+        rho_KS = np.fromstring(cubefile.read(), dtype=np.float64, sep=' ')
+
+    if rho_KS.size != npoints:
+        print(f"ERROR: inconsistent number of grid points!")
         sys.exit(0)
         
-    nx,ny,nz = nside[0], nside[1], nside[2]
+    rho_KS = rho_KS.reshape((nx, ny, nz))
     volume = (nx*dx)*(ny*dy)*(nz*dz) 
 
     # Get cell
@@ -161,8 +154,6 @@ for iconf in conf_range:
         gmax_ewald_idx = np.searchsorted(knorm_vec, gmax_ewald).astype(np.int64) # Index of the last G-vector below the cutoff
 
     # Compute density Fourier-components
-    rho_KS = np.array(rho_qm)
-    rho_KS = rho_KS.reshape((nside[0], nside[1], nside[2]))
     rho_KS_rec = np.fft.fftn(rho_KS).ravel()* dx * dy * dz
     rho_KS_rec = rho_KS_rec[mask]
     if df_metric == "coulomb": # exclude G=0
@@ -227,7 +218,7 @@ for iconf in conf_range:
     if df_metric == "coulomb":
         sigma_ewald_en = 1.0 / b2a
         e_hartree, e_ee, e_en, e_nn = compute_hartree_energy(c, S, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf,
-                                                             nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, origin, nside)
+                                                             nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, origin, [nx, ny, nz])
         print(f"conf {conf_start+iconf+1}: Hartree energy = {e_hartree:.8f} Ha", flush=True)
         if inp.salted.verbose: print(f"conf {conf_start+iconf+1}: E_ee = {e_ee:.8f} Ha, E_en = {e_en:.8f} Ha, E_nn = {e_nn:.8f} Ha", flush=True)
         if inp.salted.verbose: print('Time to compute Hartree energy:', time.time() - time_c)
