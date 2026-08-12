@@ -162,12 +162,13 @@ for iconf in conf_range:
 
     # Compute partial-wave coefs as basis set fourier transform
     time_c = time.time()
-    partial_wave_coefs_prim = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, gcuts) # Primitive
+    partial_wave_coefs_prim_re, partial_wave_coefs_prim_im = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, gcuts) # Primitive basis set Fourier transform
+    pwc_g0, pwc_spread = gto_rec_g0(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, alphas, contranorm, ncoefs) # Monopole and spread
     if inp.salted.verbose: print("Time to compute primitive pw coeffs:", time.time()-time_c)
 
     # Compute primitive density projections <phi|O|rho> fully in reciprocal space with flexible G-cutoffs
     time_c = time.time()
-    wp = get_w_prim(Gvec_half, natoms[iconf], atomic_coords[iconf], npgf, lmax_numba, atomic_symbols[iconf], partial_wave_coefs_prim, volume, rho_KS_rec, df_metric, gcuts, rank)
+    wp = get_w_prim(Gvec_half, natoms[iconf], atomic_coords[iconf], npgf, lmax_numba, atomic_symbols[iconf], partial_wave_coefs_prim_re, partial_wave_coefs_prim_im, volume, rho_KS_rec, df_metric, gcuts, rank)
     # Contract projections
     C = build_contraction_matrix(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, contranorm) 
     w = C.T @ wp
@@ -185,7 +186,6 @@ for iconf in conf_range:
         # Compute 2-center Coulomb integral matrix J_ij = <Phi_i|1/|r-r'||Phi_j> via Ewald sums 
         time_c = time.time()
         # Short-range term in real space with PySCF
-        pwc_g0, pwc_spread = gto_rec_g0(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, alphas, contranorm, ncoefs) # Needed for the G=0 correction
         S_SR = overlap_coulomb_real(cell, atomic_coords[iconf], atomic_symbols[iconf], nbasis, ncoefs, volume, pyscf_data, pyscf_ewald, pwc_g0, pwc_spread, sigma_ewald, rcut_pairs)
         if inp.salted.verbose: print("Time to build S_SR:", time.time()-time_c)
         time_c = time.time()

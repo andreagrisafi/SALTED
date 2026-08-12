@@ -461,9 +461,10 @@ def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc):
       for spe in species:       
          if knorm == 0.0:
             costheta = 0.0
+            phi = 0.0
          else:
             costheta = kz/knorm
-         phi = np.arctan2(ky,kx)
+            phi = np.arctan2(ky,kx)
          
          ibasis = 0
          # Precompute partial wave coefficients <nlm|k> consisting in
@@ -522,9 +523,10 @@ def gto_rec_ewald(lmax,lcut,nmax,nbasis,species, npgf, contranorm, alphas, Gvec,
       for spe in species:
          if knorm == 0.0:
             costheta = 0.0
+            phi = 0.0
          else:
             costheta = kz/knorm
-         phi = np.arctan2(ky,kx)
+            phi = np.arctan2(ky,kx)
 
          ibasis = 0
          # Precompute partial wave coefficients <nlm|k> consisting in
@@ -562,10 +564,10 @@ def gto_rec_ewald(lmax,lcut,nmax,nbasis,species, npgf, contranorm, alphas, Gvec,
 
    return partial_wave_coefs
 
-@njit(parallel = True, fastmath = True)
+@njit(parallel=True, fastmath=True)
 def gto_rec_prim(lmax, species, npgf, alphas, Gvec, gcuts):
     # Fourier transform of primitive atom-centered basis functions
-    
+
     # Determine maximum relevant G-vector index
     gmax = 0
     for key in gcuts:
@@ -574,63 +576,102 @@ def gto_rec_prim(lmax, species, npgf, alphas, Gvec, gcuts):
             gmax = gmax_key
 
     # Initialize partial wave coefficients
-    partial_wave_coefs = Dict.empty(key_type=types.unicode_type, value_type=types.complex128[:, :, :]) # Dict with key as strings and values of type float array
+    pwc_re = Dict.empty(key_type=types.unicode_type, value_type=types.float64[:, :, :])
+    pwc_im = Dict.empty(key_type=types.unicode_type, value_type=types.float64[:, :, :])
     for spe in species:
         for lam in range(lmax[spe]+1):
             key = f"{spe}_{lam}"
-            # npgf[key]: number of individual Gaussians, each with its own alpha
             nmu = 2*lam + 1  #number of m values (-lam,...,+lam) for this lam
-            partial_wave_coefs[key] = np.empty((gmax, npgf[key], nmu), dtype=np.complex128)
-
-    # Loop over G-vectors and compute partial wave coefficients
-    for iG in prange(gmax):
-
-        kx = Gvec[iG, 0]
-        ky = Gvec[iG, 1]
-        kz = Gvec[iG, 2]
-
-        # Norm squared |G|^2 and norm |G| of the k-mode vector
-        knorm2 = kx*kx + ky*ky + kz*kz
-        knorm = np.sqrt(knorm2)
-        
-        # Direction of G in spherical angles (costheta, phi)
-        if knorm == 0.0:
-            costheta = 0.0
-            phi = 0.0
-        else:
-            costheta = kz/knorm
-            phi = np.arctan2(ky, kx)
-
+            pwc_re[key] = np.empty((npgf[key], nmu, gmax), dtype=np.float64)
+            pwc_im[key] = np.empty((npgf[key], nmu, gmax), dtype=np.float64)
+ 
+    BLOCK = 512 # Chunking G-vectors
+    nblocks = (gmax + BLOCK - 1) // BLOCK # Number of blocks of G-vectors to process
+ 
+    for iblock in prange(nblocks):
+ 
+        gstart = iblock * BLOCK # Starting index of the current block of G-vectors
+        gend = min(gstart + BLOCK, gmax) # Ending index of the current block of G-vectors
+        nG_block = gend - gstart # Number of G-vectors in the current block
+ 
+        knorm = np.empty(nG_block, dtype=np.float64)
+        knorm2 = np.empty(nG_block, dtype=np.float64)
+        costheta = np.empty(nG_block, dtype=np.float64)
+        phi = np.empty(nG_block, dtype=np.float64)
+ 
+        for iG in range(nG_block):
+            kx = Gvec[gstart + iG, 0]
+            ky = Gvec[gstart + iG, 1]
+            kz = Gvec[gstart + iG, 2]
+ 
+            # Norm squared |G|^2 and norm |G| of the k-mode vector
+            k2 = kx * kx + ky * ky + kz * kz
+            kn = np.sqrt(k2)
+            knorm2[iG] = k2
+            knorm[iG] = kn
+ 
+            # Direction of G in spherical angles (costheta, phi)
+            if kn == 0.0:
+                costheta[iG] = 0.0
+                phi[iG] = 0.0
+            else:
+                costheta[iG] = kz / kn
+                phi[iG] = np.arctan2(ky, kx)
+ 
         for spe in species:
             # Precompute partial wave coefficients <nlm|k> consisting in
             # spherical harmonics and radial integrals evaluated at the given k
             for lam in range(lmax[spe]+1):
-
+ 
                 key = f"{spe}_{lam}"
-
-                # Fourier transform prefactors
-                lamfactor = np.sqrt(np.pi/2.0) * knorm**lam
-                phase_lam = (-1.0j)**lam
-
+                nmu = 2*lam + 1
+                alphas_key = alphas[key]
+                gcuts_key = gcuts[key]
+                pwc_re_key = pwc_re[key]
+                pwc_im_key = pwc_im[key]
+ 
+                # Fourier transform phase (-i)^lam: real for even lam, purely imaginary for odd lam
+                re_phase = (1.0, 0.0, -1.0, 0.0)
+                im_phase = (0.0, -1.0, 0.0, 1.0)
+                ph_re = re_phase[lam % 4]
+                ph_im = im_phase[lam % 4]
+ 
+                # |G|^lam, computed once per (block, lam)
+                klam = np.empty(nG_block, dtype=np.float64)
+                for iG in range(nG_block):
+                    lamfactor = 1.0
+                    for _ in range(lam):
+                        lamfactor *= knorm[iG]
+                    klam[iG] = lamfactor
+ 
                 # Orthonormalized real spherical harmonics Y_{lam,m}(G/|G|) with Condon-Shortley phase convention
-                harmonics = np.zeros((2*lmax[spe]+1))
-                for mu in range(2*lam+1):
-                    harmonics[mu] = spherical_harmonic(lam, mu-lam, costheta, phi)
-
+                harmonics = np.empty((nmu, nG_block), dtype=np.float64)
+                for mu in range(nmu):
+                    for iG in range(nG_block):
+                        harmonics[mu, iG] = spherical_harmonic(lam, mu - lam, costheta[iG], phi[iG])
+ 
                 for ipgf in range(npgf[key]):
+ 
+                    gcut = gcuts_key[ipgf]
+                    if gcut <= gstart:
+                        continue # Do not calculate partial wave coefficients for G-vectors beyond the cutoff for this primitive
+                    iend = min(gcut, gend) - gstart
+ 
+                    sigma2 = 1.0 / (2.0 * alphas_key[ipgf])  # Squared Gaussian width in reciprocal space
+                    sigma = np.sqrt(sigma2)          # Gaussian width in reciprocal space
+                    pradpref = np.sqrt(np.pi / 2.0) * sigma2**lam * sigma**3.0
+ 
+                    radial = np.empty(iend, dtype=np.float64)
+                    for iG in range(iend):
+                        radial[iG] = pradpref * klam[iG] * np.exp(-0.5 * knorm2[iG] * sigma2)
 
-                    if iG >= gcuts[key][ipgf]:
-                        break # Do not calculate partial wave coefficients for G-vectors beyond the cutoff for this primitive
-
-                    sigma2 = 1.0 / (2.0 * alphas[key][ipgf]) # Squared Gaussian width in reciprocal space
-                    sigma = np.sqrt(sigma2) # Gaussian width in reciprocal space
-                    
-                    # Radial integral
-                    radial = lamfactor * sigma2**lam * sigma**3.0 * np.exp(-0.5*knorm2*sigma2)
-                    for mu in range(2*lam+1):
-                        partial_wave_coefs[key][iG, ipgf, mu] = radial * harmonics[mu] * phase_lam
-
-    return partial_wave_coefs
+                    for mu in range(nmu):
+                        for iG in range(iend):
+                            pwcval = radial[iG] * harmonics[mu, iG]
+                            pwc_re_key[ipgf, mu, gstart + iG] = pwcval * ph_re
+                            pwc_im_key[ipgf, mu, gstart + iG] = pwcval * ph_im
+ 
+    return pwc_re, pwc_im
 
 def gto_rec_g0(natoms, atomic_symbols, lmax, nmax, npgf, alphas, contranorm, ncoefs):
     # G=0 Fourier component (monopole) of each contracted basis function.
@@ -840,26 +881,80 @@ def build_matrices_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, p
     Sp = np.real(Sp) * 4 * np.pi
     return Sp
 
-def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wave_coefs, volume, rho_KS_rec, df_metric, gcuts, rank):
+@njit(parallel=True, fastmath=True, cache=True)
+def _w_prim_numba(Gvec, coords, offsets, natoms, atomic_symbols, lmax, npgf, gcuts, pwc_re, pwc_im, rho_w_re, rho_w_im, nmax_atoms, wp):
+    # One thread per atom
+
+    for iat in prange(natoms):
+
+        spe = atomic_symbols[iat]
+        nmax_atom = nmax_atoms[iat]
+
+        # z = exp(-i G.R) * rho_w
+        coord_x = coords[iat, 0]
+        coord_y = coords[iat, 1]
+        coord_z = coords[iat, 2]
+        z_real = np.empty(nmax_atom, dtype=np.float64)
+        z_imag = np.empty(nmax_atom, dtype=np.float64)
+        for iG in range(nmax_atom):
+            phase = Gvec[iG, 0] * coord_x + Gvec[iG, 1] * coord_y + Gvec[iG, 2] * coord_z
+            cosphase = np.cos(phase)
+            sinphase = np.sin(phase)
+            z_real[iG] = cosphase*rho_w_re[iG] + sinphase*rho_w_im[iG]
+            z_imag[iG] = cosphase*rho_w_im[iG] - sinphase*rho_w_re[iG]
+
+        ipgf = offsets[iat]
+        for lam in range(lmax[spe] + 1):
+
+            key = f"{spe}_{lam}"
+            pwc_re_key = pwc_re[key]
+            pwc_im_key = pwc_im[key]
+            gcuts_key = gcuts[key]
+            npgf_key = npgf[key]
+
+            lam_even = (lam % 2 == 0)
+
+            for mu in range(2*lam + 1):
+                for ipgf1 in range(npgf_key):
+                    gcut = gcuts_key[ipgf1]
+                    acc = 0.0
+                    if lam_even:
+                        for iG in range(gcut):
+                            acc += pwc_re_key[ipgf1, mu, iG] * z_real[iG]
+                    else:
+                        for iG in range(gcut):
+                            acc -= pwc_im_key[ipgf1, mu, iG] * z_imag[iG]
+                    wp[ipgf + ipgf1] = acc
+
+                ipgf += npgf_key
+
+def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, pwc_re, pwc_im, volume, rho_KS_rec, df_metric, gcuts, rank):
     # Build the primitive-basis density vector wp
     
     # Get the total size of the primitive basis
     ncoefs_prim = 0
     gmax = 0
     gmax_key = {}
+    offsets = np.zeros(natoms, dtype=np.int64)
+    nmax_atoms = np.zeros(natoms, dtype=np.int64)
+    ncoefs_prim = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
+        offsets[iat] = ncoefs_prim
+        nmax_atom = 0
         for lam in range(lmax[spe]+1):
             key = f"{spe}_{lam}"
             ncoefs_prim += npgf[key] * (2*lam + 1)
             gmax_key[key] = gcuts[key].max()
             gmax = max(gmax, gmax_key[key])
+            nmax_atom = max(nmax_atom, gmax_key[key])
+        nmax_atoms[iat] = nmax_atom
 
     wp = np.zeros((ncoefs_prim), dtype=np.float64)
 
-    Gvec_half = Gvec_half[:gmax]
+    Gvec_half = np.ascontiguousarray(Gvec_half[:gmax]) # Only keep the G-vectors needed
     knorm2_vec = np.einsum('ij,ij->i', Gvec_half, Gvec_half) # |G|^2
-    
+
     # Precompute the G-weighting
     if df_metric == "identity":
         # weight 2 for G>0, weight 1 for G=0
@@ -868,33 +963,13 @@ def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, partial_wa
     if df_metric == "coulomb":
         # weight always 2 here since Gvec_half already excludes G=0
         rho_w = 2.0 * np.conj(rho_KS_rec[:gmax]) * (4.0 * np.pi) / knorm2_vec
-    
-    # Precompute real/imag parts of partial_wave_coefs ONCE per key
-    pwc_real = {key: partial_wave_coefs[key][:gmax_key[key],:,:].real for key in partial_wave_coefs}
-    pwc_imag = {key: partial_wave_coefs[key][:gmax_key[key],:,:].imag for key in partial_wave_coefs}
-    
-    ipgf = 0
-    for iat in range(natoms):
-        spe = atomic_symbols[iat]
 
-        nmax_atom = 0
-        for lam in range(lmax[spe]+1):
-            key = f"{spe}_{lam}"
-            nmax_atom = max(nmax_atom, gmax_key[key])
+    # Contiguous real/imaginary parts of the weighted density
+    rho_w_re = np.ascontiguousarray(rho_w.real)
+    rho_w_im = np.ascontiguousarray(rho_w.imag)
 
-        z = np.exp(-1j * np.dot(Gvec_half[:nmax_atom], coords[iat])) * rho_w[:nmax_atom]
-        z_real = np.ascontiguousarray(z.real)
-        z_imag = np.ascontiguousarray(z.imag)
-
-        for lam in range(lmax[spe]+1):
-            key = f"{spe}_{lam}"
-
-            for mu in range(2*lam + 1):
-                for ipgf1 in range(npgf[key]):
-                    n1 = gcuts[key][ipgf1]
-                    wp[ipgf+ipgf1] = (np.dot(pwc_real[key][:n1, ipgf1, mu], z_real[:n1]) - np.dot(pwc_imag[key][:n1, ipgf1, mu], z_imag[:n1]))
-
-                ipgf += npgf[key]
+    # Use numba to compute
+    _w_prim_numba(Gvec_half, coords, offsets, natoms, atomic_symbols, lmax, npgf, gcuts, pwc_re, pwc_im, rho_w_re, rho_w_im, nmax_atoms, wp)
 
     wp = wp * (4.0 * np.pi) / volume
 
