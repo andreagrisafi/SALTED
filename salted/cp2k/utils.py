@@ -202,17 +202,13 @@ def read_local_pseudo(species, bdir):
 def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
     """Compute total charge and dipole moment for the given configuration"""
 
-    pseudocharge_dict = {}
-    for i in range(len(species)):
-        pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
-
     # Compute unnormalized electron-density integral
     iaux = 0
     nele = 0.0
     charge = 0.0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        nele += pseudocharge_dict[spe]
+        nele += pseudocharge[spe]
         if iat in atoms_range_set:
             i = 0
             for l in range(lmax[spe]+1):
@@ -242,9 +238,9 @@ def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols
             i = 0
             if average:
                 # Add contribution of nuclear pseudocharge to the dipole
-                dipole["x"] += pseudocharge_dict[spe] * coords[iat,0]
-                dipole["y"] += pseudocharge_dict[spe] * coords[iat,1]
-                dipole["z"] += pseudocharge_dict[spe] * coords[iat,2]
+                dipole["x"] += pseudocharge[spe] * coords[iat,0]
+                dipole["y"] += pseudocharge[spe] * coords[iat,1]
+                dipole["z"] += pseudocharge[spe] * coords[iat,2]
             for l in range(lmax[spe]+1):
                 for n in range(nmax[(spe,l)]):
                     for im in range(2*l+1):
@@ -281,17 +277,13 @@ def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols
 def scale_grad_coefs(pseudocharge,natoms,atoms_range_set,atomic_symbols,lmax,nmax,species,charge_integrals,coefs,grad_coefs,average,charge,parallel,comm):
     """Compute total charge and dipole moment for the given configuration"""
 
-    pseudocharge_dict = {}
-    for i in range(len(species)):
-        pseudocharge_dict[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
-
     # Compute unnormalized electron-density integral
     iaux = 0
     nele = 0.0
     grad_charge = np.zeros((all_natoms,3))
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        nele += pseudocharge_dict[spe]
+        nele += pseudocharge[spe]
         if iat in atoms_range_set:
             i=0
             for l in range(lmax[spe]+1):
