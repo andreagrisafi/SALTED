@@ -5,7 +5,7 @@ import math
 from ase.io import read, write
 import os.path as osp
 from salted.sys_utils import ParseConfig
-from salted.cp2k.utils import init_moments, compute_charge_and_dipole, gto_rec, get_reciprocal_grid, get_basis_set_info_numba
+from salted.cp2k.utils import init_moments, compute_charge_and_dipole, gto_rec, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo
 from salted import basis
 from numba import njit, prange
 from numba import types
@@ -30,16 +30,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
     lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)            
 
     bdir = osp.join(inp.salted.saltedpath,"basis")
-
-    pseudocharge = np.zeros((len(species)), dtype = np.float64)
-    pseudocharge_numba = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
-    rloc_dict = {}
-    for i in range(len(species)):
-        spe = species[i]
-        pp = np.loadtxt(osp.join(bdir,f"{spe}-local_pseudo.dat"))
-        pseudocharge[i] = pp[0]
-        pseudocharge_numba[spe] = pp[0] 
-        rloc_dict[spe] = pp[1] 
+    pseudocharge, rloc = read_local_pseudo(species, bdir)
 
     b2a = 0.529177249
     atomic_symbols = structure.get_chemical_symbols()
@@ -119,7 +110,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
 
     gauss = {}
     for spe in species:
-        gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc_dict[spe]**2))
+        gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc[spe]**2))
 
     volfactor = 32.0*np.pi*np.pi/(volume)
 
@@ -143,7 +134,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         spe = atomic_symbols[iat]
         rho_rec[:,iat] = -np.dot(partial_wave_coefs[spe],coefs[offset:offset + nbasis[spe]]) * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat])
         if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list or "total_charge" in f_list:
-            rho_n_rec[:,iat] = +pseudocharge_numba[spe] * gauss[spe] * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat]) 
+            rho_n_rec[:,iat] = pseudocharge[spe] * gauss[spe] * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat]) 
         offset += nbasis[spe]
 
     #print(time.time()-time_coefs_dot)

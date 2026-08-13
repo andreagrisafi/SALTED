@@ -85,14 +85,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
            natom_dict[spe] += 1
 
     bdir = osp.join(inp.salted.saltedpath,"basis")
-
-    pseudocharge = np.zeros((len(species)), dtype = np.float64)
-    pseudocharge_dict = {}
-    for i in range(len(species)):
-        spe = species[i]
-        pp = np.loadtxt(osp.join(bdir,f"{spe}-local_pseudo.dat"))
-        pseudocharge[i] = pp[0]
-        pseudocharge_dict[spe] = pp[0]
+    pseudocharge, rloc = read_local_pseudo(species, bdir)
 
     if gradient:
     

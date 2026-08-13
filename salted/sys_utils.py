@@ -735,7 +735,12 @@ class ParseConfig:
                     str,
                     lambda inp, val: val.lower() in ("aims", "pyscf", "cp2k"),
                 ),  # quantum mechanical code
-                "dfmetric": (True, None, str, None),  # density fitting metric
+                "dfmetric": (
+                    False, 
+                    "identity", 
+                    str, 
+                    get_qmcode_checker("cp2k"),
+                    ),  # density fitting metric
                 "dfbasis": (True, None, str, None),  # density fitting basis
                 #### below are optional, but required for some qmcode ####
                 "qmbasis": (
