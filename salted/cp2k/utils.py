@@ -1177,15 +1177,19 @@ def overlap_identity(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf
     else:
         images = np.zeros((1, 3)) # No periodicity
 
+    # Row/column reordering from PySCF's ordering to SALTED's
+    ixmap = {}
+    for spe in perm:
+        for spe2 in perm:
+            ixmap[(spe, spe2)] = np.ix_(perm[spe], perm[spe2])
+
     icoefs = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        pbra = perm[spe]
 
         icoefs2 = 0
         for iat2 in range(iat + 1):
             spe2 = atomic_symbols[iat2]
-            pket = perm[spe2]
 
             rcut_ij = rcut[(spe, spe2)] # real-space cutoff to use for this specific pair
 
@@ -1198,11 +1202,11 @@ def overlap_identity(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf
             dvecs = delta + images
             keep = np.einsum("ij,ij->i", dvecs, dvecs) <= rcut_ij * rcut_ij # Keep only the images whose distance falls within the pair cutoff
 
-            block = np.zeros((nbasis[spe], nbasis[spe2]))
+            raw = np.zeros((nbasis[spe], nbasis[spe2]))
             for d in dvecs[keep]:
                 mol_ket[spe2]._env[cslice[spe2]] = d # Move the "ket" ghost atom
-                raw = _pyscf_gto.intor_cross("int1e_ovlp", mol_bra[spe], mol_ket[spe2]) # Ask PySCF for the raw overlap integrals
-                block += raw[np.ix_(pbra, pket)] # Reorder PySCF's rows/columns into SALTED's (n,m) ordering
+                raw += _pyscf_gto.intor_cross("int1e_ovlp", mol_bra[spe], mol_ket[spe2]) # Ask PySCF for the raw overlap integrals
+            block = raw[ixmap[(spe, spe2)]] # Reorder PySCF's rows/columns into SALTED's (n,m) ordering
 
             S[icoefs:icoefs + nbasis[spe], icoefs2:icoefs2 + nbasis[spe2]] = block
             if iat2 != iat:
@@ -1235,15 +1239,19 @@ def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, p
     else:
         images = np.zeros((1, 3)) # No periodicity
 
+    # Row/column reordering from PySCF's ordering to SALTED's
+    ixmap = {}
+    for spe in perm:
+        for spe2 in perm:
+            ixmap[(spe, spe2)] = np.ix_(perm[spe], perm[spe2])
+
     icoefs = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        pbra = perm[spe]
 
         icoefs2 = 0
         for iat2 in range(iat + 1):
             spe2 = atomic_symbols[iat2]
-            pket = perm[spe2]
 
             rcut_ij = rcut[(spe, spe2)] # real-space cutoff to use for this specific pair
 
@@ -1256,11 +1264,11 @@ def overlap_coulomb_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, p
             dvecs = delta + images
             keep = np.einsum("ij,ij->i", dvecs, dvecs) <= rcut_ij * rcut_ij # Keep only the images whose distance falls within the pair cutoff
 
-            block = np.zeros((nbasis[spe], nbasis[spe2]))
+            raw = np.zeros((nbasis[spe], nbasis[spe2]))
             for d in dvecs[keep]:
                 mol_ket[spe2]._env[cslice[spe2]] = d # Move the "ket" ghost atom
-                raw = _pyscf_gto.intor_cross("int2c2e", mol_bra[spe], mol_ket[spe2]) # Ask PySCF for the raw overlap integrals
-                block += raw[np.ix_(pbra, pket)] # Reorder PySCF's rows/columns into SALTED's (n,m) ordering
+                raw += _pyscf_gto.intor_cross("int2c2e", mol_bra[spe], mol_ket[spe2]) # Ask PySCF for the raw overlap integrals
+            block = raw[ixmap[(spe, spe2)]] # Reorder PySCF's rows/columns into SALTED's (n,m) ordering
 
             # G=0 correction
             a_bra = pwc_g0[icoefs:icoefs + nbasis[spe]]
@@ -1282,27 +1290,28 @@ def overlap_coulomb_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbol
     S = np.zeros((ncoefs, ncoefs), dtype=np.float64)
 
     # G-vector truncation based on sigma_ewald
-    Gvec_half = Gvec_half[:gcut]
-    knorm_vec = np.sqrt(np.sum(Gvec_half*Gvec_half, axis=1)).astype(np.float64)  # |G|
+    Gvec_half = np.ascontiguousarray(Gvec_half[:gcut])
+    knorm2_vec = np.einsum('ij,ij->i', Gvec_half, Gvec_half)  # |G|^2
 
     phase = np.exp(-1j * np.dot(Gvec_half, coords.T)) # e^{-iG.r_iat}
-    phase_over_knorm = phase / knorm_vec[:, np.newaxis]
+    phase_over_knorm2 = phase / knorm2_vec[:, np.newaxis]
 
     icoefs = 0
     for iat in range(natoms):
         spe = atomic_symbols[iat]
-        obj1 = phase_over_knorm[:, iat, np.newaxis] * partial_wave_coefs[spe][:gcut]
+        obj1 = phase_over_knorm2[:, iat, np.newaxis] * partial_wave_coefs[spe][:gcut]
         obj1_real = np.ascontiguousarray(obj1.real)
         obj1_imag = np.ascontiguousarray(obj1.imag)
 
         icoefs2 = 0
         for iat2 in range(iat+1):
             spe2 = atomic_symbols[iat2]
-            obj2 = phase_over_knorm[:, iat2, np.newaxis] * partial_wave_coefs_ewald[spe2][:gcut]  # Ewald ket
+            obj2 = phase[:, iat2, np.newaxis] * partial_wave_coefs_ewald[spe2][:gcut]  # Ewald ket
 
-            S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = 2*(np.dot(obj1_real.T, obj2.real) + np.dot(obj1_imag.T, obj2.imag))
+            block = 2*(np.dot(obj1_real.T, obj2.real) + np.dot(obj1_imag.T, obj2.imag))
+            S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]] = block
             if iat2 != iat:
-                S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = S[icoefs:icoefs+nbasis[spe], icoefs2:icoefs2+nbasis[spe2]].T
+                S[icoefs2:icoefs2+nbasis[spe2], icoefs:icoefs+nbasis[spe]] = block.T
             icoefs2 += nbasis[spe2]
         icoefs += nbasis[spe]
 
@@ -1623,7 +1632,7 @@ def get_wn_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partia
 
     wn = np.zeros((ncoefs), dtype=np.float64)
 
-    Gvec_half = Gvec_half[:gcut]
+    Gvec_half = np.ascontiguousarray(Gvec_half[:gcut])
     knorm2_vec = np.einsum('ij,ij->i', Gvec_half, Gvec_half)
 
     # Core charge density with Coulomb kernel
