@@ -33,8 +33,27 @@ In what follows, we describe how to generate training electron densities to be u
 
    :code:`python3 -m salted.get_basis_info`
 
-6. Run the density fitting script for the required configurations.
+6. Run the density fitting script for the required configurations:
 
    :code:`python3 -m salted.cp2k.density_fitting conf_start conf_end` (MPI parallelizible)
 
 The resulting fitting coefficients and overlap matrices are saved in the :code:`coefficients` and :code:`overlaps` folders of :code:`inp.salted.saltedpath`.
+
+7. Validate the trained model:
+
+   :code:`python3 -m salted.validation` (MPI parallelizable)
+
+   The validation script computes:
+
+   - :code:`errors.dat`: RMSE of the predicted density
+   - :code:`charges.dat`: reference vs. predicted total electronic charge
+   - :code:`dipoles.dat`: reference vs. predicted total dipole moment
+   - :code:`electrostatic_energy.dat`: reference vs. predicted Hartree energy (only for `dfmetric: coulomb`)
+
+   The total charge is computed **first** from the raw predicted coefficients, so that `charges.dat` reports the actual charge error of the model.
+   The predicted isotropic components are then rescaled to absorb that error and conserve the charge exactly, and these charge-corrected coefficients are used for the dipole moment and the Hartree energy.
+
+8. Test density reconstruction (optional)
+
+   The fitted coefficients can be expanded back onto a real-space grid and written as Gaussian cube files if needed, via :code:`salted.cp2k.cube_reconstruction`.
+   The script :code:`test_cube.py` provides a minimal working example.

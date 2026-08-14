@@ -65,3 +65,20 @@ A detailed description of how to generate the training data for SALTED using FHI
     ```bash
     mpirun -np $ntasks python3 -m salted.cp2k.density_fitting conf_start conf_end 
     ```
+    When `dfmetric: coulomb`, the the electrostatic energy of the fitted density is directly printed as well.
+    Charge conservation is enforced during the fitting for all metrics.
+
+7. Once a model has been trained, `salted.validation` compares predictions against the reference data:
+    ```bash
+    mpirun -np $ntasks python3 -m salted.validation
+    ```
+    `salted.validation` computes:
+
+    | File | Content |
+    |---|---|
+    | `errors.dat` | RMSE of the predicted density |
+    | `charges.dat` | Reference vs. predicted total electronic charge |
+    | `dipoles.dat` | Reference vs. predicted total dipole moment |
+    | `electrostatic_energy.dat` | Reference vs. predicted Hartree energy (only for `dfmetric: coulomb`) |
+
+    The total charge is computed **first** from the raw predicted coefficients, so that `charges.dat` reports the actual charge error of the model. The predicted isotropic components are then rescaled to absorb that error and conserve the charge exactly, and it is these charge-corrected coefficients that are used for the dipole moment and the Hartree energy.
