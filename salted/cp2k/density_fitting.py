@@ -5,14 +5,10 @@ import os
 import glob
 from ase.io import read
 import os.path as osp
-from salted import basis
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
 from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, gto_rec_ewald, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, setup_pyscf_species, setup_pyscf_ewald
-from salted.cp2k.utils import build_contraction_matrix, get_w_prim, compute_hartree_energy, build_gcutoff, pair_cutoffs, build_matrices, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
-from numba import types
-from numba.typed import Dict
+from salted.cp2k.utils import build_contraction_matrix, get_w_prim, compute_hartree_energy, build_gcutoff, pair_cutoffs, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from mpi4py import MPI
-from salted.sys_utils import ParseConfig, detect_mpi
 
 b2a = 0.529177249
 
@@ -64,7 +60,7 @@ lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_nu
 # PySCF setup and cutoffs
 pyscf_data = setup_pyscf_species(species, lmax, nmax_numba, alphas, contranorm)
 if df_metric =="identity":
-    rcut_pairs = pair_cutoffs(species, lmax, alphas, contranorm, eps=1e-10)
+    rcut_pairs = pair_cutoffs(species, lmax, alphas)
     #for spe1 in species:
     #    for spe2 in species:
     #        print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
@@ -75,8 +71,6 @@ if df_metric == "coulomb":
     for spe1 in species:
         for spe2 in species:
             rcut_pairs[(spe1, spe2)] = 4 * (sigma_ewald + sigma_ewald)
-            #print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
-            #rcut_pairs[(spe1, spe2)] = 4 * np.sqrt(2 + max(lmax[spe1], lmax[spe2])) * sigma_ewald # More strict criterion, if needed
             #print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
 
 for iconf in conf_range:
@@ -103,7 +97,6 @@ for iconf in conf_range:
         # Header: 2 comment lines + origin line + 3 lattice lines + atom lines
         header = [cubefile.readline() for _ in range(6 + natoms[iconf])]
         line_ori, line_x, line_y, line_z = (header[i].split() for i in range(2, 6))
-        nside = {}
         nx = int(line_x[0])
         ny = int(line_y[0])
         nz = int(line_z[0])
@@ -137,7 +130,6 @@ for iconf in conf_range:
     Gvec_half = Gvec[mask]
     if df_metric == "coulomb": # exclude G=0
         Gvec_half = Gvec_half[1:]
-    nG_half = len(Gvec_half)
     
     # Sort array of G-vectors depending on G-norm
     knorm_vec = np.linalg.norm(Gvec_half, axis=1)
@@ -146,7 +138,7 @@ for iconf in conf_range:
     knorm_vec = knorm_vec[sort_idx]
     
     # Get flexible G-cutoffs for full primitive basis function representation
-    gcuts = build_gcutoff(alphas, npgf, species, lmax, knorm_vec, nG_half)
+    gcuts = build_gcutoff(alphas, species, lmax, knorm_vec)
 
     if df_metric == "coulomb":
         # G-vector truncation based on omega
@@ -205,7 +197,7 @@ for iconf in conf_range:
     Sinv = np.linalg.solve(S, np.column_stack([w, q]))
     Sinv_w, Sinv_q = Sinv[:, 0], Sinv[:, 1]
     lagmult = (np.dot(q, Sinv_w) - n_elec) / np.dot(q, Sinv_q) # Lagrange multiplier
-    c = Sinv_w - lagmult * Sinv_q
+    c = Sinv_w - lagmult * Sinv_q # Fitted coefficients
 
     if inp.salted.verbose: print("Time to solve linear system:", time.time()-time_c)
 
@@ -216,7 +208,7 @@ for iconf in conf_range:
     # Hartree energy calculation
     time_c = time.time()
     if df_metric == "coulomb":
-        sigma_ewald_en = 1.0 / b2a
+        sigma_ewald_en = 1.0 / b2a # 1 angstrom, hard-coded
         e_hartree, e_ee, e_en, e_nn = compute_hartree_energy(c, S, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, origin, [nx, ny, nz])
         print(f"conf {conf_start+iconf+1}: Hartree energy = {e_hartree:.8f} Ha", flush=True)
         if inp.salted.verbose: print(f"conf {conf_start+iconf+1}: E_ee = {e_ee:.8f} Ha, E_en = {e_en:.8f} Ha, E_nn = {e_nn:.8f} Ha", flush=True)
