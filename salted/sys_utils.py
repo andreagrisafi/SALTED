@@ -735,6 +735,12 @@ class ParseConfig:
                     str,
                     lambda inp, val: val.lower() in ("aims", "pyscf", "cp2k"),
                 ),  # quantum mechanical code
+                "dfmetric": (
+                    False,
+                    PLACEHOLDER,
+                    str,
+                    lambda inp, val: get_qmcode_checker("cp2k")(inp, val) and (val == PLACEHOLDER or val in ("identity", "coulomb")),
+                ),  # density fitting metric, only for CP2K
                 "dfbasis": (True, None, str, None),  # density fitting basis
                 #### below are optional, but required for some qmcode ####
                 "qmbasis": (
@@ -749,24 +755,6 @@ class ParseConfig:
                     str,
                     get_qmcode_checker("pyscf"),
                 ),  # quantum mechanical functional, only for PySCF
-                "pseudocharge": (
-                    False,
-                    PLACEHOLDER,
-                    list,
-                    get_qmcode_checker("cp2k"),
-                ),  # pseudo nuclear charge, only for CP2K
-                "coeffile": (
-                    False,
-                    PLACEHOLDER,
-                    str,
-                    get_qmcode_checker("cp2k"),
-                ),
-                "ovlpfile": (
-                    False,
-                    PLACEHOLDER,
-                    str,
-                    get_qmcode_checker("cp2k"),
-                ),
                 "periodic": (
                     False,
                     PLACEHOLDER,

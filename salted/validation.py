@@ -17,7 +17,7 @@ from salted.sys_utils import (
     init_property_file,
     read_system,
 )
-from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
+from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo
 
 def build():
 
@@ -91,6 +91,7 @@ def build():
         if saltedtype=="density":
             qfile = init_property_file("charges",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
             dfile = init_property_file("dipoles",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+            if inp.qm.dfmetric=="coulomb": ufile = init_property_file("electrostatic_energy",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
         if saltedtype=="density-response":
             pfile = init_property_file("polarizabilities",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
 
@@ -154,17 +155,51 @@ def build():
 
             if qmcode=="cp2k":
 
+                bdir = osp.join(inp.salted.saltedpath,"basis")
+                pseudocharge, rloc = read_local_pseudo(species, bdir)
+
                 # Compute reference total charges and dipole moments
-                ref_charge, ref_dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,parallel,comm)
+                ref_charge, ref_dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,parallel,comm)
+                
                 # Compute predicted total charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(inp.qm.pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
+                charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
 
+                if inp.qm.dfmetric == "coulomb":
+                   
+                    # Prepare Hartree energy calculation 
+                    structure = read(inp.system.filename,":")[iconf]
+                    b2a = 0.529177249
+                    cell = structure.get_cell() / b2a
+                    nx = int(np.floor(cell[0,0]/(0.111))+1)
+                    ny = int(np.floor(cell[1,1]/(0.111))+1)
+                    nz = int(np.floor(cell[2,2]/(0.111))+1)
+                    sigma_ewald_en = 1.0 / b2a # sigma_en = 1 angs
+                    lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)
 
-                # Save charges and dipole moments
+                    # Compute reference Hartree energy
+                    ref_hartree, ref_ee, ref_en, ref_nn = compute_hartree_energy(ref_coefs, overl, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, np.array([0.0,0.0,0.0]), [nx, ny, nz]) 
+                    
+                    # Compute predicted Hartree energy
+                    hartree, ee, en, nn = compute_hartree_energy(pred_coefs, overl, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, np.array([0.0,0.0,0.0]), [nx, ny, nz]) 
+
+                ## Compute reference energy and forces
+                #ref_U_ele, ref_forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc_dict,structure,ref_coefs)
+                #
+                ## Compute predicted energy and forces
+                #U_ele, forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc_dict,structure,pred_coefs)
+
+                # Save total charge 
                 print(iconf+1,ref_charge,
                                   charge,file=qfile)
+
+                # Save total dipole
                 print(iconf+1,ref_dipole["x"],ref_dipole["y"],ref_dipole["z"],
                                   dipole["x"],    dipole["y"],    dipole["z"],file=dfile)
+                
+                # Save electrostatic energy
+                if inp.qm.dfmetric=="coulomb":
+                     print(iconf+1,ref_hartree,
+                                       hartree,file=ufile)
             
             np.savetxt(osp.join(dirpath,
                                 f"COEFFS-{iconf+1}.dat"
@@ -238,6 +273,7 @@ def build():
         if saltedtype=="density":
             qfile.close()
             dfile.close()
+            if inp.qm.dfmetric=="coulomb": ufile.close()
         if saltedtype=="density-response":
             pfile.close()
 

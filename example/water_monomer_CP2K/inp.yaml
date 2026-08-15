@@ -2,6 +2,7 @@
 salted:
   saltedname: rc4_nl
   saltedpath: ./
+  verbose: True
 
 # system general parameters
 system:
@@ -14,9 +15,7 @@ qm:
   qmcode: cp2k
   periodic: 3D
   dfbasis: RI-basis
-  coeffile: wat_mon-RI_DENSITY_COEFFS.dat
-  ovlpfile: wat_mon-RI_2C_INTS.fm
-  pseudocharge: [1.0, 6.0]
+  dfmetric: coulomb
 
 # descriptor parameters 
 descriptor:
@@ -28,22 +27,19 @@ descriptor:
     nang: 6
     neighspe: [H, O]
   rep2:
-    type: V
+    type: rho 
     rcut: 4.0
     sig: 0.3
     nrad: 8
     nang: 6
     neighspe: [H, O]
   sparsify:
-    nsamples: 10
+    nsamples: 100
     ncut: 1000
 
 # Gaussian process regression variables
 gpr:
-  z: 1.0
-  Menv: 50
-  Ntrain: 190
+  z: 2.0
+  Menv: 100
+  Ntrain: 800
   trainfrac: 1.0
-  regul: 1e-5
-  gradtol: 1e-6 
-  trainsel: sequential

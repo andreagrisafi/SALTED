@@ -86,7 +86,7 @@ def sph_zproj(theta,phi,lam):
     """Project on the spherical harmonics evaluated at d_ij direction"""
     sph_dij = np.zeros(2*lam+1,complex)
     for mu in range(2*lam+1):
-        sph_dij[mu] = special.sph_harm(mu-lam,lam,phi,theta)
+        sph_dij[mu] = special.sph_harm_y(lam,mu-lam,theta,phi)
     CR = complex_to_real_transformation([2*lam+1])[0]
     return np.real(np.dot(CR,sph_dij))
 

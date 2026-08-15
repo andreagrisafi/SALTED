@@ -67,12 +67,10 @@ for iconf in conf_range:
         print("conf", iconf+1, "size =", nRI, flush=True)
 
     # save overlap matrix in SALTED format
-    overlap = np.zeros((nRI, nRI)).astype(np.double)
-    for i in range(nRI):
-       offset = 4 + i*((nRI+1)*8)
-       overlap[:, i] = np.fromfile(os.path.join(
-           inp.qm.path2qm, f"conf_{iconf+1}", inp.qm.ovlpfile
-        ), dtype=np.float64, offset = offset, count=nRI)
+    filepath = os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", inp.qm.ovlpfile)
+    raw_data = np.fromfile(filepath, dtype=np.float64, offset=4, count=(nRI - 1)*(nRI + 1) + nRI)
+    raw_data = np.append(raw_data, 0.0) # to be able to reshape the array into a square matrix
+    overlap = raw_data.reshape(nRI,nRI + 1)[:, :nRI].T.copy()
 
     dirpath = os.path.join(inp.salted.saltedpath, "overlaps")
     if not os.path.exists(dirpath):
