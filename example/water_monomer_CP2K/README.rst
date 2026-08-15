@@ -33,27 +33,32 @@ In what follows, we describe how to generate training electron densities to be u
 
    :code:`python3 -m salted.get_basis_info`
 
-6. Run the density fitting script for the required configurations:
+6. Perform the density fitting (either with :code:`identity` or :code:`coulomb` metric) on the selected RI basis for the required configurations:
 
    :code:`python3 -m salted.cp2k.density_fitting conf_start conf_end` (MPI parallelizible)
 
-The resulting fitting coefficients and overlap matrices are saved in the :code:`coefficients` and :code:`overlaps` folders of :code:`inp.salted.saltedpath`.
+   A Lagrange multiplier is adopted to solve the linear problem under total charge conservation. The fitted coefficients and 2-center integral (overlap) matrices are saved in the :code:`coefficients` and :code:`overlaps` folders, respectively, in :code:`inp.salted.saltedpath`.
 
-7. Validate the trained model:
+Derived properties
+------------------
 
-   :code:`python3 -m salted.validation` (MPI parallelizable)
+Analytical calculation of derived electrostatic properties is performed by relevant SALTED functions, e.g., :code:`salted.validation`, :code:`salted.prediction` and :code:`salted.salted_prediction`. 
 
-   The validation script computes:
+1. :code:`saltedtype : density`:
 
-   - :code:`errors.dat`: RMSE of the predicted density
-   - :code:`charges.dat`: reference vs. predicted total electronic charge
-   - :code:`dipoles.dat`: reference vs. predicted total dipole moment
-   - :code:`electrostatic_energy.dat`: reference vs. predicted Hartree energy (only for `dfmetric: coulomb`)
+   The total charge is first computed from the raw predicted coefficients. The L=0 (isotropic) components are then rescaled to enforce exact charge conservation and compute total dipole moments and Hartree energies. Specifically, :code:`salted.validation` will automatically output the following files:
+   
+      - :code:`charges.dat`: reference vs. predicted total electronic charge
+      - :code:`dipoles.dat`: reference vs. predicted total dipole moment of 3 elements each (X, Y, Z)
+      - :code:`electrostatic_energy.dat`: reference vs. predicted electrostatic energy (only for `dfmetric: coulomb`)
 
-   The total charge is computed **first** from the raw predicted coefficients, so that `charges.dat` reports the actual charge error of the model.
-   The predicted isotropic components are then rescaled to absorb that error and conserve the charge exactly, and these charge-corrected coefficients are used for the dipole moment and the Hartree energy.
+2. :code:`saltedtype : density-response`:
 
-8. Test density reconstruction (optional)
+   The total integral of the predicted density response is enforced to vanish by removing the total integral error from the L=0 coefficients for each Cartesian component. Derived polarizability tensors are then analytically computed. :code:`salted.validation` will automatically output a :code:`polarizabilities.dat` file including reference vs. predicted flattened rank-2 tensors of 9 elements each (XX, XY, XZ, YX, YY, ...). NB: a :code:`alpha_only` keyword can be used in the :code:`inp.prediction` section to only predict the L=0 and L=1 density-response coefficients, required for the calculation of the polarizability. 
 
-   The fitted coefficients can be expanded back onto a real-space grid and written as Gaussian cube files if needed, via :code:`salted.cp2k.cube_reconstruction`.
-   The script :code:`test_cube.py` provides a minimal working example.
+
+Print 3D-fields as cube files (optional)
+----------------------------------------
+
+   Electron densities, total charge densities, electrostatic potentials and electric fields associated with density-fitted or SALTED-predicted coefficients can be printed on a 3D real-space grid as :code:`<cube_file_name>.cube` files, via the function :code:`salted.cp2k.cube_reconstruction`.
+   The script :code:`print_cubes.py` found in the example folder provides a minimal working example. A light 3D grid is used by default for visualization purposes; alternatively, reference cube files can be provided in input to use a prescribed 3D grid, as well as to measure the mean absolute error of the electron density, normalized by the total number of electrons (% MAE).  

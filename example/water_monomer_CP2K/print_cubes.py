@@ -12,7 +12,7 @@ inp = ParseConfig().parse_input()
 comm, size, rank, _ = detect_mpi()
 
 # Load structure
-iconf = 1
+iconf = 0
 structure = read(inp.system.filename,":")[iconf]
 
 # Cube file name prefix
