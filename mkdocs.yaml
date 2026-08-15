@@ -17,11 +17,7 @@ nav:
   - Tutorial:
     - Part 1 - Dataset: tutorial/dataset.md
     - Part 2 - Training: tutorial/training.md
-      #    - Part 3 - Predict Properties: tutorial/predict.md
-      #  - Examples:
-      #    - Example 1 - Water & PySCF: examples/water_pyscf.md
-      #    - Example 2 - Water & FHI-aims: examples/water_aims.md
-      #    - Example 3 - Au slab & CP2K: examples/au_cp2k.md
+    - Part 3 - Training: tutorial/derived_properties.md
   - API: api.md
 
 plugins:
