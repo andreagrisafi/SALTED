@@ -15,7 +15,11 @@ def build():
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system(filename=inp.prediction.filename,spelist = inp.system.species, dfbasis = inp.qm.dfbasis)
     
-    pdir = f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}"
+    if inp.system.collinear:
+        pdir_avgs = f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}_avgs"
+        pdir_diff = f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}_diff"
+    else:
+        pdir = f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}"
     
     ntrain = int(inp.gpr.trainfrac*inp.gpr.Ntrain)
     
@@ -28,18 +32,43 @@ def build():
     for i in conf_range:
         if inp.salted.verbose:
             print(f"processing {i+1}/{ndata} frame")
-        t = np.loadtxt(os.path.join(
-            inp.salted.saltedpath, pdir,
-            f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
-            f"COEFFS-{i+1}.dat",
-        ))
-        n = len(t)
+        if inp.system.collinear:
+            ta = np.loadtxt(os.path.join(
+                inp.salted.saltedpath, pdir_avgs,
+                f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
+                f"COEFFS-{i+1}.dat",
+            ))
+            n = len(ta)
+
+            td = np.loadtxt(os.path.join(
+                inp.salted.saltedpath, pdir_diff,
+                f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
+                f"COEFFS-{i+1}.dat",
+            ))
+
+            alpha = ta + td*0.5
+            beta = ta - td*0.5
+
+            dirpath = os.path.join(inp.qm.path2qm, inp.prediction.predict_data, f"{i+1}")
+            if not os.path.exists(dirpath):
+                os.makedirs(dirpath, exist_ok=True)
+
+            np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted.out"), alpha)
+            np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted_beta.out"), beta)
+
+        else:
+            t = np.loadtxt(os.path.join(
+                inp.salted.saltedpath, pdir,
+                f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
+                f"COEFFS-{i+1}.dat",
+            ))
+            n = len(t)
     
-        dirpath = os.path.join(inp.qm.path2qm, inp.prediction.predict_data, f"{i+1}")
-        if not os.path.exists(dirpath):
-            os.makedirs(dirpath, exist_ok=True)
+            dirpath = os.path.join(inp.qm.path2qm, inp.prediction.predict_data, f"{i+1}")
+            if not os.path.exists(dirpath):
+                os.makedirs(dirpath, exist_ok=True)
     
-        np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted.out"), t)
+            np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted.out"), t)
 
 if __name__ == "__main__":
     build()

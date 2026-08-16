@@ -1,0 +1,3 @@
+To generate AIMS outputs for collinear SALTED, you must use a version >=YYYYYYY.
+
+Hessian_matrix and solve_regression do not yet support collinear calculations.

@@ -28,7 +28,7 @@ from salted.sys_utils import (
 )
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
-def build():
+def build(end=""):
 
     inp = ParseConfig().parse_input()
     # frequently used parameters
@@ -86,7 +86,7 @@ def build():
     ntrain = int(inp.gpr.Ntrain * inp.gpr.trainfrac)
     weights = np.load(osp.join(
         saltedpath,
-        f"regrdir_{saltedname}",
+        f"regrdir_{saltedname}{end}",
         f"M{Menv}_zeta{zeta}",
         f"weights_N{ntrain}_reg{reg_log10_intstr}.npy"
     ))
@@ -98,7 +98,7 @@ def build():
     # base directory path for this prediction
     pdir = osp.join(
         saltedpath,
-        f"predictions_{saltedname}_{predname}"
+        f"predictions_{saltedname}_{predname}{end}"
     )
     dirpath = osp.join(pdir,
         f"M{Menv}_zeta{zeta}",
@@ -165,7 +165,7 @@ def build():
         if average:
             av_coefs = {}
             for spe in species:
-                av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
+                av_coefs[spe] = np.load(os.path.join(saltedpath, f"coefficients{end}", "averages", f"averages_{spe}.npy"))
 
         # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
         pvec = {}
@@ -643,4 +643,9 @@ def save_pred_descriptor(data: dict[int, np.ndarray], config_range: list[int], n
 
 
 if __name__ == "__main__":
-    build()
+    inp = ParseConfig().parse_input()
+    if inp.system.collinear:
+        build(end='_avgs')
+        build(end='_diff')
+    else:
+        build()

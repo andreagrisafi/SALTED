@@ -19,7 +19,7 @@ from salted.sys_utils import (
 )
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo
 
-def build():
+def build(end=""):
 
     inp = ParseConfig().parse_input()
     # frequently used parameters
@@ -36,8 +36,8 @@ def build():
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-    vdir = f"validations_{saltedname}"
-    rdir = f"regrdir_{saltedname}"
+    vdir = f"validations_{saltedname}{end}"
+    rdir = f"regrdir_{saltedname}{end}"
     fdir = f"rkhs-vectors_{saltedname}"
 
     # define test set
@@ -77,7 +77,7 @@ def build():
         # Load spherical averages 
         av_coefs = {}
         for spe in species:
-            av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
+            av_coefs[spe] = np.load(os.path.join(saltedpath, f"coefficients{end}", "averages", f"averages_{spe}.npy"))
 
     if qmcode=="cp2k":
         from ase.io import read
@@ -107,7 +107,7 @@ def build():
 
             # Load reference coefficients
             ref_coefs = np.load(osp.join(
-                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+                saltedpath, f"coefficients{end}", f"coefficients_conf{iconf}.npy"
             ))
             ref_projs = np.dot(overl,ref_coefs)
             Tsize = len(ref_coefs)
@@ -282,8 +282,15 @@ def build():
         variance = comm.allreduce(variance)
 
     if rank == 0:
-        print(f"\n % RMSE: {(100*np.sqrt(error_density/variance)):.3e}", flush=True)
-
+        if end == "":
+            print(f"\n % RMSE: {(100*np.sqrt(error_density/variance)):.3e}", flush=True)
+        else:
+            print(f"\n % RMSE for {end[-4:]}: {(100*np.sqrt(error_density/variance)):.3e}", flush=True)
 
 if __name__ == "__main__":
-    build()
+    inp = ParseConfig().parse_input()
+    if inp.system.collinear:
+        build(end='_avgs')
+        build(end='_diff')
+    else:
+        build()

@@ -721,6 +721,12 @@ class ParseConfig:
                     bool,
                     None,
                 ),  # if bias the GPR by the average of predictions
+            "collinear": (
+                    False,
+                    False,
+                    bool,
+                    None,
+                ),  # does it have spin?
             },
             "qm": {
                 "path2qm": (
