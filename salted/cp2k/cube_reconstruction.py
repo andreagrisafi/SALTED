@@ -4,6 +4,8 @@ import time
 import math
 from ase.io import read, write
 import os.path as osp
+
+from salted.constants import bohr2angs
 from salted.sys_utils import ParseConfig
 from salted.cp2k.utils import init_moments, compute_charge_and_dipole, gto_rec, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo
 from salted import basis
@@ -32,13 +34,12 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
     bdir = osp.join(inp.salted.saltedpath,"basis")
     pseudocharge, rloc = read_local_pseudo(species, bdir)
 
-    b2a = 0.529177249
     atomic_symbols = structure.get_chemical_symbols()
     valences = structure.get_atomic_numbers()
     natoms = len(atomic_symbols)
-    coords  = structure.positions/b2a
-
-    volume = structure.get_volume()/(b2a**3)
+    coords  = structure.positions / bohr2angs
+    cell = structure.get_cell() / bohr2angs
+    volume = structure.get_volume() / (bohr2angs**3)
 
     charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
     charge, dipole = compute_charge_and_dipole(pseudocharge, natoms, range(natoms), atomic_symbols, coords, lmax, nmax, species, charge_integrals, dipole_integrals, coefs, True, False, False)
@@ -73,13 +74,13 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         nx, ny, nz = nside[0], nside[1], nside[2]
 
     else:
-        nx = int(np.floor(structure.cell[0,0]/(0.111*b2a))+1)
-        ny = int(np.floor(structure.cell[1,1]/(0.111*b2a))+1)
-        nz = int(np.floor(structure.cell[2,2]/(0.111*b2a))+1)
+        nx = int(np.floor(cell[0,0]/0.111)+1)
+        ny = int(np.floor(cell[1,1]/0.111)+1)
+        nz = int(np.floor(cell[2,2]/0.111)+1)
 
-    dx = float(structure.cell[0,0]/nx) / b2a
-    dy = float(structure.cell[1,1]/ny) / b2a
-    dz = float(structure.cell[2,2]/nz) / b2a
+    dx = float(cell[0,0]/nx) 
+    dy = float(cell[1,1]/ny) 
+    dz = float(cell[2,2]/nz) 
 
     Gvec = get_reciprocal_grid(nx,ny,nz,dx,dy,dz)
 
