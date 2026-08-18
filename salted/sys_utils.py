@@ -9,6 +9,7 @@ import numpy as np
 import yaml
 from ase.io import read
 
+from salted.constants import bohr2angs
 from salted import basis
 
 
@@ -105,8 +106,6 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
     xyzfile = read(filename, ":", parallel=False)
     ndata = len(xyzfile)
     
-    bohr2angs = 0.529177210670
-
     # Define system excluding atoms that belong to species not listed in SALTED input
     atomic_symbols = []
     atomic_coords  = []
@@ -115,7 +114,7 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
         atomic_symbols.append(xyzfile[iconf].get_chemical_symbols())
         natoms_total = len(atomic_symbols[iconf])
         xyzfile[iconf].wrap()
-        atomic_coords.append(xyzfile[iconf].get_positions()/bohr2angs)
+        atomic_coords.append( xyzfile[iconf].get_positions() / bohr2angs )
         excluded_species = []
         for iat in range(natoms_total):
             spe = atomic_symbols[iconf][iat]

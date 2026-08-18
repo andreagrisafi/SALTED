@@ -7,6 +7,7 @@ from pyscf import gto
 from ase.io import read
 from scipy import special
 
+from salted.constants import bohr2angs, hart2kcal
 from salted import basis  # WARNING: relative import
 from salted.sys_utils import ParseConfig
 
@@ -33,8 +34,6 @@ llmax = max(llist)
 xyzfile = read(inp.system.filename,":")
 ndata = len(xyzfile)
 
-hart2kcal = 627.5096080305927
-bohr2ang = 0.52917721067121
 #======================= system parameters
 atomic_symbols = []
 atomic_valence = []
@@ -150,7 +149,7 @@ for iconf in testrange:
     for i in range(natoms):
         coord = coords[i]
         catoms.append([atoms[i],(coord[0],coord[1],coord[2])])
-    coords /= bohr2ang
+    coords /= bohr2angs
     # basis
     mol = gto.M(atom=catoms,basis=inp.qm.qmbasis)
     ribasis = inp.qm.qmbasis+" jkfit"

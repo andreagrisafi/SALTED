@@ -6,6 +6,7 @@ import os.path as osp
 import numpy as np
 from scipy import sparse
 
+from salted.constants import bohr2angs
 from salted import basis
 from salted.sys_utils import (
     ParseConfig,
@@ -168,12 +169,11 @@ def build():
                    
                     # Prepare Hartree energy calculation 
                     structure = read(inp.system.filename,":")[iconf]
-                    b2a = 0.529177249
-                    cell = structure.get_cell() / b2a
+                    cell = structure.get_cell() / bohr2angs
                     nx = int(np.floor(cell[0,0]/(0.111))+1)
                     ny = int(np.floor(cell[1,1]/(0.111))+1)
                     nz = int(np.floor(cell[2,2]/(0.111))+1)
-                    sigma_ewald_en = 1.0 / b2a # sigma_en = 1 angs
+                    sigma_ewald_en = 1.0 / bohr2angs # sigma_en = 1 angs
                     lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)
 
                     # Compute reference Hartree energy

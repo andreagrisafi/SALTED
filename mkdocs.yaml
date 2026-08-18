@@ -17,7 +17,8 @@ nav:
   - Tutorial:
     - Part 1 - Dataset: tutorial/dataset.md
     - Part 2 - Training: tutorial/training.md
-    - Part 3 - Training: tutorial/derived_properties.md
+    - Part 3 - Prediction: tutorial/prediction.md
+    - Part 4 - Derived properties: tutorial/derived_properties.md
   - API: api.md
 
 plugins:
