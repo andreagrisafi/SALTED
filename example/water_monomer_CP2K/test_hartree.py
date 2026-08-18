@@ -9,8 +9,6 @@ from mpi4py import MPI
 
 inp = ParseConfig().parse_input()
 
-bohr2angs = 0.529177249
-
 comm, size, rank, _ = detect_mpi()
 
 # Load structure
