@@ -181,13 +181,9 @@ def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols
                 for n in range(nmax[(spe,l)]):
                     for im in range(2*l+1):
                         if l==0:
-                            if average:
-                                # rescale isotropic coefficients to conserve the electronic charge
-                                coefs[iaux+i] *= nele/charge
-                            else:
-                                # remove residual charge from the most diffuse isotropic function
-                                if n==nmax[(spe,l)]-1:
-                                    coefs[iaux+i] -= charge/(charge_integrals[(spe,l,n)]*natoms)
+                            # Remove charge error from the last radial function
+                            if n==nmax[(spe,l)]-1:
+                                coefs[iaux+i] -= (charge-nele)/(charge_integrals[(spe,l,n)]*natoms)
                             # Compute l=0 electronic contribution to the dipole
                             # NB: this is ill-defined in a truly periodic system and/or for systems with a net charge
                             dipole["x"] -= coefs[iaux+i] * charge_integrals[(spe,l,n)] * coords[iat,0]
