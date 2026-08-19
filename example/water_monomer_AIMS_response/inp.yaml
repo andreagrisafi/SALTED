@@ -17,6 +17,12 @@ qm:
   qmcode: aims
   dfbasis: RI-aims
 
+# prediction data
+prediction:
+  filename: ./water_dimers_10.xyz
+  predname: prediction
+  predict_data: ./aims_pred_data
+
 # atomic environment parameters (for rascaline)
 descriptor:
   rep1:
@@ -38,7 +44,7 @@ descriptor:
 gpr:
   z: 2.0
   Menv: 100
-  Ntrain: 100
+  Ntrain: 40
   trainfrac: 1.0
   trainsel: "random"
   regul: 1e-8

@@ -9,7 +9,6 @@ python -m salted.aims.make_geoms
 
 n=$(ls $DATADIR/geoms | grep -c 'in')
 for (( i=1; i<=$n; i++ )); do
-	let j=$i-1
 	mkdir ${DATADIR}/$i
 	cp control.in ${DATADIR}/$i
 	cp ${DATADIR}/geoms/$i.in ${DATADIR}/$i/geometry.in
@@ -19,3 +18,7 @@ for (( i=1; i<=$n; i++ )); do
 
 	cd -
 done
+
+wait
+
+mpirun -np 16 python -m salted.aims.move_data

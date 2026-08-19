@@ -121,10 +121,13 @@ def build():
     
     """delte ri basis overlap and proj coeffs files"""
     
-    #for i in conf_range:
-    #    dirpath = osp.join(inp.qm.path2qm, 'data', str(i+1))
-    #    os.remove(osp.join(dirpath, 'ri_ovlp.out'))
-    #    os.remove(osp.join(dirpath, 'ri_projections.out'))
+    for i in conf_range:
+        dirpath = osp.join(inp.qm.path2qm, 'data', str(i+1))
+        os.remove(osp.join(dirpath, 'ri_ovlp.out'))
+        os.remove(osp.join(dirpath, 'ri_projections.out'))
+        if inp.salted.saltedtype == 'density-response':
+            os.remove(osp.join(dirpath, 'ri_projections_rho1.out'))
+
 
 if __name__ == "__main__":
     build()

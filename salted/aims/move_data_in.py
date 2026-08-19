@@ -28,18 +28,31 @@ def build():
     for i in conf_range:
         if inp.salted.verbose:
             print(f"processing {i+1}/{ndata} frame")
-        t = np.loadtxt(os.path.join(
-            inp.salted.saltedpath, pdir,
-            f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
-            f"COEFFS-{i+1}.dat",
-        ))
-        n = len(t)
-    
+        
         dirpath = os.path.join(inp.qm.path2qm, inp.prediction.predict_data, f"{i+1}")
         if not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
+
+        if inp.salted.saltedtype == 'density-response':
+            x = ["x","y","z"]
+            for j in range(3):
+                t = np.loadtxt(os.path.join(
+                    inp.salted.saltedpath, pdir,
+                    f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
+                    x[j], f"COEFFS-{i+1}.dat",
+                ))
+                n = len(t)
+ 
+                np.savetxt(os.path.join(dirpath, f"ri_rho1_restart_coeffs_predicted_{j+1}.out"), t)
+        else:
+            t = np.loadtxt(os.path.join(
+                inp.salted.saltedpath, pdir,
+                f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
+                f"COEFFS-{i+1}.dat",
+            ))
+            n = len(t)
     
-        np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted.out"), t)
+            np.savetxt(os.path.join(dirpath, f"ri_restart_coeffs_predicted.out"), t)
 
 if __name__ == "__main__":
     build()

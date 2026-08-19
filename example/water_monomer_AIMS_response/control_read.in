@@ -11,9 +11,9 @@
   relativistic       none
   charge             0.
 
-  ri_density_restart         read 0
+#  ri_density_restart         read 0
   ri_rho1 read
-  ri_full_output .True.
+#  ri_full_output .True.
   dfpt_iter_limit 1
   DFPT polarizability
   sc_accuracy_rho    1d-6

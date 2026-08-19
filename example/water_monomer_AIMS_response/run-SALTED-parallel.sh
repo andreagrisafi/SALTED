@@ -17,3 +17,5 @@ python3 -m salted.solve_regression
 #mpirun -np 4 python3 -m salted.minimize_loss
 
 mpirun -np 4 python3 -m salted.validation
+
+mpirun -np 4 python3 -m salted.prediction
