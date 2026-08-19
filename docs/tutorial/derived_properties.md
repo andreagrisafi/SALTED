@@ -22,7 +22,7 @@ Analytical GTO-based calculations of derived electrostatic properties can be per
 
 2. `saltedtype : density-response`
 
-     The function `compute_polarizability` is used to compute polarizability tensors from input density-response coefficients. The total integral of the predicted density response is enforced to vanish by removing the total integral error from the L=0 coefficients for each Cartesian component. **NB:** absolute values of dipole moments will only make physical sense when computed from electron-density responses that vanish before reaching the cell periodic boundaries.
+     The function `compute_polarizability` is used to compute polarizability tensors from input density-response coefficients. The total integral of the predicted density response is enforced to vanish by removing the total integral error from the L=0 coefficients for each Cartesian component. **NB:** absolute values of polarizabilities will only make physical sense when computed from electron-density responses that vanish before reaching the cell periodic boundaries.
      
      When validating a SALTED model, `salted.validation` will automatically output a `polarizabilities.dat` file including reference vs. predicted flattened rank-2 tensors of 9 elements each (XX, XY, XZ, YX, YY, ...). When predicting for a batch of structures via `salted.prediction`, an `alpha_only` keyword can be used in the `inp.prediction` section to only predict the L=0 and L=1 density-response coefficients, required for the calculation of the polarizability.
 
