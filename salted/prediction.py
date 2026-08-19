@@ -63,8 +63,6 @@ def build():
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system(filename_pred, inp.system.species, inp.qm.dfbasis)
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-    bohr2angs = 0.529177210670
-
     if rank == 0:
         print(f"The dataset contains {ndata} frames.")
 

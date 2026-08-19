@@ -10,6 +10,8 @@ from numba import types
 from numba.typed import Dict
 from pyscf import gto as _pyscf_gto
 
+from salted.constants import bohr2angs
+
 def init_moments(inp,species,lmax,nmax,rank):
     """Compute basis function integrals relevant for computing total charge, dipole and polarizability tensor"""
 
@@ -1178,17 +1180,17 @@ def elec_energy_forces(lmax,nmax,saltedpath,dfbasis,species,structure,coefs):
         pseudocharge_numba[spe] = pp[0]
         rloc_dict[spe] = pp[1]
 
-    b2a = 0.529177249
     atomic_symbols = structure.get_chemical_symbols()
     natoms = len(atomic_symbols)
-    coords  = structure.positions/b2a
-    volume = structure.get_volume()/(b2a**3)
+    coords  = structure.positions / bohr2angs
+    cell = structure.get_cell() / bohr2angs
+    volume = structure.get_volume() / (bohr2angs**3)
 
-    nx = int(np.floor(structure.cell[0,0]/(0.111*b2a))+1)
-    ny = int(np.floor(structure.cell[1,1]/(0.111*b2a))+1)
-    nz = int(np.floor(structure.cell[2,2]/(0.111*b2a))+1)
+    nx = int(np.floor(cell[0,0]/0.111)+1)
+    ny = int(np.floor(cell[1,1]/0.111)+1)
+    nz = int(np.floor(cell[2,2]/0.111)+1)
 
-    dx, dy, dz = structure.cell[0,0]/(b2a*nx), structure.cell[1,1]/(b2a*ny), structure.cell[2,2]/(b2a*nz)
+    dx, dy, dz = cell[0,0]/nx, cell[1,1]/ny, cell[2,2]/nz
 
     Gvec = get_reciprocal_grid(nx,ny,nz,dx,dy,dz)
 
@@ -1251,11 +1253,9 @@ def elec_energy_forces(lmax,nmax,saltedpath,dfbasis,species,structure,coefs):
 
 def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocharge,rloc_dict,structure,coefs):
 
-    b2a = 0.529177249
-
     bdir = osp.join(saltedpath,"basis")
 
-    sigma_ewald = 1.0/b2a
+    sigma_ewald = 1.0 / bohr2angs
 
     lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, dfbasis, bdir)
 
@@ -1265,15 +1265,15 @@ def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocha
 
     atomic_symbols = structure.get_chemical_symbols()
     natoms = len(atomic_symbols)
-    coords  = structure.positions/b2a
+    coords  = structure.positions / bohr2angs
+    cell = structure.get_cell() / bohr2angs
+    volume = structure.get_volume() / (bohr2angs**3)
 
-    volume = structure.get_volume()/(b2a**3)
+    nx = int(np.floor(cell[0,0]/((np.pi*sigma_ewald/(2*np.sqrt(2)))))+1)
+    ny = int(np.floor(cell[1,1]/((np.pi*sigma_ewald/(2*np.sqrt(2)))))+1)
+    nz = int(np.floor(cell[2,2]/((np.pi*sigma_ewald/(2*np.sqrt(2)))))+1)
 
-    nx = int(np.floor(structure.cell[0,0]/((np.pi*sigma_ewald/(2*np.sqrt(2)))*b2a))+1)
-    ny = int(np.floor(structure.cell[1,1]/((np.pi*sigma_ewald/(2*np.sqrt(2)))*b2a))+1)
-    nz = int(np.floor(structure.cell[2,2]/((np.pi*sigma_ewald/(2*np.sqrt(2)))*b2a))+1)
-
-    dx, dy, dz = structure.cell[0,0]/(b2a*nx), structure.cell[1,1]/(b2a*ny), structure.cell[2,2]/(b2a*nz)
+    dx, dy, dz = cell[0,0]/nx, cell[1,1]/ny, cell[2,2]/nz
 
     Gvec = get_reciprocal_grid(nx,ny,nz,dx,dy,dz)
 

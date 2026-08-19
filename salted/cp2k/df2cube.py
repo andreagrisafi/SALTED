@@ -10,10 +10,7 @@ from scipy import sparse
 from itertools import islice
 from scipy.interpolate import interp1d
 
-#from sympy.parsing import mathematica
-#from sympy import symbols
-#from sympy import lambdify
-
+from salted.constants import bohr2angs
 from salted import basis
 from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, format_index_ranges
 
@@ -38,15 +35,13 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
             nlist.append(nmax[(spe,l)])
     lmax_max = max(llist)
 
-    bohr2angs = 0.529177210670
-
     # read system
     ndata = len(structure)
     atomic_symbols_tot = structure.get_chemical_symbols()
     atomic_symbols = structure.get_chemical_symbols()
     valences = structure.get_atomic_numbers()
-    coords = structure.get_positions()/bohr2angs
-    cell = structure.get_cell()/bohr2angs
+    coords = structure.get_positions() / bohr2angs
+    cell = structure.get_cell() / bohr2angs
 
     # Define system excluding atoms that belong to species not listed in SALTED input 
     natoms_tot = len(atomic_symbols)

@@ -5,12 +5,12 @@ import os
 import glob
 from ase.io import read
 import os.path as osp
+
+from salted.constants import bohr2angs
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
 from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, gto_rec_ewald, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, setup_pyscf_species, setup_pyscf_ewald
 from salted.cp2k.utils import build_contraction_matrix, get_w_prim, compute_hartree_energy, build_gcutoff, pair_cutoffs, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from mpi4py import MPI
-
-b2a = 0.529177249
 
 inp = ParseConfig().parse_input()
 df_metric = inp.qm.dfmetric
@@ -65,7 +65,7 @@ if df_metric =="identity":
     #    for spe2 in species:
     #        print(f'rcut({spe1}-{spe2})={rcut_pairs[(spe1, spe2)]}')
 if df_metric == "coulomb":
-    sigma_ewald = 2.0 / b2a # 2 angstrom, hard-coded
+    sigma_ewald = 2.0 / bohr2angs # 2 angstrom, hard-coded
     pyscf_ewald = setup_pyscf_ewald(species, lmax, nmax_numba, alphas, contranorm, sigma_ewald)
     rcut_pairs = {}
     for spe1 in species:
@@ -208,7 +208,7 @@ for iconf in conf_range:
     # Hartree energy calculation
     time_c = time.time()
     if df_metric == "coulomb":
-        sigma_ewald_en = 1.0 / b2a # 1 angstrom, hard-coded
+        sigma_ewald_en = 1.0 / bohr2angs # 1 angstrom, hard-coded
         e_hartree, e_ee, e_en, e_nn = compute_hartree_energy(c, S, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, origin, [nx, ny, nz])
         print(f"conf {conf_start+iconf+1}: Hartree energy = {e_hartree:.8f} Ha", flush=True)
         if inp.salted.verbose: print(f"conf {conf_start+iconf+1}: E_ee = {e_ee:.8f} Ha, E_en = {e_en:.8f} Ha, E_nn = {e_nn:.8f} Ha", flush=True)
