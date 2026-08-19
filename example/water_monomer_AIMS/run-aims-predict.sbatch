@@ -11,7 +11,7 @@
 export OMP_NUM_THREADS=1
 ulimit -s unlimited
 
-DATADIR='qmdata/predicted_data'
+DATADIR='./aims_pred_data'
 AIMS=~/aims.master.gnu.x
 
 mkdir $DATADIR
@@ -24,7 +24,6 @@ for (( i=1; i<=$n; i++ )); do
 	mkdir $DATADIR/$i
 	cp control_read.in ${DATADIR}/$i/control.in
 	cp $DATADIR/geoms/$i.in $DATADIR/$i/geometry.in
-	cd -
 done
 
 wait 

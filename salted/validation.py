@@ -18,11 +18,12 @@ from salted.sys_utils import (
     init_property_file,
     read_system,
 )
-from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo
+
 
 def build():
 
     inp = ParseConfig().parse_input()
+
     # frequently used parameters
     saltedname = inp.salted.saltedname
     saltedpath = inp.salted.saltedpath
@@ -31,6 +32,9 @@ def build():
     qmcode = inp.qm.qmcode
     zeta = inp.gpr.z
     Menv = inp.gpr.Menv
+    
+    if qmcode=='cp2k':
+        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo
 
     comm, size, rank, parallel = detect_mpi()
 

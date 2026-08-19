@@ -39,3 +39,4 @@ srun -n 16 python -m salted.hessian_matrix
 python -m salted.solve_regression
 srun -n 16 python -m salted.validation > validation.out
 
+srun -n 10 python -m salted.prediction
