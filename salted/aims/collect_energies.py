@@ -90,9 +90,14 @@ for i in range(2):
     xcs[:,i] /= n_atoms
     eles[:,i] /= n_atoms
 
-np.savetxt('predict_reference_electrostatic_energy.dat',np.vstack([eles[:,1],eles[:,0]]).T)
-np.savetxt('predict_reference_xc_energy.dat',np.vstack([xcs[:,1],xcs[:,0]]).T)
-np.savetxt('predict_reference_total_energy.dat',np.vstack([es[:,1],es[:,0]]).T)
+if validation:
+    fname_prefix = "validation_reference"
+else:
+    fname_prefix = "predict_reference"
+
+np.savetxt(f'{fname_prefix}_electrostatic_energy.dat',np.vstack([eles[:,1],eles[:,0]]).T)
+np.savetxt(f'{fname_prefix}_xc_energy.dat',np.vstack([xcs[:,1],xcs[:,0]]).T)
+np.savetxt(f'{fname_prefix}_total_energy.dat',np.vstack([es[:,1],es[:,0]]).T)
 
 print('Mean absolute errors (eV/atom):')
 print('Electrostatic energy:',np.average(np.abs(eles[:,1]-eles[:,0])))

@@ -62,7 +62,7 @@ def build():
     
     # Initialize files for validation results
     
-    pfname = osp.join(saltedpath,pdir,"errors")
+    pfname = osp.join(saltedpath,pdir,"errors.dat")
     if rank == 0 and os.path.exists(pfname):
         os.remove(pfname)
 
