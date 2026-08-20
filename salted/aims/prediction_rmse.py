@@ -138,14 +138,14 @@ def build():
 
                 # Load reference coefficients for the given Cartesian component
                 ref_coefs[icart] = np.loadtxt(osp.join(
-                    saltedpath, pdir, f"{iconf+1}", "ri_rho1_restart_coeffs_{j}_df.out"
+                    saltedpath, pdir, f"{iconf+1}", f"ri_rho1_restart_coeffs_{j}_df.out"
                 ))
-                Tsize = len(ref_coefs)
+                Tsize = len(ref_coefs[icart])
                 overl = overl.reshape(Tsize,Tsize)
                 ref_projs[icart] = np.dot(overl,ref_coefs[icart])
 
                 pred_coefs[icart] = np.loadtxt(osp.join(
-                    saltedpath, pdir, f"{iconf+1}", "ri_rho1_restart_coeffs_{j}_ml.out"
+                    saltedpath, pdir, f"{iconf+1}", f"ri_rho1_restart_coeffs_{j}_ml.out"
                 ))
 
                 # Compute predicted density-response projections <phi|rho>
