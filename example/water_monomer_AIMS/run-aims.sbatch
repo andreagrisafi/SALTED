@@ -12,8 +12,10 @@
 export OMP_NUM_THREADS=1
 ulimit -s unlimited
 
-QMDIR='qmdata/'
+QMDIR='./'
 AIMS=~/aims.master.mkl.x
+
+python -m salted.aims.make_geoms
 
 DATADIR=${QMDIR}data
 
@@ -31,3 +33,5 @@ for (( i=1; i<=$n; i++ )); do
 done
 
 wait
+
+python -m salted.aims.move_data

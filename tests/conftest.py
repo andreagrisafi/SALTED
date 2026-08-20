@@ -127,7 +127,18 @@ class PipelineWorkspace:
                     "with the alphas/contra .dat files of its density-fitting basis; "
                     "needed for the charge/dipole moment integrals of the validation step",
                 )
-            (self.root / "basis").symlink_to(src)
+            # Real dir of per-file symlinks (not a dir symlink): the workspace also
+            # holds generated {spe}-local_pseudo.dat files the dataset does not ship.
+            dst = self.root / "basis"
+            dst.mkdir()
+            for f in src.iterdir():
+                (dst / f.name).symlink_to(f)
+            assert self.spec.local_pseudo, (
+                "cp2k models must set ModelSpec.local_pseudo; salted.validation "
+                "reads basis/{spe}-local_pseudo.dat for the charge/dipole check"
+            )
+            for spe, (charge, rloc) in self.spec.local_pseudo.items():
+                (dst / f"{spe}-local_pseudo.dat").write_text(f"{charge}\n{rloc}\n")
 
     def _write_inp(self, ntrain: int | None, require_datasets: bool):
         """Build inp.yaml from the spec: deep copy + external basis + Ntrain."""

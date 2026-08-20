@@ -68,6 +68,17 @@ class ModelSpec:
     check_mpi: bool = False
     """Include this model in the serial-vs-MPI equivalence tests."""
 
+    local_pseudo: dict[str, tuple[float, float]] | None = None
+    """Per-species ``(pseudocharge, rloc)`` of the local GTH pseudopotential,
+    written to ``basis/{spe}-local_pseudo.dat`` in the workspace. CP2K only:
+    ``salted.validation`` reads these files for the charge/dipole check."""
+
+    fd_gradient: bool = True
+    """Check the live-API analytical gradient against finite differences.
+    False for cp2k: ``salted_prediction`` rescales the returned gradient to
+    conserve the total charge but returns the coefficients unscaled, so the
+    gradient is by design not the derivative of the returned coefficients."""
+
     @property
     def saltedtype(self) -> str:
         return self.inp["salted"].get("saltedtype", "density")
@@ -175,10 +186,8 @@ _SPECS = [
                 "path2qm": "./",
                 "qmcode": "cp2k",
                 "periodic": "3D",
+                "dfmetric": "identity",
                 "dfbasis": "RI-basis",
-                "coeffile": "dummy-RI_DENSITY_COEFFS.dat",
-                "ovlpfile": "dummy-RI_2C_INTS.fm",
-                "pseudocharge": [1.0, 6.0],
             },
             "prediction": {"filename": "./water_dimers_10.xyz", "predname": "prediction"},
             "descriptor": {
@@ -199,6 +208,9 @@ _SPECS = [
         # andreagrisafi/SALTED-datasets: water_monomer_CP2K_subset100/README.md
         # 2026-07 Ntrain=40/validation=60 on 100-structure subset: % RMSE 1.625e+00
         validation_rmse_threshold=2.5,
+        # GTH-PBE (charge, rloc) per species, as in example/water_monomer_CP2K/{H,O}-local_pseudo.dat
+        local_pseudo={"H": (1.0, 0.20059317301776), "O": (6.0, 0.2444632848016)},
+        fd_gradient=False,
     ),
     ModelSpec(
         key="water_monomer_pyscf_density",

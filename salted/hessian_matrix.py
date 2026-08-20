@@ -26,7 +26,7 @@ def build():
     saltedname, saltedpath = inp.salted.saltedname, inp.salted.saltedpath
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 
     rdir = f"regrdir_{saltedname}"
 
@@ -166,7 +166,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
             saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf0.npz"
         ))
 
-    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     totsize = p.shape[-1]

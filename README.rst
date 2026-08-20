@@ -7,7 +7,7 @@ SALTED: Symmetry-Adapted Learning of Three-dimensional Electron Densities
    :width: 80%
 
 
-This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant learning and prediction of the electron density of molecular and condensed-phase systems, together with its static linear response function to applied electric fields. This is done by representing the continuous scalar (density) and vector (density-response) fields on a linear basis of atom-centered radial functions and spherical harmonics.
+This repository contains an implementation of symmetry-adapted Gaussian Process Regression suitable to perform equivariant learning and prediction of the electron density of molecular [1-2] and condensed-phase [3-4] systems, together with its static linear response to applied electric fields [5]. This is done by representing the continuous scalar (density) and vector (density-response) fields on a linear basis of atom-centered radial functions and spherical harmonics.
 
 Documentation
 -------------
@@ -22,6 +22,8 @@ References
 3. Alan M. Lewis, Andrea Grisafi, Michele Ceriotti, Mariana Rossi, "Learning electron densities in the condensed-phase", *Journal of Chemical Theory and Computation* **17**, 7203 (2021) [https://pubs.acs.org/doi/10.1021/acs.jctc.1c00576]
 
 4. Andrea Grisafi, Alan M. Lewis, Mariana Rossi, Michele Ceriotti, "Electronic-Structure Properties from Atom-Centered Predictions of the Electron Density", *Journal of Chemical Theory and Computation* **19**, 4451 (2023) [https://pubs.acs.org/doi/10.1021/acs.jctc.2c00850]
+
+5. Mariana Rossi, Kevin Rossi, Alan M. Lewis, Mathieu Salanne, Andrea Grisafi, "Learning the Electrostatic Response of the Electron Density through a Symmetry-Adapted Vector Field Model", The Journal of Physical Chemistry Letters **16**, 2326-2332 (2025) [https://pubs.acs.org/doi/full/10.1021/acs.jpclett.5c00165]
 
 Installation
 ------------
@@ -53,9 +55,9 @@ Input structures are required in extXYZ format; the corresponding filename must 
 Training data consists in the expansion coefficients of the scalar/vector field over atom-centered basis functions made of radial functions and spherical harmonics. These coefficients are computed following density-fitting (DF), a.k.a. resolution of the identity, approximations, commonly applied in electronic-structure codes. We assume to work with orthonormalized real spherical harmonics defined with the Condon-Shortley phase convention. No restriction is instead imposed on the nature of the radial functions. Because of the non-orthogonality of the basis functions, the 2-center electronic integral matrices associated with the given density-fitting approximation are also required as input. 
 The electronic-structure codes that are to date interfaced with SALTED are:
     
-   - **FHI-aims**
-   - **CP2K** 
-   - **PySCF** 
+   * `FHI-aims <https://gitlab.com/FHI-aims-club/tutorials/fhi-aims-with-salted>`_ 
+   * `CP2K  <https://github.com/andreagrisafi/SALTED/tree/master/example/water_monomer_CP2K>`_
+   * `PySCF <https://github.com/andreagrisafi/SALTED/tree/master/example/water_monomer_PySCF>`_
 
 We refer to the code-specific examples for how to produce the required quantum-mechanical data. 
 

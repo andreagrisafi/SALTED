@@ -114,13 +114,3 @@ def test_dfbasis_file_nonexistent_path_raises(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(Exception):
         ParseConfig().parse_input()
-
-
-def test_get_all_params_consistent(tmp_path, monkeypatch):
-    write_inp(tmp_path, MINIMAL_INP)
-    monkeypatch.chdir(tmp_path)
-    params = ParseConfig().get_all_params()
-    inp = ParseConfig().parse_input()
-    # spot-check a few positional entries against the parsed config
-    assert inp.salted.saltedname in params
-    assert inp.gpr.Menv in params

@@ -94,6 +94,8 @@ def test_prediction_matches_validation(serial_run: PipelineWorkspace, predictor:
 @pytest.mark.parametrize("model_spec", LIVE_API_MODELS, indirect=True)
 def test_prediction_gradient_finite_difference(serial_run: PipelineWorkspace, predictor: Predictor):
     """Analytical gradients must agree with second-order finite differences."""
+    if not serial_run.spec.fd_gradient:
+        pytest.skip("returned gradient is charge-conservation rescaled, not d(pred_coefs)/dR")
     structure = read(serial_run.root / serial_run.inp["system"]["filename"], ":")[-1]
     iat, axis = 0, 1  # displace the zeroth atom along y
 

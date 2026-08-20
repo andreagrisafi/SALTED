@@ -10,10 +10,7 @@ from scipy import sparse
 from itertools import islice
 from scipy.interpolate import interp1d
 
-#from sympy.parsing import mathematica
-#from sympy import symbols
-#from sympy import lambdify
-
+from salted.constants import bohr2angs
 from salted.basis_client import BasisClient
 from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, format_index_ranges
 
@@ -21,15 +18,10 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
 
     inp = ParseConfig().parse_input()
 
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedpath = inp.salted.saltedpath
+    species = inp.system.species
+    dfbasis = inp.qm.dfbasis
 
     comm, size, rank, parallel = detect_mpi()
 
@@ -43,15 +35,13 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
             nlist.append(nmax[(spe,l)])
     lmax_max = max(llist)
 
-    bohr2angs = 0.529177210670
-
     # read system
     ndata = len(structure)
     atomic_symbols_tot = structure.get_chemical_symbols()
     atomic_symbols = structure.get_chemical_symbols()
     valences = structure.get_atomic_numbers()
-    coords = structure.get_positions()/bohr2angs
-    cell = structure.get_cell()/bohr2angs
+    coords = structure.get_positions() / bohr2angs
+    cell = structure.get_cell() / bohr2angs
 
     # Define system excluding atoms that belong to species not listed in SALTED input 
     natoms_tot = len(atomic_symbols)
@@ -269,7 +259,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                                 ylm_real = np.zeros((2*l+1,nidx))
                                 lm = 0
                                 for m in range(-l,1):
-                                    ylm = special.sph_harm(m,l,lph,lth)
+                                    ylm = special.sph_harm_y(l,m,lth,lph)
                                     if m==0:
                                         ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
                                         lm += l+1
@@ -300,7 +290,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                             ylm_real = np.zeros((2*l+1,nidx))
                             lm = 0
                             for m in range(-l,1):
-                                ylm = special.sph_harm(m,l,lph,lth)
+                                ylm = special.sph_harm_y(l,m,lth,lph)
                                 if m==0:
                                     ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
                                     lm += l+1
@@ -327,7 +317,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
                     ylm_real = np.zeros((2*l+1,nidx))
                     lm = 0
                     for m in range(-l,1):
-                        ylm = special.sph_harm(m,l,lph,lth)
+                        ylm = special.sph_harm_y(l,m,lth,lph)
                         if m==0:
                             ylm_real[lm,:] = np.real(ylm)/np.sqrt(2.0)
                             lm += l+1
@@ -360,7 +350,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
         print("Integral = ", nele)
 
         # compute error as a fraction of electronic charge
-        if refcube and saltedtype=="density":
+        if refcube and inp.salted.saltedtype=="density":
             error = np.sum(abs(rhor-rho_qm))*dx*dy*dz/nele
             print("% MAE =", error*100)
         
