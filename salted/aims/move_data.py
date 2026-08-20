@@ -80,7 +80,7 @@ def build():
         if inp.salted.saltedtype == 'density-response':
            t1 = np.zeros((3,len(t)))
            for j in range(3):
-               t1[j,:] = np.loadtxt(osp.join(dirpath, f"ri_rho1_restart_coeffs_{j+1}.out")).reshape(-1)
+               t1[j,:] = np.loadtxt(osp.join(dirpath, f"ri_rho1_restart_coeffs_{j+1}_df.out")).reshape(-1)
                o1 = np.loadtxt(osp.join(dirpath, 'ri_projections_rho1.out')).transpose()
 
         ovlp = np.loadtxt(osp.join(dirpath, 'ri_ovlp.out')).reshape(-1)

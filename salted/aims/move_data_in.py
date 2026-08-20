@@ -43,7 +43,7 @@ def build():
                 ))
                 n = len(t)
  
-                np.savetxt(os.path.join(dirpath, f"ri_rho1_restart_coeffs_predicted_{j+1}.out"), t)
+                np.savetxt(os.path.join(dirpath, f"ri_rho1_restart_coeffs_{j+1}_predicted.out"), t)
         else:
             t = np.loadtxt(os.path.join(
                 inp.salted.saltedpath, pdir,

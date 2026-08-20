@@ -14,7 +14,8 @@ for (( i=1; i<=$n; i++ )); do
 	cp ${DATADIR}/geoms/$i.in ${DATADIR}/$i/geometry.in
 	cd ${DATADIR}/$i
 
-	mpirun -np 1 $AIMS < /dev/null > aims.out && mv  rho_rebuilt_ri.out rho_df.out && mv ri_restart_coeffs.out ri_restart_coeffs_df.out &
+	mpirun -np 1 $AIMS < /dev/null > aims.out && mv  rho_rebuilt_ri.out rho_df.out && mv ri_restart_coeffs.out ri_restart_coeffs_df.out && mv ri_rho1_restart_coeffs_1.out ri_rho1_restart_coeffs_1_df.out && mv ri_rho1_restart_coeffs_2.out ri_rho1_restart_coeffs_2_df.out && mv ri_rho1_restart_coeffs_3.out ri_rho1_restart_coeffs_3_df.out &
+
 
 	cd -
 done

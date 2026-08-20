@@ -21,11 +21,12 @@ python -m salted.aims.move_data_in
 
 for (( i=1; i<=$n; i++ )); do
 	cd ${DATADIR}/$i
-        mv ri_rho1_restart_coeffs_predicted_1.out ri_rho1_restart_coeffs_1.out
-        mv ri_rho1_restart_coeffs_predicted_2.out ri_rho1_restart_coeffs_2.out
-        mv ri_rho1_restart_coeffs_predicted_3.out ri_rho1_restart_coeffs_3.out
+        mv ri_rho1_restart_coeffs_1_predicted.out ri_rho1_restart_coeffs_1.out
+        mv ri_rho1_restart_coeffs_2_predicted.out ri_rho1_restart_coeffs_2.out
+        mv ri_rho1_restart_coeffs_3_predicted.out ri_rho1_restart_coeffs_3.out
 
-	mpirun -np 1 $AIMS < /dev/null > aims_predict.out &
+	mpirun -np 1 $AIMS < /dev/null > aims_predict.out && mv ri_rho1_restart_coeffs_1.out ri_rho1_restart_coeffs_1_ml.out && mv ri_rho1_restart_coeffs_2.out ri_rho1_restart_coeffs_2_ml.out && mv ri_rho1_restart_coeffs_3.out ri_rho1_restart_coeffs_3_ml.out &
+
 
 	cd -
 done
