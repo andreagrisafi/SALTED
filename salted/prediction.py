@@ -26,7 +26,6 @@ from salted.sys_utils import (
     read_system,
     init_property_file,
 )
-from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
 def build():
 
@@ -51,6 +50,9 @@ def build():
     sparsify = ncut > 0
     HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
     HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
+
+    if qmcode=='cp2k':
+        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
         raise ValueError(
