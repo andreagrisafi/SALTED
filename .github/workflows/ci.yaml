@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:  # unit tests on every branch; integration tests only on master/dev_test_CI
+  pull_request:  # PRs into the main development branches: full suite
+    branches: [master, dev_test_CI]
+  workflow_dispatch:  # manual trigger from the GitHub Actions UI
+
+# a new push to the same branch/PR supersedes the running check
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATASETS_REPO: andreagrisafi/SALTED-datasets
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install MPI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libopenmpi-dev openmpi-bin
+
+      - name: Install SALTED
+        run: |
+          python -m pip install --upgrade pip
+          # pyscf is only needed to cover salted.pyscf.get_basis_info
+          pip install -e ".[test]" pyscf
+
+      - name: Run unit tests
+        run: pytest tests/unit -v
+
+  integration-tests:
+    needs: unit-tests
+    # Run integration tests on PRs, manual dispatches, and pushes to the core branches.
+    # Skips on pushes to feature branches (unit tests cover those).
+    if: |
+      github.event_name != 'push' ||
+      github.ref_name == 'master' ||
+      github.ref_name == 'dev_test_CI'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        marker: [aims_density, pyscf_density, cp2k_density, aims_response]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: SALTED
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: SALTED/pyproject.toml
+
+      - name: Install MPI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libopenmpi-dev openmpi-bin
+
+      - name: Install SALTED
+        working-directory: SALTED
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Resolve datasets revision
+        id: datasets-rev
+        run: |
+          sha=$(git ls-remote "https://github.com/${DATASETS_REPO}.git" HEAD | cut -f1)
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SALTED-datasets
+        id: cache-datasets
+        uses: actions/cache@v6
+        with:
+          path: SALTED-datasets
+          key: salted-datasets-${{ steps.datasets-rev.outputs.sha }}
+
+      - name: Checkout SALTED-datasets
+        if: steps.cache-datasets.outputs.cache-hit != 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.DATASETS_REPO }}
+          path: SALTED-datasets
+          fetch-depth: 1
+          sparse-checkout: |
+            water_monomer_AIMS
+            water_monomer_CP2K_subset100
+            water_monomer_PySCF_subset100
+            water_monomer_AIMS_response_subset100
+          sparse-checkout-cone-mode: false
+
+      - name: Run model pipeline (${{ matrix.marker }})
+        working-directory: SALTED
+        run: |
+          pytest tests/integration -m "${{ matrix.marker }}" -v -s \
+            --require-datasets \
+            --datasets-path "$GITHUB_WORKSPACE/SALTED-datasets"

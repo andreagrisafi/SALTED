@@ -52,7 +52,7 @@ def build():
     HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
 
     if qmcode=='cp2k':
-        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
+        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, read_local_pseudo
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
         raise ValueError(
@@ -291,12 +291,7 @@ def build():
             if qmcode=="cp2k":
 
                 bdir = osp.join(inp.salted.saltedpath,"basis")
-
-                pseudocharge = np.zeros((len(species)), dtype = np.float64)
-                for i in range(len(species)):
-                    spe = species[i]
-                    pp = np.loadtxt(osp.join(bdir,f"{spe}-local_pseudo.dat"))
-                    pseudocharge[i] = pp[0]
+                pseudocharge, rloc = read_local_pseudo(species, bdir)
 
                 # Compute charges and dipole moments
                 charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)

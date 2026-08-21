@@ -40,6 +40,10 @@ docs = [
     "markdown-include",
     "pymdown-extensions",
 ]
+test = [
+    "pytest",
+]
+all = ["salted[docs,test]"]
 
 [project.urls]
 Homepage = "https://github.com/andreagrisafi/SALTED"
@@ -51,3 +55,14 @@ exclude = ["salted.ortho*", "*_deprecated_*"]
 [tool.setuptools.package-data]
 # In case one needs the FORTRAN code again
 salted = ["lib/*.so"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: end-to-end test of a model's pipeline, needs the SALTED-datasets repository",
+    "aims_density: tests of the water_monomer_AIMS dataset (serial + MPI equivalence)",
+    "pyscf_density: tests of the water_monomer_PySCF dataset (serial)",
+    "cp2k_density: tests of the water_monomer_CP2K dataset (serial)",
+    "aims_response: density-response tests of the water_monomer_AIMS_response_subset100 dataset (serial + MPI)",
+]

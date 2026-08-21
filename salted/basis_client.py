@@ -84,19 +84,27 @@ class BasisClient:
 
     DEFAULT_DATA_FNAME = "basis_data.yaml"
 
-    def __init__(self, _dev_data_fpath: str | None = None):
+    def __init__(self, data_fpath: str | None = None):
         """Initialize the basis client with the data file path.
 
+        The data file is resolved as:
+
+        1. the ``data_fpath`` argument, if given, so the basis can be loaded
+           from an external file (e.g. the ``basis_data.yaml`` shipped with a
+           dataset in the SALTED-datasets repository; see ``inp.qm.dfbasis_file``);
+        2. otherwise, the ``basis_data.yaml`` inside the installed salted
+           package directory, falling back to the current working directory if
+           that is not writable.
+
         Args:
-            _dev_data_fpath (optional): For development only!!! Do not use this argument!!!
-                The path to the dataset file. If not provided, the default dataset file will be used.
+            data_fpath (optional): Explicit path to a basis dataset file.
+                Typically populated from ``inp.qm.dfbasis_file``. If not provided,
+                the default dataset file inside the salted package directory is used.
         """
-        if _dev_data_fpath is None:
-            self.data_fpath = os.path.join(
-                self.__salted_package_root, self.DEFAULT_DATA_FNAME
-            )
-        if _dev_data_fpath is None:
-            # Try to place the dataset next to the salted package. If that directory is not writable
+        if data_fpath is not None:
+            self.data_fpath = data_fpath
+        else:
+            # Try to place the dataset inside the salted package directory. If that directory is not writable
             # (e.g. when running inside a read-only container like Apptainer), fall back to the
             # current working directory so the process can still create and modify the file.
             try:
@@ -119,12 +127,6 @@ class BasisClient:
                     file=sys.stderr,
                 )
                 self.data_fpath = fallback
-        else:
-            print(
-                f"[{self.__class__.__name__}] WARNING: _dev_data_fpath is for development only!!!",
-                file=sys.stderr,
-            )
-            self.data_fpath = _dev_data_fpath
 
         """create the data file if it does not exist"""
         if not os.path.isfile(self.data_fpath):
