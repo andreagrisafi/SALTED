@@ -32,22 +32,19 @@ if rank==0:
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
 
-xyzfile = read(inp.system.filename,":")[conf_start:conf_end+1]
-ndata = len(xyzfile)
-
 if parallel:
 
     comm.Barrier()
 
     check_MPI_tasks_count(comm, ndata, "configurations")
-    conf_range = distribute_jobs(comm, np.arange(ndata,dtype=int))
+    conf_range = distribute_jobs(comm, np.asarray(list(range(conf_start,conf_end+1))))
     print(
         f"Task {rank+1} handles the following configurations: {conf_range}", flush=True
     )
 
 else:
 
-    conf_range = np.arange(ndata,dtype=int)
+    conf_range = np.asarray(list(range(conf_start,conf_end+1)))
 
 # Initialize SALTED
 time_start = time.time()
@@ -92,7 +89,7 @@ for iconf in conf_range:
         ncoefs += nbasis[spe]*ntype[spe]
 
     # Read in electron density from cube files
-    cubefile_pattern = os.path.join(inp.qm.path2qm, f"conf_{conf_start+iconf+1}", "*ELECTRON_DENSITY-1_0.cube")
+    cubefile_pattern = os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", "*ELECTRON_DENSITY-1_0.cube")
     with open(glob.glob(cubefile_pattern)[0], "r") as cubefile:
         # Header: 2 comment lines + origin line + 3 lattice lines + atom lines
         header = [cubefile.readline() for _ in range(6 + natoms[iconf])]
@@ -202,16 +199,16 @@ for iconf in conf_range:
     if inp.salted.verbose: print("Time to solve linear system:", time.time()-time_c)
 
     # Save data
-    np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{conf_start + iconf}.npy"), c)
-    np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{conf_start + iconf}.npy"), S)
+    np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), c)
+    np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"), S)
 
     # Hartree energy calculation
     time_c = time.time()
     if df_metric == "coulomb":
         sigma_ewald_en = 1.0 / bohr2angs # 1 angstrom, hard-coded
         e_hartree, e_ee, e_en, e_nn = compute_hartree_energy(c, S, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, origin, [nx, ny, nz])
-        print(f"conf {conf_start+iconf+1}: Hartree energy = {e_hartree:.8f} Ha", flush=True)
-        if inp.salted.verbose: print(f"conf {conf_start+iconf+1}: E_ee = {e_ee:.8f} Ha, E_en = {e_en:.8f} Ha, E_nn = {e_nn:.8f} Ha", flush=True)
+        print(f"conf {iconf+1}: Hartree energy = {e_hartree:.8f} Ha", flush=True)
+        if inp.salted.verbose: print(f"conf {iconf+1}: E_ee = {e_ee:.8f} Ha, E_en = {e_en:.8f} Ha, E_nn = {e_nn:.8f} Ha", flush=True)
         if inp.salted.verbose: print('Time to compute Hartree energy:', time.time() - time_c)
     
 time_end = time.time()
