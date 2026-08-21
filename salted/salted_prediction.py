@@ -11,7 +11,7 @@ from scipy import special
 
 from salted.constants import bohr2angs
 from salted import basis, sph_utils
-from salted.cp2k.utils import compute_charge_and_dipole, scale_grad_coefs
+from salted.cp2k.utils import compute_charge_and_dipole, scale_grad_coefs, read_local_pseudo
 from salted.sys_utils import ParseConfig, build_featomic_hyper_params, check_MPI_tasks_count, compute_Mcut, distribute_jobs, format_index_ranges
 
 def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,gradient,structure):
