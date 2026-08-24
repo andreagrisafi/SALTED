@@ -43,3 +43,7 @@ gpr:
   Menv: 100
   Ntrain: 800
   trainfrac: 1.0
+
+prediction:
+  filename: water_dimers_10.xyz
+  predname: dimers
