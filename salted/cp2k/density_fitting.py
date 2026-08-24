@@ -8,7 +8,7 @@ import os.path as osp
 from salted.constants import bohr2angs
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
 from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, gto_rec_ewald, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, setup_pyscf_species, setup_pyscf_ewald
-from salted.cp2k.utils import build_contraction_matrix, get_w_prim, compute_hartree_energy, build_gcutoff, pair_cutoffs, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
+from salted.cp2k.utils import build_contraction_matrix, get_w_prim, get_rho_n, compute_hartree_energy, build_gcutoff, pair_cutoffs, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from mpi4py import MPI
 
 inp = ParseConfig().parse_input()
@@ -152,7 +152,7 @@ for iconf in conf_range:
 
     # Compute primitive density projections <phi|O|rho> fully in reciprocal space with flexible G-cutoffs
     time_c = time.time()
-    wp = get_w_prim(Gvec_half, natoms[iconf], atomic_coords[iconf], npgf, lmax_numba, atomic_symbols[iconf], partial_wave_coefs_prim_re, partial_wave_coefs_prim_im, volume, rho_KS_rec, df_metric, gcuts, rank)
+    wp = get_w_prim(Gvec_half, natoms[iconf], atomic_coords[iconf], npgf, lmax_numba, atomic_symbols[iconf], partial_wave_coefs_prim_re, partial_wave_coefs_prim_im, volume, rho_KS_rec, df_metric, gcuts)
     # Contract projections
     C = build_contraction_matrix(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, contranorm) 
     w = C.T @ wp
@@ -200,11 +200,13 @@ for iconf in conf_range:
     # Hartree energy calculation
     time_c = time.time()
     if df_metric == "coulomb":
-        sigma_ewald_en = 1.0 / bohr2angs # 1 angstrom, hard-coded
-        e_hartree, e_ee, e_en, e_nn = compute_hartree_energy(c, S, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, origin, [nx, ny, nz])
+        rho_n = get_rho_n([nx, ny, nz], dx, dy, dz, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
+        rho_n_rec = np.fft.fftn(rho_n).ravel() * dx * dy * dz
+        rho_n_rec = rho_n_rec[mask][1:][sort_idx]
+        e_hartree, e_ee, e_en, e_nn = compute_hartree_energy(c, S, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, partial_wave_coefs_prim_re, partial_wave_coefs_prim_im, C, gcuts, cell, [nx, ny, nz])        
         print(f"conf {iconf+1}: Hartree energy = {e_hartree:.8f} Ha", flush=True)
         if inp.salted.verbose: print(f"conf {iconf+1}: E_ee = {e_ee:.8f} Ha, E_en = {e_en:.8f} Ha, E_nn = {e_nn:.8f} Ha", flush=True)
-        if inp.salted.verbose: print('Time to compute Hartree energy:', time.time() - time_c)
+        if inp.salted.verbose: print('Time to compute Hartree energy:', time.time() - time_c, flush=True)
     
 time_end = time.time()
-if inp.salted.verbose: print("Total density fitting time:", time_end-time_start)
+if inp.salted.verbose: print("Total density fitting time:", time_end-time_start, flush=True)
