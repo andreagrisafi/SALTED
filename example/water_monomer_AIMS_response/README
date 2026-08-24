@@ -1,3 +1,6 @@
+This workflow assumes you are using AIMS version >=260824. Please upgrade to at least this version
+to follow this example.
+
 Note that in this folder we are creating RI coeffs of the density response
 for a periodic calculation with DFPT polarizability. Change to DFPT dielectric
 for periodic systems.
