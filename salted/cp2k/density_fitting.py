@@ -3,7 +3,6 @@ import time
 import sys
 import os
 import glob
-from ase.io import read
 import os.path as osp
 
 from salted.constants import bohr2angs
@@ -32,19 +31,15 @@ if rank==0:
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
 
+conf_list = np.arange(conf_start, conf_end + 1)
+
 if parallel:
-
     comm.Barrier()
-
-    check_MPI_tasks_count(comm, ndata, "configurations")
-    conf_range = distribute_jobs(comm, np.asarray(list(range(conf_start,conf_end+1))))
-    print(
-        f"Task {rank+1} handles the following configurations: {conf_range}", flush=True
-    )
-
+    check_MPI_tasks_count(comm, len(conf_list), "configurations")
+    conf_range = distribute_jobs(comm, conf_list)
+    print(f"Task {rank+1} handles the following configurations: {conf_range}", flush=True)
 else:
-
-    conf_range = np.asarray(list(range(conf_start,conf_end+1)))
+    conf_range = conf_list
 
 # Initialize SALTED
 time_start = time.time()
