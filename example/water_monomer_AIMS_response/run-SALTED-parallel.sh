@@ -1,6 +1,5 @@
 # Setup SALTED calculation using AIMS data
 python3 -m salted.get_basis_info
-python3 -m salted.aims.move_data
 
 # Run full SALTED workflow
 python3 -m salted.initialize
