@@ -81,7 +81,7 @@ def build():
            t1 = np.zeros((3,len(t)))
            for j in range(3):
                t1[j,:] = np.loadtxt(osp.join(dirpath, f"ri_rho1_restart_coeffs_{j+1}_df.out")).reshape(-1)
-               o1 = np.loadtxt(osp.join(dirpath, 'ri_projections_rho1.out')).transpose()
+           o1 = np.loadtxt(osp.join(dirpath, 'ri_projections_rho1.out')).transpose()
 
         ovlp = np.loadtxt(osp.join(dirpath, 'ri_ovlp.out')).reshape(-1)
         ovlp = ovlp.reshape(n,n)
@@ -97,11 +97,20 @@ def build():
             for j in cs_list:
                 ovlp[j,:] *= -1
                 ovlp[:,j] *= -1
-                o[j] *= -1
-                t[j] *= -1
+                if inp.salted.saltedtype == 'density-response':
+                    o1[:,j] *= -1
+                    t1[:,j] *= -1
+                else:
+                    o[j] *= -1
+                    t[j] *= -1
         
-            o = o[idx]
-            t = t[idx]
+            if inp.salted.saltedtype == 'density-response':
+                o1 = o1[:,idx]
+                t1 = t1[:,idx]
+            else:
+                o = o[idx]
+                t = t[idx]
+
             ovlp = ovlp[idx,:]
             ovlp = ovlp[:,idx]
         
