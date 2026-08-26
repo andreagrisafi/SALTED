@@ -56,7 +56,7 @@ ENV PATH=/opt/mpi/bin:${PATH}
 ENV LD_LIBRARY_PATH=/opt/mpi/lib
 
 # Create a runtime-only copy without headers, pkg-config files, static
-# archives, documentation, or HDF5 developer tools.
+# archives or documentation.
 RUN mkdir -p /opt/runtime \
     && cp -a /opt/mpi /opt/runtime/mpi \
     && rm -rf \
