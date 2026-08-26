@@ -19,6 +19,15 @@ def build():
         for sub_dir in sub_dirs:
             if not osp.exists(sub_dir):
                 os.mkdir(sub_dir)
+
+        if inp.salted.saltedtype == 'density-response':
+            sub_dirs = [
+                osp.join(inp.salted.saltedpath, d, x)
+                for d in ("coefficients", "projections") for x in ("x","y","z")
+            ]
+            for sub_dir in sub_dirs:
+                if not osp.exists(sub_dir):
+                    os.makedirs(sub_dir)
     
     xyzfile = read(inp.system.filename,":")
     ndata = len(xyzfile)
@@ -66,9 +75,15 @@ def build():
     
         o = np.loadtxt(osp.join(dirpath, 'ri_projections.out')).reshape(-1)
         t = np.loadtxt(osp.join(dirpath, 'ri_restart_coeffs_df.out')).reshape(-1)
-        ovlp = np.loadtxt(osp.join(dirpath, 'ri_ovlp.out')).reshape(-1)
-        
         n = len(o)
+
+        if inp.salted.saltedtype == 'density-response':
+           t1 = np.zeros((3,len(t)))
+           for j in range(3):
+               t1[j,:] = np.loadtxt(osp.join(dirpath, f"ri_rho1_restart_coeffs_{j+1}_df.out")).reshape(-1)
+           o1 = np.loadtxt(osp.join(dirpath, 'ri_projections_rho1.out')).transpose()
+
+        ovlp = np.loadtxt(osp.join(dirpath, 'ri_ovlp.out')).reshape(-1)
         ovlp = ovlp.reshape(n,n)
         
         if reorder:
@@ -79,22 +94,37 @@ def build():
             idx = list(idx)
             cs_list = list(cs_list)
         
-        
             for j in cs_list:
                 ovlp[j,:] *= -1
                 ovlp[:,j] *= -1
-                o[j] *= -1
-                t[j] *= -1
+                if inp.salted.saltedtype == 'density-response':
+                    o1[:,j] *= -1
+                    t1[:,j] *= -1
+                else:
+                    o[j] *= -1
+                    t[j] *= -1
         
-            o = o[idx]
-            t = t[idx]
+            if inp.salted.saltedtype == 'density-response':
+                o1 = o1[:,idx]
+                t1 = t1[:,idx]
+            else:
+                o = o[idx]
+                t = t[idx]
+
             ovlp = ovlp[idx,:]
             ovlp = ovlp[:,idx]
         
         np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
         np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{i}.npy"), o)
         np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
-    
+
+        if inp.salted.saltedtype == 'density-response':
+            x = ["x","y","z"]
+            for j in range(3):
+                np.save(osp.join(inp.salted.saltedpath, "projections", x[j], f"projections_conf{i}.npy"), o1[j,:])
+                np.save(osp.join(inp.salted.saltedpath, "coefficients", x[j], f"coefficients_conf{i}.npy"), t1[j,:])
+
+
     if parallel:
         comm.Barrier()
     
@@ -104,6 +134,9 @@ def build():
         dirpath = osp.join(inp.qm.path2qm, 'data', str(i+1))
         os.remove(osp.join(dirpath, 'ri_ovlp.out'))
         os.remove(osp.join(dirpath, 'ri_projections.out'))
+        if inp.salted.saltedtype == 'density-response':
+            os.remove(osp.join(dirpath, 'ri_projections_rho1.out'))
+
 
 if __name__ == "__main__":
     build()
