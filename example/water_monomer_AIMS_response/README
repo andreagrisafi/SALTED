@@ -1,6 +1,9 @@
+This workflow assumes you are using AIMS version >=260824. Please upgrade to at least this version
+to follow this example.
+
 Note that in this folder we are creating RI coeffs of the density response
-for  a periodic calculation with DFPT dielectric. Change to DFPT polarizability
-for non-periodic systems.
+for a non-periodic calculation with DFPT polarizability. Change to DFPT dielectric
+for periodic systems.
 
 The workflow for the ML learning and prediction is then the same as for the other examples.
 Only the data generation and the calculation of derived quantities (reading in RI coefficients)
