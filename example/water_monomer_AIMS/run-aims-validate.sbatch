@@ -12,7 +12,7 @@ export OMP_NUM_THREADS=1
 ulimit -s unlimited
 
 DATADIR='./data'
-AIMS=~/aims_master.x
+AIMS=~/aims.master.mkl.x
 
 python -m salted.aims.move_data_in -vl
 
