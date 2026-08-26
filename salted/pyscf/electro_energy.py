@@ -7,6 +7,7 @@ from pyscf import gto
 from ase.io import read
 from scipy import special
 
+from salted.constants import bohr2angs, hart2kcal
 from salted.sys_utils import ParseConfig
 
 from salted import basis  # WARNING: relative import
@@ -34,9 +35,6 @@ nnmax = max(nlist)
 # read system
 xyzfile = read(inp.system.filename,":")
 ndata = len(xyzfile)
-
-hart2kcal = 627.5096080305927
-bohr2ang = 0.52917721067121
 
 #======================= system parameters
 atomic_symbols = []
@@ -70,7 +68,7 @@ def sph_zproj(theta,phi,lam):
     """Project on the spherical harmonics evaluated at d_ij direction"""
     sph_dij = np.zeros(2*lam+1,complex)
     for mu in range(2*lam+1):
-        sph_dij[mu] = special.sph_harm(mu-lam,lam,phi,theta)
+        sph_dij[mu] = special.sph_harm_y(lam,mu-lam,theta,phi)
     CR = complex_to_real_transformation([2*lam+1])[0]
     return np.real(np.dot(CR,sph_dij))
 
@@ -134,7 +132,7 @@ for iconf in range(ndata):
     for i in range(natoms):
         coord = coords[i]
         catoms.append([atoms[i],(coord[0],coord[1],coord[2])])
-    coords /= bohr2ang
+    coords /= bohr2angs 
     # basis
     mol = gto.M(atom=catoms,basis=inp.qm.qmbasis)
     ribasis = inp.qm.qmbasis+" jkfit" 

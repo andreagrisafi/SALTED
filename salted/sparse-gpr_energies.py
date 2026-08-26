@@ -12,7 +12,7 @@ def build(propname:str):
 
     inp = ParseConfig().parse_input()
     
-    spelist, lmax, nmax, llmax, nnmax, ndata, symbols, natoms, natmax = read_system()
+    spelist, lmax, nmax, llmax, nnmax, ndata, symbols, atomic_coords, natoms, natmax = read_system()
     
     xyzfile = read(inp.system.filename,":")
     

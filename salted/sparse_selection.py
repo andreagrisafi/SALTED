@@ -9,7 +9,7 @@ from salted.sys_utils import ParseConfig, read_system, get_atom_idx, do_fps
 def build():
     inp = ParseConfig().parse_input()
 
-    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 

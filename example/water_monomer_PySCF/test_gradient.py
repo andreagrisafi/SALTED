@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 inp = ParseConfig().parse_input()
 
-comm, size, rank, _ = detect_mpi()
+comm, size, rank, parallel = detect_mpi()
 
 # Initialize SALTED prediction
 lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals = init_pred.build(rank)
@@ -41,6 +41,9 @@ grad_finite_diff = {}
 # Analytical gradient
 output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,True,structure) 
 grad_pred_coefs = output[1]
+if parallel:
+    comm.Barrier()
+    grad_pred_coefs = comm.allreduce(grad_pred_coefs)
 
 # Compute gradient by finite-differences for each atomic displacement d
 for i in range(len(d)):
@@ -49,11 +52,17 @@ for i in range(len(d)):
     structure.positions[iat,d_c] += d[i]
     output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,False,structure)
     coefs[str(d[i])] = output[0].copy()
+    if parallel:
+        comm.Barrier()
+        coefs[str(d[i])] = comm.allreduce(coefs[str(d[i])])
 
     # -d 
     structure.positions[iat,d_c] -= 2*d[i]
     output = salted_prediction.build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_integrals,dipole_integrals,comm,size,rank,lcut,False,structure)
     coefs[str("m"+str(d[i]))] = output[0].copy()
+    if parallel:
+        comm.Barrier()
+        coefs["m"+str(d[i])] = comm.allreduce(coefs["m"+str(d[i])])
     
     # Compute gradient
     grad_finite_diff[str(d[i])] = (np.array(coefs[str(d[i])]) - np.array(coefs[str("m"+str(d[i]))]))/(2*d[i])

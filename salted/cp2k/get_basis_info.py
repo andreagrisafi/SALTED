@@ -23,8 +23,8 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     inp = ParseConfig().parse_input()
     assert inp.qm.qmcode.lower() == "cp2k", f"{inp.qm.qmcode=}, but expected 'cp2k'"
 
-    """Parse CP2K basis set"""
-    lmax, nmax, alphas, contra = parse_files_basis_info(inp.system.species, inp.qm.dfbasis)
+    """Parse CP2K basis set and pseudopotential"""
+    lmax, nmax, alphas, contra, pseudocharge, rloc = parse_files_basis_info(inp.system.species, inp.qm.dfbasis)
 
     """Convert to basis_client format"""
     basis_data: dict[str, SpeciesBasisData] = {}
@@ -37,7 +37,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
             "nmax": [nmax[(spe, l)] for l in range(lmax[spe] + 1)],
         }
 
-    # Generate directory for saving basis set info 
+    # Generate directory for saving basis set info
     bdir = osp.join(inp.salted.saltedpath, "basis")
     if not osp.exists(bdir):
         os.mkdir(bdir)
@@ -55,6 +55,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
             for l in range(lmax[spe] + 1):
                 np.savetxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat"), alphas[(spe, l)])
                 np.savetxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-contra-L{l}.dat"), contra[(spe, l)])
+                np.savetxt(osp.join(bdir,f"{spe}-local_pseudo.dat"), [pseudocharge[spe], rloc[spe]])
         BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
@@ -74,6 +75,8 @@ def parse_files_basis_info(species: list[str], dfbasis: str) -> (
     nmax = {}
     alphas = {}
     contra = {}
+    pseudocharge = {}
+    rloc = {}
     # fbasis = open("new_basis_entry", "w+")
     # fbasis.write('   if basis=="' + dfbasis + '":\n\n')
     for spe in species:
@@ -128,8 +131,12 @@ def parse_files_basis_info(species: list[str], dfbasis: str) -> (
                         contra[(spe, l)][ntot+n,mtot+m] = contra_temp[(iset,l)][n,m]
                 mtot += mtemp
                 ntot += ntemp 
+        with open(spe + "-local_pseudo.dat") as f:
+            lines = f.readlines()
+            pseudocharge[spe] = float(lines[0].split()[0])
+            rloc[spe] = float(lines[1].split()[0])
 
-    return lmax, nmax, alphas, contra
+    return lmax, nmax, alphas, contra, pseudocharge, rloc
 
 
 if __name__ == "__main__":

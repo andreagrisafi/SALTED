@@ -11,6 +11,7 @@ from ase.data import atomic_numbers
 
 from salted.sys_utils import (
     ParseConfig,
+    build_featomic_hyper_params,
     check_MPI_tasks_count,
     detect_mpi,
     distribute_jobs,
@@ -29,23 +30,28 @@ def build():
 
     inp = ParseConfig().parse_input()
 
-    # salted parameters
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedname = inp.salted.saltedname
+    saltedpath = inp.salted.saltedpath
+    saltedtype = inp.salted.saltedtype
+    Menv = inp.gpr.Menv
+    rep1, rep2 = inp.descriptor.rep1.type, inp.descriptor.rep2.type
+    nrad1, nrad2 = inp.descriptor.rep1.nrad, inp.descriptor.rep2.nrad
+    nang1, nang2 = inp.descriptor.rep1.nang, inp.descriptor.rep2.nang
+    neighspe1, neighspe2 = inp.descriptor.rep1.neighspe, inp.descriptor.rep2.neighspe
+    nspe1 = len(inp.descriptor.rep1.neighspe)
+    nspe2 = len(inp.descriptor.rep2.neighspe)
+    ncut = inp.descriptor.sparsify.ncut
+    sparsify = ncut > 0
+    HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
+    HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
 
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
-    frames = read(filename,":")
+    frames = read(inp.system.filename,":")
 
     sdir = osp.join(saltedpath, f"equirepr_{saltedname}")
 
@@ -176,8 +182,10 @@ def build():
             h5f = h5py.File(osp.join(sdir,  f"FEAT_M-{Menv}.h5"), 'w')
             for spe in species:
                 for lam in range(lmax[spe]+1):
-                    power_env_sparse[(spe,lam)] = power_env_sparse[(spe,lam)].reshape(Mspe[spe]*(2*lam+1),power_env_sparse[(spe,lam)].shape[-1])
-                    h5f.create_dataset(f"sparse_descriptors/{spe}/{lam}",data=power_env_sparse[(spe,lam)])
+                    power_env_sparse[(spe, lam)] = power_env_sparse[(spe, lam)].reshape(
+                        Mspe[spe] * (2 * lam + 1), power_env_sparse[(spe, lam)].shape[-1]
+                    )  # shape (Mspe[spe]*(2*lam+1), featsize)
+                    h5f.create_dataset(f"sparse_descriptors/{spe}/{lam}", data=power_env_sparse[(spe, lam)])
             h5f.close()
 
     elif saltedtype=="density-response":
@@ -250,7 +258,7 @@ def build():
             comm.Barrier()
             for spe in species:
                 for lam in range(lmax[spe]+1):
-                    power_env_sparse[(spe,lam)] = comm.allreduce(power_env_sparse[(spe,lam)])
+                    power_env_sparse[(spe,lam)] = comm.allreduce(power_env_sparse[(spe,lam)])  # shape (Mspe[spe],(2*lam+1), featsize)
     
         if rank==0:
             # reshape sparse vector and save

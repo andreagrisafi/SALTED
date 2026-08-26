@@ -15,7 +15,9 @@ from salted.sph_utils import equicombnonorm, antiequicombnonorm, kernelequicomb,
 from salted.sys_utils import (
     PLACEHOLDER,
     ParseConfig,
+    build_featomic_hyper_params,
     check_MPI_tasks_count,
+    compute_Mcut,
     detect_mpi,
     distribute_jobs,
     format_index_ranges,
@@ -25,9 +27,6 @@ from salted.sys_utils import (
     read_system,
     init_property_file,
 )
-
-from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
-from salted import read_model
 
 
 
@@ -705,15 +704,29 @@ def predict_config_mode():
     - Directory structure loading
     """
     inp = ParseConfig().parse_input()
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedname = inp.salted.saltedname
+    saltedpath = inp.salted.saltedpath
+    saltedtype = inp.salted.saltedtype
+    average = inp.system.average
+    qmcode = inp.qm.qmcode
+    filename_pred = inp.prediction.filename
+    predname = inp.prediction.predname
+    zeta = inp.gpr.z
+    Menv = inp.gpr.Menv
+    rep1, rep2 = inp.descriptor.rep1.type, inp.descriptor.rep2.type
+    nrad1, nrad2 = inp.descriptor.rep1.nrad, inp.descriptor.rep2.nrad
+    nang1, nang2 = inp.descriptor.rep1.nang, inp.descriptor.rep2.nang
+    neighspe1, neighspe2 = inp.descriptor.rep1.neighspe, inp.descriptor.rep2.neighspe
+    nspe1 = len(inp.descriptor.rep1.neighspe)
+    nspe2 = len(inp.descriptor.rep2.neighspe)
+    ncut = inp.descriptor.sparsify.ncut
+    sparsify = ncut > 0
+    HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
+    HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
+
+    if qmcode=='cp2k':
+        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, read_local_pseudo
 
     if filename_pred == PLACEHOLDER or predname == PLACEHOLDER:
         raise ValueError(
@@ -723,10 +736,8 @@ def predict_config_mode():
 
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system(
-        filename_pred, species, dfbasis
-    )
-    atom_idx, natom_dict = get_atom_idx(ndata, natoms, species, atomic_symbols)
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system(filename_pred, inp.system.species, inp.qm.dfbasis)
+    atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     if rank == 0:
         print(f"The dataset contains {ndata} frames.")
@@ -744,8 +755,10 @@ def predict_config_mode():
     
     reg_log10_intstr = str(int(np.log10(regul)))
 
-    # Load regression weights
-    ntrain = int(Ntrain * trainfrac)
+    reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))  # for consistency
+
+    # load regression weights
+    ntrain = int(inp.gpr.Ntrain * inp.gpr.trainfrac)
     weights = np.load(osp.join(
         saltedpath,
         f"regrdir_{saltedname}",
@@ -834,13 +847,87 @@ def predict_config_mode():
                 print(f"Saving descriptor to {dirpath}", flush=True)
             save_pred_descriptor(pvec, conf_range, list(natoms[conf_range]), dirpath)
 
-        # Compute predictions
-        for i, iconf in enumerate(conf_range):
-            psi_nm = compute_density_descriptor_structure(
-                iconf, i, conf_range, atom_idx, natom_dict,
-                lmax, species, zeta, pvec, power_env_sparse, Vmat, Mspe,
-                average=average, av_coefs=av_coefs_dict
-            )
+        psi_nm = {}
+        for i,iconf in enumerate(conf_range):
+
+            Tsize = 0
+            for iat in range(natoms[iconf]):
+                spe = atomic_symbols[iconf][iat]
+                for l in range(lmax[spe]+1):
+                    for n in range(nmax[(spe,l)]):
+                        Tsize += 2*l+1
+
+            for spe in species:
+
+                Mcut = compute_Mcut(inp.gpr.Mcut, Mspe[spe], lmax[spe])
+                Mcutsize = {}
+                for lam in range(lmax[spe]+1):
+                    Mcutsize[lam] = Mcut[lam]*(2*lam+1)
+
+                # lam = 0
+                if zeta==1:
+                    psi_nm[(spe,0)] = np.dot(pvec[0][i,atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
+                else:
+                    kernel0_nm = np.dot(pvec[0][i,atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
+                    kernel_nm = kernel0_nm[:, :Mcutsize[0]]**zeta
+                    psi_nm[(spe,0)] = np.dot(kernel_nm,Vmat[(0,spe)])
+
+                # lam > 0
+                for lam in range(1,lmax[spe]+1):
+
+                    featsize = pvec[lam].shape[-1]
+                    if zeta==1:
+                        psi_nm[(spe,lam)] = np.dot(pvec[lam][i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                    else:
+                        kernel_nm = np.dot(pvec[lam][i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*(2*lam+1),featsize),power_env_sparse[(lam,spe)].T)
+                        kernel_nm_blocks = kernel_nm.reshape(natom_dict[(iconf,spe)], 2*lam+1, Mspe[spe], 2*lam+1)
+                        kernel_nm_blocks *= kernel0_nm[:, np.newaxis, :, np.newaxis] ** (zeta - 1)
+                        kernel_nm = kernel_nm_blocks.reshape(natom_dict[(iconf,spe)]*(2*lam+1), Mspe[spe]*(2*lam+1))
+                        kernel_nm = kernel_nm[:, :Mcutsize[lam]]
+                        psi_nm[(spe,lam)] = np.dot(kernel_nm,Vmat[(lam,spe)])
+
+            # compute predictions per channel
+            C = {}
+            ispe = {}
+            isize = 0
+            for spe in species:
+                ispe[spe] = 0
+                for l in range(lmax[spe]+1):
+                    for n in range(nmax[(spe,l)]):
+                        psi_cols = psi_nm[(spe,l)].shape[1]
+                        C[(spe,l,n)] = np.dot(psi_nm[(spe,l)],weights[isize:isize+psi_cols])
+                        isize += psi_cols
+
+            # init averages array if asked
+            if average:
+                Av_coeffs = np.zeros(Tsize)
+
+            # fill vector of predictions
+            i = 0
+            pred_coefs = np.zeros(Tsize)
+            for iat in range(natoms[iconf]):
+                spe = atomic_symbols[iconf][iat]
+                for l in range(lmax[spe]+1):
+                    for n in range(nmax[(spe,l)]):
+                        pred_coefs[i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
+                        if average and l==0:
+                            Av_coeffs[i] = av_coefs[spe][n]
+                        i += 2*l+1
+                ispe[spe] += 1
+
+            # add back spherical averages if required
+            if average:
+                pred_coefs += Av_coeffs
+
+            if qmcode=="cp2k":
+
+                bdir = osp.join(inp.salted.saltedpath,"basis")
+                pseudocharge, rloc = read_local_pseudo(species, bdir)
+
+                # Compute charges and dipole moments
+                charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,False,comm)
+                print(iconf+1,charge,file=qfile)
+                print(iconf+1,dipole["x"],dipole["y"],dipole["z"],file=dfile)
             
             pred_coefs = compute_prediction(
                 iconf_idx=i,
@@ -882,32 +969,206 @@ def predict_config_mode():
             rank=rank,
         )
 
-        for i, iconf in enumerate(conf_range):
-            if rank == 0 or i % 10 == 0:
-                print(f"Predicting structure {iconf + 1}/{len(conf_range)}...", flush=True)
+        psi_nm = {}
+        psi_nm_cart = {}
+        for i,iconf in enumerate(conf_range):
+
+            Tsize = 0
+            for iat in range(natoms[iconf]):
+                spe = atomic_symbols[iconf][iat]
+                for l in range(lmax[spe]+1):
+                    for n in range(nmax[(spe,l)]):
+                        Tsize += 2*l+1
+
+            # Compute kernels and RKHS descriptors
+            for ic in cart:
+                for spe in species:
+                    for lam in range(lmax[spe]+1):
+                        psi_nm_cart[(ic,spe,lam)] = np.zeros((natom_dict[(iconf,spe)]*(2*lam+1),Vmat[(lam,spe)].shape[-1]))
+
+            for spe in species:
+
+                start_kernel_0 = time.time()
+
+                Mcut = compute_Mcut(inp.gpr.Mcut, Mspe[spe], lmax[spe])
+                Mcutsize = {}
+                for lam in range(lmax[spe]+1):
+                    Mcutsize[lam] = Mcut[lam]*3*(2*lam+1)
+
+                # lam=0
+                kernel0_nm = np.dot(power[0][i,atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
+                kernel_nm = np.dot(power[1][i,atom_idx[(iconf,spe)]].reshape(natom_dict[(iconf,spe)]*3,power[1].shape[-1]),power_env_sparse[(1,spe)].T)
+
+                kernel_nm_blocks = kernel_nm.reshape(natom_dict[(iconf,spe)], 3, Mspe[spe], 3)
+                kernel_nm_blocks *= kernel0_nm[:, np.newaxis, :, np.newaxis] ** (zeta - 1)
+                kernel_nm = kernel_nm_blocks.reshape(natom_dict[(iconf,spe)] * 3, Mspe[spe] * 3)
+                kernel_nm = kernel_nm[:,:Mcutsize[0]]
+
+                kernel0_nn_diag = np.sum(power[0][i,atom_idx[(iconf,spe)]]**2,axis=1)
+                kernel_nn_diag = power[1][i,atom_idx[(iconf,spe)]] @ power[1][i,atom_idx[(iconf,spe)]].transpose(0,2,1)
+                kernel_nn_diag = kernel_nn_diag * kernel0_nn_diag[:,np.newaxis,np.newaxis]**(zeta-1)
+                normfact = np.sqrt(np.sum(kernel_nn_diag**2,axis=(1,2)))
+
+                normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{0}.npy"))
+                knorm = kernelnorm(natom_dict[(iconf,spe)],Mcut[0],3,normfact,normfact_sparse,np.real(kernel_nm))
+                kernel_nm = knorm
+
+                psi_nm[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
+
+                psi_nm_reshaped = psi_nm[(spe, 0)].reshape(natom_dict[(iconf,spe)], 3, psi_nm[(spe, 0)].shape[-1])
+                for ik in range(3):
+                    psi_nm_cart[(cart[ik], spe, 0)][:natom_dict[(iconf,spe)]] = psi_nm_reshaped[:, ik]
+
+                if inp.salted.verbose:
+                    print("kernel lam=0 time (sec) = ",time.time()-start_kernel_0,flush=True)
+                start_kernel_lam = time.time()
+
+                if inp.prediction.alpha_only and qmcode=="cp2k":
+                    lmax[spe] = 1
+
+                # lam>0
+                for lam in range(1,lmax[spe]+1):
+
+                    Msize = Mspe[spe]*3*(2*lam+1)
+                    Nsize = natom_dict[(iconf,spe)]*3*(2*lam+1)
+                    kernel_nm = np.zeros((Nsize,Msize),complex)
+                    kernel_nn_diag = np.zeros((Nsize,3*(2*lam+1)),complex)
+
+                    # Perform CG combination
+                    for L in [lam-1,lam,lam+1]:
+
+                        #print("L=", L)
+
+                        c2r = sph_utils.complex_to_real_transformation([2*L+1])[0]
+
+                        # compute complex descriptor for the given L
+                        if L==lam:
+                            pimag = power_antisymm[L][i,atom_idx[(iconf,spe)]]
+                            featsize = pimag.shape[-1]
+                            pimag = pimag.reshape(natom_dict[(iconf,spe)],2*L+1,featsize)
+                            pimag = np.transpose(pimag,(1,0,2)).reshape(2*L+1,natom_dict[(iconf,spe)]*featsize)
+                            preal = np.zeros_like(pimag)
+                        else:
+                            preal = power[L][i,atom_idx[(iconf,spe)]]
+                            featsize = preal.shape[-1]
+                            preal = preal.reshape(natom_dict[(iconf,spe)],2*L+1,featsize)
+                            preal = np.transpose(preal,(1,0,2)).reshape(2*L+1,natom_dict[(iconf,spe)]*featsize)
+                            pimag = np.zeros_like(preal)
+
+                        ptemp = preal + 1j * pimag
+                        pcmplx = np.dot(np.conj(c2r.T),ptemp).reshape(2*L+1,natom_dict[(iconf,spe)],featsize)
+                        pcmplx = np.transpose(pcmplx,(1,0,2)).reshape(natom_dict[(iconf,spe)]*(2*L+1),featsize)
+
+                        # compute complex sparse descriptor for the given L 
+                        if L==lam:
+                            pimag = power_env_sparse_antisymm[(L,spe)]
+                            featsize = pimag.shape[-1]
+                            pimag = pimag.reshape(Mspe[spe],2*L+1,featsize)
+                            pimag = np.transpose(pimag,(1,0,2)).reshape(2*L+1,Mspe[spe]*featsize)
+                            preal = np.zeros_like(pimag)
+                        else:
+                            preal = power_env_sparse[(L,spe)]
+                            featsize = preal.shape[-1]
+                            preal = preal.reshape(Mspe[spe],2*L+1,featsize)
+                            preal = np.transpose(preal,(1,0,2)).reshape(2*L+1,Mspe[spe]*featsize)
+                            pimag = np.zeros_like(preal)
+
+                        ptemp = preal + 1j * pimag
+                        pcmplx_sparse = np.dot(np.conj(c2r.T),ptemp).reshape(2*L+1,Mspe[spe],featsize)
+                        pcmplx_sparse = np.transpose(pcmplx_sparse,(1,0,2)).reshape(Mspe[spe]*(2*L+1),featsize)
+
+                        # compute complex K_nm kernel 
+                        knm = np.dot(pcmplx,np.conj(pcmplx_sparse).T)
+
+                        # load the relevant CG coefficients 
+                        cgcoefs = np.loadtxt(os.path.join(saltedpath, "wigners", f"cg_response_lam-{lam}_L-{L}.dat"))
+
+                        k0 = kernel0_nm**(zeta-1)
+                        cgkernel = kernelequicomb(natom_dict[(iconf,spe)],Mspe[spe],lam,1,L,Nsize,Msize,len(cgcoefs),cgcoefs,knm,k0)
+                        kernel_nm += cgkernel
+
+                        # compute complex K_nn kernel
+                        pcmplx = pcmplx.reshape(natom_dict[(iconf,spe)],2*L+1,featsize)
+                        knn_diag = pcmplx @ np.conj(pcmplx).transpose(0,2,1)
+                        knn_diag = knn_diag.reshape(natom_dict[(iconf,spe)]*(2*L+1),2*L+1)
+                        k0 = kernel0_nn_diag**(zeta-1) 
+                        cgkernel = kernelequicomb(natom_dict[(iconf,spe)],1,lam,1,L,Nsize,3*(2*lam+1),len(cgcoefs),cgcoefs,knn_diag,k0[:,np.newaxis])
+                        kernel_nn_diag += cgkernel
+
+                    kernel_nm = kernel_nm[:,:Mcutsize[lam]]
+
+                    # compute complex to real transformation matrix for lam X 1 tensor product space
+                    A = sph_utils.complex_to_real_transformation([2*lam+1])[0]
+                    B = sph_utils.complex_to_real_transformation([3])[0]
+                    c2r = np.zeros((3*(2*lam+1),3*(2*lam+1)),complex)
+                    j1 = 0
+                    for i1 in range(2*lam+1):
+                        j2 = 0
+                        for i2 in range(2*lam+1):
+                            c2r[j1:j1+3,j2:j2+3] = A[i1,i2] * B
+                            j2 += 3
+                        j1 += 3
+
+                    # make k_NM real
+                    ktemp1 = np.dot(c2r,np.transpose(kernel_nm.reshape(natom_dict[(iconf,spe)],3*(2*lam+1),Mcutsize[lam]),(1,0,2)).reshape(3*(2*lam+1),natom_dict[(iconf,spe)]*Mcutsize[lam]))
+                    ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),natom_dict[(iconf,spe)],Mcutsize[lam]),(1,0,2)).reshape(Nsize,Mcutsize[lam])
+                    kernel_nm = np.dot(ktemp2.reshape(Nsize,Mcut[lam],3*(2*lam+1)).reshape(Nsize*Mcut[lam],3*(2*lam+1)),np.conj(c2r).T).reshape(Nsize,Mcut[lam],3*(2*lam+1)).reshape(Nsize,Mcutsize[lam])
+
+
+                    # make k_NN_diag real and compute normalization factor
+                    ktemp1 = np.dot(c2r,np.transpose(kernel_nn_diag.reshape(natom_dict[(iconf,spe)],3*(2*lam+1),3*(2*lam+1)),(1,0,2)).reshape(3*(2*lam+1),natom_dict[(iconf,spe)]*3*(2*lam+1)))
+                    ktemp2 = np.transpose(ktemp1.reshape(3*(2*lam+1),natom_dict[(iconf,spe)],3*(2*lam+1)),(1,0,2)).reshape(Nsize,3*(2*lam+1))
+                    kernel_nn_diag = np.real(np.dot(ktemp2,np.conj(c2r).T)).reshape(natom_dict[(iconf,spe)],3*(2*lam+1),3*(2*lam+1))
+                    normfact = np.sqrt(np.sum(kernel_nn_diag**2,axis=(1,2)))
+
+                    normfact_sparse = np.load(os.path.join(saltedpath, f"normfacts_{saltedname}", f"M{Menv}_zeta{zeta}", f"normfact_spe-{spe}_lam-{lam}.npy"))
+                    knorm = kernelnorm(natom_dict[(iconf,spe)],Mcut[lam],3*(2*lam+1),normfact,normfact_sparse,np.real(kernel_nm))
+                    kernel_nm = knorm
+
+                    # project kernel on the RKHS
+                    psi_nm[(spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))
+
+                    psi_nm_reshaped = psi_nm[(spe, lam)].reshape(natom_dict[(iconf,spe)]*(2*lam+1), 3, psi_nm[(spe, lam)].shape[-1])
+                    for ik in range(3):
+                        psi_nm_cart[(cart[ik], spe, lam)][:natom_dict[(iconf,spe)]*(2*lam+1)] = psi_nm_reshaped[:, ik]
+
+                if inp.salted.verbose:
+                    print("kernel lam>0 time (sec) = ",time.time()-start_kernel_lam,flush=True)
+
+            start_pred = time.time()
+
+            pred_coefs = {}
+            for icart in ["x","y","z"]:
+                
+                # compute predictions per channel
+                C = {}
+                ispe = {}
+                isize = 0
+                for spe in species:
+                    ispe[spe] = 0
+                    for l in range(lmax[spe]+1):
+                        for n in range(nmax[(spe,l)]):
+                            Mcut = psi_nm_cart[(icart,spe,l)].shape[1]
+                            C[(spe,l,n)] = np.dot(psi_nm_cart[(icart,spe,l)],weights[isize:isize+Mcut])
+                            isize += Mcut
+
+                # fill vector of predictions
+                i = 0
+                pred_coefs[icart] = np.zeros(Tsize)
+                for iat in range(natoms[iconf]):
+                    spe = atomic_symbols[iconf][iat]
+                    for l in range(lmax[spe]+1):
+                        for n in range(nmax[(spe,l)]):
+                            pred_coefs[icart][i:i+2*l+1] = C[(spe,l,n)][ispe[spe]*(2*l+1):ispe[spe]*(2*l+1)+2*l+1]
+                            i += 2*l+1
+                    ispe[spe] += 1
+
+                # save predicted coefficients 
+                np.savetxt(osp.join(dirpath, f"{icart}", f"COEFFS-{iconf+1}.dat"), pred_coefs[icart])
             
-            start = time.time()
-            psi_nm_cart = compute_density_response_descriptor_structure(
-                iconf, i, conf_range, atom_idx, natom_dict,
-                lmax, species, zeta,
-                power, power_antisymm, power_env_sparse, power_env_sparse_antisymm,
-                Vmat, Mspe, cart, saltedpath, saltedname, Menv,
-                verbose=inp.salted.verbose,
-                alpha_only=alpha_only,
-                qmcode=qmcode,
-            )
-            
-            for icart in ["x", "y", "z"]:
-                pred_coefs = compute_prediction(
-                    i, atomic_symbols, natoms, lmax, nmax, species, psi_nm_cart, weights,
-                    cart=icart,
-                    average=average,
-                    av_coefs=av_coefs
-                )
-                np.savetxt(os.path.join(dirpath, icart, f"COEFFS-{iconf + 1}.dat"), pred_coefs)
-            
-            if rank == 0 or i % 10 == 0:
-                print(f"done in {time.time() - start:.2f} seconds.", flush=True)
+            if qmcode=="cp2k":
+                # Compute polarizability
+                alpha = compute_polarizability(natoms[iconf],atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs)
 
 
         if qmcode=="cp2k":

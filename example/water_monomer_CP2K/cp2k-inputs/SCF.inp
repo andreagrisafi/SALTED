@@ -51,6 +51,11 @@
         &END PAIR_POTENTIAL
       &END VDW_POTENTIAL
     &END XC
+    &PRINT
+      &E_DENSITY_CUBE
+        STRIDE 1 1 1
+      &END E_DENSITY_CUBE
+    &END PRINT
   &END DFT
   &SUBSYS
       @include cell.sys

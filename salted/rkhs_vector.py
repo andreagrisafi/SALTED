@@ -11,29 +11,35 @@ from scipy import sparse
 from salted import sph_utils
 from salted.sph_utils import equicomb_numba, equicombsparse_numba, equicombnonorm, antiequicombnonorm, kernelequicomb, kernelnorm
 from salted.sys_utils import (
-    ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs,
-    format_index_ranges, get_atom_idx, get_feats_projs, get_feats_projs_response,
-    read_system,
+    ParseConfig, build_featomic_hyper_params, check_MPI_tasks_count, compute_Mcut,
+    detect_mpi, distribute_jobs, format_index_ranges, get_atom_idx, get_feats_projs,
+    get_feats_projs_response, read_system,
 )
 
 def build():
 
     inp = ParseConfig().parse_input()
 
-    # salted parameters
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+    # frequently used parameters
+    saltedname = inp.salted.saltedname
+    saltedpath = inp.salted.saltedpath
+    saltedtype = inp.salted.saltedtype
+    zeta = inp.gpr.z
+    Menv = inp.gpr.Menv
+    rep1, rep2 = inp.descriptor.rep1.type, inp.descriptor.rep2.type
+    nrad1, nrad2 = inp.descriptor.rep1.nrad, inp.descriptor.rep2.nrad
+    nang1, nang2 = inp.descriptor.rep1.nang, inp.descriptor.rep2.nang
+    neighspe1, neighspe2 = inp.descriptor.rep1.neighspe, inp.descriptor.rep2.neighspe
+    nspe1 = len(inp.descriptor.rep1.neighspe)
+    nspe2 = len(inp.descriptor.rep2.neighspe)
+    ncut = inp.descriptor.sparsify.ncut
+    sparsify = ncut > 0
+    HP1 = build_featomic_hyper_params(inp.descriptor.rep1)
+    HP2 = build_featomic_hyper_params(inp.descriptor.rep2)
 
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     class arraylist:
@@ -77,7 +83,7 @@ def build():
     else:
         conf_range = list(range(ndata))
 
-    frames = read(filename,":")
+    frames = read(inp.system.filename,":")
 
     if saltedtype=="density":
 
@@ -155,13 +161,15 @@ def build():
                 else:
                     power[lam] = p.reshape(natoms[iconf],2*lam+1,featsize)
 
-            # Compute kernels and RKHS descriptors 
+            # Compute kernels and RKHS descriptors
             Psi:dict[tuple[int, str], np.ndarray] = {}
             ispe = {}
             Tsize = 0
             for spe in species:
 
                 ispe[spe] = 0
+
+                Mcut = compute_Mcut(inp.gpr.Mcut, Mspe[spe], lmax[spe])
 
                 # lam=0
                 if zeta == 1:
@@ -172,7 +180,7 @@ def build():
                 else:
 
                     kernel0_nm = np.dot(power[0][atom_idx[(iconf,spe)]],power_env_sparse[(0,spe)].T)
-                    kernel_nm = kernel0_nm**zeta
+                    kernel_nm = kernel0_nm[:, :Mcut[0]]**zeta
                     Psi[(spe,0)] = np.real(np.dot(kernel_nm,Vmat[(0,spe)]))
 
                 Tsize += natom_dict[(iconf,spe)]*nmax[(spe,0)]
@@ -192,8 +200,9 @@ def build():
                         kernel_nm_blocks = kernel_nm.reshape(natom_dict[(iconf,spe)], 2*lam+1, Mspe[spe], 2*lam+1)
                         kernel_nm_blocks *= kernel0_nm[:, np.newaxis, :, np.newaxis] ** (zeta - 1)
                         kernel_nm = kernel_nm_blocks.reshape(natom_dict[(iconf,spe)]*(2*lam+1), Mspe[spe]*(2*lam+1))
+                        kernel_nm = kernel_nm[:, :Mcut[lam]*(2*lam+1)]
                         Psi[(spe,lam)] = np.real(np.dot(kernel_nm,Vmat[(lam,spe)]))
-                
+
                     Tsize += natom_dict[(iconf,spe)]*nmax[(spe,lam)]*(2*lam+1)
 
             # build sparse feature-vector memory efficiently
@@ -338,11 +347,9 @@ def build():
             Tsize = 0
             for spe in species:
 
-                Mcut = {}
+                Mcut = compute_Mcut(inp.gpr.Mcut, Mspe[spe], lmax[spe])
                 Mcutsize = {}
                 for lam in range(lmax[spe]+1):
-                    frac = np.exp(-0.05*lam**2)
-                    Mcut[lam] = int(round(Mspe[spe]*frac))
                     Mcutsize[lam] = Mcut[lam]*3*(2*lam+1)
 
                 for icart in range(3):

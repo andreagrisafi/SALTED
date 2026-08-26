@@ -6,6 +6,7 @@ import os.path as osp
 import numpy as np
 from scipy import sparse
 
+from salted.constants import bohr2angs
 from salted import basis
 from salted.sys_utils import (
     ParseConfig,
@@ -17,24 +18,27 @@ from salted.sys_utils import (
     init_property_file,
     read_system,
 )
-from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability
+
 
 def build():
 
     inp = ParseConfig().parse_input()
-    (saltedname, saltedpath, saltedtype,
-    filename, species, average,
-    path2qm, qmcode, qmbasis, dfbasis,
-    filename_pred, predname, predict_data, alpha_only,
-    rep1, rcut1, sig1, nrad1, nang1, neighspe1,
-    rep2, rcut2, sig2, nrad2, nang2, neighspe2,
-    sparsify, nsamples, ncut,
-    zeta, Menv, Ntrain, trainfrac, regul, eigcut,
-    gradtol, restart, trainsel, nspe1, nspe2, HP1, HP2) = ParseConfig().get_all_params()
+
+    # frequently used parameters
+    saltedname = inp.salted.saltedname
+    saltedpath = inp.salted.saltedpath
+    saltedtype = inp.salted.saltedtype
+    average = inp.system.average
+    qmcode = inp.qm.qmcode
+    zeta = inp.gpr.z
+    Menv = inp.gpr.Menv
+    
+    if qmcode=='cp2k':
+        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo
 
     comm, size, rank, parallel = detect_mpi()
 
-    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, natoms, natmax = read_system()
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     vdir = f"validations_{saltedname}"
@@ -43,9 +47,9 @@ def build():
 
     # define test set
     trainrangetot = np.loadtxt(osp.join(
-        saltedpath, rdir, f"training_set_N{Ntrain}.txt"
+        saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
     ), int)
-    ntrain = round(trainfrac*len(trainrangetot))
+    ntrain = round(inp.gpr.trainfrac*len(trainrangetot))
     testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
     # Distribute structures to tasks
@@ -55,7 +59,7 @@ def build():
         if inp.salted.verbose:
             print(f"Task {rank} handles the following structures: {format_index_ranges(testrange,True)}", flush=True)
 
-    reg_log10_intstr = str(int(np.log10(regul)))
+    reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))
 
     # load regression weights
     weights = np.load(osp.join(
@@ -82,7 +86,7 @@ def build():
 
     if qmcode=="cp2k":
         from ase.io import read
-        xyzfile = read(filename, ":")
+        xyzfile = read(inp.system.filename, ":")
         # Initialize calculation of density/density-response moments
         charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
 
@@ -92,6 +96,7 @@ def build():
         if saltedtype=="density":
             qfile = init_property_file("charges",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
             dfile = init_property_file("dipoles",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+            if inp.qm.dfmetric=="coulomb": ufile = init_property_file("electrostatic_energy",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
         if saltedtype=="density-response":
             pfile = init_property_file("polarizabilities",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
 
@@ -155,17 +160,50 @@ def build():
 
             if qmcode=="cp2k":
 
+                bdir = osp.join(inp.salted.saltedpath,"basis")
+                pseudocharge, rloc = read_local_pseudo(species, bdir)
+
                 # Compute reference total charges and dipole moments
-                ref_charge, ref_dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average)
+                ref_charge, ref_dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,False,comm)
+                
                 # Compute predicted total charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(xyzfile[iconf],inp.qm.pseudocharge,natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average)
+                charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,False,comm)
 
+                if inp.qm.dfmetric == "coulomb":
+                   
+                    # Prepare Hartree energy calculation 
+                    structure = read(inp.system.filename,":")[iconf]
+                    cell = structure.get_cell() / bohr2angs
+                    nx = int(np.floor(cell[0,0]/(0.111))+1)
+                    ny = int(np.floor(cell[1,1]/(0.111))+1)
+                    nz = int(np.floor(cell[2,2]/(0.111))+1)
+                    sigma_ewald_en = 1.0 / bohr2angs # sigma_en = 1 angs
+                    lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)
 
-                # Save charges and dipole moments
+                    # Compute reference Hartree energy
+                    ref_hartree, ref_ee, ref_en, ref_nn = compute_hartree_energy(ref_coefs, overl, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, np.array([0.0,0.0,0.0]), [nx, ny, nz]) 
+                    
+                    # Compute predicted Hartree energy
+                    hartree, ee, en, nn = compute_hartree_energy(pred_coefs, overl, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, np.array([0.0,0.0,0.0]), [nx, ny, nz]) 
+
+                ## Compute reference energy and forces
+                #ref_U_ele, ref_forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc_dict,structure,ref_coefs)
+                #
+                ## Compute predicted energy and forces
+                #U_ele, forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc_dict,structure,pred_coefs)
+
+                # Save total charge 
                 print(iconf+1,ref_charge,
                                   charge,file=qfile)
+
+                # Save total dipole
                 print(iconf+1,ref_dipole["x"],ref_dipole["y"],ref_dipole["z"],
                                   dipole["x"],    dipole["y"],    dipole["z"],file=dfile)
+                
+                # Save electrostatic energy
+                if inp.qm.dfmetric=="coulomb":
+                     print(iconf+1,ref_hartree,
+                                       hartree,file=ufile)
             
             np.savetxt(osp.join(dirpath,
                                 f"COEFFS-{iconf+1}.dat"
@@ -215,8 +253,8 @@ def build():
             if qmcode=="cp2k":
 
                 # Compute reference and predicted polarizabilities
-                ref_alpha = compute_polarizability(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs)
-                alpha = compute_polarizability(xyzfile[iconf],natoms[iconf],atomic_symbols[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs)
+                ref_alpha = compute_polarizability(natoms[iconf],atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs)
+                alpha = compute_polarizability(natoms[iconf],atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs)
 
                 # Save polarizabilities
                 print(iconf+1,ref_alpha[("x","x")],ref_alpha[("x","y")],ref_alpha[("x","z")],
@@ -239,6 +277,7 @@ def build():
         if saltedtype=="density":
             qfile.close()
             dfile.close()
+            if inp.qm.dfmetric=="coulomb": ufile.close()
         if saltedtype=="density-response":
             pfile.close()
 
