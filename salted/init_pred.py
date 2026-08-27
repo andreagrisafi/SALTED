@@ -24,7 +24,7 @@ def build(rank):
     sparsify = True if inp.descriptor.sparsify.ncut > 0 else False
   
     # read basis
-    [lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read_as_old_format(inp.qm.dfbasis)
+    [lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read(inp.qm.dfbasis)
     llist = []
     nlist = []
     for spe in species:

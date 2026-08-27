@@ -16,7 +16,7 @@ inp = ParseConfig().parse_input()
 xyzfile = read(inp.system.filename,":")
 ndata = len(xyzfile)
 species = inp.system.species
-[lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read_as_old_format(inp.qm.dfbasis)
+[lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read(inp.qm.dfbasis)
 
 comm, size, rank, parallel = detect_mpi()
 

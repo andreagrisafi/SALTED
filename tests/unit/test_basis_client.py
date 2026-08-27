@@ -18,40 +18,40 @@ def client(tmp_path):
 
 
 def test_write_read_roundtrip(client):
-    client.write(BASIS_NAME, BASIS_DATA)
-    assert client.read(BASIS_NAME) == BASIS_DATA
+    client.write_to_yaml(BASIS_NAME, BASIS_DATA)
+    assert client.read_as_yaml_format(BASIS_NAME) == BASIS_DATA
 
 
 def test_write_same_data_twice_is_ok(client):
-    client.write(BASIS_NAME, BASIS_DATA)
-    client.write(BASIS_NAME, BASIS_DATA)  # identical data: union, no error
-    assert client.read(BASIS_NAME) == BASIS_DATA
+    client.write_to_yaml(BASIS_NAME, BASIS_DATA)
+    client.write_to_yaml(BASIS_NAME, BASIS_DATA)  # identical data: union, no error
+    assert client.read_as_yaml_format(BASIS_NAME) == BASIS_DATA
 
 
 def test_write_conflicting_data_raises(client):
-    client.write(BASIS_NAME, BASIS_DATA)
+    client.write_to_yaml(BASIS_NAME, BASIS_DATA)
     conflicting = {"H": {"lmax": 1, "nmax": [2, 1]}}
     with pytest.raises(ValueError):
-        client.write(BASIS_NAME, conflicting)
+        client.write_to_yaml(BASIS_NAME, conflicting)
 
 
 def test_write_conflicting_data_force_overwrite(client):
-    client.write(BASIS_NAME, BASIS_DATA)
+    client.write_to_yaml(BASIS_NAME, BASIS_DATA)
     new_h = {"H": {"lmax": 1, "nmax": [2, 1]}}
-    client.write(BASIS_NAME, new_h, force_overwrite=True)
-    data = client.read(BASIS_NAME)
+    client.write_to_yaml(BASIS_NAME, new_h, force_overwrite=True)
+    data = client.read_as_yaml_format(BASIS_NAME)
     assert data["H"] == new_h["H"]
     assert data["O"] == BASIS_DATA["O"]  # untouched species survives
 
 
 def test_read_missing_basis_raises(client):
     with pytest.raises(Exception):
-        client.read("no-such-basis")
+        client.read_as_yaml_format("no-such-basis")
 
 
-def test_read_as_old_format(client):
-    client.write(BASIS_NAME, BASIS_DATA)
-    lmax, nmax = client.read_as_old_format(BASIS_NAME)
+def test_read_old_format(client):
+    client.write_to_yaml(BASIS_NAME, BASIS_DATA)
+    lmax, nmax = client.read(BASIS_NAME)
     assert lmax == {"H": 2, "O": 4}
     assert nmax[("H", 0)] == 4
     assert nmax[("O", 4)] == 1
@@ -66,7 +66,7 @@ def test_data_fpath_points_to_external_file(tmp_path):
 
     client = BasisClient(data_fpath=str(external))
     assert client.data_fpath == str(external)
-    assert client.read(BASIS_NAME) == BASIS_DATA
+    assert client.read_as_yaml_format(BASIS_NAME) == BASIS_DATA
 
 
 def test_compare_species_basis_data():
