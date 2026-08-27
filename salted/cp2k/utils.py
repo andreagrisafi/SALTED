@@ -95,7 +95,7 @@ def read_local_pseudo(species, bdir):
         rloc[spe] = pp[1]
     return pseudocharge, rloc
 
-def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
+def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
     """Compute total charge and dipole moment for the given configuration"""
 
     atoms_range_set = set(atoms_range_set)

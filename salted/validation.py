@@ -166,10 +166,10 @@ def build():
             if qmcode=="cp2k":
 
                 # Compute reference total charges and dipole moments
-                ref_charge, ref_dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,charge_integrals,dipole_integrals,ref_coefs,average,False,comm)
+                ref_charge, ref_dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,False,comm)
                 
                 # Compute predicted total charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,charge_integrals,dipole_integrals,pred_coefs,average,False,comm)
+                charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,False,comm)
 
                 if inp.qm.dfmetric == "coulomb":
                    
