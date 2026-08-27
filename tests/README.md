@@ -14,10 +14,10 @@ Concepts in the integration tests design:
 
 | marker | dataset | `saltedtype`  | time (1 core) |
 |---|---|---|---|
-| `aims_density` | `water_monomer_AIMS` | `density` | ~4 min, ~10 with MPI |
-| `pyscf_density` | `water_monomer_PySCF_subset100` | `density` | ~4 min |
-| `cp2k_density` | `water_monomer_CP2K_subset100` | `density` | ~6 min |
-| `aims_response` | `water_monomer_AIMS_response_subset100` | `density-response` | ~20 min with MPI |
+| `aims_density` | `water_monomer_AIMS` | `density` | ~3 min |
+| `pyscf_density` | `water_monomer_PySCF_subset100` | `density` | ~3 min |
+| `cp2k_density` | `water_monomer_CP2K_subset100` | `density` | ~4 min |
+| `aims_response` | `water_monomer_AIMS_response_subset100` | `density-response` | ~6 min with MPI |
 
 The four markers select **disjoint** sets and `integration` is their union, so CI runs every test exactly once.
 
@@ -63,16 +63,16 @@ Which `salted.*` modules the integration tests exercise. `+MPI` means the module
 | `salted.*` | aims_density | pyscf_density | cp2k_density | aims_response |
 |---|:--:|:--:|:--:|:--:|
 | `initialize` → `wigner`, `scalar_vector` | y | y | y | y +antisymm |
-| `sparsify_features` | n/a | y | y | n/a |
+| `sparsify_features` | n | y | y | n |
 | `sparse_selection` | y | y | y | y |
-| `sparse_descriptor` | y +MPI | y | y | y +MPI |
+| `sparse_descriptor` | y +MPI | y | y +MPI | y +MPI |
 | `rkhs_projector` | y | y | y | y response variant |
-| `rkhs_vector` | y +MPI | y | y | y +MPI |
-| `hessian_matrix` → `numba_sparse`, `get_averages` | y +MPI | y | y | y +MPI, no averages |
+| `rkhs_vector` | y +MPI | y | y +MPI | y +MPI |
+| `hessian_matrix` → `numba_sparse`, `get_averages` | y +MPI | y | y +MPI | y +MPI (no averages) |
 | `solve_regression` | y | y | y | y |
-| `validation` | y +MPI | y | y | y +MPI |
-| `prediction` | y +MPI | y | y | y +MPI |
-| `init_pred` + `salted_prediction` | y +MPI | y | y | n (density-only API)
+| `validation` | y +MPI | y | y +MPI | y +MPI |
+| `prediction` | y +MPI | y | y +MPI | y +MPI |
+| `init_pred` + `salted_prediction` | y +MPI | y | y +MPI | n (density-only API) |
 
 The `n/a` entries follow from the model configuration, not from implementation gaps.
 `salted.minimize_loss` is deliberately not covered.
