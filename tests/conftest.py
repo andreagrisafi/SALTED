@@ -127,18 +127,18 @@ class PipelineWorkspace:
                     "with the alphas/contra .dat files of its density-fitting basis; "
                     "needed for the charge/dipole moment integrals of the validation step",
                 )
-            # Real dir of per-file symlinks (not a dir symlink): the workspace also
-            # holds generated {spe}-local_pseudo.dat files the dataset does not ship.
+            # Real dir of per-file symlinks
             dst = self.root / "basis"
             dst.mkdir()
             for f in src.iterdir():
                 (dst / f.name).symlink_to(f)
-            assert self.spec.local_pseudo, (
-                "cp2k models must set ModelSpec.local_pseudo; salted.validation "
-                "reads basis/{spe}-local_pseudo.dat for the charge/dipole check"
+            pseudos = list(self.dataset.glob("*-local_pseudo.dat"))
+            assert pseudos, (
+                f"dataset {self.dataset.name} does not ship {{spe}}-local_pseudo.dat "
+                "files; salted.validation reads them for the charge/dipole/Hartree checks"
             )
-            for spe, (charge, rloc) in self.spec.local_pseudo.items():
-                (dst / f"{spe}-local_pseudo.dat").write_text(f"{charge}\n{rloc}\n")
+            for f in pseudos:
+                (dst / f.name).symlink_to(f)
 
     def _write_inp(self, ntrain: int | None, require_datasets: bool):
         """Build inp.yaml from the spec: deep copy + external basis + Ntrain."""
@@ -243,6 +243,10 @@ class PipelineWorkspace:
         (1-based index into the full dataset)."""
         return self.root / f"validations_{self.saltedname}" / self.mz / f"N{self.ntrain}_{self.reg_str}"
 
+    def validation_property(self, name: str) -> np.ndarray:
+        """Load validation output, for 'errors', also 'charges', 'dipoles, 'electrostatic_energy' for derived ones."""
+        return np.loadtxt(self.validation_output_dir / f"{name}.dat", ndmin=2)
+
     def prediction_output_dir(self, predname: str) -> Path:
         """Where salted.prediction writes its COEFFS-<k+1>.dat files
         (1-based position in the prediction xyz)."""
@@ -293,6 +297,10 @@ class PipelineWorkspace:
             cmd = mpi + cmd
             label = f"{label}[mpi]"
         env = os.environ.copy()
+        if mpi:
+            #avoid intelmpi / openmpi PATHs conflict
+            mpi_dir = str(Path(mpi[0]).resolve().parent)
+            env["PATH"] = mpi_dir + os.pathsep + env.get("PATH", "")
         env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
         env.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
         t0 = time.perf_counter()
@@ -413,7 +421,8 @@ def workspaces(request, tmp_path_factory) -> WorkspaceBuilder:
             "(use --datasets-path or $SALTED_DATASETS_PATH)",
         )
 
-    mpirun = shutil.which("mpirun")
+    # due to above change of env PATH, ensure again that mpirun is found in the new PATH
+    mpirun = shutil.which("mpirun", path=f"{Path(sys.executable).parent}:{os.environ.get('PATH', '')}")
     assert mpirun is not None, (
         "mpirun not found on PATH; the integration tests require an MPI launcher"
     )

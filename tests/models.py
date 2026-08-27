@@ -68,20 +68,20 @@ class ModelSpec:
     check_mpi: bool = False
     """Include this model in the serial-vs-MPI equivalence tests."""
 
-    local_pseudo: dict[str, tuple[float, float]] | None = None
-    """Per-species ``(pseudocharge, rloc)`` of the local GTH pseudopotential,
-    written to ``basis/{spe}-local_pseudo.dat`` in the workspace. CP2K only:
-    ``salted.validation`` reads these files for the charge/dipole check."""
-
     fd_gradient: bool = True
-    """Check the live-API analytical gradient against finite differences.
-    False for cp2k: ``salted_prediction`` rescales the returned gradient to
-    conserve the total charge but returns the coefficients unscaled, so the
-    gradient is by design not the derivative of the returned coefficients."""
+    """Check the live-API analytical gradient against finite differences."""
+
+    derived_property_tols: dict[str, float] | None = None
+    """Check dervied properties from output RI coefficients, see ``test_derived_properties.py``"""
 
     @property
     def saltedtype(self) -> str:
         return self.inp["salted"].get("saltedtype", "density")
+
+    @property
+    def has_derived_properties(self) -> bool:
+        """for cp2k total charge, dipole moment, and Hartree energy"""
+        return self.inp["qm"]["qmcode"] == "cp2k" and not self.is_response
 
     @property
     def is_response(self) -> bool:
@@ -179,6 +179,7 @@ _SPECS = [
         dataset_dir="water_monomer_CP2K_subset100",
         marker="cp2k_density",
         nconf=100,
+        check_mpi=True,
         inp={
             "salted": {"saltedname": "test", "saltedpath": "./", "verbose": True},
             "system": {"filename": "./water_monomers_100.xyz", "species": ["H", "O"]},
@@ -186,7 +187,7 @@ _SPECS = [
                 "path2qm": "./",
                 "qmcode": "cp2k",
                 "periodic": "3D",
-                "dfmetric": "identity",
+                "dfmetric": "coulomb",
                 "dfbasis": "RI-basis",
             },
             "prediction": {"filename": "./water_dimers_10.xyz", "predname": "prediction"},
@@ -205,12 +206,11 @@ _SPECS = [
                 "trainsel": "random",
             },
         },
-        # andreagrisafi/SALTED-datasets: water_monomer_CP2K_subset100/README.md
-        # 2026-07 Ntrain=40/validation=60 on 100-structure subset: % RMSE 1.625e+00
+        # 2026-08 Ntrain=40/validation=60 on Coulomb metric: % RMSE 1.497e+00
         validation_rmse_threshold=2.5,
-        # GTH-PBE (charge, rloc) per species, as in example/water_monomer_CP2K/{H,O}-local_pseudo.dat
-        local_pseudo={"H": (1.0, 0.20059317301776), "O": (6.0, 0.2444632848016)},
         fd_gradient=False,
+        # 2026-08 observed maxima on the same run: charge 1.3e-2, dipole 1.9e-2, hartree 1.2e-3
+        derived_property_tols={"charge": 0.05, "dipole": 0.05, "hartree": 5e-3},
     ),
     ModelSpec(
         key="water_monomer_pyscf_density",
@@ -274,6 +274,10 @@ a density-response path.
 
 MPI_MODELS = params(s for s in MODELS.values() if s.check_mpi)
 """Models run twice, serially and under mpirun, for equivalence checking."""
+
+DERIVED_PROPERTY_MODELS = params(s for s in MODELS.values() if s.has_derived_properties)
+"""Models whose validation step also derives electrostatic observables
+(total charge, dipole moment, Hartree energy) from the density coefficients."""
 
 LIVE_API_MPI_MODELS = params(s for s in MODELS.values() if s.check_mpi and not s.is_response)
 """MPI-checked models the live prediction API also supports.

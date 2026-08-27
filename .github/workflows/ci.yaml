@@ -77,6 +77,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[test]"
 
+      - name: Install pyscf
+        if: matrix.marker == 'cp2k_density'
+        run: pip install pyscf
+
       - name: Resolve datasets revision
         id: datasets-rev
         run: |

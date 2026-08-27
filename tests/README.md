@@ -52,7 +52,7 @@ pytest -m aims_density -k "not mpi"   # just its serial checks
 | `--mpi-np N` | 2 | MPI tasks for the equivalence tests |
 | `--require-datasets` | off | fail instead of skip when SALTED-datasets is missing; used in CI |
 
-Each model runs in a fresh temp workspace under `/tmp/pytest-of-<user>/pytest-<N>/salted_<model>_0/`. Use `--basetemp /some/dir` to put them somewhere predictable. The `pyscf` unit tests are skipped unless `pyscf` is installed.
+Each model runs in a fresh temp workspace under `/tmp/pytest-of-<user>/pytest-<N>/salted_<model>_0/`. Use `--basetemp /some/dir` to put them somewhere predictable. The `pyscf` unit tests are skipped unless `pyscf` is installed or testing with marker `cp2k_density`.
 
 Do not run a marker's tests concurrently (no `pytest-xdist`): the prediction tests write into the shared trained workspace.
 
@@ -76,6 +76,9 @@ Which `salted.*` modules the integration tests exercise. `+MPI` means the module
 
 The `n/a` entries follow from the model configuration, not from implementation gaps.
 `salted.minimize_loss` is deliberately not covered.
+
+For `cp2k_density` the validation step also derives electrostatic observables from the density coefficients, including total charge, dipole moment, and Hartree energy via `salted.cp2k.utils`.
+`test_derived_properties.py` checks each predicted value against the one computed from the reference coefficients.
 
 ## Continuous integration
 
