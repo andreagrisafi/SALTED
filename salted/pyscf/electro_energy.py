@@ -21,7 +21,7 @@ for i in range(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read_as_old_format(inp.qm.dfbasis)
+[lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read(inp.qm.dfbasis)
 
 llist = []
 nlist = []

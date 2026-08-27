@@ -46,9 +46,9 @@ class BasisClient:
     Usage:
     ```python
     basis_client = BasisClient()        # instantiate the basis client
-    basis_data = basis_client.read("my_basis")       # read basis data
-    lmax, nmax = basis_client.read_as_old_format("my_basis")  # read basis data in the old format (see docstring)
-    basis_client.write("my_basis", {
+    lmax, nmax = basis_client.read("my_basis")  # read basis data in the old format (see docstring)
+    basis_data = basis_client.read_as_yaml_format("my_basis")       # read basis data
+    basis_client.write_to_yaml("my_basis", {
         "H": {"lmax": 1, "nmax": [4, 3]}, "O": {"lmax": 2, "nmax": [5, 4, 3]}
     })  # write basis data
     basis_client.pop("my_basis")        # remove basis data
@@ -167,7 +167,7 @@ class BasisClient:
             return  # empty dataset -> don't need to check the rest things
         basis_names = basis_data.keys()
         for basis_name in basis_names:
-            basis_data = self.read(basis_name)
+            basis_data = self.read_as_yaml_format(basis_name)
             for spe_name, spe_data in basis_data.items():
                 """Checking 2 is done here"""
                 assert (
@@ -180,7 +180,7 @@ class BasisClient:
             basis_data_all = yaml.safe_load(f)
         return basis_data_all
 
-    def read(self, basis_name: str) -> dict[str, SpeciesBasisData]:
+    def read_as_yaml_format(self, basis_name: str) -> dict[str, SpeciesBasisData]:
         """Read basis data from the dataset file"""
         basis_data_all = self._read_all()
         assert (
@@ -188,7 +188,7 @@ class BasisClient:
         ), f"{basis_name=} not found in {self.data_fpath}"
         return basis_data_all[basis_name]
 
-    def read_as_old_format(
+    def read(
         self, basis_name: str
     ) -> tuple[dict[str, int], dict[tuple[str, int], int]]:
         """Read basis data and return as the old format
@@ -208,11 +208,7 @@ class BasisClient:
         }
         ```
         """
-        # print(
-        #     "Old format is deprecated and will be removed in the future. Please call read() instead.",
-        #     file=sys.stderr,
-        # )
-        basis_data = self.read(basis_name)
+        basis_data = self.read_as_yaml_format(basis_name)
         lmax = {spe_name: spe_data["lmax"] for spe_name, spe_data in basis_data.items()}
         nmax = {
             (spe_name, i): n
@@ -228,7 +224,7 @@ class BasisClient:
                 basis_data_all, f, default_flow_style=None
             )  # default_flow_style is important!
 
-    def write(self, basis_name: str, basis_data: dict[str, SpeciesBasisData], force_overwrite: bool = False):
+    def write_to_yaml(self, basis_name: str, basis_data: dict[str, SpeciesBasisData], force_overwrite: bool = False):
         """Write basis data to the dataset file"""
         with open(self.data_fpath) as f:
             basis_data_all: dict = yaml.safe_load(f)
@@ -291,11 +287,11 @@ def test_BasisClient():
     )
 
     print("\nTEST: read basis data")
-    basis_data = basis_client.read("FHI-aims-light")
+    basis_data = basis_client.read_as_yaml_format("FHI-aims-light")
     print(basis_data)
 
     print("\nTEST: read basis data in the old format")
-    basis_data_old_format = basis_client.read_as_old_format("FHI-aims-light")
+    basis_data_old_format = basis_client.read("FHI-aims-light")
     print(basis_data_old_format)
 
     print("\nTEST: write basis data")
@@ -304,22 +300,22 @@ def test_BasisClient():
         "H": {"lmax": 1, "nmax": [4, 3]},
         "O": {"lmax": 2, "nmax": [5, 4, 3]},
     }
-    basis_client.write(test_basis_name, test_basis_data)
+    basis_client.write_to_yaml(test_basis_name, test_basis_data)
 
     print("\nTEST: remove basis data")
     basis_client.pop(test_basis_name)
 
     print("\nTEST: write duplicated basis data")
     assert test_basis_name not in basis_client._read_all().keys()
-    basis_client.write(test_basis_name, test_basis_data)
+    basis_client.write_to_yaml(test_basis_name, test_basis_data)
 
     print("\nTEST: deal with duplicate species but same data")
     test_basis_data1 = test_basis_data.copy()
     test_basis_data1["_Ghost"] = {"lmax": 1, "nmax": [4, 3]}
     print(f"write {test_basis_data1=}")
-    basis_client.write(test_basis_name, test_basis_data1)
+    basis_client.write_to_yaml(test_basis_name, test_basis_data1)
     print(
-        f"Current basis data: {test_basis_name} = {basis_client.read(test_basis_name)}"
+        f"Current basis data: {test_basis_name} = {basis_client.read_as_yaml_format(test_basis_name)}"
     )
 
     print("\nTEST: deal with duplicate species but different data")
@@ -329,7 +325,7 @@ def test_BasisClient():
     ]  # make a little change
     try:
         print(f"write {test_basis_data2=}")
-        basis_client.write(test_basis_name, test_basis_data2)
+        basis_client.write_to_yaml(test_basis_name, test_basis_data2)
     except ValueError:
         print("Duplication error caught, print error info:")
         import traceback
