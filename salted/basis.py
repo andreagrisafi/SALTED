@@ -30,4 +30,4 @@ def basiset(basis: str, dfbasis_file: str | None = None):
     }
     ```
     """
-    return BasisClient(data_fpath=dfbasis_file).read_as_old_format(basis)
+    return BasisClient(data_fpath=dfbasis_file).read(basis)

@@ -92,7 +92,7 @@ def read_system(filename: str = None, spelist: list[str] = None, dfbasis: str = 
         )
 
     # read basis (optionally from an external file, inp.qm.dfbasis_file)
-    [lmax, nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read_as_old_format(dfbasis)
+    [lmax, nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read(dfbasis)
     llist = []
     nlist = []
     for spe in spelist:

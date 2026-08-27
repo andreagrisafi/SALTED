@@ -26,7 +26,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
     comm, size, rank, parallel = detect_mpi()
 
     # read basis
-    [lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read_as_old_format(dfbasis)
+    [lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read(dfbasis)
     llist = []
     nlist = []
     for spe in species:
