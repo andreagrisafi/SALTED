@@ -18,7 +18,8 @@ SALTED is to date interfaced with the following electronic-structure codes: *CP2
 
 ### PySCF
 
-To install PySCF, you can follow the instructions [here](https://pyscf.org/install.html).
+PySCF is installed automatically as a core dependency of SALTED.
+It is required by PySCF datasets, also some calculations in CP2K workflow.
 
 Please note that PySCF works well with small systems like molecules and clusters, but it lacks the scalability to handle periodic systems.
 We suggest using CP2K or FHI-aims for these applications.
