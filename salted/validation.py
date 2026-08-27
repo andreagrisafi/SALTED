@@ -34,7 +34,7 @@ def build():
     Menv = inp.gpr.Menv
     
     if qmcode=='cp2k':
-        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo
+        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo, build_real_grid, build_gvec, build_gcutoff, gto_rec_prim, build_contraction_matrix, get_rho_n
 
     comm, size, rank, parallel = detect_mpi()
 
@@ -89,6 +89,11 @@ def build():
         xyzfile = read(inp.system.filename, ":")
         # Initialize calculation of density/density-response moments
         charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
+        # Basis set and local pseudopotential info
+        bdir = osp.join(saltedpath, "basis")
+        pseudocharge, rloc = read_local_pseudo(species, bdir)
+        if inp.qm.dfmetric == "coulomb":
+            lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)
 
     # Initialize files for validation results
     efile = init_property_file("errors",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
@@ -160,9 +165,6 @@ def build():
 
             if qmcode=="cp2k":
 
-                bdir = osp.join(inp.salted.saltedpath,"basis")
-                pseudocharge, rloc = read_local_pseudo(species, bdir)
-
                 # Compute reference total charges and dipole moments
                 ref_charge, ref_dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,False,comm)
                 
@@ -172,19 +174,26 @@ def build():
                 if inp.qm.dfmetric == "coulomb":
                    
                     # Prepare Hartree energy calculation 
-                    structure = read(inp.system.filename,":")[iconf]
-                    cell = structure.get_cell() / bohr2angs
-                    nx = int(np.floor(cell[0,0]/(0.111))+1)
-                    ny = int(np.floor(cell[1,1]/(0.111))+1)
-                    nz = int(np.floor(cell[2,2]/(0.111))+1)
-                    sigma_ewald_en = 1.0 / bohr2angs # sigma_en = 1 angs
-                    lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)
+                    structure = xyzfile[iconf]
+                    cell = np.asarray(structure.get_cell()) / bohr2angs
+                    nside, dr, volume = build_real_grid(cell, 0.111) # Real space grid
+
+                    Gvec_half, knorm_vec, gidx = build_gvec(nside, dr, inp.qm.dfmetric) # Generate G-vectors for the half-space Z>0
+                    gcuts = build_gcutoff(alphas, species, lmax, knorm_vec) # Flexible G-cutoffs
+                    
+                    pwc_prim_re, pwc_prim_im = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, gcuts) # Primitive pw coefs
+                    C = build_contraction_matrix(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, contranorm) # Contraction amtrix
+
+                    # Core charge density in reciprocal space
+                    origin = np.zeros(3)
+                    rho_n = get_rho_n(nside, dr, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
+                    rho_n_rec = np.fft.fftn(rho_n).ravel()[gidx] * np.prod(dr)
 
                     # Compute reference Hartree energy
-                    ref_hartree, ref_ee, ref_en, ref_nn = compute_hartree_energy(ref_coefs, overl, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, np.array([0.0,0.0,0.0]), [nx, ny, nz]) 
+                    ref_hartree, ref_ee, ref_en, ref_nn = compute_hartree_energy(ref_coefs, overl, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, volume) 
                     
                     # Compute predicted Hartree energy
-                    hartree, ee, en, nn = compute_hartree_energy(pred_coefs, overl, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, np.array([0.0,0.0,0.0]), [nx, ny, nz]) 
+                    hartree, ee, en, nn = compute_hartree_energy(pred_coefs, overl, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, volume) 
 
                 ## Compute reference energy and forces
                 #ref_U_ele, ref_forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc_dict,structure,ref_coefs)
