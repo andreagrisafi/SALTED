@@ -34,7 +34,7 @@ def build():
     Menv = inp.gpr.Menv
     
     if qmcode=='cp2k':
-        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo, get_reciprocal_grid, build_gcutoff, gto_rec_prim, build_contraction_matrix, get_rho_n
+        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo, build_real_grid, build_gvec, build_gcutoff, gto_rec_prim, build_contraction_matrix, get_rho_n
 
     comm, size, rank, parallel = detect_mpi()
 
@@ -166,51 +166,34 @@ def build():
             if qmcode=="cp2k":
 
                 # Compute reference total charges and dipole moments
-                ref_charge, ref_dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,ref_coefs,average,False,comm)
+                ref_charge, ref_dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,charge_integrals,dipole_integrals,ref_coefs,average,False,comm)
                 
                 # Compute predicted total charges and dipole moments
-                charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,False,comm)
+                charge, dipole = compute_charge_and_dipole(pseudocharge,natoms[iconf],np.arange(natoms[iconf]),atomic_symbols[iconf],atomic_coords[iconf],lmax,nmax,charge_integrals,dipole_integrals,pred_coefs,average,False,comm)
 
                 if inp.qm.dfmetric == "coulomb":
                    
                     # Prepare Hartree energy calculation 
                     structure = xyzfile[iconf]
                     cell = np.asarray(structure.get_cell()) / bohr2angs
-                    nx = int(np.floor(cell[0,0]/(0.111))+1)
-                    ny = int(np.floor(cell[1,1]/(0.111))+1)
-                    nz = int(np.floor(cell[2,2]/(0.111))+1)
-                    dx, dy, dz = cell[0,0]/nx, cell[1,1]/ny, cell[2,2]/nz
+                    nside, dr, volume = build_real_grid(cell, 0.111) # Real space grid
 
-                    # Generate G-vectors for the half-space Z>0
-                    Gvec = get_reciprocal_grid(nx, ny, nz, dx, dy, dz)
-                    mask = (
-                        (Gvec[:, 2] > 0) |
-                        ((Gvec[:, 2] == 0) & (Gvec[:, 1] > 0)) |
-                        ((Gvec[:, 2] == 0) & (Gvec[:, 1] == 0) & (Gvec[:, 0] >= 0)))
-                    Gvec_half = Gvec[mask][1:]
+                    Gvec_half, knorm_vec, gidx = build_gvec(nside, dr, inp.qm.dfmetric) # Generate G-vectors for the half-space Z>0
+                    gcuts = build_gcutoff(alphas, species, lmax, knorm_vec) # Flexible G-cutoffs
                     
-                    # Sort array of G-vectors depending on G-norm
-                    knorm_vec = np.linalg.norm(Gvec_half, axis=1)
-                    sort_idx = np.argsort(knorm_vec)
-                    Gvec_half = Gvec_half[sort_idx]
-                    knorm_vec = knorm_vec[sort_idx]
-
-                    # Flexible G-cutoffs, primitive pw coefs and contraction matrix
-                    gcuts = build_gcutoff(alphas, species, lmax, knorm_vec)
-                    pwc_prim_re, pwc_prim_im = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, gcuts)
-                    C = build_contraction_matrix(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, contranorm)
+                    pwc_prim_re, pwc_prim_im = gto_rec_prim(lmax_numba, species, npgf, alphas, Gvec_half, gcuts) # Primitive pw coefs
+                    C = build_contraction_matrix(natoms[iconf], atomic_symbols[iconf], lmax, nmax_numba, npgf, contranorm) # Contraction amtrix
 
                     # Core charge density in reciprocal space
                     origin = np.zeros(3)
-                    rho_n = get_rho_n([nx, ny, nz], dx, dy, dz, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
-                    rho_n_rec = np.fft.fftn(rho_n).ravel() * dx * dy * dz
-                    rho_n_rec = rho_n_rec[mask][1:][sort_idx]
+                    rho_n = get_rho_n(nside, dr, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
+                    rho_n_rec = np.fft.fftn(rho_n).ravel()[gidx] * np.prod(dr)
 
                     # Compute reference Hartree energy
-                    ref_hartree, ref_ee, ref_en, ref_nn = compute_hartree_energy(ref_coefs, overl, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, cell, [nx, ny, nz]) 
+                    ref_hartree, ref_ee, ref_en, ref_nn = compute_hartree_energy(ref_coefs, overl, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, volume) 
                     
                     # Compute predicted Hartree energy
-                    hartree, ee, en, nn = compute_hartree_energy(pred_coefs, overl, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, cell, [nx, ny, nz]) 
+                    hartree, ee, en, nn = compute_hartree_energy(pred_coefs, overl, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, volume) 
 
                 ## Compute reference energy and forces
                 #ref_U_ele, ref_forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc_dict,structure,ref_coefs)

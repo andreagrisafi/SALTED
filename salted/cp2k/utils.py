@@ -66,14 +66,9 @@ def init_moments(inp,species,lmax,nmax,rank):
 
     return [charge_integrals,dipole_integrals]
 
-def compute_hartree_energy(coefs, S, coords, atomic_symbols, rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, cell, nside):
+def compute_hartree_energy(coefs, S, coords, atomic_symbols, rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, volume):
 
     natoms = len(atomic_symbols)
-
-    # Real-space grid
-    nx, ny, nz = nside[0], nside[1], nside[2]
-    dx, dy, dz = cell[0,0]/nx, cell[1,1]/ny, cell[2,2]/nz
-    volume = (nx*dx) * (ny*dy) * (nz*dz)
 
     # Electron-electron term: E_ee = 1/2 c^T.S.c
     e_ee = 0.5 * np.dot(coefs, S @ coefs)
@@ -97,8 +92,10 @@ def read_local_pseudo(species, bdir):
         rloc[spe] = pp[1]
     return pseudocharge, rloc
 
-def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
+def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
     """Compute total charge and dipole moment for the given configuration"""
+
+    atoms_range_set = set(atoms_range_set)
 
     # Compute unnormalized electron-density integral
     iaux = 0
@@ -325,6 +322,43 @@ def get_reciprocal_grid(nx, ny, nz, dx, dy, dz):
     ), axis=-1)
 
     return Gvec
+
+def build_real_grid(cell, spacing):
+
+    L = np.diag(cell)
+    nx = int(np.floor(L[0]/spacing)+1)
+    ny = int(np.floor(L[1]/spacing)+1)
+    nz = int(np.floor(L[2]/spacing)+1)
+    nside = (nx, ny, nz)
+    dr = L / np.asarray(nside)
+    volume = float(np.prod(np.asarray(nside) * dr))
+
+    return nside, dr, volume
+
+def build_gvec(nside, dr, df_metric):
+
+    # Get the G-vectors
+    Gx = 2 * np.pi * np.fft.fftfreq(nside[0], dr[0])
+    Gy = 2 * np.pi * np.fft.fftfreq(nside[1], dr[1])
+    Gz = 2 * np.pi * np.fft.fftfreq(nside[2], dr[2])
+
+    # Half-space: Gz > 0, or Gz == 0 and Gy > 0, or Gz == Gy == 0 and Gx >= 0
+    X, Y, Z = Gx[:, None, None], Gy[None, :, None], Gz[None, None, :]
+    mask = ((Z > 0) |
+            ((Z == 0) & (Y > 0)) |
+            ((Z == 0) & (Y == 0) & (X >= 0)))
+    gidx = np.flatnonzero(mask.ravel())
+
+    if df_metric == "coulomb": # exclude G=0
+        gidx = gidx[1:]
+
+    # Build the half-space grid
+    i, j, k = np.unravel_index(gidx, nside)
+    knorm_vec = np.sqrt(Gx[i]**2 + Gy[j]**2 + Gz[k]**2)
+    sort_idx = np.argsort(knorm_vec)
+    Gvec_half = np.stack((Gx[i[sort_idx]], Gy[j[sort_idx]], Gz[k[sort_idx]]), axis=1)
+
+    return Gvec_half, knorm_vec[sort_idx], gidx[sort_idx]
 
 @njit(parallel = True, fastmath = True)
 def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc):
@@ -788,34 +822,6 @@ def setup_pyscf_species(species, lmax, nmax, alphas, contranorm):
         perm[spe] = np.asarray(idx, dtype=int)
 
     return {"mol_bra": mol_bra, "mol_ket": mol_ket, "perm": perm, "coord_slice": coord_slice}
-
-def setup_pyscf_core(species, pseudocharge, rloc):
-    # Build per-species PySCF Mole objects for the Gaussian core charge distribution (a single s function)
-
-    mol_core = {}
-    coord_slice = {}
-    scale = {}
-
-    for spe in species:
-        sigma = rloc[spe]
-        alpha = 1.0 / (2.0 * sigma**2)
-
-        # "Ghost" atom sitting at the origin, carrying the basis assembled above
-        mol = _pyscf_gto.M(
-            atom=[[f"ghost-{spe}", (0.0, 0.0, 0.0)]],
-            basis={f"ghost-{spe}": [[0, [float(alpha), 1.0]]]},
-            spin=0,
-            cart=False,    # real spherical harmonics, not cartesian Gaussians
-            unit="Bohr",   # match SALTED units
-        )
-
-        # Rescale to have the correct pseudocharge
-        mol_core[spe] = mol
-        scale[spe] = (pseudocharge[spe] / ((2.0*np.pi)**1.5 * sigma**3)) / mol.eval_gto("GTOval_sph", np.zeros((1,3)))[0,0]
-        ptr = mol._atm[0, _pyscf_gto.PTR_COORD]
-        coord_slice[spe] = slice(ptr, ptr + 3)
-
-    return {"mol_core": mol_core, "coord_slice": coord_slice, "scale": scale}
 
 def setup_pyscf_ewald(species, lmax, nmax, alphas, contranorm, sigma_ewald):
     # Build per-species PySCF Mole objects carrying the Ewald-corrected radial functions
@@ -1292,11 +1298,10 @@ def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocha
 
     return U_tot, forces
 
-def get_rho_n(nside, dx, dy, dz, origin, natoms, coords, atomic_symbols, pseudocharge, rloc, nsigma=6.0):
+def get_rho_n(nside, dr, origin, natoms, coords, atomic_symbols, pseudocharge, rloc, nsigma=6.0):
     # Gaussian core charge on the cube grid
 
     rho_n = np.zeros((nside[0], nside[1], nside[2]), dtype=np.float64)
-    dr = np.array([dx, dy, dz]) # grid spacing along x, y, z
 
     for iat in range(natoms):
         spe = atomic_symbols[iat]

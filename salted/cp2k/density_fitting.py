@@ -7,7 +7,7 @@ import os.path as osp
 
 from salted.constants import bohr2angs
 from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, gto_rec_ewald, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo, setup_pyscf_species, setup_pyscf_ewald
+from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, gto_rec_ewald, build_gvec, get_basis_set_info_numba, read_local_pseudo, setup_pyscf_species, setup_pyscf_ewald
 from salted.cp2k.utils import build_contraction_matrix, get_w_prim, get_rho_n, compute_hartree_energy, build_gcutoff, pair_cutoffs, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
 from mpi4py import MPI
 
@@ -47,7 +47,8 @@ species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, nato
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
 bdir = osp.join(inp.salted.saltedpath,"basis")
-lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)    
+lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)  
+pseudocharge, rloc = read_local_pseudo(species, bdir)  
 
 # PySCF setup and cutoffs
 pyscf_data = setup_pyscf_species(species, lmax, nmax_numba, alphas, contranorm)
@@ -70,7 +71,6 @@ for iconf in conf_range:
     if inp.salted.verbose: print("conf:", iconf+1)
 
     # Compute coefs array size and number of electrons
-    pseudocharge, rloc = read_local_pseudo(species, bdir)
     ntype = {}
     n_elec = 0.0
     for spe in species:
@@ -99,6 +99,7 @@ for iconf in conf_range:
         npoints = nx * ny * nz
         if inp.salted.verbose: print("Number of grid points:", npoints)
         rho_KS = np.fromstring(cubefile.read(), dtype=np.float64, sep=' ')
+    dr = np.array([dx, dy, dz])
 
     if rho_KS.size != npoints:
         print(f"ERROR: inconsistent number of grid points!")
@@ -113,22 +114,12 @@ for iconf in conf_range:
     cell[1,1] = ny*dy
     cell[2,2] = nz*dz
 
-    # Generate G-vectors for the half-space Z>0
-    Gvec = get_reciprocal_grid(nx,ny,nz,dx,dy,dz)
-    mask = (
-        (Gvec[:, 2] > 0) |
-        ((Gvec[:, 2] == 0) & (Gvec[:, 1] > 0)) |
-        ((Gvec[:, 2] == 0) & (Gvec[:, 1] == 0) & (Gvec[:, 0] >= 0)))
-    Gvec_half = Gvec[mask]
-    if df_metric == "coulomb": # exclude G=0
-        Gvec_half = Gvec_half[1:]
-    
-    # Sort array of G-vectors depending on G-norm
-    knorm_vec = np.linalg.norm(Gvec_half, axis=1)
-    sort_idx = np.argsort(knorm_vec)
-    Gvec_half = Gvec_half[sort_idx]
-    knorm_vec = knorm_vec[sort_idx]
-    
+    # Generate sorted G-vectors for the half-space Z>0
+    Gvec_half, knorm_vec, gidx = build_gvec((nx, ny, nz), dr, df_metric)
+     
+    # Compute density Fourier-components
+    rho_KS_rec = np.fft.fftn(rho_KS).ravel()[gidx] * np.prod(dr)
+
     # Get flexible G-cutoffs for full primitive basis function representation
     gcuts = build_gcutoff(alphas, species, lmax, knorm_vec)
 
@@ -136,13 +127,6 @@ for iconf in conf_range:
         # G-vector truncation based on omega
         gmax_ewald = 2.0 * np.pi / sigma_ewald
         gmax_ewald_idx = np.searchsorted(knorm_vec, gmax_ewald).astype(np.int64) # Index of the last G-vector below the cutoff
-
-    # Compute density Fourier-components
-    rho_KS_rec = np.fft.fftn(rho_KS).ravel()* dx * dy * dz
-    rho_KS_rec = rho_KS_rec[mask]
-    if df_metric == "coulomb": # exclude G=0
-        rho_KS_rec = rho_KS_rec[1:]
-    rho_KS_rec = rho_KS_rec[sort_idx]
 
     # Compute partial-wave coefs as basis set fourier transform
     time_c = time.time()
@@ -200,10 +184,9 @@ for iconf in conf_range:
     # Hartree energy calculation
     time_c = time.time()
     if df_metric == "coulomb":
-        rho_n = get_rho_n([nx, ny, nz], dx, dy, dz, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
-        rho_n_rec = np.fft.fftn(rho_n).ravel() * dx * dy * dz
-        rho_n_rec = rho_n_rec[mask][1:][sort_idx]
-        e_hartree, e_ee, e_en, e_nn = compute_hartree_energy(c, S, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, partial_wave_coefs_prim_re, partial_wave_coefs_prim_im, C, gcuts, cell, [nx, ny, nz])        
+        rho_n = get_rho_n([nx, ny, nz], dr, origin, natoms[iconf], atomic_coords[iconf], atomic_symbols[iconf], pseudocharge, rloc)
+        rho_n_rec = np.fft.fftn(rho_n).ravel()[gidx] * np.prod(dr)
+        e_hartree, e_ee, e_en, e_nn = compute_hartree_energy(c, S, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, partial_wave_coefs_prim_re, partial_wave_coefs_prim_im, C, gcuts, volume)        
         print(f"conf {iconf+1}: Hartree energy = {e_hartree:.8f} Ha", flush=True)
         if inp.salted.verbose: print(f"conf {iconf+1}: E_ee = {e_ee:.8f} Ha, E_en = {e_en:.8f} Ha, E_nn = {e_nn:.8f} Ha", flush=True)
         if inp.salted.verbose: print('Time to compute Hartree energy:', time.time() - time_c, flush=True)
