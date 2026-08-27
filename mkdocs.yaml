@@ -11,6 +11,7 @@ site_url: https://github.com/andreagrisafi/SALTED
 nav:
   - Home: index.md
   - Installation: installation.md
+  - Docker: docker.md
   - Theory: theory.md
   - Workflow: workflow.md
   - Input: input.md
