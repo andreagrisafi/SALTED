@@ -11,7 +11,7 @@ from itertools import islice
 from scipy.interpolate import interp1d
 
 from salted.constants import bohr2angs
-from salted import basis
+from salted.basis_client import BasisClient
 from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs, format_index_ranges
 
 def build(structure,coefs,cubename,refcube,comm,size,rank):
@@ -26,7 +26,7 @@ def build(structure,coefs,cubename,refcube,comm,size,rank):
     comm, size, rank, parallel = detect_mpi()
 
     # read basis
-    [lmax,nmax] = basis.basiset(dfbasis)
+    [lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read_as_old_format(dfbasis)
     llist = []
     nlist = []
     for spe in species:

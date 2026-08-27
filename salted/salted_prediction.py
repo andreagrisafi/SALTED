@@ -83,8 +83,6 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
            atom_idx[spe].append(iat)
            natom_dict[spe] += 1
 
-    bdir = osp.join(inp.salted.saltedpath,"basis")
-    pseudocharge, rloc = read_local_pseudo(species, bdir)
 
     if gradient:
     
@@ -318,10 +316,13 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
     
     if inp.qm.qmcode=="cp2k":
 
+        bdir = osp.join(inp.salted.saltedpath,"basis")
+        pseudocharge, rloc = read_local_pseudo(species, bdir)
+
         lcuts = {}
         for spe in species:
             lcuts[spe] = min(lcut,lmax[spe])
- 
+
         charge, dipole = compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,atomic_coords,lcuts,nmax,species,charge_integrals,dipole_integrals,pred_coefs,average,parallel,comm)
         
         if gradient:

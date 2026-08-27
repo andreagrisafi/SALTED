@@ -113,9 +113,9 @@ def main(geom_indexes: list[int] | None, num_threads: int = None):
     if num_threads is not None:
         lib.num_threads(num_threads)
 
-    lmax, nmax = BasisClient().read_as_old_format(inp.qm.dfbasis)
+    lmax, nmax = BasisClient(data_fpath=inp.qm.dfbasis_file).read_as_old_format(inp.qm.dfbasis)
     ribasis = df.addons.DEFAULT_AUXBASIS[basis._format_basis_name(inp.qm.qmbasis)][0]  # RI basis name in pyscf
-    basis_data = BasisClient().read(inp.qm.dfbasis)
+    basis_data = BasisClient(data_fpath=inp.qm.dfbasis_file).read(inp.qm.dfbasis)
     df_irreps_by_spe = {
         spe: Irreps(tuple((cnt, lam) for lam, cnt in enumerate(spe_basis_data["nmax"])))
         for spe, spe_basis_data in basis_data.items()

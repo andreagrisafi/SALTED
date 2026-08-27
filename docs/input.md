@@ -37,6 +37,7 @@ For all the path-related variables, the path can be either a relative path or an
 | `path2qm` | `str` | **Required** | Location of the quantum-mechanical training data. |
 | `qmcode` | `Literal["aims"] \| Literal["cp2k"] \| Literal["pyscf"]` | **Required** | Which ab initio software was used to generate training data. |
 | `dfbasis` | `str` | **Required** | A label for the auxiliary basis set used to expand the density. |
+| `dfbasis_file` | `str` | Optional | Path to an external basis dataset yaml file holding `dfbasis`. If unset, the `basis_data.yaml` inside to the installed salted package is used. Mainly intended for testing purposes. |
 | `qmbasis` | `str` | Required if `qmcode=pyscf` | Wavefunction basis set to use when generating the training data (only for PySCF). |
 | `functional` | `str` | Required if `qmcode=pyscf` | DFT functional to use when generating the training data (only for PySCF). |
 | `pseudocharge` | `float` | Required if `qmcode=cp2k` | Pseudo nuclear charge (only for CP2K). |

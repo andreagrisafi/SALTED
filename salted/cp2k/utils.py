@@ -8,7 +8,10 @@ from scipy import special
 from numba import njit, prange
 from numba import types
 from numba.typed import Dict
-from pyscf import gto as _pyscf_gto
+try:
+    from pyscf import gto as _pyscf_gto
+except ImportError:  # pyscf is optional: only the CP2K periodic-overlap utilities need it
+    _pyscf_gto = None
 
 from salted.constants import bohr2angs
 
@@ -171,7 +174,7 @@ def scale_grad_coefs(pseudocharge,natoms,atoms_range_set,atomic_symbols,lmax,nma
     # Compute unnormalized electron-density integral
     iaux = 0
     nele = 0.0
-    grad_charge = np.zeros((all_natoms,3))
+    grad_charge = np.zeros((grad_coefs.shape[0],3))
     for iat in range(natoms):
         spe = atomic_symbols[iat]
         nele += pseudocharge[spe]
