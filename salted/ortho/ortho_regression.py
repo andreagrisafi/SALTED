@@ -34,7 +34,7 @@ random.Random(3).shuffle(dataset)
 trainrangetot = dataset[:N]
 np.savetxt("training_set.txt",trainrangetot,fmt='%i')
 #trainrangetot = np.loadtxt("training_set2.txt",int)
-ntrain = int(frac*len(trainrangetot))
+ntrain = round(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 natoms_train = natoms[trainrange]
 print("Number of training configurations =", ntrain)

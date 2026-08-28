@@ -54,7 +54,7 @@ def build(rank):
     Vmat,Mspe,power_env_sparse = get_feats_projs(species,lmax)
  
     # load regression weights
-    ntrain = int(inp.gpr.Ntrain*inp.gpr.trainfrac)
+    ntrain = round(inp.gpr.Ntrain*inp.gpr.trainfrac)
     weights = np.load(osp.join(
         saltedpath, f"regrdir_{saltedname}", f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(reg))}.npy"
     ))

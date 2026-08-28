@@ -54,7 +54,7 @@ natoms_test = natoms[testrange]
 
 M = inp.gpr.Menv
 eigcut = inp.gpr.eigcut
-ntrain = int(inp.gpr.Ntrain*inp.gpr.trainfrac)
+ntrain = round(inp.gpr.Ntrain*inp.gpr.trainfrac)
 reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))  # for consistency
 vdir = os.path.join(
     inp.salted.saltedpath,

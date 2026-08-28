@@ -11,7 +11,7 @@ inp = ParseConfig().parse_input()
 
 comm, size, rank, parallel = detect_mpi()
 
-ntrain = int(inp.gpr.Ntrain*inp.gpr.trainfrac)
+ntrain = round(inp.gpr.Ntrain*inp.gpr.trainfrac)
 vdir = f"validations_{inp.salted.saltedname}"
 reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))
 dirpath = os.path.join(inp.salted.saltedpath, vdir, f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{reg_log10_intstr}")

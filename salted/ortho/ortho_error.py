@@ -18,7 +18,7 @@ pdir = inp.valcdir
 
 # load predicted coefficients for test structures
 trainrangetot = np.loadtxt("training_set.txt",int)
-ntrain = int(inp.trainfrac*len(trainrangetot))
+ntrain = round(inp.trainfrac*len(trainrangetot))
 testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
