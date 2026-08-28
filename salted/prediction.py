@@ -83,7 +83,7 @@ def build():
     reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))  # for consistency
 
     # load regression weights
-    ntrain = int(inp.gpr.Ntrain * inp.gpr.trainfrac)
+    ntrain = round(inp.gpr.Ntrain * inp.gpr.trainfrac)
     weights = np.load(osp.join(
         saltedpath,
         f"regrdir_{saltedname}",

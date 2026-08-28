@@ -92,7 +92,7 @@ def build():
     # trainrangetot = np.loadtxt("training_set.txt",int)
 
     # Distribute structures to tasks
-    ntraintot = int(inp.gpr.trainfrac * Ntrain)
+    ntraintot = round(inp.gpr.trainfrac * Ntrain)
 
     if parallel:
         check_MPI_tasks_count(comm, ntraintot, "training structures")

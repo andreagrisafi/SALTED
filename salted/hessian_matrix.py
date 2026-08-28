@@ -65,7 +65,7 @@ def build():
     np.savetxt(osp.join(
         saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
     ), trainrangetot, fmt='%i')
-    ntrain = int(inp.gpr.trainfrac*inp.gpr.Ntrain)
+    ntrain = round(inp.gpr.trainfrac*inp.gpr.Ntrain)
     trainrange = trainrangetot[:ntrain]
 
     """

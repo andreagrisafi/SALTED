@@ -17,7 +17,7 @@ def build():
     
     pdir = f"predictions_{inp.salted.saltedname}_{inp.prediction.predname}"
     
-    ntrain = int(inp.gpr.trainfrac*inp.gpr.Ntrain)
+    ntrain = round(inp.gpr.trainfrac*inp.gpr.Ntrain)
     
     # Distribute structures to tasks
     if parallel:
