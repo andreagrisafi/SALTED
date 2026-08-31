@@ -1228,7 +1228,7 @@ def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocha
 
     pseudocharge_numba = Dict.empty(key_type=types.unicode_type,value_type=types.float64)
     for i in range(len(species)):
-       pseudocharge_numba[species[i]] = pseudocharge[i] # Warning: species and pseudocharge must have the same ordering
+       pseudocharge_numba[species[i]] = pseudocharge[species[i]] # Warning: species and pseudocharge must have the same ordering
 
     atomic_symbols = structure.get_chemical_symbols()
     natoms = len(atomic_symbols)
