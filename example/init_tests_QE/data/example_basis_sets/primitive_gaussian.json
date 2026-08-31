@@ -1,0 +1,78 @@
+{
+    "Na": {
+        "n_max": 3,
+        "l_max": 2,
+        "radial_method": "gaussian",
+        "angular_method": "real_spherical",
+        "radial_params": {
+            "alphas": [
+                1,
+                2,
+                2,
+                2,
+                3,
+                3,
+                3,
+                3,
+                3
+            ]
+        }
+    },
+    "V": {
+        "n_max": 3,
+        "l_max": 2,
+        "radial_method": "gaussian",
+        "angular_method": "real_spherical",
+        "radial_params": {
+            "alphas": [
+                1,
+                2,
+                2,
+                2,
+                3,
+                3,
+                3,
+                3,
+                3
+            ]
+        }
+    },
+    "O": {
+        "n_max": 3,
+        "l_max": 2,
+        "radial_method": "gaussian",
+        "angular_method": "real_spherical",
+        "radial_params": {
+            "alphas": [
+                1,
+                2,
+                2,
+                2,
+                3,
+                3,
+                3,
+                3,
+                3
+            ]
+        }
+    },
+    "P": {
+        "n_max": 3,
+        "l_max": 2,
+        "radial_method": "gaussian",
+        "angular_method": "real_spherical",
+        "radial_params": {
+            "alphas": [
+                1,
+                2,
+                2,
+                2,
+                3,
+                3,
+                3,
+                3,
+                3
+            ]
+        }
+    }
+}

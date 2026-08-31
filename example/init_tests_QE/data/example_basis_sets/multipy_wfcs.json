@@ -1,0 +1,38 @@
+{
+    "Na": {
+        "n_max": 3,
+        "l_max": 2,
+        "radial_method": "atomic",
+        "angular_method": "real_spherical",
+        "radial_params": {
+            "filename": "Na_TZP_rc10.0_qe.dat", 
+        }
+    },
+    "V": {
+        "n_max": 3,
+        "l_max": 2,
+        "radial_method": "atomic",
+        "angular_method": "real_spherical",
+        "radial_params": {
+            "filename": "V_TZ_rc10.0_qe.dat", 
+        }
+    },
+    "O": {
+        "n_max": 3,
+        "l_max": 2,
+        "radial_method": "atomic",
+        "angular_method": "real_spherical",
+        "radial_params": {
+            "filename": "O_TZP_rc10.0_qe.dat", 
+        }
+    },
+    "P": {
+        "n_max": 3,
+        "l_max": 2,
+        "radial_method": "atomic",
+        "angular_method": "real_spherical",
+        "radial_params": {
+            "filename": "P_TZP_rc10.0_qe.dat", 
+        }
+    }
+}

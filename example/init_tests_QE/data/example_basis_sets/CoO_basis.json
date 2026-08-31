@@ -1,0 +1,14 @@
+Co:
+  n_max: 3
+  l_max: 2
+  radial_method: atomic
+  angular_method: real_spherical
+  radial_params:
+    filename: ../atomic_densities/Co_TZP_rc14.0_qe.dat
+O:
+  n_max: 3
+  l_max: 2
+  radial_method: atomic
+  angular_method: real_spherical
+  radial_params:
+    filename: ../atomic_densities/O_TZP_rc10.0_qe.dat
