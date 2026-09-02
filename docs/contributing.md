@@ -25,7 +25,7 @@ For questions about usage that aren't bug reports, please:
 - Open a [GitHub issue](https://github.com/andreagrisafi/SALTED/issues/new) with the `question`
   label, so the discussion is visible to other users who may have the same question.
 - For matters not suited to a public issue, you can reach the maintainers directly (see the
-  Contact section of the [README](../README.rst)).
+  Contact section of the README).
 
 ## Contributing changes
 
@@ -99,5 +99,5 @@ integration marker.
    and unrelated to your change.
 4. A maintainer will review your PR and may ask for changes before merging.
 
-By contributing, you agree that your contributions will be licensed under the same
-[GNU GPLv3+ license](../LICENSE) as the rest of the project.
+By contributing, you agree that your contributions will be licensed under the 
+GNU GPLv3+ license.
