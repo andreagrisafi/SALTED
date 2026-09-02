@@ -1,15 +1,37 @@
 import os
+import argparse
 import sys
+import os.path as osp
 
 import numpy as np
 
-from salted.sys_utils import ParseConfig
+from salted.sys_utils import ParseConfig, read_system
 inp = ParseConfig().parse_input()
 
-dn = os.path.join(inp.qm.path2qm, inp.prediction.predict_data)
-l = os.listdir(os.path.join(dn, "geoms"))
-nfiles = len(l)
-testset = list(range(nfiles))
+def add_command_line_arguments_contraction():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-vl", "--validation", action='store_true', help="Move SALTED-predicted coefficients for the validations into the relevant AIMS data folders")
+    args = parser.parse_args()
+    return args
+
+args = add_command_line_arguments_contraction()
+validation = args.validation
+ntrain = int(inp.gpr.trainfrac*inp.gpr.Ntrain)
+
+if validation:
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
+    dn = os.path.join(inp.qm.path2qm, 'data')
+    # define validation set
+    rdir = f"regrdir_{inp.salted.saltedname}"
+    trainrangetot = np.loadtxt(osp.join(
+        inp.salted.saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
+    ), int)
+    testset = np.setdiff1d(list(range(ndata)),trainrangetot)
+else:
+    dn = os.path.join(inp.qm.path2qm, inp.prediction.predict_data)
+    species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system(filename=inp.prediction.filename,spelist = inp.system.species, dfbasis = inp.qm.dfbasis)
+    testset = list(range(ndata))
+
 testset = [x+1 for x in testset]
 
 es = []
@@ -68,9 +90,14 @@ for i in range(2):
     xcs[:,i] /= n_atoms
     eles[:,i] /= n_atoms
 
-np.savetxt('predict_reference_electrostatic_energy.dat',np.vstack([eles[:,1],eles[:,0]]).T)
-np.savetxt('predict_reference_xc_energy.dat',np.vstack([xcs[:,1],xcs[:,0]]).T)
-np.savetxt('predict_reference_total_energy.dat',np.vstack([es[:,1],es[:,0]]).T)
+if validation:
+    fname_prefix = "validation_reference"
+else:
+    fname_prefix = "predict_reference"
+
+np.savetxt(f'{fname_prefix}_electrostatic_energy.dat',np.vstack([eles[:,1],eles[:,0]]).T)
+np.savetxt(f'{fname_prefix}_xc_energy.dat',np.vstack([xcs[:,1],xcs[:,0]]).T)
+np.savetxt(f'{fname_prefix}_total_energy.dat',np.vstack([es[:,1],es[:,0]]).T)
 
 print('Mean absolute errors (eV/atom):')
 print('Electrostatic energy:',np.average(np.abs(eles[:,1]-eles[:,0])))
