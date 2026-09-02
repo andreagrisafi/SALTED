@@ -4,14 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "salted"
-version = "3.0.0"
+version = "3.0.3"
 description = "Symmetry-Adapted Learning of Three-Dimensional Electron Densities"
 readme = "README.rst"
 requires-python = ">=3.10"
 license = { text = "GNU General Public License v3 or later (GPLv3+)" }
 authors = [
-    { name = "Andrea Grisafi", email = "andrea.grisafi@ens.psl.eu" },
+    { name = "Andrea Grisafi", email = "andrea.grisafi@sorbonne-universite.fr" },
     { name = "Alan Lewis", email = "alan.m.lewis@york.ac.uk" },
+    { name = "Mariana Rossi", email = "mr2102@cam.ac.uk" },
+    { name = "Zekun Lou", email = "zekun.lou@mpsd.mpg.de" },
 ]
 dependencies = [
     "mpi4py",
@@ -27,7 +29,6 @@ dependencies = [
     "packaging",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: POSIX :: Linux",
