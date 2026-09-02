@@ -20,6 +20,7 @@ nav:
     - Part 2 - Training: tutorial/training.md
     - Part 3 - Prediction: tutorial/prediction.md
     - Part 4 - Derived properties: tutorial/derived_properties.md
+  - Contributing: contributing.md
   - API: api.md
 
 plugins:
