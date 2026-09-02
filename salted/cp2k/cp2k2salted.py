@@ -8,7 +8,7 @@ from itertools import islice
 import copy
 import time
 
-from salted import basis
+from salted.basis_client import BasisClient
 from salted.sys_utils import ParseConfig, check_MPI_tasks_count, detect_mpi, distribute_jobs
 
 inp = ParseConfig().parse_input()
@@ -16,7 +16,7 @@ inp = ParseConfig().parse_input()
 xyzfile = read(inp.system.filename,":")
 ndata = len(xyzfile)
 species = inp.system.species
-[lmax,nmax] = basis.basiset(inp.qm.dfbasis)
+[lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read(inp.qm.dfbasis)
 
 comm, size, rank, parallel = detect_mpi()
 

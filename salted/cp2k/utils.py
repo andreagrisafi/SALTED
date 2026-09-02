@@ -8,7 +8,10 @@ from scipy import special
 from numba import njit, prange
 from numba import types
 from numba.typed import Dict
-from pyscf import gto as _pyscf_gto
+try:
+    from pyscf import gto as _pyscf_gto
+except ImportError:  # pyscf is optional: only the CP2K periodic-overlap utilities need it
+    _pyscf_gto = None
 
 from salted.constants import bohr2angs
 
@@ -66,59 +69,16 @@ def init_moments(inp,species,lmax,nmax,rank):
 
     return [charge_integrals,dipole_integrals]
 
-def compute_hartree_energy(coefs, S, cell, coords, atomic_symbols, species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald, origin, nside):
+def compute_hartree_energy(coefs, S, coords, atomic_symbols, rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, volume):
 
     natoms = len(atomic_symbols)
-    ncoefs = len(coefs)
-
-    # Real-space grid
-    nx, ny, nz = nside[0], nside[1], nside[2]
-    dx, dy, dz = cell[0,0]/nx, cell[1,1]/ny, cell[2,2]/nz
-    volume = (nx*dx) * (ny*dy) * (nz*dz)
-
-    # G-vectors for the half-space, G=0 excluded, sorted by |G|
-    Gvec = get_reciprocal_grid(nx, ny, nz, dx, dy, dz)
-    mask = (
-        (Gvec[:, 2] > 0) |
-        ((Gvec[:, 2] == 0) & (Gvec[:, 1] > 0)) |
-        ((Gvec[:, 2] == 0) & (Gvec[:, 1] == 0) & (Gvec[:, 0] >= 0)))
-    Gvec_half = Gvec[mask][1:]
-    knorm_vec = np.linalg.norm(Gvec_half, axis=1)
-    sort_idx = np.argsort(knorm_vec)
-    Gvec_half = Gvec_half[sort_idx]
-    knorm_vec = knorm_vec[sort_idx]
-
-    # Reciprocal space cutoff
-    gmax_ewald = 2.0 * np.pi / sigma_ewald
-    gmax_ewald_idx = np.searchsorted(knorm_vec, gmax_ewald).astype(np.int64)  # Index of the last G-vector below the cutoff  
-
-    # Real space cutoff
-    rcut_pairs = {}
-    for spe1 in species:
-        for spe2 in species:
-            rcut_pairs[(spe1, spe2)] = 4 * (sigma_ewald + sigma_ewald)
-
-    # PySCF objects: Ewald-corrected basis (bra) and core pseudocharge (ket)
-    pyscf_ewald = setup_pyscf_ewald(species, lmax_numba, nmax_numba, alphas, contranorm, sigma_ewald)
-    pyscf_core = setup_pyscf_core(species, pseudocharge, rloc)
-
-    # Compute partial-wave coefs as basis set fourier transform
-    partial_wave_coefs_ewald = gto_rec_ewald(lmax_numba, lmax_max, nmax_numba, nbasis, species, npgf, contranorm, alphas, Gvec_half, gmax_ewald_idx, sigma_ewald)
-    pwc_g0, pwc_spread = gto_rec_g0(natoms, atomic_symbols, lmax_numba, nmax_numba, npgf, alphas, contranorm, ncoefs)
-
-    # Core charge density in reciprocal space
-    rho_n = get_rho_n(nside, dx, dy, dz, origin, natoms, coords, atomic_symbols, pseudocharge, rloc)
-    rho_n_rec = np.fft.fftn(rho_n).ravel() * dx * dy * dz
-    rho_n_rec = rho_n_rec[mask][1:][sort_idx]
 
     # Electron-electron term: E_ee = 1/2 c^T.S.c
     e_ee = 0.5 * np.dot(coefs, S @ coefs)
 
     # Electron-nucleus term: E_en = -sum_i c_i (Phi_i|rho_n)
-    wn = get_wn_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_ewald, pyscf_core, rcut_pairs)
-    ztot = sum(pseudocharge[spe] for spe in atomic_symbols)
-    wn -= (4.0*np.pi)**2 / (2.0*volume) * ztot * (sigma_ewald**2 * pwc_g0 - pwc_spread)  # G=0 correction
-    wn += get_wn_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs_ewald, rho_n_rec, volume, gmax_ewald_idx)
+    wnp = get_w_prim(Gvec_half, natoms, coords, npgf, lmax_numba, atomic_symbols, pwc_prim_re, pwc_prim_im, volume, rho_n_rec, 'coulomb', gcuts)
+    wn = C.T @ wnp
     e_en = -np.dot(coefs, wn)
 
     # Nucleus-nucleus term: E_nn = 1/2 (rho_n|rho_n)
@@ -137,6 +97,8 @@ def read_local_pseudo(species, bdir):
 
 def compute_charge_and_dipole(pseudocharge,natoms,atoms_range_set,atomic_symbols,coords,lmax,nmax,species,charge_integrals,dipole_integrals,coefs,average,parallel,comm):
     """Compute total charge and dipole moment for the given configuration"""
+
+    atoms_range_set = set(atoms_range_set)
 
     # Compute unnormalized electron-density integral
     iaux = 0
@@ -212,7 +174,7 @@ def scale_grad_coefs(pseudocharge,natoms,atoms_range_set,atomic_symbols,lmax,nma
     # Compute unnormalized electron-density integral
     iaux = 0
     nele = 0.0
-    grad_charge = np.zeros((all_natoms,3))
+    grad_charge = np.zeros((grad_coefs.shape[0],3))
     for iat in range(natoms):
         spe = atomic_symbols[iat]
         nele += pseudocharge[spe]
@@ -363,6 +325,43 @@ def get_reciprocal_grid(nx, ny, nz, dx, dy, dz):
     ), axis=-1)
 
     return Gvec
+
+def build_real_grid(cell, spacing):
+
+    L = np.diag(cell)
+    nx = int(np.floor(L[0]/spacing)+1)
+    ny = int(np.floor(L[1]/spacing)+1)
+    nz = int(np.floor(L[2]/spacing)+1)
+    nside = (nx, ny, nz)
+    dr = L / np.asarray(nside)
+    volume = float(np.prod(np.asarray(nside) * dr))
+
+    return nside, dr, volume
+
+def build_gvec(nside, dr, df_metric):
+
+    # Get the G-vectors
+    Gx = 2 * np.pi * np.fft.fftfreq(nside[0], dr[0])
+    Gy = 2 * np.pi * np.fft.fftfreq(nside[1], dr[1])
+    Gz = 2 * np.pi * np.fft.fftfreq(nside[2], dr[2])
+
+    # Half-space: Gz > 0, or Gz == 0 and Gy > 0, or Gz == Gy == 0 and Gx >= 0
+    X, Y, Z = Gx[:, None, None], Gy[None, :, None], Gz[None, None, :]
+    mask = ((Z > 0) |
+            ((Z == 0) & (Y > 0)) |
+            ((Z == 0) & (Y == 0) & (X >= 0)))
+    gidx = np.flatnonzero(mask.ravel())
+
+    if df_metric == "coulomb": # exclude G=0
+        gidx = gidx[1:]
+
+    # Build the half-space grid
+    i, j, k = np.unravel_index(gidx, nside)
+    knorm_vec = np.sqrt(Gx[i]**2 + Gy[j]**2 + Gz[k]**2)
+    sort_idx = np.argsort(knorm_vec)
+    Gvec_half = np.stack((Gx[i[sort_idx]], Gy[j[sort_idx]], Gz[k[sort_idx]]), axis=1)
+
+    return Gvec_half, knorm_vec[sort_idx], gidx[sort_idx]
 
 @njit(parallel = True, fastmath = True)
 def gto_rec(lmax,nmax,nbasis,species, npgf, contranorm, alphas, Gvec, nG_loc):
@@ -728,7 +727,7 @@ def _w_prim_numba(Gvec, coords, offsets, natoms, atomic_symbols, lmax, npgf, gcu
 
                 ipgf += npgf_key
 
-def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, pwc_re, pwc_im, volume, rho_KS_rec, df_metric, gcuts, rank):
+def get_w_prim(Gvec_half, natoms, coords, npgf, lmax, atomic_symbols, pwc_re, pwc_im, volume, rho_KS_rec, df_metric, gcuts):
     # Build the primitive-basis density vector wp
     
     # Get the total size of the primitive basis
@@ -826,34 +825,6 @@ def setup_pyscf_species(species, lmax, nmax, alphas, contranorm):
         perm[spe] = np.asarray(idx, dtype=int)
 
     return {"mol_bra": mol_bra, "mol_ket": mol_ket, "perm": perm, "coord_slice": coord_slice}
-
-def setup_pyscf_core(species, pseudocharge, rloc):
-    # Build per-species PySCF Mole objects for the Gaussian core charge distribution (a single s function)
-
-    mol_core = {}
-    coord_slice = {}
-    scale = {}
-
-    for spe in species:
-        sigma = rloc[spe]
-        alpha = 1.0 / (2.0 * sigma**2)
-
-        # "Ghost" atom sitting at the origin, carrying the basis assembled above
-        mol = _pyscf_gto.M(
-            atom=[[f"ghost-{spe}", (0.0, 0.0, 0.0)]],
-            basis={f"ghost-{spe}": [[0, [float(alpha), 1.0]]]},
-            spin=0,
-            cart=False,    # real spherical harmonics, not cartesian Gaussians
-            unit="Bohr",   # match SALTED units
-        )
-
-        # Rescale to have the correct pseudocharge
-        mol_core[spe] = mol
-        scale[spe] = (pseudocharge[spe] / ((2.0*np.pi)**1.5 * sigma**3)) / mol.eval_gto("GTOval_sph", np.zeros((1,3)))[0,0]
-        ptr = mol._atm[0, _pyscf_gto.PTR_COORD]
-        coord_slice[spe] = slice(ptr, ptr + 3)
-
-    return {"mol_core": mol_core, "coord_slice": coord_slice, "scale": scale}
 
 def setup_pyscf_ewald(species, lmax, nmax, alphas, contranorm, sigma_ewald):
     # Build per-species PySCF Mole objects carrying the Ewald-corrected radial functions
@@ -1330,11 +1301,10 @@ def elec_energy_forces_ewald(lmax,lcut,nmax,saltedpath,dfbasis,species,pseudocha
 
     return U_tot, forces
 
-def get_rho_n(nside, dx, dy, dz, origin, natoms, coords, atomic_symbols, pseudocharge, rloc, nsigma=6.0):
+def get_rho_n(nside, dr, origin, natoms, coords, atomic_symbols, pseudocharge, rloc, nsigma=6.0):
     # Gaussian core charge on the cube grid
 
     rho_n = np.zeros((nside[0], nside[1], nside[2]), dtype=np.float64)
-    dr = np.array([dx, dy, dz]) # grid spacing along x, y, z
 
     for iat in range(natoms):
         spe = atomic_symbols[iat]
@@ -1360,83 +1330,6 @@ def get_rho_n(nside, dx, dy, dz, origin, natoms, coords, atomic_symbols, pseudoc
         rho_n[np.ix_(idx[0], idx[1], idx[2])] += norm * gauss[0][:,None,None] * gauss[1][None,:,None] * gauss[2][None,None,:]
 
     return rho_n
-
-def get_wn_real(cell, coords, atomic_symbols, nbasis, ncoefs, volume, pyscf_ewald, pyscf_core, rcut):
-    # Short-range part of w_n = (Phi_i|rho_n)
-
-    natoms = len(atomic_symbols)
-
-    wn = np.zeros((ncoefs), dtype=np.float64)
-
-    # Unpack PySCF data
-    mol_bra = pyscf_ewald["mol_bra"]
-    perm = pyscf_ewald["perm"]
-    mol_core = pyscf_core["mol_core"]
-    cslice = pyscf_core["coord_slice"]
-    scale = pyscf_core["scale"]
-    
-    rcut_max = max(rcut.values()) # Pairs cutoff, to decided how many periodic images to include
-    periodic = cell is not None and volume > 1.0e-10
-    if periodic:
-        cell = np.asarray(cell, dtype=float)
-        inv_cell = np.linalg.inv(cell)
-        images = lattice_images(cell, rcut_max, volume)
-    else:
-        images = np.zeros((1, 3))
-
-    icoefs = 0
-    for iat in range(natoms):
-        spe = atomic_symbols[iat]
-        pbra = perm[spe]
- 
-        block = np.zeros((nbasis[spe]), dtype=np.float64)
-        for iat2 in range(natoms):
-            spe2 = atomic_symbols[iat2]
-
-            rcut_ij = rcut[(spe, spe2)] # real-space cutoff to use for this specific pair
-
-            delta = coords[iat2] - coords[iat]
-
-            if periodic:
-                frac = delta @ inv_cell # Convert to fractional coordinates
-                delta = (frac - np.round(frac)) @ cell # Wrap and convert back to Cartesian
-
-            dvecs = delta + images
-            keep = np.einsum("ij,ij->i", dvecs, dvecs) <= rcut_ij * rcut_ij # Keep only the images whose distance falls within the pair cutoff
-
-            for d in dvecs[keep]:
-                mol_core[spe2]._env[cslice[spe2]] = d # Move the core charge "ghost" atom
-                raw = _pyscf_gto.intor_cross("int2c2e", mol_bra[spe], mol_core[spe2]) # Ask PySCF for the raw overlap integrals
-                block += raw[pbra, 0] * scale[spe2] # Reorder PySCF's rows/columns into SALTED's (n,m) ordering and restore the core charge
-
-        wn[icoefs:icoefs + nbasis[spe]] = block
-        icoefs += nbasis[spe]
-
-    return wn
-
-def get_wn_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs_ewald, rho_n_rec, volume, gcut):
-    # Long-range part of w_n = (Phi_i|rho_n)
-
-    wn = np.zeros((ncoefs), dtype=np.float64)
-
-    Gvec_half = np.ascontiguousarray(Gvec_half[:gcut])
-    knorm2_vec = np.einsum('ij,ij->i', Gvec_half, Gvec_half)
-
-    # Core charge density with Coulomb kernel
-    rho_krnl = rho_n_rec[:gcut] / knorm2_vec
-    rho_krnl_real = np.ascontiguousarray(rho_krnl.real)
-    rho_krnl_imag = np.ascontiguousarray(rho_krnl.imag)
-
-    icoefs = 0
-    for iat in range(natoms):
-        spe = atomic_symbols[iat]
-        phase = np.exp(-1j * np.dot(Gvec_half, coords[iat])) # e^{-iG.r_iat}
-        obj = partial_wave_coefs_ewald[spe] * phase[:, np.newaxis]
-
-        wn[icoefs:icoefs + nbasis[spe]] = (np.dot(obj.real.T, rho_krnl_real) + np.dot(obj.imag.T, rho_krnl_imag))
-        icoefs += nbasis[spe]
-
-    return wn * 2 * (4*np.pi)**2 / volume
 
 def overlap_coulomb_rho(rho1_rec, rho2_rec, knorm_vec, volume):
     # Coulomb-metric overlap (rho1|rho2) in reciprocal space

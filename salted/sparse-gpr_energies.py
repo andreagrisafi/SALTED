@@ -107,7 +107,7 @@ def build(propname:str):
     for frac in [0.025,0.05,0.1,0.2,0.4,1.0]:
     
         # define training set
-        ntrain = int(frac*len(trainrangetot))
+        ntrain = round(frac*len(trainrangetot))
         trainrange = trainrangetot[0:ntrain]
         natoms_train = natoms[trainrange]
        

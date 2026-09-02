@@ -30,7 +30,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
         print("Dryrun mode, not writing to the database")
         print(f"{basis_data=}")
     else:
-        BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
+        BasisClient(data_fpath=inp.qm.dfbasis_file).write_to_yaml(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
 

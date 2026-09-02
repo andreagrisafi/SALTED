@@ -8,7 +8,7 @@ from ase.io import read
 from scipy import special
 
 from salted.constants import bohr2angs, hart2kcal
-from salted import basis  # WARNING: relative import
+from salted.basis_client import BasisClient
 from salted.sys_utils import ParseConfig
 
 inp = ParseConfig().parse_input()
@@ -20,7 +20,7 @@ for i in range(len(spelist)):
     spe_dict[i] = spelist[i]
 
 # read basis
-[lmax,nmax] = basis.basiset(inp.qm.dfbasis)
+[lmax,nmax] = BasisClient(data_fpath=inp.qm.dfbasis_file).read(inp.qm.dfbasis)
 llist = []
 nlist = []
 for spe in spelist:
@@ -54,7 +54,7 @@ natoms_test = natoms[testrange]
 
 M = inp.gpr.Menv
 eigcut = inp.gpr.eigcut
-ntrain = int(inp.gpr.Ntrain*inp.gpr.trainfrac)
+ntrain = round(inp.gpr.Ntrain*inp.gpr.trainfrac)
 reg_log10_intstr = str(int(np.log10(inp.gpr.regul)))  # for consistency
 vdir = os.path.join(
     inp.salted.saltedpath,

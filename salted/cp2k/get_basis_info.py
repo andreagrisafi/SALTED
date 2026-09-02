@@ -56,7 +56,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
                 np.savetxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat"), alphas[(spe, l)])
                 np.savetxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-contra-L{l}.dat"), contra[(spe, l)])
                 np.savetxt(osp.join(bdir,f"{spe}-local_pseudo.dat"), [pseudocharge[spe], rloc[spe]])
-        BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
+        BasisClient(data_fpath=inp.qm.dfbasis_file).write_to_yaml(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
 def parse_files_basis_info(species: list[str], dfbasis: str) -> (

@@ -121,6 +121,6 @@ zekun.lou@mpsd.mpg.de
 
 Funding
 -------
-The development of SALTED has received support from the French National Research Agency under the France 2030 program (Grant No. ANR-22-PEBA-0002). 
+The development of SALTED has received support from the French National Research Agency under the France 2030 program (Grant No. ANR-22-PEBA-0002 and Grant No. ANR-22-PEXD-0001). 
 It also received partial support from the German Research Foundation (DFG) Project-ID 555467911 - CRC 1772 / TP A06.
 

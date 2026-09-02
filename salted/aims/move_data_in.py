@@ -56,7 +56,6 @@ def build():
     for i in conf_range:
         if inp.salted.verbose:
             print(f"processing {i+1}/{ndata} frame")
-    
         dirpath = os.path.join(inp.qm.path2qm, datadir, f"{i+1}")
         if not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
