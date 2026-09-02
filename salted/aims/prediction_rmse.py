@@ -61,18 +61,16 @@ def build():
             av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
     
     # Initialize files for validation results
-    
     pfname = osp.join(saltedpath,pdir,"errors.dat")
     if rank == 0 and os.path.exists(pfname):
         os.remove(pfname)
 
     if parallel:
         comm.Barrier()
-    
-    efile = open(pfname,"a")
 
     error_density = 0
     variance = 0
+    local_lines = []
     for iconf in testrange:
 
         overl = np.loadtxt(osp.join(
@@ -118,7 +116,8 @@ def build():
                 ref_coefs -= Av_coeffs
             var = np.dot(ref_coefs,ref_projs)
             variance += var
-            print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
+            line = f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}"
+            local_lines.append(line)
             if inp.salted.verbose:
                 print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
@@ -158,11 +157,21 @@ def build():
 
             error_density += error
             variance += var
-            print(f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}", file=efile)
+            line = f"{iconf+1:d} {(np.sqrt(error/var)*100):.3e}"
+            local_lines.append(line)
             if inp.salted.verbose:
                 print(f"{iconf+1}: {(np.sqrt(error/var)*100):.3e} % RMSE", flush=True)
 
-    efile.close()
+    if parallel:
+        gathered_lines = comm.gather(local_lines, root=0)
+    else:
+        gathered_lines = [local_lines]
+
+    if rank == 0:
+        with open(pfname, "a") as efile:
+            for lines in gathered_lines:
+                for line in lines:
+                    print(line, file=efile)
 
     if parallel:
         error_density = comm.allreduce(error_density)
