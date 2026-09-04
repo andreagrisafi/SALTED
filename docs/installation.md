@@ -38,4 +38,4 @@ Especially, you can find an FHI-aims focused tutorial on SALTED [here in FHI-aim
 
 ### CP2K
 
-Printing of RI density coefficients and 2-center auxiliary integrals needed to train SALTED is made available starting from the v2023.1 release of CP2K.
+**CP2K v2026.2 or later** is required. Please refer to the [CP2K documentation](https://manual.cp2k.org/trunk/index.html) to download and install CP2K.
