@@ -1,7 +1,7 @@
 # Installation
 
-!!! warning "Linux only 🐧"
-    SALTED is only available on Linux OS. For Windows users, please use WSL or virtual machines.
+!!! warning "Windows users"
+    SALTED is available on Linux OS and MacOS. Windows users please use WSL or virtual machines.
 
 ## Install SALTED
 
