@@ -207,13 +207,9 @@ def scale_grad_coefs(pseudocharge,natoms,atoms_range_set,atomic_symbols,lmax,nma
                     for n in range(nmax[(spe,l)]):
                         for im in range(2*l+1):
                             if l==0:
-                                if average:
-                                    # rescale isotropic coefficients to conserve the electronic charge
-                                    grad_coefs[:,:,iaux + i] = (grad_coefs[:,:,iaux + i]*nele/charge)-coefs[iaux + i]*grad_charge[:,:]/charge
-                                else:
-                                    # remove residual charge from the most diffuse isotropic function
-                                    if n==nmax[(spe,l)]-1:
-                                        grad_coefs[:,:,iaux + i] -= grad_charge[:,:]/(charge_integrals[(spe,l,n)]*natoms)
+                                # remove residual charge from the most diffuse isotropic function
+                                if n==nmax[(spe,l)]-1:
+                                    grad_coefs[:,:,iaux + i] -= grad_charge[:,:]/(charge_integrals[(spe,l,n)]*natoms)
                             i += 1
         for l in range(lmax[spe]+1):
             for n in range(nmax[(spe,l)]):
