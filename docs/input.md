@@ -35,15 +35,13 @@ For all the path-related variables, the path can be either a relative path or an
 | var name | type | default | usage |
 | -:| :-: | :-: | :- |
 | `path2qm` | `str` | **Required** | Location of the quantum-mechanical training data. |
-| `qmcode` | `Literal["aims"] \| Literal["cp2k"] \| Literal["pyscf"]` | **Required** | Which ab initio software was used to generate training data. |
+| `qmcode` | `Literal["aims"] \| Literal["cp2k"] \| Literal["pyscf"]` | **Required** | Ab initio software used to generate training data. |
 | `dfbasis` | `str` | **Required** | A label for the auxiliary basis set used to expand the density. |
 | `dfbasis_file` | `str` | Optional | Path to an external basis dataset yaml file holding `dfbasis`. If unset, the `basis_data.yaml` inside to the installed salted package is used. Mainly intended for testing purposes. |
 | `qmbasis` | `str` | Required if `qmcode=pyscf` | Wavefunction basis set to use when generating the training data (only for PySCF). |
 | `functional` | `str` | Required if `qmcode=pyscf` | DFT functional to use when generating the training data (only for PySCF). |
-| `pseudocharge` | `float` | Required if `qmcode=cp2k` | Pseudo nuclear charge (only for CP2K). |
-| `coeffile` | `str` | Required if `qmcode=cp2k` | Density coefficients file name as printed by CP2K. |
-| `ovlpfile` | `str` | Required if `qmcode=cp2k` | Overlap matrix file name as printed by CP2K. |
-| `periodic` | `bool` | Required if `qmcode=cp2k` | The periodic boundary conditions (only for CP2K). |
+| `dfmetric` | `Literal["identity"] \| Literal["coulomb"]` | Required if `qmcode=cp2k` | Metric used to perform the density fitting (only for CP2K). `coulomb` enables the calculation of the Hartree energy in `salted.cp2k.density_fitting` and `salted.validation`. |
+| `periodic` | `bool` | Required if `qmcode=cp2k` | Periodic boundary conditions (only for CP2K). |
 
 ### Rascaline atomic environment parameters `inp.descriptor.rep[n]`
 

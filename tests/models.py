@@ -208,7 +208,7 @@ _SPECS = [
         },
         # 2026-08 Ntrain=40/validation=60 on Coulomb metric: % RMSE 1.497e+00
         validation_rmse_threshold=2.5,
-        fd_gradient=False,
+        fd_gradient=True,
         # 2026-08 observed maxima on the same run: charge 1.3e-2, dipole 1.9e-2, hartree 1.2e-3
         derived_property_tols={"charge": 0.05, "dipole": 0.05, "hartree": 5e-3},
     ),
