@@ -34,7 +34,7 @@ def build():
     Menv = inp.gpr.Menv
     
     if qmcode=='cp2k':
-        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo, elec_energy_forces_ewald, build_real_grid, build_gvec, build_gcutoff, gto_rec_prim, build_contraction_matrix, get_rho_n
+        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo, build_real_grid, build_gvec, build_gcutoff, gto_rec_prim, build_contraction_matrix, get_rho_n
 
     comm, size, rank, parallel = detect_mpi()
 
@@ -85,7 +85,7 @@ def build():
             av_coefs[spe] = np.load(os.path.join(saltedpath, "coefficients", "averages", f"averages_{spe}.npy"))
 
     if qmcode=="cp2k":
-        from ase.io import read
+        from ase.io import read, write
         xyzfile = read(inp.system.filename, ":")
         # Initialize calculation of density/density-response moments
         charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
@@ -101,8 +101,7 @@ def build():
         if saltedtype=="density":
             qfile = init_property_file("charges",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
             dfile = init_property_file("dipoles",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
-            if inp.qm.dfmetric=="coulomb": ufile = init_property_file("ewald_electrostatic_energy",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
-            if inp.qm.dfmetric=="coulomb": ffile = init_property_file("ewald_electrostatic_forces",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
+            if inp.qm.dfmetric=="coulomb": ufile = init_property_file("electrostatic_energy",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
         if saltedtype=="density-response":
             pfile = init_property_file("polarizabilities",saltedpath,vdir,Menv,zeta,ntrain,reg_log10_intstr,rank,size,comm)
 
@@ -191,13 +190,10 @@ def build():
                     rho_n_rec = np.fft.fftn(rho_n).ravel()[gidx] * np.prod(dr)
 
                     # Compute reference Hartree energy
-                    #ref_hartree, ref_ee, ref_en, ref_nn = compute_hartree_energy(ref_coefs, overl, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, np.array([0.0,0.0,0.0]), [nx, ny, nz]) 
-                    
-                    # Compute predicted Hartree energy
-                    #hartree, ee, en, nn = compute_hartree_energy(pred_coefs, overl, cell, atomic_coords[iconf], atomic_symbols[iconf], species, lmax_numba, lmax_max, nmax_numba, npgf, nbasis, alphas, contranorm, pseudocharge, rloc, sigma_ewald_en, np.array([0.0,0.0,0.0]), [nx, ny, nz]) 
+                    ref_hartree, ref_ee, ref_en, ref_nn = compute_hartree_energy(ref_coefs, overl, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, volume)
 
-                    ref_U_ele_ewald, ref_forces_ewald = elec_energy_forces_ewald(lmax,2,nmax,inp.salted.saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc,structure,ref_coefs)
-                    U_ele_ewald, forces_ewald = elec_energy_forces_ewald(lmax,2,nmax,inp.salted.saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc,structure,pred_coefs)
+                    # Compute predicted Hartree energy
+                    hartree, ee, en, nn = compute_hartree_energy(pred_coefs, overl, atomic_coords[iconf], atomic_symbols[iconf], rho_n_rec, Gvec_half, knorm_vec, lmax_numba, npgf, pwc_prim_re, pwc_prim_im, C, gcuts, volume)
 
                 ## Compute reference energy and forces
                 #ref_U_ele, ref_forces = elec_energy_forces(lmax,nmax,saltedpath,inp.qm.dfbasis,species,pseudocharge,rloc_dict,structure,ref_coefs)
@@ -214,16 +210,10 @@ def build():
                                   dipole["x"],    dipole["y"],    dipole["z"],file=dfile)
                 
                 # Save electrostatic energy
-                #if inp.qm.dfmetric=="coulomb":
-                #     print(iconf+1,ref_hartree,
-                #                       hartree,file=ufile)
-
-                # Save electrostatic energy and forces
                 if inp.qm.dfmetric=="coulomb":
-                    print(iconf+1,ref_U_ele_ewald,
-                                  U_ele_ewald,file=ufile)
-                    print(iconf+1, np.mean(abs(ref_forces_ewald[:,0]-forces_ewald[:,0])), np.mean(abs(ref_forces_ewald[:,1]-forces_ewald[:,1])), np.mean(abs(ref_forces_ewald[:,2]-forces_ewald[:,2])), file=ffile)
-            
+                     print(iconf+1,ref_hartree,
+                                       hartree,file=ufile)
+
             np.savetxt(osp.join(dirpath,
                                 f"COEFFS-{iconf+1}.dat"
             ), pred_coefs)
@@ -297,7 +287,6 @@ def build():
             qfile.close()
             dfile.close()
             if inp.qm.dfmetric=="coulomb": ufile.close()
-            if inp.qm.dfmetric=="coulomb": ffile.close()
         if saltedtype=="density-response":
             pfile.close()
 
