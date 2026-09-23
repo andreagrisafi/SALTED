@@ -1,7 +1,6 @@
 import os
 import os.path as osp
 import random
-import sys
 import time
 
 import numpy as np
@@ -132,7 +131,7 @@ def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
         N_df, K_rkhs = psivec.shape
         avec_contrib = psivec.T @ ref_projs               # O(nnz) vector multiply
         engine       = get_hessian_engine(N_df, K_rkhs)
-        bmat_contrib = engine.compute(over, psivec).copy()
+        bmat_contrib = engine.compute(over, psivec)
         return avec_contrib, bmat_contrib, "numba"
 
     # Dense fallback (original behavior)
@@ -159,11 +158,11 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
     if inp.salted.saltedtype=="density-response":
         p = sparse.load_npz(osp.join(
-            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf0_x.npz"
+            saltedpath, fdir, f"M{Menv}_zeta{zeta}", "psi-nm_conf0_x.npz"
         ))
     else:
         p = sparse.load_npz(osp.join(
-            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf0.npz"
+            saltedpath, fdir, f"M{Menv}_zeta{zeta}", "psi-nm_conf0.npz"
         ))
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
@@ -178,6 +177,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
     Avec = np.zeros(totsize)
     Bmat = np.zeros((totsize,totsize))
+    total_start_time = time.time()
     for iconf in trainrange:
 
         start_time = time.time()
@@ -251,6 +251,8 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 Bmat += bmat_contrib
 
         if inp.salted.verbose: print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s", flush=True)
+
+    if inp.salted.verbose: print(f"Task {rank}, total time for {len(trainrange)} structures = {(time.time() - total_start_time):.2f} s", flush=True)
 
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
