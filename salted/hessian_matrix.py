@@ -65,7 +65,7 @@ def build():
         saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
     ), trainrangetot, fmt='%i')
     ntrain = round(inp.gpr.trainfrac*inp.gpr.Ntrain)
-    trainrange = trainrangetot[:ntrain]
+    trainrange = sorted(trainrangetot[:ntrain])
 
     """
     Calculate regression matrices in parallel or serial mode.
@@ -178,13 +178,16 @@ def matrices(trainrange,ntrain,av_coefs,rank):
     Avec = np.zeros(totsize)
     Bmat = np.zeros((totsize,totsize))
     total_start_time = time.time()
+    total_io_time, total_compute_time = 0.0, 0.0
     for iconf in trainrange:
 
         start_time = time.time()
+        io_time, compute_time = 0.0, 0.0
 
         if inp.salted.saltedtype=="density":
 
             # load reference QM data
+            t0 = time.time()
             ref_coefs = np.load(osp.join(
                 saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
             ))
@@ -194,6 +197,8 @@ def matrices(trainrange,ntrain,av_coefs,rank):
             psivec = sparse.load_npz(osp.join(
                 saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
             ))
+            t1 = time.time()
+            io_time += t1 - t0
 
             if inp.system.average:
 
@@ -224,22 +229,28 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 sparse_algorithm = algorithm_used
             Avec += avec_contrib
             Bmat += bmat_contrib
+            compute_time += time.time() - t1
 
 
         elif inp.salted.saltedtype=="density-response":
 
+            t0 = time.time()
             over = np.load(osp.join(
                 saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
             ))
+            io_time += time.time() - t0
 
             for icart in ["x","y","z"]:
 
+                t0 = time.time()
                 ref_coefs = np.load(osp.join(
                     saltedpath, "coefficients", f"{icart}/coefficients_conf{iconf}.npy"
                 ))
                 psivec = sparse.load_npz(osp.join(
                     saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
                 ))
+                t1 = time.time()
+                io_time += t1 - t0
 
                 ref_projs = np.dot(over,ref_coefs)
 
@@ -249,10 +260,13 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 )
                 Avec += avec_contrib
                 Bmat += bmat_contrib
+                compute_time += time.time() - t1
 
-        if inp.salted.verbose: print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s", flush=True)
+        total_io_time += io_time
+        total_compute_time += compute_time
+        if inp.salted.verbose: print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s (I/O = {io_time:.2f} s, compute = {compute_time:.2f} s)", flush=True)
 
-    if inp.salted.verbose: print(f"Task {rank}, total time for {len(trainrange)} structures = {(time.time() - total_start_time):.2f} s", flush=True)
+    if inp.salted.verbose: print(f"Task {rank}, total time for {len(trainrange)} structures = {(time.time() - total_start_time):.2f} s (I/O = {total_io_time:.2f} s, compute = {total_compute_time:.2f} s)", flush=True)
 
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
