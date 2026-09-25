@@ -21,7 +21,7 @@ In what follows, we describe how to generate training electron densities to be u
 
    System cells and coordinates are extracted from the configuration dataset in XYZ format and saved in folders named :code:`conf_1`, :code:`conf_2`, ...  located in the path :code:`inp.qm.path2qm`. NB: cell information (Lattice) must be included in second line of each XYZ configuration, even if it does not change.
 
-3. Run SCF calculations for each configuration in the corresponding folders previously generated, printing the converged electron density on the real-space grid. An example CP2K input is provided in :code:`cp2k-inputs/SCF.inp`.
+3. Run SCF calculations for each configuration in the corresponding folders previously generated, printing the converged electron density on the real-space grid. Cube files must be printed with `STRIDE 1 1 1` to obtain a high-resolution grid. An example CP2K input is provided in :code:`cp2k-inputs/SCF.inp`. 
 
 4. Print the RI basis set information required for SALTED postprocessing of the CP2K density. An example CP2K input is provided in :code:`cp2k-inputs/RI-basis.inp`. This operation can be performed only once for any arbitrary configuration included in the dataset adopting the given choice of RI basis. The output is a single file including wavefunction and RI basis set information of all the species included in the selected test configuration. The information about the pseudopotential used is extracted from a CP2K input file, and the potential file used by CP2K. To extract this information run:
 
