@@ -262,6 +262,8 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 Bmat += bmat_contrib
                 compute_time += time.time() - t1
 
+        del over, psivec
+
         total_io_time += io_time
         total_compute_time += compute_time
         if inp.salted.verbose: print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s (I/O = {io_time:.2f} s, compute = {compute_time:.2f} s)", flush=True)
