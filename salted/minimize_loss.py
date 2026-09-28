@@ -1,6 +1,7 @@
 import os
 import os.path as osp
 import random
+import sys
 import time
 
 import numpy as np
@@ -17,7 +18,6 @@ from salted.sys_utils import (
     load_overlap,
     read_system,
 )
-import sys
 
 
 def build():
@@ -102,7 +102,7 @@ def build():
             print(f"Task {rank} handles the following structures: {format_index_ranges(trainrange,True)}", flush=True)
     else:
         trainrange = trainrangetot[:ntraintot]
-    ntrain = int(len(trainrange))
+    ntrain = len(trainrange)
 
     def loss_func(weights, ovlp_list, psi_list):
         """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
@@ -301,7 +301,7 @@ def build():
 
         totsize = psi_list[0].shape[1]
 
-        Ad = np.zeros((totsize))
+        Ad = np.zeros(totsize)
 
         if saltedtype=="density":
 
