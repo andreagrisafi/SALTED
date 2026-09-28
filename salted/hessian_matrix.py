@@ -14,6 +14,7 @@ from salted.sys_utils import (
     distribute_jobs,
     format_index_ranges,
     get_atom_idx,
+    load_overlap,
     read_system,
 )
 
@@ -191,7 +192,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
             ref_coefs = np.load(osp.join(
                 saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
             ))
-            over = np.load(osp.join(
+            over = load_overlap(osp.join(
                 saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
             ))
             psivec = sparse.load_npz(osp.join(
@@ -235,7 +236,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
         elif inp.salted.saltedtype=="density-response":
 
             t0 = time.time()
-            over = np.load(osp.join(
+            over = load_overlap(osp.join(
                 saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
             ))
             io_time += time.time() - t0

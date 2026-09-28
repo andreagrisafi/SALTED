@@ -538,6 +538,56 @@ def get_feats_projs_response(species, lmax):
     return Vmat, Mspe, power_env_sparse, power_env_sparse_antisymm
 
 
+def save_overlap(path: str, S: np.ndarray):
+    #Save a symmetric overlap matrix storing only its lower triangle.
+    
+    assert S.ndim == 2 and S.shape[0] == S.shape[1] # must be a square matrix
+    S = np.ascontiguousarray(S, dtype=np.float64)
+    N = S.shape[0] # number of rows/columns
+    header = {
+        "descr": np.lib.format.dtype_to_descr(np.dtype(np.float64)), # dtype descriptor
+        "fortran_order": False, # not Fortran order
+        "shape": (N * (N + 1) // 2,), # shape of the packed lower triangle
+    }
+    with open(path, "wb") as f:
+        np.lib.format.write_array_header_1_0(f, header) # write header
+        f.writelines(S[i, : i + 1] for i in range(N)) # write lower triangle rows sequentially
+
+
+def load_overlap(path: str, tile: int = 128) -> np.ndarray:
+    # Load an overlap matrix as a full dense (N,N) array.
+
+    with open(path, "rb") as f:
+        version = np.lib.format.read_magic(f) # read magic number to determine format version
+        if version == (1, 0):
+            shape, fortran_order, dtype = np.lib.format.read_array_header_1_0(f) # read header for version 1.0
+        else:
+            shape, fortran_order, dtype = np.lib.format.read_array_header_2_0(f) # read header for version 2.0
+        if len(shape) == 2:
+            return np.load(path)  # full matrix (older files, other codes)
+        L = shape[0]
+        N = (int(np.sqrt(8 * L + 1)) - 1) // 2 # compute N from L = N*(N+1)/2
+        if len(shape) != 1 or dtype != np.float64 or N * (N + 1) // 2 != L:
+            raise ValueError(f"{path}: shape {shape} and dtype {dtype} do not match a packed float64 overlap matrix")
+
+        # read the lower triangle sequentially, each row straight into S
+        S = np.empty((N, N))
+        for i in range(N):
+            if f.readinto(S[i, : i + 1]) != (i + 1) * 8:
+                raise ValueError(f"{path}: file is truncated")
+
+    # mirror lower triangle into the upper one, in small tiles that fit in cache
+    for i0 in range(0, N, tile):
+        i1 = min(i0 + tile, N) # compute the end index of the tile
+        diag = S[i0:i1, i0:i1] # extract the diagonal tile
+        diag[...] = np.tril(diag) + np.tril(diag, -1).T # mirror the diagonal tile
+        for j0 in range(i1, N, tile): # for each tile in the upper triangle
+            j1 = min(j0 + tile, N) # compute the end index of the tile
+            S[i0:i1, j0:j1] = S[j0:j1, i0:i1].T # mirror the off-diagonal tile
+
+    return S
+
+
 class AttrDict:
     """Access dict keys as attributes
 
