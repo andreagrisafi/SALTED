@@ -1,6 +1,7 @@
 import os
 import os.path as osp
 import random
+import sys
 import time
 
 import numpy as np
@@ -14,6 +15,7 @@ from salted.sys_utils import (
     distribute_jobs,
     format_index_ranges,
     get_atom_idx,
+    load_overlap,
     read_system,
 )
 
@@ -60,9 +62,8 @@ def build():
             )
 
     dirpath = os.path.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}")
-    if rank == 0:
-        if not os.path.exists(dirpath):
-            os.makedirs(dirpath, exist_ok=True)
+    if rank == 0 and not os.path.exists(dirpath):
+        os.makedirs(dirpath, exist_ok=True)
     if parallel:
         comm.Barrier()
 
@@ -74,7 +75,7 @@ def build():
                 f"than are present in the input data {ndata=}."
             )
         else:
-            exit()
+            sys.exit()
     dataset = list(range(ndata))
     if inp.gpr.trainsel == "sequential":
         trainrangetot = dataset[:Ntrain]
@@ -101,7 +102,7 @@ def build():
             print(f"Task {rank} handles the following structures: {format_index_ranges(trainrange,True)}", flush=True)
     else:
         trainrange = trainrangetot[:ntraintot]
-    ntrain = int(len(trainrange))
+    ntrain = len(trainrange)
 
     def loss_func(weights, ovlp_list, psi_list):
         """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
@@ -300,7 +301,7 @@ def build():
 
         totsize = psi_list[0].shape[1]
 
-        Ad = np.zeros((totsize))
+        Ad = np.zeros(totsize)
 
         if saltedtype=="density":
 
@@ -331,7 +332,7 @@ def build():
     psi_list = []
     for iconf in trainrange:
         ovlp_list.append(
-            np.load(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf}.npy"))
+            load_overlap(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf}.npy"))
         )
         # load feature vector as a scipy sparse object
         if saltedtype=="density":
@@ -439,7 +440,7 @@ def build():
             loss = loss_func(w, ovlp_list, psi_list)
             if loss>loss_old:
                 if rank == 0:
-                    print(f"WARNING: loss function increased, search direction reset as the steepest descent.")
+                    print("WARNING: loss function increased, search direction reset as the steepest descent.")
                 r = -grad_func(w, ovlp_list, psi_list)
                 if rank == 0:
                     print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)

@@ -1,6 +1,4 @@
-import os
 import os.path as osp
-import sys
 import time
 
 import numpy as np
@@ -34,13 +32,13 @@ def build():
 
     start = time.time()
 
-    w = np.linalg.solve(Bmat+np.eye(totsize)*regul,Avec)
+    Bmat[np.diag_indices_from(Bmat)] += regul
+    w = np.linalg.solve(Bmat,Avec)
 
-    print(f"regression time: {((time.time()-start)/60):.3f} minutes",flush=True)
+    print(f"regression time: {time.time() - start} seconds",flush=True)
 
     np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"weights_N{ntrain}_reg{int(np.log10(regul))}.npy"), w)
 
-    return
 
 if __name__ == "__main__":
     build()
