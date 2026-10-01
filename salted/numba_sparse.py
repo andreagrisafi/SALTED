@@ -15,6 +15,7 @@ Public API:
 import os
 import re
 import subprocess
+import time
 
 import numpy as np
 import scipy.sparse
@@ -108,6 +109,7 @@ class KBlockedHessianEngine:
 
     Pre-allocates all buffers for the given (N_df, K_rkhs) shape.
     Call warmup() once before the first timed/MPI use to trigger JIT compilation.
+    self.timings holds the wall time in seconds of its parts.
     """
 
     def __init__(self, N_df, K_rkhs, cache_bytes=None):
@@ -118,12 +120,14 @@ class KBlockedHessianEngine:
         self.H = np.empty((K_rkhs, K_rkhs), dtype=np.float64)
         self._B_k1 = int(_auto_bk(N_df, cb, itemsize))  # step 1: rows of S
         self._B_k2 = int(_auto_bk(K_rkhs, cb, itemsize))  # step 2: rows of R
+        self.timings = {}
 
     def compute(self, S, Psi_csc):
         """Return H = Psi^T @ S @ Psi, shape [K_rkhs, K_rkhs].
 
         Returns a view into an internal buffer; call .copy() if you need to own it.
         """
+        t0 = time.time()
         if not scipy.sparse.issparse(Psi_csc):
             raise TypeError("Psi_csc must be a scipy sparse matrix")
         sp = Psi_csc if isinstance(Psi_csc, scipy.sparse.csc_matrix) else Psi_csc.tocsc()
@@ -131,15 +135,30 @@ class KBlockedHessianEngine:
         indices = np.ascontiguousarray(sp.indices, dtype=np.int32)
         data = np.ascontiguousarray(sp.data, dtype=np.float64)
         S_c = np.ascontiguousarray(S, dtype=np.float64)
+        t1 = time.time()
 
         # Step 1: R^T = Psi^T @ S (S is symmetric → pass S directly as dense_T)
         self.R_storage[:] = 0.0
+        t2 = time.time()
         _dense_csc_kernel_kblocked(S_c, indptr, indices, data, self.R_storage, self._B_k1)
+        t3 = time.time()
 
         # Step 2: H = Psi^T @ R (R_storage.T is strided → copy required)
         np.copyto(self._R_buf, self.R_storage.T)
+        t4 = time.time()
         self.H[:] = 0.0
+        t5 = time.time()
         _dense_csc_kernel_kblocked(self._R_buf, indptr, indices, data, self.H, self._B_k2)
+        t6 = time.time()
+
+        self.timings = {
+            "prep": t1 - t0, # CSC conversion
+            "step1": t3 - t1, # Step 1: R^T = Psi^T @ S
+            "zero1": t2 - t1, # Zeroing the output
+            "step2": t6 - t3, # Step 2: H = Psi^T @ R
+            "transpose": t4 - t3, # Transpose copy of R^T
+            "zero2": t5 - t4, # Zeroing the output
+        }
         return self.H  # H is symmetric
 
     @staticmethod

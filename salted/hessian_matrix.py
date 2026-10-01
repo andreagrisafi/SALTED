@@ -21,6 +21,7 @@ from salted.sys_utils import (
 
 def build():
 
+    build_start_time = time.time()
     inp = ParseConfig().parse_input()
 
     saltedname, saltedpath = inp.salted.saltedname, inp.salted.saltedpath
@@ -80,8 +81,10 @@ def build():
         """ calculate and gather """
         if inp.salted.verbose:
             print(f"Task {rank} handling structures: {format_index_ranges(this_task_trainrange,True)}", flush=True)
-        [Avec, Bmat] = matrices(this_task_trainrange, ntrain,av_coefs,rank)
+        [Avec, Bmat, (loop_start_time, loop_end_time)] = matrices(this_task_trainrange, ntrain,av_coefs,rank)
+        matrices_end_time = time.time()
         comm.Barrier()
+        barrier_end_time = time.time()
         """ reduce matrices in slices to avoid MPI overflows """
         nslices = int(np.ceil(len(Avec) / 100.0))
         for islice in range(nslices-1):
@@ -89,13 +92,28 @@ def build():
             Bmat[islice*100:(islice+1)*100] = comm.allreduce(Bmat[islice*100:(islice+1)*100])
         Avec[(nslices-1)*100:] = comm.allreduce(Avec[(nslices-1)*100:])
         Bmat[(nslices-1)*100:] = comm.allreduce(Bmat[(nslices-1)*100:])
+        reduce_end_time = time.time()
     else:
         print("Running in serial mode")
-        [Avec, Bmat] = matrices(trainrange,ntrain,av_coefs,rank)
+        [Avec, Bmat, (loop_start_time, loop_end_time)] = matrices(trainrange,ntrain,av_coefs,rank)
+        matrices_end_time = time.time()
+        barrier_end_time = reduce_end_time = matrices_end_time
 
     if rank==0:
         np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
         np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
+    save_end_time = time.time()
+
+    if inp.salted.verbose:
+        print(
+            f"Task {rank}, time outside the configuration loop: "
+            f"setup = {(loop_start_time - build_start_time):.2f} s, "
+            f"normalisation = {(matrices_end_time - loop_end_time):.2f} s, "
+            f"wait for other tasks = {(barrier_end_time - matrices_end_time):.2f} s, "
+            f"reduction over tasks = {(reduce_end_time - barrier_end_time):.2f} s, "
+            f"save = {(save_end_time - reduce_end_time):.2f} s",
+            flush=True,
+        )
 
 
 def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
@@ -109,7 +127,7 @@ def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
         sparse_algorithm: "numba", "dense", or "omp_sparse"
 
     Returns:
-        (avec_contrib, bmat_contrib, algorithm_used)
+        (avec_contrib, bmat_contrib, algorithm_used, timings)
     """
     if sparse_algorithm == "omp_sparse":
         try:
@@ -119,28 +137,67 @@ def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
             avec_contrib = sparse_transpose_dot_dense(psivec, ref_projs)
 
             # Bmat += psi.T @ (over @ psi)
-            bmat_contrib = sparse_transpose_dot_dense(psivec, dense_dot_sparse(over, psivec))
+            t0 = time.time()
+            over_psi = dense_dot_sparse(over, psivec)
+            t1 = time.time()
+            bmat_contrib = sparse_transpose_dot_dense(psivec, over_psi)
+            timings = {"step1": t1 - t0, "step2": time.time() - t1}
 
-            return avec_contrib, bmat_contrib, "omp_sparse"
+            return avec_contrib, bmat_contrib, "omp_sparse", timings
 
         except Exception as e:
             print(f"Warning: omp_sparse unavailable ({e}), falling back to numba", flush=True)
             sparse_algorithm = "numba"
 
     if sparse_algorithm == "numba":
+        t0 = time.time()
         from salted.numba_sparse import get_hessian_engine
         N_df, K_rkhs = psivec.shape
-        avec_contrib = psivec.T @ ref_projs               # O(nnz) vector multiply
         engine       = get_hessian_engine(N_df, K_rkhs)
+        setup_time   = time.time() - t0
+        avec_contrib = psivec.T @ ref_projs               # O(nnz) vector multiply
         bmat_contrib = engine.compute(over, psivec)
-        return avec_contrib, bmat_contrib, "numba"
+        return avec_contrib, bmat_contrib, "numba", dict(engine.timings, setup=setup_time)
 
     # Dense fallback (original behavior)
     psi_dense = psivec.toarray()
     avec_contrib = np.dot(psi_dense.T, ref_projs)
-    bmat_contrib = np.dot(psi_dense.T, np.dot(over, psi_dense))
+    t0 = time.time()
+    over_psi = np.dot(over, psi_dense)
+    t1 = time.time()
+    bmat_contrib = np.dot(psi_dense.T, over_psi)
+    timings = {"step1": t1 - t0, "step2": time.time() - t1}
 
-    return avec_contrib, bmat_contrib, "dense"
+    return avec_contrib, bmat_contrib, "dense", timings
+
+
+def _add_times(total, times):
+    for key, value in times.items():
+        total[key] = total.get(key, 0.0) + value
+
+
+def _format_conf_details(iconf, nnz, nentries, flops, compute_time, times):
+    """Return one log line with the breakdown of the compute time of one configuration.
+    """
+    t1, t2 = times.get("step1", 0.0), times.get("step2", 0.0)
+    step1 = f"step 1 (S psi) = {t1:.2f} s"
+    if "zero1" in times:
+        step1 += f" [zeroing {times['zero1']:.2f} s]"
+    step2 = f"step 2 (psi^T S psi) = {t2:.2f} s"
+    if "transpose" in times:
+        step2 += f" [transposed copy {times['transpose']:.2f} s, zeroing {times['zero2']:.2f} s]"
+    setup = times.get("setup", 0.0)
+    prep = times.get("prep", 0.0)
+    other = compute_time - (times["sc"] + setup + prep + t1 + t2 + times["badd"])
+    rate = flops / (t1 + t2) / 1e9 if t1 + t2 > 0 else 0.0
+    return (
+        f"conf {iconf} details: nnz(psi) = {nnz} ({100.0 * nnz / nentries:.3f}% of entries), "
+        f"S*c = {times['sc']:.2f} s, "
+        + (f"numba setup = {setup:.2f} s, " if "setup" in times else "")
+        + f"psi to CSC = {prep:.2f} s, {step1}, {step2}, "
+        f"B += {times['badd']:.2f} s, other = {other:.2f} s, "
+        f"steps 1+2 at {rate:.1f} GFLOP/s ({flops / 1e9:.1f} GFLOP)"
+    )
 
 
 def matrices(trainrange,ntrain,av_coefs,rank):
@@ -184,6 +241,8 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
         start_time = time.time()
         io_time, compute_time = 0.0, 0.0
+        times = {"sc": 0.0, "badd": 0.0} # dictionary to store timings for each configuration
+        nnz, nentries, flops = 0, 0, 0.0
 
         if inp.salted.saltedtype=="density":
 
@@ -218,18 +277,26 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 # subtract average
                 ref_coefs -= Av_coeffs
 
+            t2 = time.time()
             ref_projs = np.dot(over,ref_coefs)
+            times["sc"] += time.time() - t2 # time for computing S*c
 
             # Use sparse operations with automatic fallback
-            avec_contrib, bmat_contrib, algorithm_used = _compute_sparse_operations(
+            avec_contrib, bmat_contrib, algorithm_used, kernel_times = _compute_sparse_operations(
                 psivec, ref_projs, over, sparse_algorithm
             )
+            _add_times(times, kernel_times)
             if algorithm_used != sparse_algorithm:
                 # set sparse_algorithm to algorithm_used
                 print(f"Warning: Using fallback dense algorithm for conf {iconf} due to failure in {sparse_algorithm}, set current sparse_algorithm to {algorithm_used}", flush=True)
                 sparse_algorithm = algorithm_used
+            t2 = time.time()
             Avec += avec_contrib
             Bmat += bmat_contrib
+            times["badd"] += time.time() - t2 # time for adding contributions to Avec and Bmat
+            nnz += psivec.nnz # count non-zero entries in psivec
+            nentries += psivec.shape[0] * psivec.shape[1] # count total entries in psivec
+            flops += 2.0 * psivec.nnz * (psivec.shape[0] + psivec.shape[1])
             compute_time += time.time() - t1
 
 
@@ -253,28 +320,39 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 t1 = time.time()
                 io_time += t1 - t0
 
+                t2 = time.time()
                 ref_projs = np.dot(over,ref_coefs)
+                times["sc"] += time.time() - t2 # time for computing S*c
 
                 # Use sparse operations with automatic fallback
-                avec_contrib, bmat_contrib, algorithm_used = _compute_sparse_operations(
+                avec_contrib, bmat_contrib, algorithm_used, kernel_times = _compute_sparse_operations(
                     psivec, ref_projs, over, sparse_algorithm
                 )
+                _add_times(times, kernel_times)
+                t2 = time.time()
                 Avec += avec_contrib
                 Bmat += bmat_contrib
+                times["badd"] += time.time() - t2 # time for adding contributions to Avec and Bmat
+                nnz += psivec.nnz # count non-zero entries in psivec
+                nentries += psivec.shape[0] * psivec.shape[1] # count total entries in psivec
+                flops += 2.0 * psivec.nnz * (psivec.shape[0] + psivec.shape[1]) # count flops for this cartesian component
                 compute_time += time.time() - t1
 
         del over, psivec
 
         total_io_time += io_time
         total_compute_time += compute_time
-        if inp.salted.verbose: print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s (I/O = {io_time:.2f} s, compute = {compute_time:.2f} s)", flush=True)
+        if inp.salted.verbose:
+            print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s (I/O = {io_time:.2f} s, compute = {compute_time:.2f} s)", flush=True)
+            print(_format_conf_details(iconf, nnz, nentries, flops, compute_time, times), flush=True)
 
-    if inp.salted.verbose: print(f"Task {rank}, total time for {len(trainrange)} structures = {(time.time() - total_start_time):.2f} s (I/O = {total_io_time:.2f} s, compute = {total_compute_time:.2f} s)", flush=True)
+    loop_end_time = time.time()
+    if inp.salted.verbose: print(f"Task {rank}, total time for {len(trainrange)} structures = {(loop_end_time - total_start_time):.2f} s (I/O = {total_io_time:.2f} s, compute = {total_compute_time:.2f} s)", flush=True)
 
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
 
-    return [Avec,Bmat]
+    return [Avec,Bmat,(total_start_time,loop_end_time)]
 
 if __name__ == "__main__":
     build()
