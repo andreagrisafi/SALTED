@@ -8,7 +8,8 @@ overlap matrix of the density-fitting basis and Psi the RKHS vectors of the stru
 
 The non-zero entries of Psi form a "dense blocks" for each species and angular momentum l
 (atoms x sparse environments), repeated for every radial function n. This module computes
-Psi^T @ S @ Psi from these blocks with dense matrix products (numpy's BLAS library).
+Psi^T @ S @ Psi from these blocks with dense matrix products (BLAS, through numpy and
+scipy), adding the result into the regression matrix.
 
 The density-response case is not supported yet.
 
@@ -22,6 +23,7 @@ import os
 import time
 
 import numpy as np
+from scipy.linalg.blas import dgemm
 
 
 class LayoutMismatch(Exception):
@@ -113,15 +115,16 @@ def _view(name, shape):
     return _flat(name, size)[:size].reshape(shape)
 
 
-def hessian_contribution(over, psivec, layout, symbols):
-    """Return H = psivec^T @ over @ psivec, shape (K, K).
+def hessian_contribution(over, psivec, layout, symbols, bmat):
+    """Add psivec^T @ over @ psivec to bmat (C-contiguous float64, shape (K, K))
 
     "step1" T = over @ psivec, of which "gather1" is copying the rows of over of each channel
-    "step2" H = psivec^T @ T, of which "gather2" is copying the rows of T.
-    "zero2" is zeroing H when a species is missing from the configuration.
+    "step2" bmat += psivec^T @ T, of which "gather2" is copying the rows of T.
     """
     t0 = time.time()
     N_df, K = psivec.shape
+    if bmat.shape != (K, K) or bmat.dtype != np.float64 or not bmat.flags.c_contiguous:
+        raise ValueError(f"bmat must be a C-contiguous float64 array of shape ({K}, {K})")
     nrows, rows = layout.channel_rows(symbols)
     if (nrows, layout.ncols) != (N_df, K) or over.shape != (N_df, N_df):
         raise LayoutMismatch(
@@ -179,11 +182,9 @@ def hessian_contribution(over, psivec, layout, symbols):
             np.matmul(Sg.T, P, out=T[:, c0 + n * M : c0 + (n + 1) * M]) # over[rows_c, :]^T @ P
     t2 = time.time()
 
-    # step 2: H[cols_c, :] = P^T @ T[rows_c, :] (T only has columns for the species present)
-    H = _view("H", (K, K))  # C-contiguous float64 array of shape (K, K)
-    if kt != K: # zero H for species missing from the configuration
-        H.fill(0.0)
-    t3 = time.time()
+    # step 2: bmat[cols_c, :] += P^T @ T[rows_c, :] (T only has columns for the species present)
+    # If all species are present, the product is added into bmat directly.
+    # Otherwise the product for each present species is computed separately and added to its block of bmat.
     tg2 = 0.0
     for (spe, l), P in tables.items():
         r = rows[(spe, l)]
@@ -195,19 +196,21 @@ def hessian_contribution(over, psivec, layout, symbols):
             np.take(T, r[n], axis=0, out=Tg, mode="clip")
             tg2 += time.time() - tg
             out_rows = slice(c0 + n * M, c0 + (n + 1) * M)
-            if kt == K:
-                np.matmul(P.T, Tg, out=H[out_rows, :]) # H[cols_c, :] = P^T @ T[rows_c, :]
-            else:
-                for t_first, a, w in tcols.values():
-                    np.matmul(P.T, Tg[:, t_first : t_first + w], out=H[out_rows, a : a + w]) # H[cols_c, :] = P^T @ T[rows_c, :] but one species at a time
-    t4 = time.time()
+            if kt == K: # all species present, add directly into bmat
+                # bmat[cols_c, :] += P^T @ T[rows_c, :]
+                target = bmat[out_rows, :].T
+                res = dgemm(1.0, Tg.T, P.T, beta=1.0, c=target, trans_b=1, overwrite_c=1)
+                if res.ctypes.data != target.ctypes.data:  # dgemm worked on a copy (future-proofing)
+                    target[...] = res # copy back into bmat
+            else: # some species missing, add into the columns of each present species
+                for t_first, a, w in tcols.values(): # a: first column of the species in psi, w: number of columns of the species
+                    bmat[out_rows, a : a + w] += P.T @ Tg[:, t_first : t_first + w]
+    t3 = time.time()
 
-    timings = {
+    return {
         "tables": t1 - t0,
         "step1": t2 - t1,
         "gather1": tg1,
-        "step2": t4 - t2,
-        "zero2": t3 - t2,
+        "step2": t3 - t2,
         "gather2": tg2,
     }
-    return H, timings

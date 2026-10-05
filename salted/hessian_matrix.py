@@ -118,7 +118,7 @@ def build():
         )
 
 
-def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm, layout=None, symbols=None):
+def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm, layout=None, symbols=None, bmat=None):
     """
     Compute sparse matrix operations with fallback logic.
 
@@ -129,16 +129,18 @@ def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm, layout
         sparse_algorithm: "numba", "dense", "omp_sparse" or "dense_blocks"
         layout: dense_blocks.BlockLayout (dense_blocks only)
         symbols: atomic symbols of the configuration (dense_blocks only)
+        bmat: regression matrix
 
     Returns:
         (avec_contrib, bmat_contrib, algorithm_used, timings)
+        bmat_contrib is None if the contribution has already been added to bmat (dense_blocks case)
     """
     if sparse_algorithm == "dense_blocks":
         from salted.dense_blocks import LayoutMismatch, hessian_contribution
         try:
-            bmat_contrib, timings = hessian_contribution(over, psivec, layout, symbols)
+            timings = hessian_contribution(over, psivec, layout, symbols, bmat)
             avec_contrib = psivec.T @ ref_projs               # O(nnz) vector multiply
-            return avec_contrib, bmat_contrib, "dense_blocks", timings
+            return avec_contrib, None, "dense_blocks", timings
         except LayoutMismatch as e:
             print(f"Warning: psi does not have the layout dense_blocks expects ({e}), falling back to numba", flush=True)
             sparse_algorithm = "numba"
@@ -320,7 +322,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
             # Use sparse operations with automatic fallback
             avec_contrib, bmat_contrib, algorithm_used, kernel_times = _compute_sparse_operations(
-                psivec, ref_projs, over, sparse_algorithm, layout, atomic_symbols[iconf]
+                psivec, ref_projs, over, sparse_algorithm, layout, atomic_symbols[iconf], Bmat
             )
             _add_times(times, kernel_times)
             if algorithm_used != sparse_algorithm:
@@ -329,7 +331,8 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 sparse_algorithm = algorithm_used
             t2 = time.time()
             Avec += avec_contrib # A = Psi^T @ S @ c
-            Bmat += bmat_contrib # B = Psi^T @ S @ Psi
+            if bmat_contrib is not None: # for cases other than dense_blocks
+                Bmat += bmat_contrib # B = Psi^T @ S @ Psi
             times["badd"] += time.time() - t2 # time for adding contributions to Avec and Bmat
             nnz += psivec.nnz # count non-zero entries in psivec
             nentries += psivec.shape[0] * psivec.shape[1] # count total entries in psivec
