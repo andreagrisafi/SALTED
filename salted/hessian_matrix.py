@@ -116,7 +116,7 @@ def build():
         )
 
 
-def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
+def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm, layout=None, symbols=None):
     """
     Compute sparse matrix operations with fallback logic.
 
@@ -124,11 +124,23 @@ def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
         psivec: Sparse matrix (scipy.sparse)
         ref_projs: Dense vector/matrix
         over: Dense overlap matrix
-        sparse_algorithm: "numba", "dense", or "omp_sparse"
+        sparse_algorithm: "numba", "dense", "omp_sparse" or "dense_blocks"
+        layout: dense_blocks.BlockLayout (dense_blocks only)
+        symbols: atomic symbols of the configuration (dense_blocks only)
 
     Returns:
         (avec_contrib, bmat_contrib, algorithm_used, timings)
     """
+    if sparse_algorithm == "dense_blocks":
+        from salted.dense_blocks import LayoutMismatch, hessian_contribution
+        try:
+            bmat_contrib, timings = hessian_contribution(over, psivec, layout, symbols)
+            avec_contrib = psivec.T @ ref_projs               # O(nnz) vector multiply
+            return avec_contrib, bmat_contrib, "dense_blocks", timings
+        except LayoutMismatch as e:
+            print(f"Warning: psi does not have the layout dense_blocks expects ({e}), falling back to numba", flush=True)
+            sparse_algorithm = "numba"
+
     if sparse_algorithm == "omp_sparse":
         try:
             from salted.omp_sparse import dense_dot_sparse, sparse_transpose_dot_dense
@@ -176,25 +188,33 @@ def _add_times(total, times):
         total[key] = total.get(key, 0.0) + value
 
 
+# Backend-specific entries of the timings, with their labels in the log: outside steps 1
+# and 2, inside step 1, inside step 2.
+_OUTER_TIMES = (("setup", "numba setup"), ("prep", "psi to CSC"), ("tables", "psi tables"))
+_STEP1_TIMES = (("zero1", "zeroing"), ("gather1", "row copies"))
+_STEP2_TIMES = (("transpose", "transposed copy"), ("zero2", "zeroing"), ("gather2", "row copies"))
+
+
 def _format_conf_details(iconf, nnz, nentries, flops, compute_time, times):
     """Return one log line with the breakdown of the compute time of one configuration.
     """
+    def parts(entries):
+        return [f"{label} {times[key]:.2f} s" for key, label in entries if key in times]
+
     t1, t2 = times.get("step1", 0.0), times.get("step2", 0.0)
     step1 = f"step 1 (S psi) = {t1:.2f} s"
-    if "zero1" in times:
-        step1 += f" [zeroing {times['zero1']:.2f} s]"
+    if parts(_STEP1_TIMES):
+        step1 += f" [{', '.join(parts(_STEP1_TIMES))}]"
     step2 = f"step 2 (psi^T S psi) = {t2:.2f} s"
-    if "transpose" in times:
-        step2 += f" [transposed copy {times['transpose']:.2f} s, zeroing {times['zero2']:.2f} s]"
-    setup = times.get("setup", 0.0)
-    prep = times.get("prep", 0.0)
-    other = compute_time - (times["sc"] + setup + prep + t1 + t2 + times["badd"])
+    if parts(_STEP2_TIMES):
+        step2 += f" [{', '.join(parts(_STEP2_TIMES))}]"
+    outer = "".join(f"{label} = {times[key]:.2f} s, " for key, label in _OUTER_TIMES if key in times)
+    other = compute_time - (times["sc"] + sum(times.get(key, 0.0) for key, _ in _OUTER_TIMES)
+                            + t1 + t2 + times["badd"])
     rate = flops / (t1 + t2) / 1e9 if t1 + t2 > 0 else 0.0
     return (
         f"conf {iconf} details: nnz(psi) = {nnz} ({100.0 * nnz / nentries:.3f}% of entries), "
-        f"S*c = {times['sc']:.2f} s, "
-        + (f"numba setup = {setup:.2f} s, " if "setup" in times else "")
-        + f"psi to CSC = {prep:.2f} s, {step1}, {step2}, "
+        f"S*c = {times['sc']:.2f} s, {outer}{step1}, {step2}, "
         f"B += {times['badd']:.2f} s, other = {other:.2f} s, "
         f"steps 1+2 at {rate:.1f} GFLOP/s ({flops / 1e9:.1f} GFLOP)"
     )
@@ -231,13 +251,28 @@ def matrices(trainrange,ntrain,av_coefs,rank):
     if totsize>100000:
         raise ValueError(f"problem dimension too large ({totsize=}), minimize directly loss-function instead!")
 
+    layout = None
+    if sparse_algorithm == "dense_blocks":
+        if inp.salted.saltedtype == "density":
+            from salted.dense_blocks import BlockLayout
+            layout = BlockLayout.from_projectors(osp.join(
+                saltedpath, f"equirepr_{saltedname}", f"projector_M{Menv}_zeta{zeta}.h5"
+            ), species, lmax, nmax)
+            if layout.ncols != totsize:
+                if rank == 0: print(f"Warning: the RKHS projectors give {layout.ncols} columns of psi, the psi files have {totsize}; falling back to numba", flush=True)
+                sparse_algorithm, layout = "numba", None
+        else:
+            if rank == 0: print("Warning: dense_blocks is not available for density-response yet, falling back to numba", flush=True)
+            sparse_algorithm = "numba"
+
     if rank == 0: print("computing regression matrices...")
 
     Avec = np.zeros(totsize)
     Bmat = np.zeros((totsize,totsize))
     total_start_time = time.time()
     total_io_time, total_compute_time = 0.0, 0.0
-    for iconf in trainrange:
+    
+    for iconf in trainrange: # loop over training configurations
 
         start_time = time.time()
         io_time, compute_time = 0.0, 0.0
@@ -249,13 +284,13 @@ def matrices(trainrange,ntrain,av_coefs,rank):
             # load reference QM data
             t0 = time.time()
             ref_coefs = np.load(osp.join(
-                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy" # Load reference coefficients c for the current configuration
             ))
             over = load_overlap(osp.join(
-                saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+                saltedpath, "overlaps", f"overlap_conf{iconf}.npy" # Load overlap matrix S for the current configuration
             ))
             psivec = sparse.load_npz(osp.join(
-                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz" # Load sparse RKHS vectors for the current configuration
             ))
             t1 = time.time()
             io_time += t1 - t0
@@ -278,12 +313,12 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 ref_coefs -= Av_coeffs
 
             t2 = time.time()
-            ref_projs = np.dot(over,ref_coefs)
+            ref_projs = np.dot(over,ref_coefs) # S*c
             times["sc"] += time.time() - t2 # time for computing S*c
 
             # Use sparse operations with automatic fallback
             avec_contrib, bmat_contrib, algorithm_used, kernel_times = _compute_sparse_operations(
-                psivec, ref_projs, over, sparse_algorithm
+                psivec, ref_projs, over, sparse_algorithm, layout, atomic_symbols[iconf]
             )
             _add_times(times, kernel_times)
             if algorithm_used != sparse_algorithm:
@@ -291,8 +326,8 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 print(f"Warning: Using fallback dense algorithm for conf {iconf} due to failure in {sparse_algorithm}, set current sparse_algorithm to {algorithm_used}", flush=True)
                 sparse_algorithm = algorithm_used
             t2 = time.time()
-            Avec += avec_contrib
-            Bmat += bmat_contrib
+            Avec += avec_contrib # A = Psi^T @ S @ c
+            Bmat += bmat_contrib # B = Psi^T @ S @ Psi
             times["badd"] += time.time() - t2 # time for adding contributions to Avec and Bmat
             nnz += psivec.nnz # count non-zero entries in psivec
             nentries += psivec.shape[0] * psivec.shape[1] # count total entries in psivec
