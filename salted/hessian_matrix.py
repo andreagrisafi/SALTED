@@ -85,13 +85,15 @@ def build():
         matrices_end_time = time.time()
         comm.Barrier()
         barrier_end_time = time.time()
-        """ reduce matrices in slices to avoid MPI overflows """
-        nslices = int(np.ceil(len(Avec) / 100.0))
-        for islice in range(nslices-1):
-            Avec[islice*100:(islice+1)*100] = comm.allreduce(Avec[islice*100:(islice+1)*100])
-            Bmat[islice*100:(islice+1)*100] = comm.allreduce(Bmat[islice*100:(islice+1)*100])
-        Avec[(nslices-1)*100:] = comm.allreduce(Avec[(nslices-1)*100:])
-        Bmat[(nslices-1)*100:] = comm.allreduce(Bmat[(nslices-1)*100:])
+        """ sum the matrices of all tasks into task 0 """
+        from mpi4py import MPI
+        rows_per_block = max(1, 2**26 // Bmat.shape[1]) # Max 2**26 entries (512 MB of doubles) per block
+        blocks = [Avec] + [Bmat[i:i+rows_per_block] for i in range(0, Bmat.shape[0], rows_per_block)]
+        for block in blocks:
+            if rank == 0:
+                comm.Reduce(MPI.IN_PLACE, block, op=MPI.SUM, root=0) # sum the contributions from all tasks into task 0
+            else:
+                comm.Reduce(block, None, op=MPI.SUM, root=0) # send the contributions from this task to task 0
         reduce_end_time = time.time()
     else:
         print("Running in serial mode")
