@@ -118,10 +118,9 @@ def _view(name, shape):
 def hessian_contribution(over, psivec, layout, symbols, bmat):
     """Add psivec^T @ over @ psivec to bmat (C-contiguous float64, shape (K, K))
 
-    "step1" T = over @ psivec, of which "gather1" is copying the rows of over of each channel
-    "step2" bmat += psivec^T @ T, of which "gather2" is copying the rows of T.
+    Returns the wall times in seconds of "step1" (T = over @ psivec) and "step2"
+    (bmat += psivec^T @ T).
     """
-    t0 = time.time()
     N_df, K = psivec.shape
     if bmat.shape != (K, K) or bmat.dtype != np.float64 or not bmat.flags.c_contiguous:
         raise ValueError(f"bmat must be a C-contiguous float64 array of shape ({K}, {K})")
@@ -168,33 +167,27 @@ def hessian_contribution(over, psivec, layout, symbols, bmat):
 
     # step 1: T[:, cols_c] = over[rows_c, :]^T @ P   (over is symmetric)
     T = _view("T", (N_df, kt)) # C-contiguous float64 array of shape (N_df, kt)
-    tg1 = 0.0
     for (spe, l), P in tables.items():
         r = rows[(spe, l)]
         nr, M = P.shape
         t_first, a, _ = tcols[spe]
         c0 = t_first + layout.col0[(spe, l)] - a
         for n in range(r.shape[0]): # loop over radial functions
-            tg = time.time()
             Sg = gather[: nr * N_df].reshape(nr, N_df)
             np.take(over, r[n], axis=0, out=Sg, mode="clip")
-            tg1 += time.time() - tg
             np.matmul(Sg.T, P, out=T[:, c0 + n * M : c0 + (n + 1) * M]) # over[rows_c, :]^T @ P
     t2 = time.time()
 
     # step 2: bmat[cols_c, :] += P^T @ T[rows_c, :] (T only has columns for the species present)
     # If all species are present, the product is added into bmat directly.
     # Otherwise the product for each present species is computed separately and added to its block of bmat.
-    tg2 = 0.0
     for (spe, l), P in tables.items():
         r = rows[(spe, l)]
         nr, M = P.shape
         c0 = layout.col0[(spe, l)]
         for n in range(r.shape[0]):
-            tg = time.time()
             Tg = gather[: nr * kt].reshape(nr, kt)
             np.take(T, r[n], axis=0, out=Tg, mode="clip")
-            tg2 += time.time() - tg
             out_rows = slice(c0 + n * M, c0 + (n + 1) * M)
             if kt == K: # all species present, add directly into bmat
                 # bmat[cols_c, :] += P^T @ T[rows_c, :]
@@ -207,10 +200,4 @@ def hessian_contribution(over, psivec, layout, symbols, bmat):
                     bmat[out_rows, a : a + w] += P.T @ Tg[:, t_first : t_first + w]
     t3 = time.time()
 
-    return {
-        "tables": t1 - t0,
-        "step1": t2 - t1,
-        "gather1": tg1,
-        "step2": t3 - t2,
-        "gather2": tg2,
-    }
+    return {"step1": t2 - t1, "step2": t3 - t2}
