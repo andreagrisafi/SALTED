@@ -36,6 +36,13 @@ def build():
 
     comm, size, rank, parallel = detect_mpi()
 
+    # testing aid: SALTED_MINLOSS_TIMERS=1 prints, per rank at the end, where the time of the
+    # CG steps goes (seconds summed over the steps, reported in ms per step)
+    timing = os.environ.get("SALTED_MINLOSS_TIMERS", "0") == "1"
+    t_build = time.perf_counter()
+    timers = dict.fromkeys(["psi", "S", "psiT", "wait", "allreduce", "loss", "grad", "save"], 0.0)
+    ncalls = {"loss": 0, "grad": 0}
+
     fdir = f"rkhs-vectors_{saltedname}"
     rdir = f"regrdir_{saltedname}"
 
@@ -107,6 +114,7 @@ def build():
     def loss_func(weights, ovlp_list, psi_list):
         """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
 
+        t0 = time.perf_counter()
         #        global totsize
         totsize = psi_list[0].shape[1]
 
@@ -192,6 +200,8 @@ def build():
         # add regularization term
         loss += regul * np.dot(weights, weights)
 
+        timers["loss"] += time.perf_counter() - t0
+        ncalls["loss"] += 1
         return loss
 
     def grad_func(weights, ovlp_list, psi_list):
@@ -199,6 +209,7 @@ def build():
         Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function.
         """
 
+        t0 = time.perf_counter()
         #        global totsize
         totsize = psi_list[0].shape[1]
 
@@ -271,6 +282,8 @@ def build():
         else:
             gradient *= norm
             gradient += 2.0 * regul * weights
+        timers["grad"] += time.perf_counter() - t0
+        ncalls["grad"] += 1
         return gradient
 
     def precond_func(ovlp_list, psi_list):
@@ -306,8 +319,16 @@ def build():
         if saltedtype=="density":
 
             for iconf in range(ntrain):
+                t0 = time.perf_counter()
                 psi_x_dire = sparse.csr_matrix.dot(psi_list[iconf],cg_dire)
-                Ad += 2.0 * sparse.csc_matrix.dot(psi_list[iconf].T,np.dot(ovlp_list[iconf],psi_x_dire))
+                t1 = time.perf_counter()
+                ovlp_x_psi = np.dot(ovlp_list[iconf],psi_x_dire)
+                t2 = time.perf_counter()
+                Ad += 2.0 * sparse.csc_matrix.dot(psi_list[iconf].T,ovlp_x_psi)
+                t3 = time.perf_counter()
+                timers["psi"] += t1 - t0
+                timers["S"] += t2 - t1
+                timers["psiT"] += t3 - t2
 
         elif saltedtype=="density-response":
 
@@ -319,7 +340,13 @@ def build():
                     itot += 1
         
         if parallel:
+            t0 = time.perf_counter()
+            if timing:
+                comm.Barrier()  # separates waiting for the slowest rank from the sum itself
+            t1 = time.perf_counter()
             Ad = comm.allreduce(Ad) * norm + 2.0 * regul * cg_dire
+            timers["wait"] += t1 - t0
+            timers["allreduce"] += time.perf_counter() - t1
         else:
             Ad *= norm
             Ad += 2.0 * regul * cg_dire
@@ -330,10 +357,15 @@ def build():
         print("loading matrices...")
     ovlp_list = []
     psi_list = []
+    t_setup = time.perf_counter() - t_build
+    t_load_S = t_load_psi = 0.0
     for iconf in trainrange:
+        t0 = time.perf_counter()
         ovlp_list.append(
             load_overlap(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf}.npy"))
         )
+        t1 = time.perf_counter()
+        t_load_S += t1 - t0
         # load feature vector as a scipy sparse object
         if saltedtype=="density":
             psi_list.append(sparse.load_npz(osp.join(
@@ -344,6 +376,7 @@ def build():
                 psi_list.append(sparse.load_npz(osp.join(
                   saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
                 )))
+        t_load_psi += time.perf_counter() - t1
 
     totsize = psi_list[0].shape[1]
     norm = 1.0 / float(ntraintot)
@@ -357,6 +390,20 @@ def build():
     P = np.ones(totsize)
 
     reg_log10_intstr = str(int(np.log10(regul)))  # for consistency
+
+    # testing aids: SALTED_MINLOSS_SAVE_EVERY=<n> keeps a copy of the weights every n CG steps;
+    # SALTED_MINLOSS_MAX_STEPS=<n> changes the maximum number of CG steps (default 100000)
+    save_every = int(os.environ.get("SALTED_MINLOSS_SAVE_EVERY", "0"))
+    max_steps = int(os.environ.get("SALTED_MINLOSS_MAX_STEPS", "100000"))
+    stepdir = osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", "minloss_steps")
+    if save_every > 0 and rank == 0:
+        os.makedirs(stepdir, exist_ok=True)
+
+    def save_step(step, weights):
+        np.save(
+            osp.join(stepdir, f"weights_N{ntraintot}_reg{reg_log10_intstr}_step{step}.npy"),
+            weights,
+        )
 
     init = True
     if inp.gpr.restart:
@@ -401,12 +448,19 @@ def build():
 
     if rank == 0:
         print("minimizing...")
-    for i in range(100000):
+    t_init = time.time() - start  # initial loss and gradient (or restart)
+    timers.update(dict.fromkeys(timers, 0.0))  # from here on, only the CG steps
+    ncalls.update(dict.fromkeys(ncalls, 0))
+    t_loop = time.perf_counter()
+    for i in range(max_steps):
         #loss = loss_func(w, ovlp_list, psi_list)
         Ad = curv_func(d, ovlp_list, psi_list)
         curv = np.dot(d, Ad)
         alpha = delnew / curv
         w = w + alpha * d
+        t0 = time.perf_counter()
+        if save_every > 0 and (i + 1) % save_every == 0 and rank == 0:
+            save_step(i + 1, w)
         if (i + 1) % 50 == 0 and rank == 0:
             np.save(
                 osp.join(
@@ -435,6 +489,7 @@ def build():
                 ),
                 r,
             )
+        timers["save"] += time.perf_counter() - t0
         if (i+1)%50==0:
             loss_old = loss.copy()
             loss = loss_func(w, ovlp_list, psi_list)
@@ -443,7 +498,7 @@ def build():
                     print("WARNING: loss function increased, search direction reset as the steepest descent.")
                 r = -grad_func(w, ovlp_list, psi_list)
                 if rank == 0:
-                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
+                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}, time: {time.time()-start:.1f} s", flush=True)
                 if np.linalg.norm(r) < gradtol:
                     break
                 d = np.multiply(P, r)
@@ -451,7 +506,7 @@ def build():
             else:
                 r -= alpha * Ad
                 if rank == 0:
-                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}", flush=True)
+                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}, time: {time.time()-start:.1f} s", flush=True)
                 if np.linalg.norm(r) < gradtol:
                     break
                 else:
@@ -464,7 +519,7 @@ def build():
             r -= alpha * Ad
             if np.linalg.norm(r) < gradtol:
                 if rank == 0:
-                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}", flush=True)
+                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, time: {time.time()-start:.1f} s", flush=True)
                 break
             else:
                 s = np.multiply(P, r)
@@ -472,8 +527,28 @@ def build():
                 delnew = np.dot(r, s)
                 beta = delnew / delold
                 d = s + beta * d
+    t_loop = time.perf_counter() - t_loop
+
+    if timing:
+        nsteps = i + 1
+        ms = {k: 1e3 * v / nsteps for k, v in timers.items()}
+        other = t_loop - sum(timers.values())  # CG vector updates, dot products, gradient norms
+        gb = sum(o.nbytes for o in ovlp_list) / 1e9
+        rate = f"{gb * nsteps / timers['S']:.1f} GB/s" if timers["S"] > 0 else "-"
+        print(
+            f"timers rank {rank}: setup {t_setup:.1f} s, load S {t_load_S:.1f} s ({gb:.2f} GB), "
+            f"load psi {t_load_psi:.1f} s, initial loss and gradient {t_init:.1f} s; "
+            f"{nsteps} steps in {t_loop:.1f} s = {1e3 * t_loop / nsteps:.2f} ms/step: "
+            f"psi {ms['psi']:.2f}, S {ms['S']:.2f}, psiT {ms['psiT']:.2f}, wait {ms['wait']:.2f}, "
+            f"allreduce {ms['allreduce']:.2f}, loss {ms['loss']:.2f} ({ncalls['loss']} calls), "
+            f"grad {ms['grad']:.2f} ({ncalls['grad']} calls), save {ms['save']:.2f}, "
+            f"other {1e3 * other / nsteps:.2f}; S read at {rate}",
+            flush=True,
+        )
 
     if rank == 0:
+        if save_every > 0:
+            save_step(i + 1, w)  # the last step, where the loop stopped
         np.save(
             osp.join(
                 saltedpath,
