@@ -11,8 +11,6 @@ The non-zero entries of Psi form a "dense blocks" for each species and angular m
 Psi^T @ S @ Psi from these blocks with dense matrix products (BLAS, through numpy and
 scipy), adding the result into the regression matrix.
 
-The density-response case is not supported yet.
-
 The number of threads is set through the BLAS library, e.g. OPENBLAS_NUM_THREADS.
 
 Setting the environment variable SALTED_DENSE_BLOCKS_CHECK=1 also verifies that the block

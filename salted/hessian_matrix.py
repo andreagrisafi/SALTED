@@ -229,17 +229,14 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
     layout = None
     if sparse_algorithm == "dense_blocks":
-        if inp.salted.saltedtype == "density":
-            from salted.dense_blocks import BlockLayout
-            layout = BlockLayout.from_projectors(osp.join(
-                saltedpath, f"equirepr_{saltedname}", f"projector_M{Menv}_zeta{zeta}.h5"
-            ), species, lmax, nmax)
-            if layout.ncols != totsize:
-                if rank == 0: print(f"Warning: the RKHS projectors give {layout.ncols} columns of psi, the psi files have {totsize}; falling back to numba", flush=True)
-                sparse_algorithm, layout = "numba", None
-        else:
-            if rank == 0: print("Warning: dense_blocks is not available for density-response yet, falling back to numba", flush=True)
-            sparse_algorithm = "numba"
+        from salted.dense_blocks import BlockLayout
+        projector = "projector-response" if inp.salted.saltedtype == "density-response" else "projector"
+        layout = BlockLayout.from_projectors(osp.join(
+            saltedpath, f"equirepr_{saltedname}", f"{projector}_M{Menv}_zeta{zeta}.h5"
+        ), species, lmax, nmax)
+        if layout.ncols != totsize:
+            if rank == 0: print(f"Warning: the RKHS projectors give {layout.ncols} columns of psi, the psi files have {totsize}; falling back to numba", flush=True)
+            sparse_algorithm, layout = "numba", None
 
     if rank == 0: print("computing regression matrices...")
 
@@ -332,11 +329,15 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
                 # Use sparse operations with automatic fallback
                 avec_contrib, bmat_contrib, algorithm_used, kernel_times = _compute_sparse_operations(
-                    psivec, ref_projs, over, sparse_algorithm
+                    psivec, ref_projs, over, sparse_algorithm, layout, atomic_symbols[iconf], Bmat
                 )
                 _add_times(times, kernel_times)
+                if algorithm_used != sparse_algorithm:
+                    print(f"Warning: Using fallback algorithm for conf {iconf} ({icart}) due to failure in {sparse_algorithm}, set current sparse_algorithm to {algorithm_used}", flush=True)
+                    sparse_algorithm = algorithm_used
                 Avec += avec_contrib
-                Bmat += bmat_contrib
+                if bmat_contrib is not None: # for cases other than dense_blocks
+                    Bmat += bmat_contrib
                 nnz += psivec.nnz # count non-zero entries in psivec
                 nentries += psivec.shape[0] * psivec.shape[1] # count total entries in psivec
                 flops += 2.0 * psivec.nnz * (psivec.shape[0] + psivec.shape[1]) # count flops for this cartesian component
