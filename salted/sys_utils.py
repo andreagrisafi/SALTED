@@ -1,4 +1,5 @@
 # ruff: noqa: E501
+import math
 import os
 import os.path as osp
 import re
@@ -586,6 +587,30 @@ def load_overlap(path: str, tile: int = 128) -> np.ndarray:
             S[i0:i1, j0:j1] = S[j0:j1, i0:i1].T # mirror the off-diagonal tile
 
     return S
+
+
+def load_overlap_packed(path: str) -> np.ndarray:
+    # Load an overlap matrix as its lower triangle, row by row (row i: S[i, 0..i])
+
+    m = np.load(path, mmap_mode="r") # memory map: shape and order without reading the data
+    if m.ndim == 1:
+        N = (math.isqrt(8 * m.shape[0] + 1) - 1) // 2 # N from L = N*(N+1)/2
+        if m.dtype != np.float64 or N * (N + 1) // 2 != m.shape[0]:
+            raise ValueError(f"{path}: shape {m.shape} and dtype {m.dtype} do not match a packed float64 overlap matrix")
+        del m
+        return np.load(path) # packed already: read as is
+
+    # full matrix (older files, other codes): copy the lower triangle row by row so that the full matrix is never held in memory
+    N = m.shape[0]
+    if m.ndim != 2 or m.shape[1] != N:
+        raise ValueError(f"{path}: shape {m.shape} is not a square matrix")
+    packed = np.empty(N * (N + 1) // 2)
+    off = 0
+    for i in range(N):
+        # row i of the lower triangle; in Fortran order, column i (the same numbers for a symmetric S)
+        packed[off : off + i + 1] = m[:i + 1, i] if m.flags.f_contiguous and not m.flags.c_contiguous else m[i, :i + 1]
+        off += i + 1
+    return packed
 
 
 class AttrDict:

@@ -4,7 +4,9 @@ import random
 import sys
 import time
 
+import numba
 import numpy as np
+from numba import njit, prange
 from scipy import sparse
 
 from salted import get_averages
@@ -15,9 +17,76 @@ from salted.sys_utils import (
     distribute_jobs,
     format_index_ranges,
     get_atom_idx,
-    load_overlap,
+    load_overlap_packed,
     read_system,
 )
+
+
+@njit(parallel=True, cache=True)
+def _csr_matvec(indptr, indices, data, x, bounds):
+    y = np.zeros(indptr.shape[0] - 1)
+    for b in prange(bounds.shape[0] - 1): # blocks of rows, one per task
+        for i in range(bounds[b], bounds[b + 1]): # rows of the matrix
+            acc = 0.0
+            for jj in range(indptr[i], indptr[i + 1]): # non-zero entries of the row
+                acc += data[jj] * x[indices[jj]] # accumulate the dot product of the row with x
+            y[i] = acc
+    return y
+
+
+def csr_matvec(m, x):
+    # y = m @ x for a scipy CSR matrix m, on all numba threads
+    # The rows are split into blocks of about equal numbers of non-zeros, one block per task.
+    if x.shape[0] != m.shape[1]:
+        raise ValueError(f"vector of length {x.shape[0]} for a matrix with {m.shape[1]} columns")
+    targets = np.linspace(0, m.indptr[-1], 8 * numba.get_num_threads() + 1)
+    bounds = np.unique(np.searchsorted(m.indptr, targets))
+    bounds[0], bounds[-1] = 0, m.shape[0]
+    return _csr_matvec(m.indptr, m.indices, m.data, x, bounds)
+
+
+@njit(parallel=True, cache=True)
+def _packed_symv(ap, x, bounds):
+    # y = S @ x for a symmetric S stored as its lower triangle row by row (row i: S[i, 0..i]).
+    # Each task handles one block of rows.
+    n = x.shape[0]
+    nb = bounds.shape[0] - 1
+    ybuf = np.zeros((nb, n))
+    y = np.zeros(n)
+    for b in prange(nb): # blocks of rows, one per task
+        for i in range(bounds[b], bounds[b + 1]): # rows of the matrix
+            off = i * (i + 1) // 2
+            xi = x[i]
+            acc = 0.0
+            for j in range(i):
+                a = ap[off + j]
+                acc += a * x[j]
+                ybuf[b, j] += a * xi
+            y[i] = acc + ap[off + i] * xi
+    for j in prange(n): # add to y[j] the column contributions collected by all tasks
+        s = 0.0
+        for b in range(nb):
+            s += ybuf[b, j]
+        y[j] += s
+    return y
+
+
+def packed_symv(ap, x):
+    # y = S @ x for a symmetric S stored as its lower triangle (ap, from load_overlap_packed), on all
+    # numba threads. The rows are split into blocks of about equal numbers of entries, one per task.
+    n = x.shape[0]
+    if ap.shape[0] != n * (n + 1) // 2:
+        raise ValueError(f"vector of length {n} for a packed matrix of {ap.shape[0]} entries")
+    starts = np.arange(n + 1, dtype=np.int64)
+    starts = starts * (starts + 1) // 2  # position in ap of the first entry of each row
+    bounds = np.unique(np.searchsorted(starts, np.linspace(0, starts[-1], 2 * numba.get_num_threads() + 1)))
+    bounds[0], bounds[-1] = 0, n
+    return _packed_symv(ap, x, bounds)
+
+
+def _vdot(a, b):
+    # dot product without BLAS (since it slows down the numba kernels)
+    return np.einsum("i,i->", a, b)
 
 
 def build():
@@ -40,7 +109,7 @@ def build():
     # CG steps goes (seconds summed over the steps, reported in ms per step)
     timing = os.environ.get("SALTED_MINLOSS_TIMERS", "0") == "1"
     t_build = time.perf_counter()
-    timers = dict.fromkeys(["psi", "S", "psiT", "wait", "allreduce", "loss", "grad", "save"], 0.0)
+    timers = dict.fromkeys(["psi", "S", "psiT", "wait", "allreduce", "loss", "save"], 0.0)
     ncalls = {"loss": 0, "grad": 0}
 
     fdir = f"rkhs-vectors_{saltedname}"
@@ -111,183 +180,9 @@ def build():
         trainrange = trainrangetot[:ntraintot]
     ntrain = len(trainrange)
 
-    def loss_func(weights, ovlp_list, psi_list):
-        """Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function."""
-
-        t0 = time.perf_counter()
-        #        global totsize
-        totsize = psi_list[0].shape[1]
-
-        # init gradient
-        gradient = np.zeros(totsize)
-
-        if saltedtype=="density":
-
-            loss = 0.0
-            # loop over training structures
-            for iconf in range(ntrain):
-
-                ref_coefs = np.load(
-                    osp.join(
-                        saltedpath,
-                        "coefficients",
-                        f"coefficients_conf{trainrange[iconf]}.npy",
-                    )
-                )
-
-                if average:
-                    Av_coeffs = np.zeros(ref_coefs.shape[0])
-                i = 0
-                for iat in range(natoms[trainrange[iconf]]):
-                    spe = atomic_symbols[trainrange[iconf]][iat]
-                    for l in range(lmax[spe] + 1):
-                        for n in range(nmax[(spe, l)]):
-                            if average and l == 0:
-                                Av_coeffs[i] = av_coefs[spe][n]
-                            i += 2 * l + 1
-
-                # rebuild predicted coefficients
-                pred_coefs = sparse.csr_matrix.dot(psi_list[iconf], weights)
-                if average:
-                    pred_coefs += Av_coeffs
-
-                # compute predicted density projections
-                ovlp = ovlp_list[iconf]
-                ref_projs = np.dot(ovlp, ref_coefs)
-                pred_projs = np.dot(ovlp, pred_coefs)
-
-                # collect gradient contributions
-                loss += sparse.csc_matrix.dot(
-                    pred_coefs - ref_coefs, pred_projs - ref_projs
-                )
-
-        elif saltedtype=="density-response":
-
-            loss = 0.0
-            # loop over training structures
-            itot = 0
-            for iconf in range(ntrain):
-
-                ovlp = ovlp_list[iconf]
-
-                for icart in ["x","y","z"]:
-
-                    ref_coefs = np.load(
-                        osp.join(
-                            saltedpath,
-                            f"coefficients/{icart}/",
-                            f"coefficients_conf{trainrange[iconf]}.npy",
-                        )
-                    )
-
-                    # rebuild predicted coefficients
-                    pred_coefs = sparse.csr_matrix.dot(psi_list[itot], weights)
-
-                    # compute predicted density projections
-                    ref_projs = np.dot(ovlp, ref_coefs)
-                    pred_projs = np.dot(ovlp, pred_coefs)
-
-                    # collect gradient contributions
-                    loss += sparse.csc_matrix.dot(
-                        pred_coefs - ref_coefs, pred_projs - ref_projs
-                    )
-                    itot += 1
-
-        loss *= norm
-        if parallel:
-            loss = comm.allreduce(loss)
-
-        # add regularization term
-        loss += regul * np.dot(weights, weights)
-
-        timers["loss"] += time.perf_counter() - t0
-        ncalls["loss"] += 1
-        return loss
-
-    def grad_func(weights, ovlp_list, psi_list):
-        """
-        Given the weight-vector of the RKHS, compute the gradient of the electron-density loss function.
-        """
-
-        t0 = time.perf_counter()
-        #        global totsize
-        totsize = psi_list[0].shape[1]
-
-        # init gradient
-        gradient = np.zeros(totsize)
-
-        if saltedtype=="density":
-
-            # loop over training structures
-            for iconf in range(ntrain):
-
-                # load reference QM data
-                ref_coefs = np.load(osp.join(
-                    saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
-                ))
-
-                if average:
-                    Av_coeffs = np.zeros(ref_coefs.shape[0])
-                i = 0
-                for iat in range(natoms[trainrange[iconf]]):
-                    spe = atomic_symbols[trainrange[iconf]][iat]
-                    for l in range(lmax[spe]+1):
-                        for n in range(nmax[(spe,l)]):
-                            if average and l==0:
-                                Av_coeffs[i] = av_coefs[spe][n]
-                            i += 2*l+1
-
-                # rebuild predicted coefficients
-                pred_coefs = sparse.csr_matrix.dot(psi_list[iconf],weights)
-                if average:
-                    pred_coefs += Av_coeffs
-
-                # compute predicted density projections
-                ovlp = ovlp_list[iconf]
-                ref_projs = np.dot(ovlp,ref_coefs)
-                pred_projs = np.dot(ovlp,pred_coefs)
-
-                # collect gradient contributions
-                gradient += 2.0 * sparse.csc_matrix.dot(psi_list[iconf].T,pred_projs-ref_projs)
-        
-        elif saltedtype=="density-response":
-
-            # loop over training structures
-            itot = 0
-            for iconf in range(ntrain):
-
-                ovlp = ovlp_list[iconf]
- 
-                for icart in ["x","y","z"]:
-
-                    # load reference QM data
-                    ref_coefs = np.load(osp.join(
-                        saltedpath, "coefficients", f"{icart}/coefficients_conf{trainrange[iconf]}.npy"
-                    ))
-
-                    # rebuild predicted coefficients
-                    pred_coefs = sparse.csr_matrix.dot(psi_list[itot],weights)
-
-                    # compute predicted density projections
-                    ref_projs = np.dot(ovlp,ref_coefs)
-                    pred_projs = np.dot(ovlp,pred_coefs)
-
-                    # collect gradient contributions
-                    gradient += 2.0 * sparse.csc_matrix.dot(psi_list[itot].T,pred_projs-ref_projs)
-                    
-                    itot += 1
-
-        if parallel:
-            gradient = comm.allreduce(gradient) * norm + 2.0 * regul * weights
-        else:
-            gradient *= norm
-            gradient += 2.0 * regul * weights
-        timers["grad"] += time.perf_counter() - t0
-        ncalls["grad"] += 1
-        return gradient
-
     def precond_func(ovlp_list, psi_list):
         """Compute preconditioning."""
+        # never called, written for full overlap matrices, not for the packed ones (load_overlap_packed)
 
         #        global totsize
         totsize = psi_list[0].shape[1]
@@ -309,10 +204,10 @@ def build():
 
         return diag_hessian
 
-    def curv_func(cg_dire, ovlp_list, psi_list):
-        """Compute curvature on the given CG-direction."""
+    def curv_func(cg_dire):
+        """Compute curvature on the given CG-direction: 2 (B + lambda I) d, summed over all ranks."""
 
-        totsize = psi_list[0].shape[1]
+        totsize = psi_par[0].shape[1]
 
         Ad = np.zeros(totsize)
 
@@ -320,11 +215,11 @@ def build():
 
             for iconf in range(ntrain):
                 t0 = time.perf_counter()
-                psi_x_dire = sparse.csr_matrix.dot(psi_list[iconf],cg_dire)
+                psi_x_dire = csr_matvec(psi_par[iconf], cg_dire) # Psi @ d
                 t1 = time.perf_counter()
-                ovlp_x_psi = np.dot(ovlp_list[iconf],psi_x_dire)
+                ovlp_x_psi = packed_symv(ovlp_list[iconf], psi_x_dire) # S @ Psi @ d
                 t2 = time.perf_counter()
-                Ad += 2.0 * sparse.csc_matrix.dot(psi_list[iconf].T,ovlp_x_psi)
+                Ad += 2.0 * csr_matvec(psiT_par[iconf], ovlp_x_psi) # Psi^T @ S @ Psi @ d
                 t3 = time.perf_counter()
                 timers["psi"] += t1 - t0
                 timers["S"] += t2 - t1
@@ -335,8 +230,8 @@ def build():
             itot = 0
             for iconf in range(ntrain):
                 for icart in ["x","y","z"]:
-                    psi_x_dire = sparse.csr_matrix.dot(psi_list[itot],cg_dire)
-                    Ad += 2.0 * sparse.csc_matrix.dot(psi_list[itot].T,np.dot(ovlp_list[iconf],psi_x_dire))
+                    psi_x_dire = csr_matvec(psi_par[itot], cg_dire)
+                    Ad += 2.0 * csr_matvec(psiT_par[itot], packed_symv(ovlp_list[iconf], psi_x_dire))
                     itot += 1
         
         if parallel:
@@ -353,33 +248,90 @@ def build():
 
         return Ad
 
+    def grad_func(weights):
+        """Gradient of the loss: 2(B + lambda I) w - 2A"""
+        ncalls["grad"] += 1 # count the number of calls to the gradient function (for timing)
+        return curv_func(weights) - 2.0 * Avec # 2(B + lambda I) w - 2A
+
+    def loss_func(weights, resid):
+        """Loss: w^T @ (B + lambda I) @ w - 2 A @ w + C = C - w @ (A + resid/2)
+        where resid is minus the gradient at w, as kept up to date by CG"""
+        t0 = time.perf_counter()
+        loss = Cconst - _vdot(weights, Avec + 0.5 * resid) # C - w @ (A + resid/2)
+        timers["loss"] += time.perf_counter() - t0
+        ncalls["loss"] += 1
+        return loss
+
     if rank == 0:
         print("loading matrices...")
     ovlp_list = []
-    psi_list = []
+    psi_par = []   # Psi and Psi^T in CSR format, for the multithreaded products
+    psiT_par = []
     t_setup = time.perf_counter() - t_build
     t_load_S = t_load_psi = 0.0
     for iconf in trainrange:
         t0 = time.perf_counter()
         ovlp_list.append(
-            load_overlap(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf}.npy"))
+            load_overlap_packed(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf}.npy"))
         )
         t1 = time.perf_counter()
         t_load_S += t1 - t0
         # load feature vector as a scipy sparse object
         if saltedtype=="density":
-            psi_list.append(sparse.load_npz(osp.join(
+            psi = sparse.load_npz(osp.join(
               saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
-            )))
+            ))
+            psi_par.append(psi.tocsr())
+            psiT_par.append(psi.T.tocsr())
         elif saltedtype=="density-response":
             for icart in ["x","y","z"]:
-                psi_list.append(sparse.load_npz(osp.join(
+                psi = sparse.load_npz(osp.join(
                   saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
-                )))
+                ))
+                psi_par.append(psi.tocsr())
+                psiT_par.append(psi.T.tocsr())
         t_load_psi += time.perf_counter() - t1
 
-    totsize = psi_list[0].shape[1]
+    totsize = psi_par[0].shape[1]
     norm = 1.0 / float(ntraintot)
+
+    # Compute the parts of the loss and gradient that do not depend on the weights
+    # A = (1/N) sum Psi^T @ S @ c (Avec of hessian_matrix)
+    # C = (1/N) sum c^T @ S @ c
+    t0 = time.perf_counter()
+    Avec = np.zeros(totsize)
+    Cconst = 0.0
+    itot = 0
+    for iconf in range(ntrain):
+        if saltedtype=="density":
+            ref_coefs = np.load(osp.join(
+                saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
+            ))
+            if average:
+                i = 0
+                for iat in range(natoms[trainrange[iconf]]):
+                    spe = atomic_symbols[trainrange[iconf]][iat]
+                    for l in range(lmax[spe]+1):
+                        for n in range(nmax[(spe,l)]):
+                            if l==0:
+                                ref_coefs[i] -= av_coefs[spe][n] # subtract the average density coefficients for the species
+                            i += 2*l+1
+            targets = [ref_coefs]
+        elif saltedtype=="density-response":
+            targets = [np.load(osp.join(
+                saltedpath, "coefficients", f"{icart}/coefficients_conf{trainrange[iconf]}.npy"
+            )) for icart in ["x","y","z"]]
+        for ref_coefs in targets:
+            ref_projs = packed_symv(ovlp_list[iconf], ref_coefs) # S @ c
+            Avec += csr_matvec(psiT_par[itot], ref_projs) # Psi^T @ S @ c
+            Cconst += _vdot(ref_coefs, ref_projs) # c^T @ S @ c
+            itot += 1
+    if parallel:
+        Avec = comm.allreduce(Avec)
+        Cconst = comm.allreduce(Cconst)
+    Avec *= norm
+    Cconst *= norm
+    t_const = time.perf_counter() - t0
 
     if rank == 0:
         print(f"problem dimensionality: {totsize}")
@@ -387,7 +339,7 @@ def build():
     start = time.time()
 
     # preconditioner
-    P = np.ones(totsize)
+    P = np.ones(totsize) # no preconditioning
 
     reg_log10_intstr = str(int(np.log10(regul)))  # for consistency
 
@@ -431,8 +383,8 @@ def build():
             d = np.load(dpath)
             r = np.load(rpath)
             s = np.multiply(P, r)
-            delnew = np.dot(r, s)
-            loss = loss_func(w, ovlp_list, psi_list)
+            delnew = _vdot(r, s)
+            loss = loss_func(w, -grad_func(w))  # the saved r is from the step before w
         else:
             # Print a warning and revert to the else behavior
             print(
@@ -441,10 +393,10 @@ def build():
 
     if init:
         w = np.ones(totsize) * 1e-04
-        loss = loss_func(w, ovlp_list, psi_list)
-        r = -grad_func(w, ovlp_list, psi_list)
+        r = -grad_func(w)
+        loss = loss_func(w, r)
         d = np.multiply(P, r)
-        delnew = np.dot(r, d)
+        delnew = _vdot(r, d)
 
     if rank == 0:
         print("minimizing...")
@@ -453,9 +405,8 @@ def build():
     ncalls.update(dict.fromkeys(ncalls, 0))
     t_loop = time.perf_counter()
     for i in range(max_steps):
-        #loss = loss_func(w, ovlp_list, psi_list)
-        Ad = curv_func(d, ovlp_list, psi_list)
-        curv = np.dot(d, Ad)
+        Ad = curv_func(d) # Curvature 2 (B + lambda I) @ d, summed over all ranks
+        curv = _vdot(d, Ad)
         alpha = delnew / curv
         w = w + alpha * d
         t0 = time.perf_counter()
@@ -491,40 +442,41 @@ def build():
             )
         timers["save"] += time.perf_counter() - t0
         if (i+1)%50==0:
-            loss_old = loss.copy()
-            loss = loss_func(w, ovlp_list, psi_list)
-            if loss>loss_old:
+            loss_old = loss
+            r -= alpha * Ad
+            loss = loss_func(w, r)
+            if loss > loss_old:
                 if rank == 0:
                     print("WARNING: loss function increased, search direction reset as the steepest descent.")
-                r = -grad_func(w, ovlp_list, psi_list)
+                r = -grad_func(w)  # exact gradient, free of the rounding accumulated in r
+                loss = loss_func(w, r)
                 if rank == 0:
-                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}, time: {time.time()-start:.1f} s", flush=True)
-                if np.linalg.norm(r) < gradtol:
+                    print(f"step {i+1}, gradient norm: {np.sqrt(_vdot(r, r)):.3e}, loss: {loss:.3e}, time: {time.time()-start:.1f} s", flush=True)
+                if np.sqrt(_vdot(r, r)) < gradtol:
                     break
                 d = np.multiply(P, r)
-                delnew = np.dot(r, d)
+                delnew = _vdot(r, d)
             else:
-                r -= alpha * Ad
                 if rank == 0:
-                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, loss: {loss:.3e}, time: {time.time()-start:.1f} s", flush=True)
-                if np.linalg.norm(r) < gradtol:
+                    print(f"step {i+1}, gradient norm: {np.sqrt(_vdot(r, r)):.3e}, loss: {loss:.3e}, time: {time.time()-start:.1f} s", flush=True)
+                if np.sqrt(_vdot(r, r)) < gradtol:
                     break
                 else:
                     s = np.multiply(P, r)
                     delold = delnew.copy()
-                    delnew = np.dot(r, s)
+                    delnew = _vdot(r, s)
                     beta = delnew / delold
                     d = s + beta * d
         else:
             r -= alpha * Ad
-            if np.linalg.norm(r) < gradtol:
+            if np.sqrt(_vdot(r, r)) < gradtol:
                 if rank == 0:
-                    print(f"step {i+1}, gradient norm: {np.linalg.norm(r):.3e}, time: {time.time()-start:.1f} s", flush=True)
+                    print(f"step {i+1}, gradient norm: {np.sqrt(_vdot(r, r)):.3e}, time: {time.time()-start:.1f} s", flush=True)
                 break
             else:
                 s = np.multiply(P, r)
                 delold = delnew.copy()
-                delnew = np.dot(r, s)
+                delnew = _vdot(r, s)
                 beta = delnew / delold
                 d = s + beta * d
     t_loop = time.perf_counter() - t_loop
@@ -537,11 +489,12 @@ def build():
         rate = f"{gb * nsteps / timers['S']:.1f} GB/s" if timers["S"] > 0 else "-"
         print(
             f"timers rank {rank}: setup {t_setup:.1f} s, load S {t_load_S:.1f} s ({gb:.2f} GB), "
-            f"load psi {t_load_psi:.1f} s, initial loss and gradient {t_init:.1f} s; "
+            f"load psi {t_load_psi:.1f} s, A and C (with numba compilation) {t_const:.1f} s, "
+            f"initial loss and gradient {t_init:.1f} s, "
             f"{nsteps} steps in {t_loop:.1f} s = {1e3 * t_loop / nsteps:.2f} ms/step: "
             f"psi {ms['psi']:.2f}, S {ms['S']:.2f}, psiT {ms['psiT']:.2f}, wait {ms['wait']:.2f}, "
             f"allreduce {ms['allreduce']:.2f}, loss {ms['loss']:.2f} ({ncalls['loss']} calls), "
-            f"grad {ms['grad']:.2f} ({ncalls['grad']} calls), save {ms['save']:.2f}, "
+            f"grad {ncalls['grad']} calls (time in psi, S, psiT), save {ms['save']:.2f}, "
             f"other {1e3 * other / nsteps:.2f}; S read at {rate}",
             flush=True,
         )
