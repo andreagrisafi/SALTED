@@ -20,7 +20,6 @@ import numpy as np
 import scipy.sparse
 from numba import njit, prange
 
-
 # ---------------------------------------------------------------------------
 # Cache-size detection
 # ---------------------------------------------------------------------------

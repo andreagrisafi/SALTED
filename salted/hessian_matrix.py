@@ -21,6 +21,7 @@ from salted.sys_utils import (
 
 def build():
 
+    build_start_time = time.time()
     inp = ParseConfig().parse_input()
 
     saltedname, saltedpath = inp.salted.saltedname, inp.salted.saltedpath
@@ -80,25 +81,43 @@ def build():
         """ calculate and gather """
         if inp.salted.verbose:
             print(f"Task {rank} handling structures: {format_index_ranges(this_task_trainrange,True)}", flush=True)
-        [Avec, Bmat] = matrices(this_task_trainrange, ntrain,av_coefs,rank)
+        [Avec, Bmat, loop_start_time] = matrices(this_task_trainrange, ntrain,av_coefs,rank)
+        matrices_end_time = time.time()
         comm.Barrier()
-        """ reduce matrices in slices to avoid MPI overflows """
-        nslices = int(np.ceil(len(Avec) / 100.0))
-        for islice in range(nslices-1):
-            Avec[islice*100:(islice+1)*100] = comm.allreduce(Avec[islice*100:(islice+1)*100])
-            Bmat[islice*100:(islice+1)*100] = comm.allreduce(Bmat[islice*100:(islice+1)*100])
-        Avec[(nslices-1)*100:] = comm.allreduce(Avec[(nslices-1)*100:])
-        Bmat[(nslices-1)*100:] = comm.allreduce(Bmat[(nslices-1)*100:])
+        barrier_end_time = time.time()
+        """ sum the matrices of all tasks into task 0 """
+        from mpi4py import MPI
+        rows_per_block = max(1, 2**26 // Bmat.shape[1]) # Max 2**26 entries (512 MB of doubles) per block
+        blocks = [Avec] + [Bmat[i:i+rows_per_block] for i in range(0, Bmat.shape[0], rows_per_block)]
+        for block in blocks:
+            if rank == 0:
+                comm.Reduce(MPI.IN_PLACE, block, op=MPI.SUM, root=0) # sum the contributions from all tasks into task 0
+            else:
+                comm.Reduce(block, None, op=MPI.SUM, root=0) # send the contributions from this task to task 0
+        reduce_end_time = time.time()
     else:
         print("Running in serial mode")
-        [Avec, Bmat] = matrices(trainrange,ntrain,av_coefs,rank)
+        [Avec, Bmat, loop_start_time] = matrices(trainrange,ntrain,av_coefs,rank)
+        matrices_end_time = time.time()
+        barrier_end_time = reduce_end_time = matrices_end_time
 
     if rank==0:
         np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Avec_N{ntrain}.npy"), Avec)
         np.save(osp.join(saltedpath, rdir, f"M{Menv}_zeta{zeta}", f"Bmat_N{ntrain}.npy"), Bmat)
+    save_end_time = time.time()
+
+    if inp.salted.verbose:
+        print(
+            f"Task {rank}, time outside the configuration loop: "
+            f"setup = {(loop_start_time - build_start_time):.2f} s, "
+            f"wait for other tasks = {(barrier_end_time - matrices_end_time):.2f} s, "
+            f"reduction over tasks = {(reduce_end_time - barrier_end_time):.2f} s, "
+            f"save = {(save_end_time - reduce_end_time):.2f} s",
+            flush=True,
+        )
 
 
-def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
+def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm, layout=None, symbols=None, bmat=None):
     """
     Compute sparse matrix operations with fallback logic.
 
@@ -106,11 +125,25 @@ def _compute_sparse_operations(psivec, ref_projs, over, sparse_algorithm):
         psivec: Sparse matrix (scipy.sparse)
         ref_projs: Dense vector/matrix
         over: Dense overlap matrix
-        sparse_algorithm: "numba", "dense", or "omp_sparse"
+        sparse_algorithm: "numba", "dense", "omp_sparse" or "dense_blocks"
+        layout: dense_blocks.BlockLayout (dense_blocks only)
+        symbols: atomic symbols of the configuration (dense_blocks only)
+        bmat: regression matrix
 
     Returns:
         (avec_contrib, bmat_contrib, algorithm_used)
+        bmat_contrib is None if the contribution has already been added to bmat (dense_blocks case)
     """
+    if sparse_algorithm == "dense_blocks":
+        from salted.dense_blocks import LayoutMismatch, hessian_contribution
+        try:
+            hessian_contribution(over, psivec, layout, symbols, bmat)
+            avec_contrib = psivec.T @ ref_projs               # O(nnz) vector multiply
+            return avec_contrib, None, "dense_blocks"
+        except LayoutMismatch as e:
+            print(f"Warning: psi does not have the layout dense_blocks expects ({e}), falling back to numba", flush=True)
+            sparse_algorithm = "numba"
+
     if sparse_algorithm == "omp_sparse":
         try:
             from salted.omp_sparse import dense_dot_sparse, sparse_transpose_dot_dense
@@ -174,13 +207,25 @@ def matrices(trainrange,ntrain,av_coefs,rank):
     if totsize>100000:
         raise ValueError(f"problem dimension too large ({totsize=}), minimize directly loss-function instead!")
 
+    layout = None
+    if sparse_algorithm == "dense_blocks":
+        from salted.dense_blocks import BlockLayout
+        projector = "projector-response" if inp.salted.saltedtype == "density-response" else "projector"
+        layout = BlockLayout.from_projectors(osp.join(
+            saltedpath, f"equirepr_{saltedname}", f"{projector}_M{Menv}_zeta{zeta}.h5"
+        ), species, lmax, nmax)
+        if layout.ncols != totsize:
+            if rank == 0: print(f"Warning: the RKHS projectors give {layout.ncols} columns of psi, the psi files have {totsize}; falling back to numba", flush=True)
+            sparse_algorithm, layout = "numba", None
+
     if rank == 0: print("computing regression matrices...")
 
     Avec = np.zeros(totsize)
     Bmat = np.zeros((totsize,totsize))
     total_start_time = time.time()
     total_io_time, total_compute_time = 0.0, 0.0
-    for iconf in trainrange:
+    
+    for iconf in trainrange: # loop over training configurations
 
         start_time = time.time()
         io_time, compute_time = 0.0, 0.0
@@ -190,13 +235,13 @@ def matrices(trainrange,ntrain,av_coefs,rank):
             # load reference QM data
             t0 = time.time()
             ref_coefs = np.load(osp.join(
-                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy" # Load reference coefficients c for the current configuration
             ))
             over = load_overlap(osp.join(
-                saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+                saltedpath, "overlaps", f"overlap_conf{iconf}.npy" # Load overlap matrix S for the current configuration
             ))
             psivec = sparse.load_npz(osp.join(
-                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz" # Load sparse RKHS vectors for the current configuration
             ))
             t1 = time.time()
             io_time += t1 - t0
@@ -218,18 +263,19 @@ def matrices(trainrange,ntrain,av_coefs,rank):
                 # subtract average
                 ref_coefs -= Av_coeffs
 
-            ref_projs = np.dot(over,ref_coefs)
+            ref_projs = np.dot(over,ref_coefs) # S*c
 
             # Use sparse operations with automatic fallback
             avec_contrib, bmat_contrib, algorithm_used = _compute_sparse_operations(
-                psivec, ref_projs, over, sparse_algorithm
+                psivec, ref_projs, over, sparse_algorithm, layout, atomic_symbols[iconf], Bmat
             )
             if algorithm_used != sparse_algorithm:
                 # set sparse_algorithm to algorithm_used
                 print(f"Warning: Using fallback dense algorithm for conf {iconf} due to failure in {sparse_algorithm}, set current sparse_algorithm to {algorithm_used}", flush=True)
                 sparse_algorithm = algorithm_used
-            Avec += avec_contrib
-            Bmat += bmat_contrib
+            Avec += avec_contrib # A = Psi^T @ S @ c
+            if bmat_contrib is not None: # for cases other than dense_blocks
+                Bmat += bmat_contrib # B = Psi^T @ S @ Psi
             compute_time += time.time() - t1
 
 
@@ -257,24 +303,29 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
                 # Use sparse operations with automatic fallback
                 avec_contrib, bmat_contrib, algorithm_used = _compute_sparse_operations(
-                    psivec, ref_projs, over, sparse_algorithm
+                    psivec, ref_projs, over, sparse_algorithm, layout, atomic_symbols[iconf], Bmat
                 )
+                if algorithm_used != sparse_algorithm:
+                    print(f"Warning: Using fallback algorithm for conf {iconf} ({icart}) due to failure in {sparse_algorithm}, set current sparse_algorithm to {algorithm_used}", flush=True)
+                    sparse_algorithm = algorithm_used
                 Avec += avec_contrib
-                Bmat += bmat_contrib
+                if bmat_contrib is not None: # for cases other than dense_blocks
+                    Bmat += bmat_contrib
                 compute_time += time.time() - t1
 
         del over, psivec
 
         total_io_time += io_time
         total_compute_time += compute_time
-        if inp.salted.verbose: print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s (I/O = {io_time:.2f} s, compute = {compute_time:.2f} s)", flush=True)
+        if inp.salted.verbose:
+            print(f"conf {iconf}, time = {(time.time() - start_time):.2f} s (I/O = {io_time:.2f} s, compute = {compute_time:.2f} s)", flush=True)
 
     if inp.salted.verbose: print(f"Task {rank}, total time for {len(trainrange)} structures = {(time.time() - total_start_time):.2f} s (I/O = {total_io_time:.2f} s, compute = {total_compute_time:.2f} s)", flush=True)
 
     Avec /= float(ntrain)
     Bmat /= float(ntrain)
 
-    return [Avec,Bmat]
+    return [Avec,Bmat,total_start_time]
 
 if __name__ == "__main__":
     build()
