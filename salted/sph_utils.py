@@ -579,45 +579,108 @@ def grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv
                     grad_p[i_grad,2,iat,imu,ifeat] = (grad_ptemp[ifeat,imu,i_grad,2] / normfact) - ptemp[ifeat,imu] * dot3[i_grad] / (normfact3)
     return p, grad_p
 
+@njit(fastmath = True)
+def _density_matrices(v, iat, nang, nrad):
+    """A[l, m, m'] = sum_n v[n, l, m] conj(v[n, l, m']) and
+    B[l, m, m'] = sum_n v[n, l, m] v[n, l, m'] of one atom."""
+    nm = 2*nang+1
+    A = np.zeros((nang+1, nm, nm), dtype=np.complex128)
+    B = np.zeros((nang+1, nm, nm), dtype=np.complex128)
+    for l in range(nang+1):
+        for n in range(nrad):
+            for i in range(2*l+1):
+                x = v[iat,n,l,i]
+                for j in range(2*l+1):
+                    y = v[iat,n,l,j]
+                    A[l,i,j] += x * np.conj(y)
+                    B[l,i,j] += x * y
+    return A, B
+
+
+@njit(fastmath = True)
+def _pair_sum(W, il, imu, imu2, l1, l2, lam, M1, M2):
+    """sum over m1, m1' of W[il, mu, m1] W[il, mu', m1'] M1[l1, m1, m1']
+    conj(M2[l2, m1 - mu, m1' - mu'])."""
+    s = 0j
+    for i in range(2*l1+1):
+        j = i-l1-(imu-lam)+l2
+        if j < 0 or j > 2*l2 or W[il,imu,i] == 0.0:
+            continue
+        for i2 in range(2*l1+1):
+            j2 = i2-l1-(imu2-lam)+l2
+            if j2 < 0 or j2 > 2*l2:
+                continue
+            s += W[il,imu,i] * W[il,imu2,i2] * M1[l1,i,i2] * np.conj(M2[l2,j,j2])
+    return s
+
+
 @njit(parallel=True, fastmath = True)
 def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
-    p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
-    v2c  = np.conj(v2)
+    """The nfps features vfps of each atom's lam-SOAP vector, normalised over
+    all featsize features, without computing the features that are dropped.
 
+    Feature ifeat = (n1*nrad2 + n2)*llmax + il is Re(c2r @ pc) with
+    pc[mu] = sum_m1 w3j * v1[n1, l1, m1] * conj(v2[n2, l2, m1 - mu]).
+    With c2r unitary and G = c2r^T c2r, sum_mu Re(q_mu)^2 = (|pc|^2 + Re(pc^T G pc))/2
+    for q = c2r @ pc, and summed over n1, n2 both terms factor into the per-l
+    density matrices of _density_matrices.  So the norm costs one pass over
+    m pairs per (l1, l2) instead of nrad1*nrad2 feature evaluations."""
+    nmu = 2*lam+1
+    # W[il, imu, im1]: w3j in the order the per-feature loop reads it
+    W = np.zeros((llmax, nmu, 2*nang1+1))
+    iwig = 0
+    for il in range(llmax):
+        l1 = llvec[il,0]
+        l2 = llvec[il,1]
+        for imu in range(nmu):
+            for im1 in range(2*l1+1):
+                if abs(im1-l1-(imu-lam)) <= l2:
+                    W[il,imu,im1] = w3j[iwig]
+                    iwig = iwig + 1
+    G = np.zeros((nmu, nmu), dtype=np.complex128)
+    for a in range(nmu):
+        for b in range(nmu):
+            for k in range(nmu):
+                G[a,b] += c2r[k,a] * c2r[k,b]
+
+    p = np.zeros((natoms, nmu, nfps), dtype=np.float64)
     for iat in prange(natoms):
+        A1, B1 = _density_matrices(v1, iat, nang1, nrad1)
+        A2, B2 = _density_matrices(v2, iat, nang2, nrad2)
         inner = 0.0
-        ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
-        ifeat = 0
-        for n1 in range(nrad1):
-            for n2 in range(nrad2):
-                iwig = 0
-                for il in range(llmax):
-                    l1 = llvec[il,0]
-                    l2 = llvec[il,1]
-                    pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
-                    for imu in range(2*lam+1):
-                        mu = imu-lam
-                        for im1 in range(2*l1+1):
-                            m1 = im1-l1
-                            m2 = m1-mu
-                            if (abs(m2)<=l2):
-                               im2 = m2+l2
-                               v2cv  = v2c[iat,n2,l2,im2]
-                               v1v = v1[iat,n1,l1,im1]
-                               pcmplx[imu] = pcmplx[imu] + w3j[iwig] * v1v * v2cv
-                               iwig = iwig + 1
-                    preal = np.zeros(2*lam+1, dtype=np.float64)
-                    for imu in range(2*lam+1):
-                        for im1 in range(2*lam+1):
-                             preal[imu] = preal[imu] + np.real(c2r[imu,im1] * pcmplx[im1])
-                        inner = inner + preal[imu]**2
-                        ptemp[ifeat,imu] = preal[imu]
-                    ifeat = ifeat + 1
-        normfact = np.sqrt(inner)
+        for il in range(llmax):
+            l1 = llvec[il,0]
+            l2 = llvec[il,1]
+            t = 0j
+            for imu in range(nmu):
+                t += _pair_sum(W, il, imu, imu, l1, l2, lam, A1, A2)
+                for imu2 in range(nmu):
+                    if G[imu,imu2] != 0.0:
+                        t += G[imu,imu2] * _pair_sum(W, il, imu, imu2, l1, l2, lam, B1, B2)
+            inner += 0.5 * t.real
+        if inner <= 0.0:
+            normfact = 0.0
+        else:
+            normfact = 1 / np.sqrt(inner)
+        pc = np.zeros(nmu, dtype=np.complex128)
         for n in range(nfps):
-            ifps = vfps[n]
-            for imu in range(2*lam+1):
-                p[iat,imu,n] = ptemp[ifps,imu] / normfact
+            f = vfps[n]
+            il = f % llmax
+            n2 = (f // llmax) % nrad2
+            n1 = f // (llmax * nrad2)
+            l1 = llvec[il,0]
+            l2 = llvec[il,1]
+            pc[:] = 0.0
+            for imu in range(nmu):
+                for im1 in range(2*l1+1):
+                    im2 = im1-l1-(imu-lam)+l2
+                    if im2 >= 0 and im2 <= 2*l2:
+                        pc[imu] += W[il,imu,im1] * v1[iat,n1,l1,im1] * np.conj(v2[iat,n2,l2,im2])
+            for imu in range(nmu):
+                s = 0.0
+                for k in range(nmu):
+                    s += (c2r[imu,k] * pc[k]).real
+                p[iat,imu,n] = s * normfact
     return p
 
 @njit(parallel=True, fastmath = True)
