@@ -18,7 +18,6 @@ is identical for every radial function (slower, meant for testing).
 """
 
 import os
-import time
 
 import numpy as np
 from scipy.linalg.blas import dgemm
@@ -114,11 +113,7 @@ def _view(name, shape):
 
 
 def hessian_contribution(over, psivec, layout, symbols, bmat):
-    """Add psivec^T @ over @ psivec to bmat (C-contiguous float64, shape (K, K))
-
-    Returns the wall times in seconds of "step1" (T = over @ psivec) and "step2"
-    (bmat += psivec^T @ T).
-    """
+    """Add psivec^T @ over @ psivec to bmat (C-contiguous float64, shape (K, K))"""
     N_df, K = psivec.shape
     if bmat.shape != (K, K) or bmat.dtype != np.float64 or not bmat.flags.c_contiguous:
         raise ValueError(f"bmat must be a C-contiguous float64 array of shape ({K}, {K})")
@@ -161,7 +156,6 @@ def hessian_contribution(over, psivec, layout, symbols, bmat):
         raise LayoutMismatch("no channel with non-zero width in this configuration")
     maxrows = max(rows[key].shape[1] for key in tables)
     gather = _flat("gather", maxrows * max(N_df, kt))
-    t1 = time.time()
 
     # step 1: T[:, cols_c] = over[rows_c, :]^T @ P   (over is symmetric)
     T = _view("T", (N_df, kt)) # C-contiguous float64 array of shape (N_df, kt)
@@ -174,7 +168,6 @@ def hessian_contribution(over, psivec, layout, symbols, bmat):
             Sg = gather[: nr * N_df].reshape(nr, N_df)
             np.take(over, r[n], axis=0, out=Sg, mode="clip")
             np.matmul(Sg.T, P, out=T[:, c0 + n * M : c0 + (n + 1) * M]) # over[rows_c, :]^T @ P
-    t2 = time.time()
 
     # step 2: bmat[cols_c, :] += P^T @ T[rows_c, :] (T only has columns for the species present)
     # If all species are present, the product is added into bmat directly.
@@ -196,6 +189,4 @@ def hessian_contribution(over, psivec, layout, symbols, bmat):
             else: # some species missing, add into the columns of each present species
                 for t_first, a, w in tcols.values(): # a: first column of the species in psi, w: number of columns of the species
                     bmat[out_rows, a : a + w] += P.T @ Tg[:, t_first : t_first + w]
-    t3 = time.time()
 
-    return {"step1": t2 - t1, "step2": t3 - t2}
