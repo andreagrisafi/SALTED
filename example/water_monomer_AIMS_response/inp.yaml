@@ -23,7 +23,7 @@ prediction:
   predname: prediction
   predict_data: ./aims_pred_data
 
-# atomic environment parameters (for rascaline)
+# descriptor parameters
 descriptor:
   rep1:
     type: rho

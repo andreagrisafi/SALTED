@@ -1,13 +1,13 @@
 import os
+import os.path as osp
 import sys
 import time
-import os.path as osp
 
 import numpy as np
 from scipy import sparse
 
-from salted.constants import bohr2angs
 from salted import basis
+from salted.constants import bohr2angs
 from salted.sys_utils import (
     ParseConfig,
     check_MPI_tasks_count,
@@ -16,6 +16,7 @@ from salted.sys_utils import (
     format_index_ranges,
     get_atom_idx,
     init_property_file,
+    load_overlap,
     read_system,
 )
 
@@ -34,7 +35,20 @@ def build():
     Menv = inp.gpr.Menv
     
     if qmcode=='cp2k':
-        from salted.cp2k.utils import init_moments, compute_charge_and_dipole, compute_polarizability, compute_hartree_energy, get_basis_set_info_numba, read_local_pseudo, build_real_grid, build_gvec, build_gcutoff, gto_rec_prim, build_contraction_matrix, get_rho_n
+        from salted.cp2k.utils import (
+            build_contraction_matrix,
+            build_gcutoff,
+            build_gvec,
+            build_real_grid,
+            compute_charge_and_dipole,
+            compute_hartree_energy,
+            compute_polarizability,
+            get_basis_set_info_numba,
+            get_rho_n,
+            gto_rec_prim,
+            init_moments,
+            read_local_pseudo,
+        )
 
     comm, size, rank, parallel = detect_mpi()
 
@@ -109,7 +123,7 @@ def build():
     variance = 0
     for iconf in testrange:
 
-        overl = np.load(osp.join(
+        overl = load_overlap(osp.join(
             saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
         ))
 

@@ -1,15 +1,42 @@
-import numpy as np
-import time
-import sys
-import os
 import glob
+import os
 import os.path as osp
+import sys
+import time
+
+import numpy as np
+from mpi4py import MPI
 
 from salted.constants import bohr2angs
-from salted.sys_utils import ParseConfig, read_system, get_atom_idx, check_MPI_tasks_count, detect_mpi, distribute_jobs
-from salted.cp2k.utils import gto_rec, gto_rec_prim, gto_rec_g0, gto_rec_ewald, build_gvec, get_basis_set_info_numba, read_local_pseudo, setup_pyscf_species, setup_pyscf_ewald
-from salted.cp2k.utils import build_contraction_matrix, get_w_prim, get_rho_n, compute_hartree_energy, build_gcutoff, pair_cutoffs, overlap_identity, overlap_coulomb_rec, overlap_coulomb_real
-from mpi4py import MPI
+from salted.cp2k.utils import (
+    build_contraction_matrix,
+    build_gcutoff,
+    build_gvec,
+    compute_hartree_energy,
+    get_basis_set_info_numba,
+    get_rho_n,
+    get_w_prim,
+    gto_rec,
+    gto_rec_ewald,
+    gto_rec_g0,
+    gto_rec_prim,
+    overlap_coulomb_real,
+    overlap_coulomb_rec,
+    overlap_identity,
+    pair_cutoffs,
+    read_local_pseudo,
+    setup_pyscf_ewald,
+    setup_pyscf_species,
+)
+from salted.sys_utils import (
+    ParseConfig,
+    check_MPI_tasks_count,
+    detect_mpi,
+    distribute_jobs,
+    get_atom_idx,
+    read_system,
+    save_overlap,
+)
 
 inp = ParseConfig().parse_input()
 df_metric = inp.qm.dfmetric
@@ -102,7 +129,7 @@ for iconf in conf_range:
     dr = np.array([dx, dy, dz])
 
     if rho_KS.size != npoints:
-        print(f"ERROR: inconsistent number of grid points!")
+        print("ERROR: inconsistent number of grid points!")
         sys.exit(0)
         
     rho_KS = rho_KS.reshape((nx, ny, nz))
@@ -179,7 +206,7 @@ for iconf in conf_range:
 
     # Save data
     np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), c)
-    np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"), S)
+    save_overlap(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"), S) # lower triangle only
 
     # Hartree energy calculation
     time_c = time.time()
