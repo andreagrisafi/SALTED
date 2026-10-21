@@ -868,6 +868,39 @@ class ParseConfig:
                     ),  # number of features to keep
                 },
             },
+            "lr": {  # long-range density fitting, CP2K only
+                "recipe": (
+                    False,
+                    "minimal",
+                    str,
+                    lambda inp, val: val in ("minimal", "accurate"),
+                ),  # LR basis recipe
+                "lmax": (
+                    False,
+                    None,
+                    (dict, type(None)),
+                    check_lr_lmax,
+                ),  # per-species override of the recipe L_max, e.g. {O: 2}
+                "nrad": (
+                    False,
+                    None,
+                    (dict, type(None)),
+                    check_lr_nrad,
+                ),  # per-species override of the recipe widths per l, e.g. {O: [3, 2, 1]} or {O: 2}
+                "dfbasis": (
+                    False,
+                    None,
+                    (str, type(None)),
+                    check_lr_dfbasis,
+                ),  # LR basis name (default: derived from the recipe)
+                "from_density": (
+                    False,
+                    None,
+                    (str, type(None)),
+                    check_optional_path_exists,
+                ),  # folder of stored LR densities to fit instead of the cubes
+                "write_cube": (False, False, bool, None),  # also write the stored LR densities as cube files
+            },
             "gpr": {
                 "z": (False, 2.0, float, lambda inp, val: val > 0),  # kernel exponent
                 "Menv": (
@@ -1068,6 +1101,44 @@ def check_optional_path_exists(_, path: str | None) -> bool:
 
 
 check_optional_path_exists.parse_error_msg = "Path (value) does not exist."
+
+
+def check_lr_lmax(inp: dict, val: dict | None) -> bool:
+    """lr.lmax: None, or {species: L_max} with species of system.species and integer L_max >= 0"""
+    if val is None:
+        return True
+    return all(spe in inp["system"]["species"] for spe in val) and all(
+        isinstance(v, int) and not isinstance(v, bool) and v >= 0 for v in val.values()
+    )
+
+
+check_lr_lmax.parse_error_msg = "Expected {species: L_max} with species from system.species and integer L_max >= 0."
+
+
+def check_lr_nrad(inp: dict, val: dict | None) -> bool:
+    """lr.nrad: None, or {species: n} / {species: [n_0, n_1, ...]} with integer numbers of widths >= 1"""
+    if val is None:
+        return True
+
+    def ok(n):
+        return isinstance(n, int) and not isinstance(n, bool) and n >= 1
+
+    return all(spe in inp["system"]["species"] for spe in val) and all(
+        ok(v) or (isinstance(v, list) and len(v) > 0 and all(ok(n) for n in v)) for v in val.values()
+    )
+
+
+check_lr_nrad.parse_error_msg = (
+    "Expected {species: n} or {species: [n_0, n_1, ...]} with species from system.species and integers >= 1."
+)
+
+
+def check_lr_dfbasis(inp: dict, val: str | None) -> bool:
+    """lr.dfbasis: the LR basis files are written to basis/, so the name must differ from qm.dfbasis"""
+    return val is None or val != inp["qm"]["dfbasis"]
+
+
+check_lr_dfbasis.parse_error_msg = "The LR basis name must differ from qm.dfbasis (its files are written to basis/)."
 
 
 def check_conditions_alpha_only(inp: dict, val: bool) -> bool:

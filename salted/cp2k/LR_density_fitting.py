@@ -1,25 +1,29 @@
 """Long-range (LR) density fitting of CP2K electron densities
 
 Same workflow as salted.cp2k.density_fitting, but only the long-range part of the density is
-fitted: the density is smoothed with a normalised Gaussian of width sigma,
+fitted: the density is smoothed with a normalised Gaussian of width sigma = 1 A (SIGMA_LR),
 
     rho_LR(G) = exp(-sigma^2 G^2 / 2) rho(G),
 
 so that U_LR = 1/2 (rho_tot,LR | rho_tot,LR) is the Ewald long-range energy with kernel
 erf(r / 2 sigma) / r. The fit is done fully in reciprocal space on a small basis of
 primitive Gaussians whose widths lie in the band [sigma, sqrt(sigma^2 + s_max^2)] of the
-CP2K RI basis. Two basis recipes:
+CP2K RI basis (qm.dfbasis). Two basis recipes (lr.recipe in inp.yaml):
+    minimal (default): L <= 1 for every species, 3 widths for l = 0 and 1 for l = 1
+    accurate:          L <= 2 with 3/2/1 widths, except H, which keeps L <= 1 with 3/1
 Differences with density_fitting.py are marked with "LR:".
 
 Usage (conf_start and conf_end are 0-based, as in density_fitting.py):
 
-    python -m salted.cp2k.LR_density_fitting conf_start conf_end [--sigma 1.0 ...]
+    python -m salted.cp2k.LR_density_fitting conf_start conf_end [--cond]
 
-The LR settings are command-line options (-h). Outputs go to
-<saltedpath>/LR_<LR basis name>/ (coefficients/, overlaps/, lr_density/, metrics/,
-lr_metrics.dat), so the coefficients/ and overlaps/ of the CP2K density fitting are left
-untouched. The LR basis is written to <saltedpath>/basis/ and registered in
-<saltedpath>/basis/lr_basis.yaml.
+with --cond to also compute the condition number of the metric matrix (an eigendecomposition).
+The LR settings are in the lr section of inp.yaml. The outputs, in <saltedpath>, are named so
+that those of density_fitting.py are left untouched:
+    coefficients_lr/coefficients_conf<i>.npy, overlaps_lr/overlap_conf<i>.npy
+    density_lr/density_conf<i>.npz      LR density on a coarse grid (input for lr.from_density)
+    metrics_lr/metrics_conf<i>.json     error metrics, with a table in metrics_lr/summary.dat
+The LR basis is written to <saltedpath>/basis/ and registered in <saltedpath>/basis/lr_basis.yaml.
 """
 
 import argparse
@@ -53,35 +57,33 @@ from salted.sys_utils import (
 )
 
 HARTREE2MEV = 27211.386245988
+SIGMA_LR = 1.0 # LR filter width (angstrom)
 
-def lr_recipe(spe, accurate=False):
-    # L_max and number of widths per l of the LR basis recipes:
-    #   minimal (default):      lmax=1 for every species, 3 widths for l=0 and 1 for l=1
-    #   accurate (--accurate):  lmax=2 with 3/2/1 widths, except H, which keeps lmax = 1 with 3/1
+def lr_recipe(spe, recipe="minimal"):
+    # L_max and number of widths per l of the LR basis recipes (lr.recipe):
+    #   minimal (default):  lmax=1 for every species, 3 widths for l=0 and 1 for l=1
+    #   accurate:           lmax=2 with 3/2/1 widths, except H, which keeps lmax = 1 with 3/1
     # The l=0 shell needs 3 widths (one of them is the core-matched one), more l>1 widths add little
-    if accurate and spe != "H":
+    if recipe == "accurate" and spe != "H":
         return 2, [3, 2, 1]
     return 1, [3, 1]
 
 
-def lr_basis_name(sigma, accurate, lmax, nrad, band, custom):
-    """Name of the LR basis: LR-minimal-s<sigma> / LR-accurate-s<sigma> for the recipes, else a name that lists
-    the customised content (e.g. LR-s1.00-H1n31-O2n321), so that different custom bases do not overwrite each other"""
+def lr_basis_name(recipe, lmax, nrad, custom):
+    """Name of the LR basis: LR-minimal / LR-accurate for the recipes, else a name that lists the customised
+    content (e.g. LR-H1n31-O2n321), so that different custom bases do not overwrite each other"""
     if not custom:
-        return f"LR-{'accurate' if accurate else 'minimal'}-s{sigma:.2f}"
-    parts = [f"{spe}{lmax[spe]}n{''.join(map(str, nrad[spe]))}" for spe in sorted(lmax)]
-    if band != (1.0, 1.0):
-        parts.append(f"b{band[0]:g}x{band[1]:g}")
-    return f"LR-s{sigma:.2f}-" + "-".join(parts)
+        return f"LR-{recipe}"
+    return "LR-" + "-".join(f"{spe}{lmax[spe]}n{''.join(map(str, nrad[spe]))}" for spe in sorted(lmax))
 
 
-def lr_basis_widths(lmax, nrad, sigma, rloc, smax, c_lo=1.0, c_hi=1.0):
+def lr_basis_widths(lmax, nrad, sigma, rloc, smax):
     """Widths w (bohr) of the LR primitives r^l exp(-r^2 / 2 w^2) of one species, per l,
     from tight to diffuse."""
     widths = {}
     for l in range(lmax + 1):
-        lo = np.sqrt(sigma**2 + rloc**2) if l == 0 else c_lo * sigma # sqrt(sigma^2 + r_loc^2) for l = 0 to match the smoothed core charge, else c_lo * sigma
-        hi = max(c_hi * np.sqrt(sigma**2 + smax.get(l, max(smax.values())) ** 2), 1.05 * lo) # c_hi * sqrt(sigma^2 + s_max,l^2) or 1.05 * lo if the band is too narrow
+        lo = np.sqrt(sigma**2 + rloc**2) if l == 0 else sigma # sqrt(sigma^2 + r_loc^2) for l = 0 to match the smoothed core charge, else sigma
+        hi = max(np.sqrt(sigma**2 + smax.get(l, max(smax.values())) ** 2), 1.05 * lo) # sqrt(sigma^2 + s_max,l^2) or 1.05 * lo if the band is too narrow
         if nrad[l] == 1:
             widths[l] = np.array([lo if l == 0 else np.sqrt(lo * hi)]) # tightest for l = 0, else geometric mean of the band
         else:
@@ -229,33 +231,6 @@ def write_cube(path, title, rho, cell_lengths, origin, valences, pseudocharges, 
                 print(" ".join(f"{x:13.5E}" for x in row[i0:i0 + 6]), file=cubef)
 
 
-def parse_species_option(text):
-    # "H:1,O:2" -> {"H": 1, "O": 2}, per-l values separated by "/" ("O:2/2/1")
-    out = {}
-    for item in filter(None, text.split(",")):
-        spe, _, val = item.partition(":")
-        out[spe.strip()] = [int(v) for v in val.split("/")]
-    return out
-
-
-def get_parser():
-    parser = argparse.ArgumentParser(description="Long-range density fitting of CP2K densities (prototype)")
-    parser.add_argument("conf_start", type=int, help="first configuration, 0-based")
-    parser.add_argument("conf_end", type=int, help="last configuration, 0-based, included")
-    parser.add_argument("--sigma", type=float, default=1.0, help="LR filter width in angstrom (default 1.0)")
-    parser.add_argument("--accurate", action="store_true", help="accurate basis recipe: L <= 2 with 3/2/1 widths, H L <= 1 with 3/1 (default: minimal, L <= 1 with 3/1 for every species)")
-    parser.add_argument("--lmax", default="", help="override L_max per species, e.g. H:1,O:2,Pt:2")
-    parser.add_argument("--nrad", default="", help="override the widths per l, e.g. H:3/1,O:3/2/1 (one value applies to every l)")
-    parser.add_argument("--band", default="1.0,1.0", help="c_lo,c_hi factors of the width band (default 1.0,1.0)")
-    parser.add_argument("--ridge", type=float, default=0.0, help="ridge added to S, relative to mean(diag S) (default 0)")
-    parser.add_argument("--basis-name", default=None, help="LR basis name (default LR-minimal-s<sigma> / LR-accurate-s<sigma>, or a name listing the customised content)")
-    parser.add_argument("--from-lr-density", default=None, help="folder of stored LR densities (lr_conf<i>.npz) to fit instead of the cubes")
-    parser.add_argument("--outdir", default=None, help="output folder (default <saltedpath>/LR_<basis name>)")
-    parser.add_argument("--write-cube", action="store_true", help="also write the LR density on the coarse grid as a cube file")
-    parser.add_argument("--no-cond", action="store_true", help="skip the condition number of S (an eigendecomposition)")
-    return parser
-
-
 def write_summary(path, metrics):
     # Table of the per-configuration metrics
     with open(path, "w") as f:
@@ -268,7 +243,12 @@ def write_summary(path, metrics):
 
 if __name__ == "__main__":
 
-    args = get_parser().parse_args() # LR: parsed first, so that -h works without an inp.yaml
+    # LR: conf_start and conf_end as in density_fitting.py, plus --cond
+    parser = argparse.ArgumentParser(description="Long-range density fitting of CP2K densities")
+    parser.add_argument("conf_start", type=int, help="first configuration, 0-based")
+    parser.add_argument("conf_end", type=int, help="last configuration, 0-based, included")
+    parser.add_argument("--cond", action="store_true", help="also compute the condition number of S (an eigendecomposition)")
+    args = parser.parse_args()
 
     inp = ParseConfig().parse_input()
     df_metric = inp.qm.dfmetric
@@ -280,30 +260,34 @@ if __name__ == "__main__":
 
     if rank==0: print("Parallel run over", size, "tasks",flush=True)
 
-    # LR: settings and output folders
-    sigma_lr = args.sigma / bohr2angs # LR filter width (bohr), default 1.0 A
+    # LR: filter width and G-vector truncation
+    sigma_lr = SIGMA_LR / bohr2angs # LR filter width (bohr)
     gmax_lr = 2.0 * np.pi / sigma_lr # G-vector truncation, filter exp(-2 pi^2) ~ 3e-9
-    # LR: basis recipe (minimal or accurate) with the per-species overrides of --lmax / --nrad
-    lmax_opt, nrad_opt = parse_species_option(args.lmax), parse_species_option(args.nrad) # per-species overrides
-    c_lo, c_hi = (float(x) for x in args.band.split(",")) # to vary the band width (default 1.0,1.0)
+    # LR: basis recipe (lr.recipe) with the per-species overrides of lr.lmax / lr.nrad
+    lmax_opt = inp.lr.lmax.to_dict() if inp.lr.lmax is not None else {}
+    nrad_opt = inp.lr.nrad.to_dict() if inp.lr.nrad is not None else {}
     lmax_lr, nrad_lr = {}, {}
     for spe in inp.system.species:
-        lmax_spe, nrad = lr_recipe(spe, args.accurate)
-        if spe in lmax_opt: # --lmax override: the recipe widths are truncated, or extended with their last value
-            lmax_spe = lmax_opt[spe][0]
+        lmax_spe, nrad = lr_recipe(spe, inp.lr.recipe)
+        if spe in lmax_opt: # lr.lmax override: the recipe widths are truncated, or extended with their last value
+            lmax_spe = lmax_opt[spe]
             nrad = (nrad + [nrad[-1]] * lmax_spe)[:lmax_spe + 1]
-        if spe in nrad_opt: # --nrad override: one value for every l, or one per l
-            nrad = nrad_opt[spe] * (lmax_spe + 1) if len(nrad_opt[spe]) == 1 else nrad_opt[spe]
+        if spe in nrad_opt: # lr.nrad override: one value for every l, or a list with one value per l
+            nrad = [nrad_opt[spe]] * (lmax_spe + 1) if isinstance(nrad_opt[spe], int) else nrad_opt[spe]
         if len(nrad) != lmax_spe + 1:
-            raise ValueError(f"--nrad for {spe} needs 1 or {lmax_spe + 1} values")
+            raise ValueError(f"lr.nrad of {spe} needs one value, or a list of {lmax_spe + 1} values (l = 0 ... {lmax_spe})")
         lmax_lr[spe], nrad_lr[spe] = lmax_spe, nrad
-    custom = bool(lmax_opt or nrad_opt or (c_lo, c_hi) != (1.0, 1.0))
-    dfbasis_lr = args.basis_name or lr_basis_name(args.sigma, args.accurate, lmax_lr, nrad_lr, (c_lo, c_hi), custom)
-    lrpath = args.outdir or osp.join(inp.salted.saltedpath, f"LR_{dfbasis_lr}")
+    dfbasis_lr = inp.lr.dfbasis or lr_basis_name(inp.lr.recipe, lmax_lr, nrad_lr, custom=bool(lmax_opt or nrad_opt))
+
+    # LR: output folders
+    coefpath = osp.join(inp.salted.saltedpath, "coefficients_lr")
+    overpath = osp.join(inp.salted.saltedpath, "overlaps_lr")
+    denspath = osp.join(inp.salted.saltedpath, "density_lr")
+    metrpath = osp.join(inp.salted.saltedpath, "metrics_lr")
 
     if rank==0:
 
-        for dirpath in [lrpath] + [osp.join(lrpath, sub) for sub in ("coefficients", "overlaps", "lr_density", "metrics")]:
+        for dirpath in [coefpath, overpath, metrpath] + ([denspath] if inp.lr.from_density is None else []):
             if not os.path.exists(dirpath):
                 os.mkdir(dirpath)
 
@@ -331,13 +315,13 @@ if __name__ == "__main__":
         smax = {} # most diffuse CP2K width at each l
         for l in range(lmax_cp2k[spe]+1):
             smax[l] = 1.0 / np.sqrt(2.0 * np.loadtxt(osp.join(bdir, f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat")).min()) # smax = 1 / sqrt(2 alpha_min)
-        widths[spe] = lr_basis_widths(lmax_lr[spe], nrad_lr[spe], sigma_lr, rloc[spe], smax, c_lo, c_hi)
+        widths[spe] = lr_basis_widths(lmax_lr[spe], nrad_lr[spe], sigma_lr, rloc[spe], smax)
     lmax = {spe: max(widths[spe]) for spe in species}
     nmax = {(spe, l): len(widths[spe][l]) for spe in species for l in widths[spe]}
 
     if rank==0:
         write_lr_basis(bdir, dfbasis_lr, widths, osp.join(bdir, "lr_basis.yaml"))
-        print(f"LR basis {dfbasis_lr}: sigma = {args.sigma} A, G_max = {gmax_lr:.3f} bohr^-1, metric {df_metric}, ridge {args.ridge:g}", flush=True)
+        print(f"LR basis {dfbasis_lr}: sigma = {SIGMA_LR} A, G_max = {gmax_lr:.3f} bohr^-1, metric {df_metric}", flush=True)
         for spe in species:
             print(f"  {spe}: " + "; ".join(f"l={l}: " + ", ".join(f"{w * bohr2angs:.3f}" for w in widths[spe][l])
                                          for l in widths[spe]) + " A", flush=True)
@@ -364,7 +348,7 @@ if __name__ == "__main__":
         for spe in species:
             ncoefs += nbasis[spe]*ntype[spe]
 
-        if args.from_lr_density is None:
+        if inp.lr.from_density is None:
 
             # Read in electron density from cube files
             cubefile_pattern = os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", "*ELECTRON_DENSITY-1_0.cube")
@@ -382,24 +366,22 @@ if __name__ == "__main__":
                 npoints = nx * ny * nz
                 if inp.salted.verbose: print("Number of grid points:", npoints)
                 # LR: in vacuum regions CP2K writes 3-digit exponents and negative values fill their 13-character field,
-                # so they run into the previous value ("0.53102E-017-0.16205E-016"); mantissas are always 0.xxxxx and
+                # so they run into the previous value ("0.53102E-017-0.16205E-016"), mantissas are always 0.xxxxx and
                 # exponents never contain "-0.", so a space before each "-0." separates them
                 rho_KS = np.fromstring(cubefile.read().replace("-0.", " -0."), dtype=np.float64, sep=' ')
-            sigma_done = 0.0 # LR: no filter applied yet
 
         else:
 
-            # LR: read a stored LR density (coarse grid, already filtered with sigma_done <= sigma_lr)
-            lrdata = np.load(osp.join(args.from_lr_density, f"lr_conf{iconf}.npz"))
+            # LR: read a stored LR density (coarse grid, already filtered), written by a previous run in density_lr/
+            lrdata = np.load(osp.join(inp.lr.from_density, f"density_conf{iconf}.npz"))
             rho_KS = lrdata["rho_lr"]
             nx, ny, nz = rho_KS.shape
             dx, dy, dz = lrdata["cell_lengths"] / np.array([nx, ny, nz])
             origin = lrdata["origin"]
             npoints = nx * ny * nz
-            sigma_done = float(lrdata["sigma"])
-            if sigma_lr < sigma_done - 1e-12:
-                print(f"ERROR: stored LR density has sigma = {sigma_done * bohr2angs} A > {args.sigma} A")
-                sys.exit(0)
+            if abs(float(lrdata["sigma"]) - sigma_lr) > 1e-10:
+                raise ValueError(f"stored LR density of conf {iconf+1} filtered with sigma = {float(lrdata['sigma']) * bohr2angs} A, "
+                                 f"not {SIGMA_LR} A")
 
         dr = np.array([dx, dy, dz])
 
@@ -429,18 +411,20 @@ if __name__ == "__main__":
         nG = np.searchsorted(knorm_vec, gmax_lr).astype(np.int64) # Index of the last G-vector below the cutoff
         Gvec_half = np.ascontiguousarray(Gvec_half[:nG])
         knorm_vec = knorm_vec[:nG]
-        rho_KS_rec = rho_KS_rec[:nG] * np.exp(-1j * np.dot(Gvec_half, origin)) * np.exp(-0.5 * (sigma_lr**2 - sigma_done**2) * knorm_vec**2) # Apply the Gaussian filter to the density
+        rho_KS_rec = rho_KS_rec[:nG] * np.exp(-1j * np.dot(Gvec_half, origin))
+        if inp.lr.from_density is None:
+            rho_KS_rec *= np.exp(-0.5 * sigma_lr**2 * knorm_vec**2) # Apply the Gaussian filter to the density (stored densities are already filtered)
         if inp.salted.verbose: print("Number of LR G-vectors:", nG)
 
         # LR: store the LR density on the coarsest exact grid
-        if args.from_lr_density is None:
+        if inp.lr.from_density is None:
             nside_lr = lr_grid_size(Gvec_half, cell_lengths)
             rho_lr = rec_to_grid(rho_KS_rec, Gvec_half, cell_lengths, origin, nside_lr, rho_g0=n_elec_grid)
-            np.savez_compressed(osp.join(lrpath, "lr_density", f"lr_conf{iconf}.npz"),
+            np.savez_compressed(osp.join(denspath, f"density_conf{iconf}.npz"),
                                 rho_lr=rho_lr, cell_lengths=cell_lengths, origin=origin, sigma=sigma_lr)
-            if args.write_cube:
+            if inp.lr.write_cube:
                 valences = [atomic_numbers[spe] for spe in atomic_symbols[iconf]]
-                write_cube(osp.join(lrpath, "lr_density", f"lr_conf{iconf}.cube"), f"LR electron density, sigma = {args.sigma} A",
+                write_cube(osp.join(denspath, f"density_conf{iconf}.cube"), f"LR electron density, sigma = {SIGMA_LR} A",
                            rho_lr, cell_lengths, origin, valences, [pseudocharge[spe] for spe in atomic_symbols[iconf]], atomic_coords[iconf])
             if inp.salted.verbose: print("LR density stored on a grid of", nside_lr, "points")
 
@@ -465,8 +449,7 @@ if __name__ == "__main__":
         # Solve density-fitting linear system
         time_c = time.time()
         q = 4.0 * np.pi * pwc_g0
-        S_solve = S + args.ridge * np.mean(np.diag(S)) * np.eye(ncoefs) if args.ridge > 0 else S # LR: optional ridge
-        Sinv = np.linalg.solve(S_solve, np.column_stack([w, q]))
+        Sinv = np.linalg.solve(S, np.column_stack([w, q]))
         Sinv_w, Sinv_q = Sinv[:, 0], Sinv[:, 1]
         lagmult = (np.dot(q, Sinv_w) - n_elec) / np.dot(q, Sinv_q) # Lagrange multiplier
         c = Sinv_w - lagmult * Sinv_q # Fitted coefficients
@@ -474,15 +457,15 @@ if __name__ == "__main__":
         if inp.salted.verbose: print("Time to solve linear system:", time.time()-time_c)
 
         # Save data
-        np.save(os.path.join(lrpath, "coefficients", f"coefficients_conf{iconf}.npy"), c)
-        save_overlap(os.path.join(lrpath, "overlaps", f"overlap_conf{iconf}.npy"), S) # lower triangle only
+        np.save(os.path.join(coefpath, f"coefficients_conf{iconf}.npy"), c)
+        save_overlap(os.path.join(overpath, f"overlap_conf{iconf}.npy"), S) # lower triangle only
 
         # LR: fitted density in reciprocal space, for the error metrics
         rho_fit = rho_fit_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, c)
         delta_rec = rho_KS_rec - rho_fit
 
         # Hartree energy calculation
-        metrics = {"conf": int(iconf), "natoms": int(natoms[iconf]), "ncoefs": int(ncoefs), "nG": int(nG),
+        metrics = {"conf": int(iconf), "dfbasis_lr": dfbasis_lr, "natoms": int(natoms[iconf]), "ncoefs": int(ncoefs), "nG": int(nG),
                    "n_elec": float(n_elec), "n_elec_grid": float(n_elec_grid), "lagmult": float(lagmult)}
         time_c = time.time()
         if df_metric == "coulomb":
@@ -517,31 +500,32 @@ if __name__ == "__main__":
         nside_mae = lr_grid_size(Gvec_half, cell_lengths, spacing=0.25 * sigma_lr)
         delta = rec_to_grid(delta_rec, Gvec_half, cell_lengths, origin, nside_mae, rho_g0=0.0)
         mae = 100.0 * np.sum(np.abs(delta)) * volume / np.prod(nside_mae) / n_elec
-        # LR: condition number of the normalised S
-        if args.no_cond:
-            cond = float("nan")
-        else:
+        # LR: condition number of the normalised S (only with --cond)
+        if args.cond:
             d = 1.0 / np.sqrt(np.diag(S))
             eigs = np.linalg.eigvalsh(d[:, np.newaxis] * S * d[np.newaxis, :])
             cond = eigs[-1] / eigs[0] if eigs[0] > 0 else float("inf")
+        else:
+            cond = float("nan")
         print(f"conf {iconf+1}: MAE of the LR density = {mae:.4f} %, cond(S) = {cond:.2e}, ncoefs = {ncoefs}, "
               f"|c| = {np.linalg.norm(c):.3e}, max|c| = {np.abs(c).max():.3e}", flush=True)
-        if cond > 1e14 and args.ridge == 0.0:
+        if cond > 1e14:
             # LR: e.g. metal slabs with large bases: more functions than significant LR Fourier components
             print(f"WARNING conf {iconf+1}: S is numerically singular (cond = {cond:.1e}): the density and energy are fitted, "
-                  "but the coefficients are not uniquely defined; use --ridge or a smaller basis", flush=True)
+                  "but the coefficients are not uniquely defined, consider a smaller LR basis", flush=True)
         if inp.salted.verbose: print('Time to compute the errors:', time.time() - time_c, flush=True)
         metrics.update({"mae_percent": float(mae), "cond_S": float(cond), "norm_c": float(np.linalg.norm(c)),
                         "max_abs_c": float(np.abs(c).max()), "time": time.time() - time_conf})
-        with open(osp.join(lrpath, "metrics", f"conf{iconf}.json"), "w") as f:
+        with open(osp.join(metrpath, f"metrics_conf{iconf}.json"), "w") as f:
             json.dump(metrics, f, indent=1)
 
-    # LR: table of the metrics of all configurations
+    # LR: table of the metrics of all the configurations fitted with this LR basis
     if parallel:
         comm.Barrier()
     if rank==0 and df_metric == "coulomb":
-        write_summary(osp.join(lrpath, "lr_metrics.dat"),
-                      [json.load(open(osp.join(lrpath, "metrics", f"conf{i}.json"))) for i in conf_list])
+        metrics_all = [json.load(open(path)) for path in glob.glob(osp.join(metrpath, "metrics_conf*.json"))]
+        write_summary(osp.join(metrpath, "summary.dat"),
+                      sorted((m for m in metrics_all if m["dfbasis_lr"] == dfbasis_lr), key=lambda m: m["conf"]))
 
     time_end = time.time()
     if inp.salted.verbose: print("Total density fitting time:", time_end-time_start, flush=True)

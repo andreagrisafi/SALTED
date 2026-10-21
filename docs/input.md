@@ -94,6 +94,19 @@ Remember to set `inp.predict` if one wants to predict densities.
     export SALTED_NUMBA_CACHE_BYTES=$(( 512*1024*1024 / 16 / 2 ))  # 512 MiB L3, 16 ranks/node
     ```
 
+### Long-range density fitting `inp.lr` (experimental)
+
+Settings of `salted.cp2k.LR_density_fitting` (only for CP2K), which fits the long-range part of the density, smoothed by a Gaussian of width 1 Å, on a small basis of Gaussians derived from `qm.dfbasis`. The other SALTED steps ignore this section. The outputs go to `coefficients_lr/`, `overlaps_lr/`, `density_lr/` and `metrics_lr/` in `saltedpath`.
+
+| var name | type | default | usage |
+| -:| :-: | :-: | :- |
+| `recipe` | `Literal["minimal"] \| Literal["accurate"]` | `"minimal"` | LR basis recipe. `minimal`: `L <= 1` for every species, 3 widths for `l = 0` and 1 for `l = 1`. `accurate`: `L <= 2` with 3/2/1 widths, except H, which keeps `L <= 1` with 3/1. |
+| `lmax` | `dict[str, int]` | Optional | Per-species override of the recipe `L_max`, e.g. `{O: 2}`. The recipe numbers of widths are truncated, or extended with their last value. |
+| `nrad` | `dict[str, int \| list[int]]` | Optional | Per-species override of the recipe numbers of widths: one value for every `l`, or one per `l`, e.g. `{O: [3, 2, 1]}`. |
+| `dfbasis` | `str` | Optional | Name of the LR basis, written to `saltedpath/basis/` and registered in `saltedpath/basis/lr_basis.yaml`. Default `LR-minimal` / `LR-accurate`, or a name listing the content when `lmax` or `nrad` is set (e.g. `LR-H1n31-O2n321`). Must differ from `qm.dfbasis`. |
+| `from_density` | `str` | Optional | Folder of stored LR densities (`density_conf<i>.npz`, written to `density_lr/` by a previous run) to fit instead of the cube files, e.g. to compare LR bases without reading the cubes again. |
+| `write_cube` | `bool` | `False` | Also write the stored LR densities as cube files. |
+
 ---
 
 ## API

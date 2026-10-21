@@ -114,3 +114,55 @@ def test_dfbasis_file_nonexistent_path_raises(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(Exception):
         ParseConfig().parse_input()
+
+
+def test_lr_defaults(tmp_path, monkeypatch):
+    write_inp(tmp_path, MINIMAL_INP)
+    monkeypatch.chdir(tmp_path)
+    inp = ParseConfig().parse_input()
+    assert inp.lr.recipe == "minimal"
+    assert inp.lr.lmax is None and inp.lr.nrad is None and inp.lr.dfbasis is None
+    assert inp.lr.from_density is None and inp.lr.write_cube is False
+
+
+def test_lr_section_is_parsed(tmp_path, monkeypatch):
+    (tmp_path / "density_lr").mkdir()
+    data = yaml.safe_load(yaml.safe_dump(MINIMAL_INP))
+    data["lr"] = {
+        "recipe": "accurate",
+        "lmax": {"O": 2},
+        "nrad": {"O": [3, 2, 1], "H": 2},
+        "dfbasis": "LR-test",
+        "from_density": "./density_lr",
+        "write_cube": True,
+    }
+    write_inp(tmp_path, data)
+    monkeypatch.chdir(tmp_path)
+    inp = ParseConfig().parse_input()
+    assert inp.lr.recipe == "accurate"
+    assert inp.lr.lmax.to_dict() == {"O": 2}
+    assert inp.lr.nrad.to_dict() == {"O": [3, 2, 1], "H": 2}
+    assert inp.lr.dfbasis == "LR-test" and inp.lr.from_density == "./density_lr" and inp.lr.write_cube is True
+
+
+@pytest.mark.parametrize(
+    "key, value",
+    [
+        ("recipe", "large"),  # unknown recipe
+        ("lmax", {"C": 1}),  # species not in system.species
+        ("lmax", {"O": -1}),
+        ("nrad", {"O": 0}),
+        ("nrad", {"O": [3, 0]}),
+        ("nrad", {"O": []}),
+        ("dfbasis", "FHI-aims-light"),  # same name as qm.dfbasis
+        ("from_density", "./does_not_exist"),
+        ("sigma", 1.5),  # unknown key
+    ],
+)
+def test_lr_invalid_values_raise(tmp_path, monkeypatch, key, value):
+    data = yaml.safe_load(yaml.safe_dump(MINIMAL_INP))
+    data["lr"] = {key: value}
+    write_inp(tmp_path, data)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValueError):
+        ParseConfig().parse_input()
