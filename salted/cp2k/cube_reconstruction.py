@@ -20,7 +20,7 @@ from salted.cp2k.utils import (
 from salted.sys_utils import ParseConfig
 
 
-def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
+def build(f_list,structure,coefs,cubename,refcube,comm,size,rank,chunk=32768):
          
     inp = ParseConfig().parse_input()
 
@@ -67,6 +67,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         origin = np.asarray(lines[2].split(),dtype=float)[1:4]
         rho_qm = np.fromstring("".join(lines[6+natoms:]).replace("-0.", " -0."), dtype=np.float64, sep=' ')
         cubefile.close()
+        del lines
         if npoints!=len(rho_qm):
            print("ERROR: inconsistent number of grid points!")
            sys.exit(0)
@@ -102,24 +103,15 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
     iloc_end = min(rank*((nG_half//size)+1) + ((nG_half//size)+1), nG_half)
     nG_loc = iloc_end - iloc_start
 
-    #time_pwc = time.time()
-    partial_wave_coefs = gto_rec(lmax_numba,nmax_numba,nbasis,species,npgf, contranorm, alphas,Gvec_half[iloc_start:iloc_end], nG_loc)
-
-    #print(time.time()-time_pwc)
-
-    cos_k_coords = np.cos(np.dot(Gvec_half[iloc_start:iloc_end],coords.T))
-    sin_k_coords = np.sin(np.dot(Gvec_half[iloc_start:iloc_end],coords.T))
-
     knorm2_vec = np.sum(Gvec_half[iloc_start:iloc_end]*Gvec_half[iloc_start:iloc_end],axis=1)
 
     gauss = {}
     for spe in species:
         gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc[spe]**2))
 
-    offset = 0
-    rho_rec = np.zeros((nG_loc, natoms), dtype=np.complex128)
+    rho_rec = np.zeros((nG_loc), dtype=np.complex128)
     if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list or "total_charge" in f_list:
-        rho_n_rec = np.zeros((nG_loc, natoms), dtype=np.complex128)
+        rho_n_rec = np.zeros((nG_loc), dtype=np.complex128)
 
     if "efield_x" in f_list:
         efieldx_rec = np.zeros((nG_loc), dtype=np.complex128)
@@ -132,30 +124,43 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
 
     #time_coefs_dot = time.time()
 
-    for iat in range(natoms):
-        spe = atomic_symbols[iat]
-        rho_rec[:,iat] = -np.dot(partial_wave_coefs[spe],coefs[offset:offset + nbasis[spe]]) * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat])
-        if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list or "total_charge" in f_list:
-            rho_n_rec[:,iat] = pseudocharge[spe] * gauss[spe] * (cos_k_coords[:, iat] - 1j * sin_k_coords[:, iat]) 
-        offset += nbasis[spe]
+    # loop over chunks of local G-vectors: the partial wave coefficients of all of them, (nG_loc, nbasis) per species,
+    # would take tens of GB on large systems
+    for g0 in range(0, nG_loc, chunk):
+        g1 = min(g0 + chunk, nG_loc)
+        Gvec_chunk = Gvec_half[iloc_start+g0:iloc_start+g1]
+
+        partial_wave_coefs = gto_rec(lmax_numba,nmax_numba,nbasis,species,npgf, contranorm, alphas,Gvec_chunk, g1-g0)
+
+        offset = 0
+        for iat in range(natoms):
+            spe = atomic_symbols[iat]
+            cos_k_coords = np.cos(np.dot(Gvec_chunk,coords[iat]))
+            sin_k_coords = np.sin(np.dot(Gvec_chunk,coords[iat]))
+            rho_rec[g0:g1] += -np.dot(partial_wave_coefs[spe],coefs[offset:offset + nbasis[spe]]) * (cos_k_coords - 1j * sin_k_coords)
+            if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list or "total_charge" in f_list:
+                rho_n_rec[g0:g1] += pseudocharge[spe] * gauss[spe][g0:g1] * (cos_k_coords - 1j * sin_k_coords)
+            offset += nbasis[spe]
 
     #print(time.time()-time_coefs_dot)
 
     time_energy = time.time()
 
     if "potential" in f_list:
-        ha_rec = ((np.sum(rho_rec + rho_n_rec/(4*np.pi), axis=1))*1/knorm2_vec)
+        ha_rec = ((rho_rec + rho_n_rec/(4*np.pi))*1/knorm2_vec)
 
     if "efield_x" in f_list:
-        efieldx_rec = 1/knorm2_vec*(-1j *Gvec_half[iloc_start:iloc_end,0]*np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1))
+        efieldx_rec = 1/knorm2_vec*(-1j *Gvec_half[iloc_start:iloc_end,0]*((rho_n_rec/(4*np.pi))+rho_rec))
 
     if "efield_y" in f_list:
-        efieldy_rec = 1/knorm2_vec*(-1j *Gvec_half[iloc_start:iloc_end,1]*np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1))
+        efieldy_rec = 1/knorm2_vec*(-1j *Gvec_half[iloc_start:iloc_end,1]*((rho_n_rec/(4*np.pi))+rho_rec))
 
     if "efield_z" in f_list:
-        efieldz_rec = 1/knorm2_vec*(-1j *Gvec_half[iloc_start:iloc_end,2]*np.sum((rho_n_rec/(4*np.pi))+rho_rec,axis = 1))
+        efieldz_rec = 1/knorm2_vec*(-1j *Gvec_half[iloc_start:iloc_end,2]*((rho_n_rec/(4*np.pi))+rho_rec))
 
     #print(time.time()-time_energy)
+
+    del Gvec_half, knorm2_vec, gauss
 
     count = np.ones(size, dtype=int)*((nG_half//size)+1)
     count[size-1] = min(((nG_half//size)+1), nG_half-((size-1)*((nG_half//size)+1)))
@@ -164,18 +169,18 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
     if "e_density" in f_list:
         rho_rec_half = np.zeros((nG_half), dtype=np.complex128)
         if parallel :
-            comm.Allgatherv(np.sum(rho_rec, axis=1), [rho_rec_half, count, dis, MPI.DOUBLE_COMPLEX])
+            comm.Allgatherv(rho_rec, [rho_rec_half, count, dis, MPI.DOUBLE_COMPLEX])
         else:
-            rho_rec_half = np.sum(rho_rec, axis=1)
+            rho_rec_half = rho_rec
         rho_rec_half *= 4*np.pi/volume
         rho_rec_global = np.zeros((nG), dtype=np.complex128)
 
     if "total_charge" in f_list:
         rho_n_rec_half = np.zeros((nG_half), dtype=np.complex128)
         if parallel :
-            comm.Allgatherv(np.sum(rho_n_rec, axis=1)/(4*np.pi), [rho_n_rec_half, count, dis, MPI.DOUBLE_COMPLEX])
+            comm.Allgatherv(rho_n_rec/(4*np.pi), [rho_n_rec_half, count, dis, MPI.DOUBLE_COMPLEX])
         else:
-            rho_n_rec_half = np.sum(rho_n_rec, axis=1)/(4*np.pi)
+            rho_n_rec_half = rho_n_rec/(4*np.pi)
         rho_n_rec_half *= 4*np.pi/volume
         rho_n_rec_global = np.zeros((nG), dtype=np.complex128)
    
@@ -211,28 +216,29 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
             efieldz_rec_half = efieldz_rec
         efieldz_rec_half *= 16*np.pi**2/volume
         efieldz_rec_global = np.zeros((nG), dtype=np.complex128)
-   
+
+    # free the local arrays, only the gathered half arrays are used from here on
+    del rho_rec
+    if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list or "total_charge" in f_list:
+        del rho_n_rec
+    if "potential" in f_list:
+        del ha_rec
+    if "efield_x" in f_list:
+        del efieldx_rec
+    if "efield_y" in f_list:
+        del efieldy_rec
+    if "efield_z" in f_list:
+        del efieldz_rec
+
     idx = np.flatnonzero(mask)[1:]
 
-    # Round Gvec for floating-point safety
-    Gvec_rounded = np.round(Gvec, decimals=10)
-    Gvec_set = {tuple(g) for g in Gvec_rounded}
-
-    # For each k in Gvec_half, check if -k exists in Gvec
-    valid_k_mask = np.array([
-    tuple(np.round(-k, decimals=10)) in Gvec_set
-    for k in Gvec_half
-    ])
-
-    # Build a dictionary for Gvec (rounded)
-    Gvec_tuple = [tuple(g) for g in Gvec_rounded]
-    index_map = {g: i for i, g in enumerate(Gvec_tuple)}
-
-    # Find index of -k for each valid k in Gvec_half_valid
-    idx_minus_k = np.array([
-    index_map[tuple(np.round(-k, decimals=10))]
-    for k in Gvec_half[valid_k_mask]
-    ])
+    # Gvec is the C-ordered FFT grid, so -k of the k at grid index (i,j,k) is at (-i mod nx, -j mod ny, -k mod nz)
+    ijk = np.unravel_index(idx, (nx,ny,nz)) # Get the (i,j,k) indices of the valid k points in Gvec_half
+    valid_k_mask = np.ones(len(idx), dtype=bool) # Mask to identify valid k points
+    for n, i in zip((nx,ny,nz), ijk):
+        if n % 2 == 0: # If the grid size is even
+            valid_k_mask &= (i != n//2) # Mask out the Nyquist frequency points for each dimension
+    idx_minus_k = np.ravel_multi_index(tuple((-i[valid_k_mask]) % n for n, i in zip((nx,ny,nz), ijk)), (nx,ny,nz)) # Find index of -k for each valid k in Gvec_half
 
     if "e_density" in f_list:
         rho_rec_global[idx_minus_k] = np.conj(rho_rec_half[valid_k_mask])
@@ -241,6 +247,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         rho_rec_global = rho_rec_global.reshape(nx,ny,nz)
         rho = np.real(np.fft.ifftn(rho_rec_global))*nx*ny*nz
         rho = rho.reshape(nx*ny*nz)
+        del rho_rec_global, rho_rec_half
     if "total_charge" in f_list:
         rho_n_rec_global[idx_minus_k] = np.conj(rho_n_rec_half[valid_k_mask])
         rho_n_rec_global[idx] = rho_n_rec_half
@@ -248,6 +255,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         rho_n_rec_global = rho_n_rec_global.reshape(nx,ny,nz)
         rho_n = np.real(np.fft.ifftn(rho_n_rec_global))*nx*ny*nz
         rho_n = rho_n.reshape(nx*ny*nz)
+        del rho_n_rec_global, rho_n_rec_half
     if "potential" in f_list:
         ha_rec_global[idx_minus_k] = np.conj(ha_rec_half[valid_k_mask])
         ha_rec_global[idx] = ha_rec_half
@@ -255,6 +263,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         ha_rec_global = ha_rec_global.reshape(nx,ny,nz)
         ha = np.real(np.fft.ifftn(ha_rec_global))*nx*ny*nz
         ha = ha.reshape(nx*ny*nz)
+        del ha_rec_global, ha_rec_half
     if "efield_x" in f_list:
         efieldx_rec_global[idx_minus_k] = np.conj(efieldx_rec_half[valid_k_mask])
         efieldx_rec_global[idx] = efieldx_rec_half
@@ -262,6 +271,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         efieldx_rec_global = efieldx_rec_global.reshape(nx,ny,nz)
         efieldx = np.real(np.fft.ifftn(efieldx_rec_global))*nx*ny*nz
         efieldx = efieldx.reshape(nx*ny*nz)
+        del efieldx_rec_global, efieldx_rec_half
     if "efield_y" in f_list:
         efieldy_rec_global[idx_minus_k] = np.conj(efieldy_rec_half[valid_k_mask])
         efieldy_rec_global[idx] = efieldy_rec_half
@@ -269,6 +279,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         efieldy_rec_global = efieldy_rec_global.reshape(nx,ny,nz)
         efieldy = np.real(np.fft.ifftn(efieldy_rec_global))*nx*ny*nz
         efieldy = efieldy.reshape(nx*ny*nz)
+        del efieldy_rec_global, efieldy_rec_half
     if "efield_z" in f_list:
         efieldz_rec_global[idx_minus_k] = np.conj(efieldz_rec_half[valid_k_mask])
         efieldz_rec_global[idx] = efieldz_rec_half
@@ -276,6 +287,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         efieldz_rec_global = efieldz_rec_global.reshape(nx,ny,nz)
         efieldz = np.real(np.fft.ifftn(efieldz_rec_global))*nx*ny*nz
         efieldz = efieldz.reshape(nx*ny*nz)
+        del efieldz_rec_global, efieldz_rec_half
 
     if rank==0:
 
@@ -297,6 +309,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
                 knorm2_global[0,0,0] = 1.0
                 dha_rec = 4*np.pi*drho_rec/knorm2_global
                 dha_rec[0,0,0] = 0.0 + 0.0j
+                del drho_rec, knorm2_global
                 if "potential" in f_list:
                     dha = np.real(np.fft.ifftn(dha_rec)).reshape(nx*ny*nz)/(dx*dy*dz)
                     error = np.sum(abs(dha))/np.sum(abs(ha-dha))
