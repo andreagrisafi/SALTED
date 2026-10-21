@@ -1,19 +1,23 @@
-import numpy as np
 import os
-import time
-import math
-from ase.io import read, write
 import os.path as osp
+import sys
+import time
 
-from salted.constants import bohr2angs
-from salted.sys_utils import ParseConfig
-from salted.cp2k.utils import init_moments, compute_charge_and_dipole, gto_rec, get_reciprocal_grid, get_basis_set_info_numba, read_local_pseudo
-from salted import basis
-from numba import njit, prange
-from numba import types
-from numba.typed import Dict
-from numba import get_num_threads, get_thread_id
+import numpy as np
 from mpi4py import MPI
+from numba import get_num_threads
+
+from salted import basis
+from salted.constants import bohr2angs, hart2ev
+from salted.cp2k.utils import (
+    compute_charge_and_dipole,
+    get_basis_set_info_numba,
+    get_reciprocal_grid,
+    gto_rec,
+    init_moments,
+    read_local_pseudo,
+)
+from salted.sys_utils import ParseConfig
 
 
 def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
@@ -46,7 +50,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
     
     if len(refcube)==1:
 
-        # Read reference cube file
+        # Read reference cube file (electron density)
         cubefile = open(refcube[0] ,"r")
         lines = cubefile.readlines()
         nside = {}
@@ -61,14 +65,13 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
         dy = float(lines[4].split()[2])
         dz = float(lines[5].split()[3])
         origin = np.asarray(lines[2].split(),dtype=float)[1:4]
-        rho_qm = []
-        for line in lines[6+natoms:]:
-            rhovals = np.asarray(line.split(),float)
-            for rhoval in rhovals:
-                rho_qm.append(rhoval)
+        rho_qm = np.fromstring("".join(lines[6+natoms:]).replace("-0.", " -0."), dtype=np.float64, sep=' ')
         cubefile.close()
         if npoints!=len(rho_qm):
            print("ERROR: inconsistent number of grid points!")
+           sys.exit(0)
+        if np.any(origin != 0.0):
+           print("ERROR: reference cube origin is not zero, the reconstruction assumes it is!")
            sys.exit(0)
 
         nx, ny, nz = nside[0], nside[1], nside[2]
@@ -112,8 +115,6 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
     gauss = {}
     for spe in species:
         gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc[spe]**2))
-
-    volfactor = 32.0*np.pi*np.pi/(volume)
 
     offset = 0
     rho_rec = np.zeros((nG_loc, natoms), dtype=np.complex128)
@@ -215,7 +216,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
 
     # Round Gvec for floating-point safety
     Gvec_rounded = np.round(Gvec, decimals=10)
-    Gvec_set = set(tuple(g) for g in Gvec_rounded)
+    Gvec_set = {tuple(g) for g in Gvec_rounded}
 
     # For each k in Gvec_half, check if -k exists in Gvec
     valid_k_mask = np.array([
@@ -285,9 +286,33 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank):
             print("Integral density= ", nele)
 
             # compute error as a fraction of electronic charge
-            if refcube and inp.salted.saltedtype=="density":
+            if len(refcube)==1 and inp.salted.saltedtype=="density":
                 error = np.sum(abs(rho+rho_qm))*dx*dy*dz/abs(nele)
                 print("% MAE electronic density =", error*100)
+
+            # compute errors of Hartree potential and electric field with respect to the reference density
+            if len(refcube)==1 and inp.salted.saltedtype=="density" and any(f in f_list for f in ["potential","efield_x","efield_y","efield_z"]):
+                drho_rec = np.fft.fftn((rho+rho_qm).reshape(nx,ny,nz))*dx*dy*dz
+                knorm2_global = np.sum(Gvec*Gvec,axis=1).reshape(nx,ny,nz)
+                knorm2_global[0,0,0] = 1.0
+                dha_rec = 4*np.pi*drho_rec/knorm2_global
+                dha_rec[0,0,0] = 0.0 + 0.0j
+                if "potential" in f_list:
+                    dha = np.real(np.fft.ifftn(dha_rec)).reshape(nx*ny*nz)/(dx*dy*dz)
+                    error = np.sum(abs(dha))/np.sum(abs(ha-dha))
+                    print("% MAE hartree potential =", error*100, "  ( MAE =", np.mean(abs(dha))*hart2ev*1000, "mV )")
+                if "efield_x" in f_list:
+                    defieldx = np.real(np.fft.ifftn(-1j*Gvec[:,0].reshape(nx,ny,nz)*dha_rec)).reshape(nx*ny*nz)/(dx*dy*dz)
+                    error = np.sum(abs(defieldx))/np.sum(abs(efieldx-defieldx))
+                    print("% MAE electric field along x =", error*100, "  ( MAE =", np.mean(abs(defieldx))*hart2ev*1000/bohr2angs, "mV/A )")
+                if "efield_y" in f_list:
+                    defieldy = np.real(np.fft.ifftn(-1j*Gvec[:,1].reshape(nx,ny,nz)*dha_rec)).reshape(nx*ny*nz)/(dx*dy*dz)
+                    error = np.sum(abs(defieldy))/np.sum(abs(efieldy-defieldy))
+                    print("% MAE electric field along y =", error*100, "  ( MAE =", np.mean(abs(defieldy))*hart2ev*1000/bohr2angs, "mV/A )")
+                if "efield_z" in f_list:
+                    defieldz = np.real(np.fft.ifftn(-1j*Gvec[:,2].reshape(nx,ny,nz)*dha_rec)).reshape(nx*ny*nz)/(dx*dy*dz)
+                    error = np.sum(abs(defieldz))/np.sum(abs(efieldz-defieldz))
+                    print("% MAE electric field along z =", error*100, "  ( MAE =", np.mean(abs(defieldz))*hart2ev*1000/bohr2angs, "mV/A )")
         
         dirpath = os.path.join(inp.salted.saltedpath, "cubes")
         if not os.path.exists(dirpath):
