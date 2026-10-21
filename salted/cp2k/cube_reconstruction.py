@@ -166,7 +166,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank,chunk=32768):
     count[size-1] = min(((nG_half//size)+1), nG_half-((size-1)*((nG_half//size)+1)))
     dis = np.arange(0,size,1, dtype=int)*((nG_half//size)+1)
 
-    if "e_density" in f_list:
+    if "e_density" in f_list or "total_charge" in f_list:
         rho_rec_half = np.zeros((nG_half), dtype=np.complex128)
         if parallel :
             comm.Allgatherv(rho_rec, [rho_rec_half, count, dis, MPI.DOUBLE_COMPLEX])
@@ -240,7 +240,7 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank,chunk=32768):
             valid_k_mask &= (i != n//2) # Mask out the Nyquist frequency points for each dimension
     idx_minus_k = np.ravel_multi_index(tuple((-i[valid_k_mask]) % n for n, i in zip((nx,ny,nz), ijk)), (nx,ny,nz)) # Find index of -k for each valid k in Gvec_half
 
-    if "e_density" in f_list:
+    if "e_density" in f_list or "total_charge" in f_list:
         rho_rec_global[idx_minus_k] = np.conj(rho_rec_half[valid_k_mask])
         rho_rec_global[idx] = rho_rec_half
         rho_rec_global[0] = - charge / volume + 0.0j
