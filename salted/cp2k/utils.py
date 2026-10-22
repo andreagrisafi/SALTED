@@ -15,7 +15,7 @@ except ImportError:  # pyscf is optional: only the CP2K periodic-overlap utiliti
 
 from salted.constants import bohr2angs
 
-def init_moments(inp,species,lmax,nmax,rank):
+def init_moments(inp,species,lmax,nmax,rank,dfbasis=None):
     """Compute basis function integrals relevant for computing total charge, dipole and polarizability tensor"""
 
     if rank==0:
@@ -30,14 +30,16 @@ def init_moments(inp,species,lmax,nmax,rank):
             print("Polarizability tensors are computed as the first moment of the electron-density electric-field response.")
             print("WARNING: Computed values of polarizability tensors have physical meaning only along those Cartesian directions for which the electron density vanishes before reaching the cell periodic boundaries; the modern theory of polarization should be used otherwise.")
 
-    # Get CP2K basis set information 
+    # Get CP2K basis set information (dfbasis: another basis than inp.qm.dfbasis, e.g. an LR basis)
+    if dfbasis is None:
+        dfbasis = inp.qm.dfbasis
     bdir = osp.join(inp.salted.saltedpath,"basis")
     alphas = {}
     contra = {}
     for spe in species:
         for l in range(lmax[spe]+1):
-            alphas[(spe,l)] = np.atleast_1d(np.loadtxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-alphas-L{l}.dat")))
-            contra[(spe,l)] = np.atleast_2d(np.loadtxt(osp.join(bdir,f"{spe}-{inp.qm.dfbasis}-contra-L{l}.dat")))
+            alphas[(spe,l)] = np.atleast_1d(np.loadtxt(osp.join(bdir,f"{spe}-{dfbasis}-alphas-L{l}.dat")))
+            contra[(spe,l)] = np.atleast_2d(np.loadtxt(osp.join(bdir,f"{spe}-{dfbasis}-contra-L{l}.dat")))
 
     # Compute basis function integrals 
     charge_integrals = {}
@@ -1359,3 +1361,44 @@ def overlap_coulomb_rho(rho1_rec, rho2_rec, knorm_vec, volume):
     # Coulomb-metric overlap (rho1|rho2) in reciprocal space
     ovlp = np.sum((np.conj(rho1_rec)*rho2_rec).real * (4.0*np.pi) / knorm_vec**2)
     return 2 * ovlp / volume
+
+
+# LR model
+
+SIGMA_LR = 1.0 # LR filter width (angstrom)
+
+def lr_recipe(spe, recipe="minimal"):
+    # L_max and number of widths per l of the LR basis recipes (lr.recipe):
+    #   minimal (default):  lmax=1 for every species, 3 widths for l=0 and 1 for l=1
+    #   accurate:           lmax=2 with 3/2/1 widths, except H, which keeps lmax = 1 with 3/1
+    # The l=0 shell needs 3 widths (one of them is the core-matched one), more l>1 widths add little
+    if recipe == "accurate" and spe != "H":
+        return 2, [3, 2, 1]
+    return 1, [3, 1]
+
+
+def lr_basis_name(recipe, lmax, nrad, custom):
+    """Name of the LR basis: LR-minimal / LR-accurate for the recipes, else a name that lists the customised
+    content (e.g. LR-H1n31-O2n321), so that different custom bases do not overwrite each other"""
+    if not custom:
+        return f"LR-{recipe}"
+    return "LR-" + "-".join(f"{spe}{lmax[spe]}n{''.join(map(str, nrad[spe]))}" for spe in sorted(lmax))
+
+
+def lr_basis_settings(inp):
+    """LR basis of the lr section of inp.yaml: the recipe (lr.recipe) with the per-species overrides of lr.lmax / lr.nrad."""
+    lmax_opt = inp.lr.lmax.to_dict() if inp.lr.lmax is not None else {}
+    nrad_opt = inp.lr.nrad.to_dict() if inp.lr.nrad is not None else {}
+    lmax_lr, nrad_lr = {}, {}
+    for spe in inp.system.species:
+        lmax_spe, nrad = lr_recipe(spe, inp.lr.recipe)
+        if spe in lmax_opt: # lr.lmax override: the recipe widths are truncated, or extended with their last value
+            lmax_spe = lmax_opt[spe]
+            nrad = (nrad + [nrad[-1]] * lmax_spe)[:lmax_spe + 1]
+        if spe in nrad_opt: # lr.nrad override: one value for every l, or a list with one value per l
+            nrad = [nrad_opt[spe]] * (lmax_spe + 1) if isinstance(nrad_opt[spe], int) else nrad_opt[spe]
+        if len(nrad) != lmax_spe + 1:
+            raise ValueError(f"lr.nrad of {spe} needs one value, or a list of {lmax_spe + 1} values (l = 0 ... {lmax_spe})")
+        lmax_lr[spe], nrad_lr[spe] = lmax_spe, nrad
+    dfbasis_lr = inp.lr.dfbasis or lr_basis_name(inp.lr.recipe, lmax_lr, nrad_lr, custom=bool(lmax_opt or nrad_opt))
+    return dfbasis_lr, lmax_lr, nrad_lr

@@ -40,10 +40,12 @@ from ase.data import atomic_numbers
 from salted.basis_client import BasisClient
 from salted.constants import bohr2angs
 from salted.cp2k.utils import (
+    SIGMA_LR,
     build_gvec,
     get_basis_set_info_numba,
     gto_rec,
     gto_rec_g0,
+    lr_basis_settings,
     overlap_coulomb_rho,
     read_local_pseudo,
 )
@@ -57,25 +59,6 @@ from salted.sys_utils import (
 )
 
 HARTREE2MEV = 27211.386245988
-SIGMA_LR = 1.0 # LR filter width (angstrom)
-
-def lr_recipe(spe, recipe="minimal"):
-    # L_max and number of widths per l of the LR basis recipes (lr.recipe):
-    #   minimal (default):  lmax=1 for every species, 3 widths for l=0 and 1 for l=1
-    #   accurate:           lmax=2 with 3/2/1 widths, except H, which keeps lmax = 1 with 3/1
-    # The l=0 shell needs 3 widths (one of them is the core-matched one), more l>1 widths add little
-    if recipe == "accurate" and spe != "H":
-        return 2, [3, 2, 1]
-    return 1, [3, 1]
-
-
-def lr_basis_name(recipe, lmax, nrad, custom):
-    """Name of the LR basis: LR-minimal / LR-accurate for the recipes, else a name that lists the customised
-    content (e.g. LR-H1n31-O2n321), so that different custom bases do not overwrite each other"""
-    if not custom:
-        return f"LR-{recipe}"
-    return "LR-" + "-".join(f"{spe}{lmax[spe]}n{''.join(map(str, nrad[spe]))}" for spe in sorted(lmax))
-
 
 def lr_basis_widths(lmax, nrad, sigma, rloc, smax):
     """Widths w (bohr) of the LR primitives r^l exp(-r^2 / 2 w^2) of one species, per l,
@@ -264,20 +247,7 @@ if __name__ == "__main__":
     sigma_lr = SIGMA_LR / bohr2angs # LR filter width (bohr)
     gmax_lr = 2.0 * np.pi / sigma_lr # G-vector truncation, filter exp(-2 pi^2) ~ 3e-9
     # LR: basis recipe (lr.recipe) with the per-species overrides of lr.lmax / lr.nrad
-    lmax_opt = inp.lr.lmax.to_dict() if inp.lr.lmax is not None else {}
-    nrad_opt = inp.lr.nrad.to_dict() if inp.lr.nrad is not None else {}
-    lmax_lr, nrad_lr = {}, {}
-    for spe in inp.system.species:
-        lmax_spe, nrad = lr_recipe(spe, inp.lr.recipe)
-        if spe in lmax_opt: # lr.lmax override: the recipe widths are truncated, or extended with their last value
-            lmax_spe = lmax_opt[spe]
-            nrad = (nrad + [nrad[-1]] * lmax_spe)[:lmax_spe + 1]
-        if spe in nrad_opt: # lr.nrad override: one value for every l, or a list with one value per l
-            nrad = [nrad_opt[spe]] * (lmax_spe + 1) if isinstance(nrad_opt[spe], int) else nrad_opt[spe]
-        if len(nrad) != lmax_spe + 1:
-            raise ValueError(f"lr.nrad of {spe} needs one value, or a list of {lmax_spe + 1} values (l = 0 ... {lmax_spe})")
-        lmax_lr[spe], nrad_lr[spe] = lmax_spe, nrad
-    dfbasis_lr = inp.lr.dfbasis or lr_basis_name(inp.lr.recipe, lmax_lr, nrad_lr, custom=bool(lmax_opt or nrad_opt))
+    dfbasis_lr, lmax_lr, nrad_lr = lr_basis_settings(inp)
 
     # LR: output folders
     coefpath = osp.join(inp.salted.saltedpath, "coefficients_lr")
