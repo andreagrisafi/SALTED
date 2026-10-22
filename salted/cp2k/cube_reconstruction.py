@@ -10,17 +10,20 @@ from numba import get_num_threads
 from salted import basis
 from salted.constants import bohr2angs, hart2ev
 from salted.cp2k.utils import (
+    SIGMA_LR,
     compute_charge_and_dipole,
     get_basis_set_info_numba,
     get_reciprocal_grid,
     gto_rec,
     init_moments,
+    lr_basis_settings,
     read_local_pseudo,
 )
 from salted.sys_utils import ParseConfig
 
 
-def build(f_list,structure,coefs,cubename,refcube,comm,size,rank,chunk=32768):
+def build(f_list,structure,coefs,cubename,refcube,comm,size,rank,chunk=32768,lr=False):
+    """Reconstruct electron density, total charge, Hartree potential and electric field from density-fitting coefficients."""
          
     inp = ParseConfig().parse_input()
 
@@ -28,12 +31,29 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank,chunk=32768):
     
     print("Numba threads:", get_num_threads())
 
-    [lmax,nmax] = basis.basiset(inp.qm.dfbasis)
-
     bdir = osp.join(inp.salted.saltedpath,"basis")
     species = inp.system.species
+
+    if lr:
+        # LR: basis selected by the lr section of inp.yaml, registered in basis/lr_basis.yaml by LR_density_fitting
+        dfbasis, _, _ = lr_basis_settings(inp)
+        lr_yaml = osp.join(bdir, "lr_basis.yaml")
+        if not osp.exists(lr_yaml): # checked here, as BasisClient would create an empty file
+            print(f"ERROR: {lr_yaml} not found, run salted.cp2k.LR_density_fitting first!")
+            sys.exit(0)
+        try:
+            [lmax,nmax] = basis.basiset(dfbasis, lr_yaml)
+        except AssertionError:
+            print(f"ERROR: LR basis {dfbasis} (lr section of inp.yaml) not found in {lr_yaml}, run salted.cp2k.LR_density_fitting with it first!")
+            sys.exit(0)
+        sigma_lr = SIGMA_LR / bohr2angs # LR filter width (bohr)
+        gmax_lr = 2.0 * np.pi / sigma_lr # G-vector truncation, filter exp(-2 pi^2) ~ 3e-9
+        cubename = cubename + "_lr"
+    else:
+        dfbasis = inp.qm.dfbasis
+        [lmax,nmax] = basis.basiset(inp.qm.dfbasis)
     
-    lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)            
+    lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, dfbasis, bdir)            
 
     bdir = osp.join(inp.salted.saltedpath,"basis")
     pseudocharge, rloc = read_local_pseudo(species, bdir)
@@ -45,7 +65,13 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank,chunk=32768):
     cell = structure.get_cell() / bohr2angs
     volume = structure.get_volume() / (bohr2angs**3)
 
-    charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank)
+    # check that the coefficients belong to the basis
+    ncoefs = sum(nbasis[spe] for spe in atomic_symbols)
+    if len(coefs)!=ncoefs:
+        print(f"ERROR: {len(coefs)} coefficients, but the {dfbasis} basis has {ncoefs} for this structure!")
+        sys.exit(0)
+
+    charge_integrals,dipole_integrals = init_moments(inp,species,lmax,nmax,rank,dfbasis=dfbasis)
     charge, dipole = compute_charge_and_dipole(pseudocharge, natoms, range(natoms), atomic_symbols, coords, lmax, nmax, species, charge_integrals, dipole_integrals, coefs, True, False, False)
     
     if len(refcube)==1:
@@ -94,10 +120,21 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank,chunk=32768):
     ((Gvec[:, 2] == 0) & (Gvec[:, 1] == 0) & (Gvec[:, 0] >= 0))
     )
 
+    if lr:
+        # LR: only the G-vectors with |G| < G_max
+        mask &= (np.sum(Gvec*Gvec,axis=1) < gmax_lr**2)
+
     Gvec_half = Gvec[mask][1:]  # Exclude G=0
 
     nG_half=len(Gvec_half)
     nG = len(Gvec)
+    if lr and rank==0: print(f"LR mode: basis {dfbasis}, sigma = {SIGMA_LR} A, G_max = {gmax_lr:.3f} bohr^-1, {nG_half} G-vectors (half space)")
+
+    if lr and len(refcube)==1 and rank==0:
+        knorm2_global = np.sum(Gvec*Gvec,axis=1).reshape(nx,ny,nz)
+        lr_filter = np.where(knorm2_global < gmax_lr**2, np.exp(-0.5*sigma_lr**2*knorm2_global), 0.0)
+        rho_qm = np.real(np.fft.ifftn(np.fft.fftn(rho_qm.reshape(nx,ny,nz))*lr_filter)).reshape(nx*ny*nz)
+        del knorm2_global, lr_filter
 
     iloc_start = rank*((nG_half//size)+1)
     iloc_end = min(rank*((nG_half//size)+1) + ((nG_half//size)+1), nG_half)
@@ -107,7 +144,11 @@ def build(f_list,structure,coefs,cubename,refcube,comm,size,rank,chunk=32768):
 
     gauss = {}
     for spe in species:
-        gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc[spe]**2))
+        if lr:
+            # LR: core charges smoothed with the LR filter, Gaussians of width sqrt(rloc^2 + sigma^2)
+            gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc[spe]**2 + sigma_lr**2))
+        else:
+            gauss[spe] = np.exp(-0.5*knorm2_vec*(rloc[spe]**2))
 
     rho_rec = np.zeros((nG_loc), dtype=np.complex128)
     if "potential" in f_list or "efield_x" in f_list or "efield_y" in f_list or "efield_z" in f_list or "total_charge" in f_list:
