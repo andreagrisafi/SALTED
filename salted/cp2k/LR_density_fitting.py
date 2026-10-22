@@ -36,6 +36,7 @@ import time
 
 import numpy as np
 from ase.data import atomic_numbers
+from ase.io import read
 
 from salted.basis_client import BasisClient
 from salted.constants import bohr2angs
@@ -274,6 +275,8 @@ if __name__ == "__main__":
     # Initialize SALTED
     time_start = time.time()
     species, lmax_cp2k, nmax_cp2k, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
+    # Cell lengths of each configuration (bohr), from the geometry file (orthorhombic cells)
+    cell_lengths_xyz = [np.diag(np.asarray(structure.get_cell())) / bohr2angs for structure in read(inp.system.filename, ":", parallel=False)]
 
     bdir = osp.join(inp.salted.saltedpath,"basis")
     pseudocharge, rloc = read_local_pseudo(species, bdir)
@@ -329,15 +332,10 @@ if __name__ == "__main__":
                 nx = int(line_x[0])
                 ny = int(line_y[0])
                 nz = int(line_z[0])
-                dx = float(line_x[1])
-                dy = float(line_y[2])
-                dz = float(line_z[3])
+                dr_cube = np.array([float(line_x[1]), float(line_y[2]), float(line_z[3])])
                 origin = np.asarray(line_ori[1:4], dtype=float)
                 npoints = nx * ny * nz
                 if inp.salted.verbose: print("Number of grid points:", npoints)
-                # LR: in vacuum regions CP2K writes 3-digit exponents and negative values fill their 13-character field,
-                # so they run into the previous value ("0.53102E-017-0.16205E-016"), mantissas are always 0.xxxxx and
-                # exponents never contain "-0.", so a space before each "-0." separates them
                 rho_KS = np.fromstring(cubefile.read().replace("-0.", " -0."), dtype=np.float64, sep=' ')
 
         else:
@@ -346,14 +344,18 @@ if __name__ == "__main__":
             lrdata = np.load(osp.join(inp.lr.from_density, f"density_conf{iconf}.npz"))
             rho_KS = lrdata["rho_lr"]
             nx, ny, nz = rho_KS.shape
-            dx, dy, dz = lrdata["cell_lengths"] / np.array([nx, ny, nz])
+            dr_cube = lrdata["cell_lengths"] / np.array([nx, ny, nz]) # LR: cell of the run that stored it (older runs: cube header)
             origin = lrdata["origin"]
             npoints = nx * ny * nz
             if abs(float(lrdata["sigma"]) - sigma_lr) > 1e-10:
                 raise ValueError(f"stored LR density of conf {iconf+1} filtered with sigma = {float(lrdata['sigma']) * bohr2angs} A, "
                                  f"not {SIGMA_LR} A")
 
-        dr = np.array([dx, dy, dz])
+        dr = cell_lengths_xyz[iconf] / np.array([nx, ny, nz])
+        if np.any(np.abs(dr_cube - dr) > 1e-5 * dr):
+            print(f"ERROR: conf {iconf+1}: grid spacing of the density {dr_cube} bohr does not match the cell of {inp.system.filename} ({dr} bohr)!")
+            sys.exit(0)
+        dx, dy, dz = dr
 
         if rho_KS.size != npoints:
             print("ERROR: inconsistent number of grid points!")

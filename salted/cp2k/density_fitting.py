@@ -5,6 +5,7 @@ import sys
 import time
 
 import numpy as np
+from ase.io import read
 from mpi4py import MPI
 
 from salted.constants import bohr2angs
@@ -72,6 +73,8 @@ else:
 time_start = time.time()
 species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
 atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
+# Cell lengths of each configuration (bohr), from the geometry file (orthorhombic cells)
+cell_lengths_xyz = [np.diag(np.asarray(structure.get_cell())) / bohr2angs for structure in read(inp.system.filename, ":", parallel=False)]
 
 bdir = osp.join(inp.salted.saltedpath,"basis")
 lmax_numba, nmax_numba, npgf, nbasis, alphas, contranorm = get_basis_set_info_numba(lmax, nmax, species, inp.qm.dfbasis, bdir)  
@@ -119,14 +122,17 @@ for iconf in conf_range:
         nx = int(line_x[0])
         ny = int(line_y[0])
         nz = int(line_z[0])
-        dx = float(line_x[1])
-        dy = float(line_y[2])
-        dz = float(line_z[3])
+        dr_cube = np.array([float(line_x[1]), float(line_y[2]), float(line_z[3])])
         origin = np.asarray(line_ori[1:4], dtype=float)
         npoints = nx * ny * nz
         if inp.salted.verbose: print("Number of grid points:", npoints)
-        rho_KS = np.fromstring(cubefile.read(), dtype=np.float64, sep=' ')
-    dr = np.array([dx, dy, dz])
+        rho_KS = np.fromstring(cubefile.read().replace("-0.", " -0."), dtype=np.float64, sep=' ')
+
+    dr = cell_lengths_xyz[iconf] / np.array([nx, ny, nz])
+    if np.any(np.abs(dr_cube - dr) > 1e-5 * dr):
+        print(f"ERROR: conf {iconf+1}: grid spacing of the density {dr_cube} bohr does not match the cell of {inp.system.filename} ({dr} bohr)!")
+        sys.exit(0)
+    dx, dy, dz = dr
 
     if rho_KS.size != npoints:
         print("ERROR: inconsistent number of grid points!")
