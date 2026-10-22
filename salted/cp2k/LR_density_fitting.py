@@ -17,12 +17,13 @@ Usage (conf_start and conf_end are 0-based, as in density_fitting.py):
 
     python -m salted.cp2k.LR_density_fitting conf_start conf_end [--cond]
 
-with --cond to also compute the condition number of the metric matrix (an eigendecomposition).
+with --cond to also compute the condition number of the metric matrix (an eigendecomposition
+and print it with the size of the coefficients (ncoefs, |c|, max|c|).
 The LR settings are in the lr section of inp.yaml. The outputs, in <saltedpath>, are named so
 that those of density_fitting.py are left untouched:
     coefficients_lr/coefficients_conf<i>.npy, overlaps_lr/overlap_conf<i>.npy
     density_lr/density_conf<i>.npz      LR density on a coarse grid (input for lr.from_density)
-    metrics_lr/metrics_conf<i>.json     error metrics, with a table in metrics_lr/summary.dat
+    metrics_lr/metrics_conf<i>.json     LR Hartree energies (fit and reference) and diagnostics
 The LR basis is written to <saltedpath>/basis/ and registered in <saltedpath>/basis/lr_basis.yaml.
 """
 
@@ -143,15 +144,6 @@ def basis_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial
     return A
 
 
-def rho_fit_rec(Gvec_half, natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, coefs, chunk=2048):
-    # Fourier components of the fitted density sum_i c_i Phi_i
-    rho = np.empty(len(Gvec_half), dtype=np.complex128)
-    for g0 in range(0, len(Gvec_half), chunk):
-        g1 = min(g0 + chunk, len(Gvec_half))
-        rho[g0:g1] = basis_rec(Gvec_half[g0:g1], natoms, coords, nbasis, ncoefs, atomic_symbols, partial_wave_coefs, g0, g1) @ coefs
-    return rho
-
-
 def get_rho_n_rec_lr(Gvec_half, knorm_vec, natoms, coords, atomic_symbols, pseudocharge, rloc, sigma):
     # Fourier components of the Gaussian core charges (as get_rho_n, width rloc) smoothed by the LR filter,
     # computed analytically: sum_iat Z exp(-(rloc^2 + sigma^2) G^2 / 2) e^{-iG.r_iat}
@@ -218,11 +210,10 @@ def write_cube(path, title, rho, cell_lengths, origin, valences, pseudocharges, 
 def write_summary(path, metrics):
     # Table of the per-configuration metrics
     with open(path, "w") as f:
-        f.write("#  conf natoms  ncoefs       nG     U_LR_ref(Ha)     U_LR_fit(Ha) dU(meV/at) -1/2(D|D)(meV/at)"
-                "   MAE(%)     cond(S)  N_grid-N_elec  time(s)\n")
+        f.write("#  conf natoms  ncoefs       nG     U_LR_ref(Ha)     U_LR_fit(Ha) dU(meV/at)     cond(S)  N_grid-N_elec  time(s)\n")
         f.writelines(f"{r['conf']:6d} {r['natoms']:6d} {r['ncoefs']:7d} {r['nG']:8d} {r['e_hartree_ref']:16.8f} "
-                    f"{r['e_hartree']:16.8f} {r['dU_meV_per_atom']:10.5f} {r['half_DD_meV_per_atom']:17.5f} "
-                    f"{r['mae_percent']:8.4f} {r['cond_S']:11.2e} {r['n_elec_grid'] - r['n_elec']:+14.2e} {r['time']:8.1f}\n" for r in metrics)
+                    f"{r['e_hartree']:16.8f} {r['dU_meV_per_atom']:10.5f} "
+                    f"{r['cond_S']:11.2e} {r['n_elec_grid'] - r['n_elec']:+14.2e} {r['time']:8.1f}\n" for r in metrics)
 
 
 if __name__ == "__main__":
@@ -231,7 +222,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Long-range density fitting of CP2K densities")
     parser.add_argument("conf_start", type=int, help="first configuration, 0-based")
     parser.add_argument("conf_end", type=int, help="last configuration, 0-based, included")
-    parser.add_argument("--cond", action="store_true", help="also compute the condition number of S (an eigendecomposition)")
+    parser.add_argument("--cond", action="store_true", help="also compute the condition number of S (an eigendecomposition) and print it with ncoefs, |c|, max|c|")
     args = parser.parse_args()
 
     inp = ParseConfig().parse_input()
@@ -432,10 +423,6 @@ if __name__ == "__main__":
         np.save(os.path.join(coefpath, f"coefficients_conf{iconf}.npy"), c)
         save_overlap(os.path.join(overpath, f"overlap_conf{iconf}.npy"), S) # lower triangle only
 
-        # LR: fitted density in reciprocal space, for the error metrics
-        rho_fit = rho_fit_rec(Gvec_half, natoms[iconf], atomic_coords[iconf], nbasis, ncoefs, atomic_symbols[iconf], partial_wave_coefs, c)
-        delta_rec = rho_KS_rec - rho_fit
-
         # Hartree energy calculation
         metrics = {"conf": int(iconf), "dfbasis_lr": dfbasis_lr, "natoms": int(natoms[iconf]), "ncoefs": int(ncoefs), "nG": int(nG),
                    "n_elec": float(n_elec), "n_elec_grid": float(n_elec_grid), "lagmult": float(lagmult)}
@@ -455,38 +442,28 @@ if __name__ == "__main__":
             e_nn_ref = e_nn
             e_hartree_ref = e_ee_ref + e_en_ref + e_nn_ref
 
-            # LR: e_hartree - e_hartree_ref = -1/2 (D|D)
-            delta_delta = overlap_coulomb_rho(delta_rec, delta_rec, knorm_vec, volume)
             print(f"conf {iconf+1}: LR Hartree energy = {e_hartree:.8f} Ha, reference = {e_hartree_ref:.8f} Ha, "
-                  f"error = {(e_hartree - e_hartree_ref) * HARTREE2MEV / natoms[iconf]:+.5f} meV/atom "
-                  f"(-1/2 (D|D) = {-0.5 * delta_delta * HARTREE2MEV / natoms[iconf]:+.5f} meV/atom)", flush=True)
+                  f"error = {(e_hartree - e_hartree_ref) * HARTREE2MEV / natoms[iconf]:+.5f} meV/atom", flush=True)
             if inp.salted.verbose: print(f"conf {iconf+1}: E_ee = {e_ee:.8f} Ha, E_en = {e_en:.8f} Ha, E_nn = {e_nn:.8f} Ha", flush=True)
             if inp.salted.verbose: print('Time to compute Hartree energy:', time.time() - time_c, flush=True)
             metrics.update({"e_hartree": e_hartree, "e_hartree_ref": e_hartree_ref,
                             "e_ee_en_nn": [e_ee, e_en, e_nn], "e_ee_en_nn_ref": [e_ee_ref, e_en_ref, e_nn_ref],
-                            "dU_meV_per_atom": (e_hartree - e_hartree_ref) * HARTREE2MEV / natoms[iconf],
-                            "half_DD_meV_per_atom": -0.5 * delta_delta * HARTREE2MEV / natoms[iconf]})
+                            "dU_meV_per_atom": (e_hartree - e_hartree_ref) * HARTREE2MEV / natoms[iconf]})
 
-        # LR: MAE of the fitted LR density on a grid with spacing <= sigma / 4 (the G = 0 error, N_grid - n_elec, is left out)
-        time_c = time.time()
-        nside_mae = lr_grid_size(Gvec_half, cell_lengths, spacing=0.25 * sigma_lr)
-        delta = rec_to_grid(delta_rec, Gvec_half, cell_lengths, origin, nside_mae, rho_g0=0.0)
-        mae = 100.0 * np.sum(np.abs(delta)) * volume / np.prod(nside_mae) / n_elec
         # LR: condition number of the normalised S (only with --cond)
         if args.cond:
+            time_c = time.time()
             d = 1.0 / np.sqrt(np.diag(S))
             eigs = np.linalg.eigvalsh(d[:, np.newaxis] * S * d[np.newaxis, :])
             cond = eigs[-1] / eigs[0] if eigs[0] > 0 else float("inf")
+            if inp.salted.verbose: print('Time to compute the condition number:', time.time() - time_c, flush=True)
+            print(f"conf {iconf+1}: cond(S) = {cond:.2e}, ncoefs = {ncoefs}, |c| = {np.linalg.norm(c):.3e}, max|c| = {np.abs(c).max():.3e}", flush=True)
         else:
             cond = float("nan")
-        print(f"conf {iconf+1}: MAE of the LR density = {mae:.4f} %, cond(S) = {cond:.2e}, ncoefs = {ncoefs}, "
-              f"|c| = {np.linalg.norm(c):.3e}, max|c| = {np.abs(c).max():.3e}", flush=True)
         if cond > 1e14:
-            # LR: e.g. metal slabs with large bases: more functions than significant LR Fourier components
             print(f"WARNING conf {iconf+1}: S is numerically singular (cond = {cond:.1e}): the density and energy are fitted, "
                   "but the coefficients are not uniquely defined, consider a smaller LR basis", flush=True)
-        if inp.salted.verbose: print('Time to compute the errors:', time.time() - time_c, flush=True)
-        metrics.update({"mae_percent": float(mae), "cond_S": float(cond), "norm_c": float(np.linalg.norm(c)),
+        metrics.update({"cond_S": float(cond), "norm_c": float(np.linalg.norm(c)),
                         "max_abs_c": float(np.abs(c).max()), "time": time.time() - time_conf})
         with open(osp.join(metrpath, f"metrics_conf{iconf}.json"), "w") as f:
             json.dump(metrics, f, indent=1)
