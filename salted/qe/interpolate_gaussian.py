@@ -5,9 +5,9 @@ from scipy.optimize import least_squares
 from .core import RIBasis, RIBasisSet, RadialFunctions
 from .combine_gaussian import CompoundGaussianRadials
 
-def fit_gaussians(r, rho, l, n_gauss, alpha_init=None, alpha_bounds=(1e-4, 1e6)):
+def fit_gaussians(r, rho, l, n_gauss, alpha_init=None, alpha_bounds=None):
     """Fit rho(r) ~ sum_i c_i * r^l * exp(-alpha_i * r^2) via variable projection.
-    
+
     Parameters
     ----------
     r : np.ndarray
@@ -20,8 +20,13 @@ def fit_gaussians(r, rho, l, n_gauss, alpha_init=None, alpha_bounds=(1e-4, 1e6))
         The number of Gaussian functions to use.
     alpha_init : np.ndarray, optional
         The initial guess for the Gaussian exponents.
-    alpha_bounds : tuple[float, float]
-        The lower and upper bounds for the Gaussian exponents.
+    alpha_bounds : tuple[float, float], optional
+        The lower and upper bounds for the Gaussian exponents. If not given, the lower bound is
+        tied to the fit domain itself: 1/(2*r.max()**2), i.e. the exponent of a Gaussian whose
+        decay length equals r.max() (rcut). Without this, the nonlinear fit is free to drive an
+        exponent arbitrarily close to zero to chase a long tail in rho, producing a Gaussian so
+        diffuse that a periodic density-fitting real-space lattice sum built from it (see
+        salted.cp2k.utils.pair_cutoffs/lattice_images) explodes combinatorially.
 
     Returns
     -------
@@ -32,6 +37,10 @@ def fit_gaussians(r, rho, l, n_gauss, alpha_init=None, alpha_bounds=(1e-4, 1e6))
     """
     r, rho = np.asarray(r, float), np.asarray(rho, float)
     rl = r**l
+    rmin, rmax = max(r[r > 0].min(), 1e-3), r.max()
+
+    if alpha_bounds is None:
+        alpha_bounds = (1.0 / (2.0 * rmax**2), 1e6)
 
     def design(alphas):
         return rl[:, None] * np.exp(-np.outer(r**2, alphas))
@@ -46,7 +55,6 @@ def fit_gaussians(r, rho, l, n_gauss, alpha_init=None, alpha_bounds=(1e-4, 1e6))
         return Phi @ c - rho
 
     if alpha_init is None:
-        rmin, rmax = max(r[r > 0].min(), 1e-3), r.max()
         alpha_init = np.geomspace(1/(2*rmax**2), 1/(2*rmin**2), n_gauss)
 
     log_lo, log_hi = np.log(alpha_bounds[0]), np.log(alpha_bounds[1])
@@ -85,11 +93,15 @@ def interpolate_atomic_basis(ri_basis: RIBasis, species: str, position: tuple[fl
     """
     alphas = {}
     coeffs = {}
+    # Use the radial function set's own data-driven cutoff when it has one (e.g. Atomic_Rad computes
+    # this from where its compressed basis actually decays, via estimate_cutoff()), so the Gaussian
+    # fit domain -- and therefore fit_gaussians' default lower exponent bound -- reflects the real
+    # support of this species' atomic reference data rather than an arbitrary fixed radius.
+    rcut = getattr(ri_basis.radial_funcs, "cutoff", None) or 10.0
     #species_basis = ri_basis._load_ri_basis(species, position)
     for idx in range(len(ri_basis.radial_funcs)):
         n, l = ri_basis.radial_funcs.running_to_lexographic_index(idx)
         func = ri_basis.radial_funcs.radials[idx]
-        rcut = 10.0  # This can be adjusted based on the specific radial function
         r = np.linspace(0, rcut, 512)
         rho = func(r)
         fitted_alphas, fitted_coeffs = fit_gaussians(r, rho, l, num_max)

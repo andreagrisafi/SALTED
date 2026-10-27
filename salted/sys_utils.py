@@ -732,14 +732,14 @@ class ParseConfig:
                     True,
                     None,
                     str,
-                    lambda inp, val: val.lower() in ("aims", "pyscf", "cp2k"),
+                    lambda inp, val: val.lower() in ("aims", "pyscf", "cp2k", "qe"),
                 ),  # quantum mechanical code
                 "dfmetric": (
                     False,
                     PLACEHOLDER,
                     str,
-                    lambda inp, val: get_qmcode_checker("cp2k")(inp, val) and (val == PLACEHOLDER or val in ("identity", "coulomb")),
-                ),  # density fitting metric, only for CP2K
+                    lambda inp, val: get_qmcode_checker(["cp2k", "qe"])(inp, val) and (val == PLACEHOLDER or val in ("identity", "coulomb")),
+                ),  # density fitting metric, for CP2K and QE
                 "dfbasis": (True, None, str, None),  # density fitting basis
                 #### below are optional, but required for some qmcode ####
                 "qmbasis": (
@@ -758,8 +758,53 @@ class ParseConfig:
                     False,
                     PLACEHOLDER,
                     str,
-                    get_qmcode_checker("cp2k"),
-                ),  # periodic boundary conditions, only for CP2K
+                    get_qmcode_checker(["cp2k", "qe"]),
+                ),  # periodic boundary conditions, for CP2K and QE
+                #### below are optional, but required for qmcode == "qe" ####
+                "pseudo_dir": (
+                    False,
+                    PLACEHOLDER,
+                    str,
+                    lambda inp, val: get_qmcode_checker("qe")(inp, val) and check_path_exists(inp, val),
+                ),  # directory containing the UPF pseudopotential files, only for QE
+                "pseudopotentials": (
+                    False,
+                    PLACEHOLDER,
+                    dict,
+                    lambda inp, val: get_qmcode_checker("qe")(inp, val) and (
+                        val == PLACEHOLDER or all(isinstance(v, str) for v in val.values())
+                    ),
+                ),  # mapping species -> UPF filename, only for QE
+                "ecutwfc": (
+                    False,
+                    PLACEHOLDER,
+                    (int, float),
+                    get_qmcode_checker("qe"),
+                ),  # plane-wave cutoff in Ry, only for QE
+                "kpts": (
+                    False,
+                    PLACEHOLDER,
+                    (list, str),
+                    lambda inp, val: get_qmcode_checker("qe")(inp, val) and (
+                        val == PLACEHOLDER or val == "gamma"
+                        or (isinstance(val, list) and len(val) == 3 and all(isinstance(x, int) for x in val))
+                    ),
+                ),  # Monkhorst-Pack grid [nx, ny, nz], or "gamma", only for QE
+                #### below are optional for any qmcode, but only meaningful for QE ####
+                "ecutrho": (False, PLACEHOLDER, (int, float), None),  # density cutoff in Ry
+                "occupations": (
+                    False,
+                    PLACEHOLDER,
+                    str,
+                    lambda inp, val: val == PLACEHOLDER or val in (
+                        "fixed", "smearing", "tetrahedra", "tetrahedra_lin", "tetrahedra_opt"
+                    ),
+                ),
+                "smearing": (False, PLACEHOLDER, str, None),
+                "degauss": (False, PLACEHOLDER, (int, float), None),
+                "nproc": (False, PLACEHOLDER, int, None),  # MPI ranks per pw.x/pp.x call
+                "pwx_command": (False, PLACEHOLDER, str, None),  # override the pw.x executable/path
+                "ppx_command": (False, PLACEHOLDER, str, None),  # override the pp.x executable/path
             },
             "prediction": {
                 "filename": (

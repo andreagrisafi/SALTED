@@ -9,7 +9,7 @@ from scipy.integrate import quad
 from scipy.interpolate import make_interp_spline
 import linecache
 
-from .core import RadialFunctions
+from .core import RadialFunctions, enumerate_nl_pairs
 
 def Clebsch_Gordan_coeff(l1: int, m1: int, l2: int, m2: int) -> dict:
     """
@@ -120,13 +120,14 @@ class Atomic_Rad(RadialFunctions):
             The estimated cutoff radius.
         """
         r = np.linspace(0, 20.0, 1000)
-        radial_values = [radial_func(r) for radial_func in self.radials]
-        max_value = np.max(np.abs(radial_values))
-        cutoff_indices = np.where(np.abs(radial_values) < threshold * max_value)[0]
-        if len(cutoff_indices) == 0:
+        radial_values = np.abs([radial_func(r) for radial_func in self.radials])  # shape (n_funcs, len(r))
+        max_value = np.max(radial_values)
+        envelope = np.max(radial_values, axis=0)  # per-r max magnitude across all functions
+        above_threshold = np.where(envelope >= threshold * max_value)[0]
+        if len(above_threshold) == 0:
             return r[-1]
         else:
-            return r[cutoff_indices[0]]
+            return r[above_threshold[-1]]  # largest r at which any function is still significant
 
     def _compute_norm_amplitude(self, method: str = "analytical") -> float:
         match method:
@@ -188,9 +189,14 @@ class Atomic_Rad(RadialFunctions):
         return new_rfunc
 
     def _compress_basis(self, radial_basis: np.ndarray, lprime_list: list[int], overlap_ninds: list[int], rmax: float = 10.0, n_points: int = 1000) -> tuple[list[Callable], list[int]]:
-        """Compresses the product basis by keeping eigenvectors of the overlap matrix."""
-        compressed_basis = []
-        lprime_list_new = []
+        """Compresses the product basis by keeping eigenvectors of the overlap matrix.
+
+        The eigensolve naturally groups functions l-slow/n-fast, but the rest of RadialFunctions
+        (running_to_lexographic_index, enumerate_nl_pairs) indexes radials n-slow/l-fast. Build the
+        result keyed by (n, l) and re-flatten in that convention so self.radials[idx] stays consistent
+        with running_to_lexographic_index(idx).
+        """
+        radials_by_nl: dict[tuple[int, int], Callable] = {}
         lprime_values = set(lprime_list)
         for l_prime in lprime_values:
             rfuncs_for_lprime = radial_basis[np.array(lprime_list) == l_prime]
@@ -206,9 +212,11 @@ class Atomic_Rad(RadialFunctions):
 
             for i in range(overlap_ninds[l_prime]):
                 vec = sorted_eigenvectors[:, i]
-                new_rfunc = self._make_rfunc(vec, rfuncs_for_lprime)
-                compressed_basis.append(new_rfunc)
-                lprime_list_new.append(l_prime)
+                radials_by_nl[(i + 1, l_prime)] = self._make_rfunc(vec, rfuncs_for_lprime)
+
+        nl_pairs = enumerate_nl_pairs(overlap_ninds)
+        compressed_basis = [radials_by_nl[nl] for nl in nl_pairs]
+        lprime_list_new = [l for _, l in nl_pairs]
 
         return compressed_basis, lprime_list_new
 
