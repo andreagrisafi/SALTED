@@ -15,13 +15,15 @@ Differences with density_fitting.py are marked with "LR:".
 
 Usage (conf_start and conf_end are 0-based, as in density_fitting.py):
 
-    python -m salted.cp2k.LR_density_fitting conf_start conf_end [--cond] [--eigcutoff 1e-5]
+    python -m salted.cp2k.LR_density_fitting conf_start conf_end [--cond] [--eigcutoff 1e-5 | --eigeta 1e-5]
 
 with --cond to also compute the condition number of the metric matrix (an eigendecomposition
 and print it with the size of the coefficients (ncoefs, |c|, max|c|).
 With --eigcutoff (debug), the eigenvectors of the metric matrix with eigenvalue below
 the cutoff are dropped and the linear system is solved with the pseudo-inverse of the filtered matrix,
 which is also the one saved in overlaps_lr (and whose condition number --cond reports).
+With --eigeta (debug), the eigenvalues are filtered smoothly, 1/lam -> lam/(lam^2 + eta^2), and the
+unfiltered S is saved in overlaps_lr (and used by --cond). Use at most one of the two.
 The LR settings are in the lr section of inp.yaml. The outputs, in <saltedpath>, are named so
 that those of density_fitting.py are left untouched:
     coefficients_lr/coefficients_conf<i>.npy, overlaps_lr/overlap_conf<i>.npy
@@ -226,7 +228,9 @@ if __name__ == "__main__":
     parser.add_argument("conf_start", type=int, help="first configuration, 0-based")
     parser.add_argument("conf_end", type=int, help="last configuration, 0-based, included")
     parser.add_argument("--cond", action="store_true", help="also compute the condition number of S (an eigendecomposition) and print it with ncoefs, |c|, max|c|")
-    parser.add_argument("--eigcutoff", type=float, default=None, help="debug: drop eigenvectors of S with eigenvalue < eigcutoff before solving")
+    debug_filter = parser.add_mutually_exclusive_group() # LR (debug): at most one filter of S
+    debug_filter.add_argument("--eigcutoff", type=float, default=None, help="debug: drop eigenvectors of S with eigenvalue < eigcutoff before solving")
+    debug_filter.add_argument("--eigeta", type=float, default=None, help="debug: smooth filter, replace 1/lam by lam/(lam^2 + eigeta^2) in the inverse of S")
     args = parser.parse_args()
 
     inp = ParseConfig().parse_input()
@@ -416,9 +420,16 @@ if __name__ == "__main__":
         # Solve density-fitting linear system
         time_c = time.time()
         q = 4.0 * np.pi * pwc_g0
-        if args.eigcutoff is None:
+        if args.eigcutoff is None and args.eigeta is None:
             Sinv = np.linalg.solve(S, np.column_stack([w, q]))
             n_dropped = 0
+        elif args.eigeta is not None:
+            # LR (debug): smooth filter, S^-1 ~ U diag(lam/(lam^2 + eta^2)) U^T, i.e. each 1/lam damped by lam^2/(lam^2 + eta^2)
+            # (S itself is kept: saved, used by --cond and for the energy)
+            eigs, U = np.linalg.eigh(S)
+            Sinv = U @ ((U.T @ np.column_stack([w, q])) * (eigs / (eigs**2 + args.eigeta**2))[:, np.newaxis])
+            n_dropped = 0
+            print(f"conf {iconf+1}: eigeta = {args.eigeta:.1e}", flush=True)
         else:
             # LR (debug): drop the eigenvectors of S with eigenvalue < eigcutoff
             # and solve with the pseudo-inverse of the filtered S, S^+ = U_k diag(1/lam_k) U_k^T
@@ -428,6 +439,7 @@ if __name__ == "__main__":
             Uk = U[:, keep] # retained eigenvectors
             Sinv = Uk @ ((Uk.T @ np.column_stack([w, q])) / eigs[keep][:, np.newaxis])
             S = (Uk * eigs[keep]) @ Uk.T # filtered S = U_k diag(lam_k) U_k^T, saved and used below
+            cond_filtered = eigs[-1] / eigs[keep][0] # filtered S has rank ncoefs - n_dropped: largest / smallest kept eigenvalue
             print(f"conf {iconf+1}: eigcutoff = {args.eigcutoff:.1e}, dropped {n_dropped} of {ncoefs} eigenvectors "
                   f"(lam_min = {eigs[0]:.2e}, lam_min kept = {eigs[keep][0]:.2e})", flush=True)
         Sinv_w, Sinv_q = Sinv[:, 0], Sinv[:, 1]
@@ -443,7 +455,7 @@ if __name__ == "__main__":
         # Hartree energy calculation
         metrics = {"conf": int(iconf), "dfbasis_lr": dfbasis_lr, "natoms": int(natoms[iconf]), "ncoefs": int(ncoefs), "nG": int(nG),
                    "n_elec": float(n_elec), "n_elec_grid": float(n_elec_grid), "lagmult": float(lagmult),
-                   "eigcutoff": args.eigcutoff, "n_dropped": n_dropped}
+                   "eigcutoff": args.eigcutoff, "n_dropped": n_dropped, "eigeta": args.eigeta}
         time_c = time.time()
         if df_metric == "coulomb":
             # LR: core charges smoothed analytically
@@ -474,11 +486,10 @@ if __name__ == "__main__":
             #d = 1.0 / np.sqrt(np.diag(S))
             #eigs = np.linalg.eigvalsh(d[:, np.newaxis] * S * d[np.newaxis, :])
             #cond = eigs[-1] / eigs[0] if eigs[0] > 0 else float("inf")
-            if n_dropped == 0:
+            if args.eigcutoff is None:
                 cond = np.linalg.cond(S)
-            else: # LR (debug): filtered S has rank ncoefs - n_dropped, cond = largest / smallest nonzero eigenvalue
-                eigs_S = np.linalg.eigvalsh(S)
-                cond = eigs_S[-1] / eigs_S[n_dropped]
+            else: # LR (debug): filtered S is singular, np.linalg.cond would only see the rounding noise of its zero eigenvalues
+                cond = cond_filtered
             if inp.salted.verbose: print('Time to compute the condition number:', time.time() - time_c, flush=True)
             print(f"conf {iconf+1}: cond(S) = {cond:.2e}, ncoefs = {ncoefs}, |c| = {np.linalg.norm(c):.3e}, max|c| = {np.abs(c).max():.3e}", flush=True)
         else:

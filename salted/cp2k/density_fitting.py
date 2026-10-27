@@ -1,3 +1,4 @@
+import argparse
 import glob
 import os
 import os.path as osp
@@ -42,8 +43,17 @@ from salted.sys_utils import (
 inp = ParseConfig().parse_input()
 df_metric = inp.qm.dfmetric
 
-conf_start = int(sys.argv[1])
-conf_end = int(sys.argv[2])
+# conf_start and conf_end as before, plus the debug filters of S (at most one), as in LR_density_fitting.py
+parser = argparse.ArgumentParser(description="Density fitting of CP2K densities")
+parser.add_argument("conf_start", type=int, help="first configuration, 0-based")
+parser.add_argument("conf_end", type=int, help="last configuration, 0-based, included")
+debug_filter = parser.add_mutually_exclusive_group()
+debug_filter.add_argument("--eigcutoff", type=float, default=None, help="debug: drop eigenvectors of S with eigenvalue < eigcutoff before solving")
+debug_filter.add_argument("--eigeta", type=float, default=None, help="debug: smooth filter, replace 1/lam by lam/(lam^2 + eigeta^2) in the inverse of S")
+args = parser.parse_args()
+
+conf_start = args.conf_start
+conf_end = args.conf_end
 
 comm, size, rank, parallel = detect_mpi()
 
@@ -203,7 +213,25 @@ for iconf in conf_range:
     # Solve density-fitting linear system 
     time_c = time.time()
     q = 4.0 * np.pi * pwc_g0
-    Sinv = np.linalg.solve(S, np.column_stack([w, q]))
+    if args.eigcutoff is None and args.eigeta is None:
+        Sinv = np.linalg.solve(S, np.column_stack([w, q]))
+    elif args.eigeta is not None:
+        # Debug: smooth filter, S^-1 ~ U diag(lam/(lam^2 + eta^2)) U^T, i.e. each 1/lam damped by lam^2/(lam^2 + eta^2)
+        # (S itself is kept: saved and used for the energy)
+        eigs, U = np.linalg.eigh(S)
+        Sinv = U @ ((U.T @ np.column_stack([w, q])) * (eigs / (eigs**2 + args.eigeta**2))[:, np.newaxis])
+        print(f"conf {iconf+1}: eigeta = {args.eigeta:.1e}", flush=True)
+    else:
+        # Debug: drop the eigenvectors of S with eigenvalue < eigcutoff
+        # and solve with the pseudo-inverse of the filtered S, S^+ = U_k diag(1/lam_k) U_k^T
+        eigs, U = np.linalg.eigh(S)
+        keep = eigs >= args.eigcutoff
+        n_dropped = int(np.sum(~keep))
+        Uk = U[:, keep] # retained eigenvectors
+        Sinv = Uk @ ((Uk.T @ np.column_stack([w, q])) / eigs[keep][:, np.newaxis])
+        S = (Uk * eigs[keep]) @ Uk.T # filtered S = U_k diag(lam_k) U_k^T, saved and used below
+        print(f"conf {iconf+1}: eigcutoff = {args.eigcutoff:.1e}, dropped {n_dropped} of {ncoefs} eigenvectors "
+              f"(lam_min = {eigs[0]:.2e}, lam_min kept = {eigs[keep][0]:.2e})", flush=True)
     Sinv_w, Sinv_q = Sinv[:, 0], Sinv[:, 1]
     lagmult = (np.dot(q, Sinv_w) - n_elec) / np.dot(q, Sinv_q) # Lagrange multiplier
     c = Sinv_w - lagmult * Sinv_q # Fitted coefficients
