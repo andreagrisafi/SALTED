@@ -15,7 +15,7 @@ Differences with density_fitting.py are marked with "LR:".
 
 Usage (conf_start and conf_end are 0-based, as in density_fitting.py):
 
-    python -m salted.cp2k.LR_density_fitting conf_start conf_end [--cond] [--eigcutoff 1e-5 | --eigeta 1e-5]
+    python -m salted.cp2k.LR_density_fitting conf_start conf_end [--cond] [--eigcutoff 1e-5 | --eigeta 1e-5] [--hirshfeld]
 
 with --cond to also compute the condition number of the metric matrix (an eigendecomposition
 and print it with the size of the coefficients (ncoefs, |c|, max|c|).
@@ -24,6 +24,15 @@ the cutoff are dropped and the linear system is solved with the pseudo-inverse o
 which is also the one saved in overlaps_lr (and whose condition number --cond reports).
 With --eigeta (debug), the eigenvalues are filtered smoothly, 1/lam -> lam/(lam^2 + eta^2), and the
 unfiltered S is saved in overlaps_lr (and used by --cond). Use at most one of the two.
+With --hirshfeld (experimental), the total-charge constraint is replaced by one constraint per atom:
+the charge of the s functions of atom I equals its CP2K Hirshfeld population N_I, read from the
+single *.hirshfeld file in qm.path2qm/conf_<i+1>/, written by CP2K with
+    &HIRSHFELD
+      SHAPE_FUNCTION DENSITY
+      FILENAME charges
+    &END HIRSHFELD
+The populations are shifted uniformly so that they sum to the number of electrons. The energy error
+is then no longer purely second order: dU = sum_I lam_I (Z_I - N_I) - 1/2 (D|D).
 The LR settings are in the lr section of inp.yaml. The outputs, in <saltedpath>, are named so
 that those of density_fitting.py are left untouched:
     coefficients_lr/coefficients_conf<i>.npy, overlaps_lr/overlap_conf<i>.npy
@@ -221,6 +230,29 @@ def write_summary(path, metrics):
                     f"{r['cond_S']:11.2e} {r['n_elec_grid'] - r['n_elec']:+14.2e} {r['time']:8.1f}\n" for r in metrics)
 
 
+def read_hirshfeld_populations(path, atomic_symbols, pseudocharge):
+    # Hirshfeld populations (electrons) of the atoms, from the last Hirshfeld block of a CP2K file
+    # (closed shell: atom, element, kind, reference charge, population, net charge)
+    with open(path, "r") as f:
+        lines = f.read().splitlines()
+    headers = [i for i, line in enumerate(lines) if "Hirshfeld Charges" in line]
+    if not headers:
+        raise ValueError(f"{path}: no Hirshfeld charges found")
+    rows = []
+    for line in lines[headers[-1] + 3:]: # the atom rows start after a blank line and the column titles
+        if not line.split() or not line.split()[0].isdigit():
+            break
+        rows.append(line.split())
+    if len(rows) != len(atomic_symbols) or any(len(row) != 6 for row in rows):
+        raise ValueError(f"{path}: expected {len(atomic_symbols)} atoms with 6 columns (closed shell), "
+                         f"found {len(rows)} rows")
+    for iat, row in enumerate(rows):
+        if row[1] != atomic_symbols[iat] or abs(float(row[3]) - pseudocharge[atomic_symbols[iat]]) > 1e-3:
+            raise ValueError(f"{path}: atom {iat+1} is {row[1]} with reference charge {row[3]}, "
+                             f"expected {atomic_symbols[iat]} with {pseudocharge[atomic_symbols[iat]]}")
+    return np.array([float(row[4]) for row in rows])
+
+
 if __name__ == "__main__":
 
     # LR: conf_start and conf_end as in density_fitting.py, plus --cond
@@ -231,6 +263,8 @@ if __name__ == "__main__":
     debug_filter = parser.add_mutually_exclusive_group() # LR (debug): at most one filter of S
     debug_filter.add_argument("--eigcutoff", type=float, default=None, help="debug: drop eigenvectors of S with eigenvalue < eigcutoff before solving")
     debug_filter.add_argument("--eigeta", type=float, default=None, help="debug: smooth filter, replace 1/lam by lam/(lam^2 + eigeta^2) in the inverse of S")
+    parser.add_argument("--hirshfeld", action="store_true", help="experimental: constrain the charge of each atom to its CP2K Hirshfeld population "
+                        "(*.hirshfeld file in each conf_<i> folder) instead of the total charge")
     args = parser.parse_args()
 
     inp = ParseConfig().parse_input()
@@ -319,6 +353,20 @@ if __name__ == "__main__":
         ncoefs = 0
         for spe in species:
             ncoefs += nbasis[spe]*ntype[spe]
+
+        # Read Hirshfeld populations of the atoms, shifted uniformly to sum to the number of electrons
+        if args.hirshfeld:
+            hirshfeld_files = glob.glob(os.path.join(inp.qm.path2qm, f"conf_{iconf+1}", "*.hirshfeld"))
+            if len(hirshfeld_files) != 1:
+                raise ValueError(f"conf {iconf+1}: expected one *.hirshfeld file in {os.path.join(inp.qm.path2qm, f'conf_{iconf+1}')}, "
+                                 f"found {len(hirshfeld_files)}")
+            n_atom = read_hirshfeld_populations(hirshfeld_files[0], atomic_symbols[iconf], pseudocharge)
+            hirshfeld_shift = (n_elec - n_atom.sum()) / natoms[iconf] # Shift to apply to each atom so that the populations sum to n_elec
+            if abs(n_elec - n_atom.sum()) > 0.1:
+                raise ValueError(f"conf {iconf+1}: Hirshfeld populations sum to {n_atom.sum():.3f}, not {n_elec} electrons")
+            n_atom += hirshfeld_shift
+            print(f"conf {iconf+1}: Hirshfeld populations from {osp.basename(hirshfeld_files[0])}, "
+                  f"shifted by {hirshfeld_shift:+.1e} e per atom to sum to {n_elec}", flush=True)
 
         if inp.lr.from_density is None:
 
@@ -419,15 +467,22 @@ if __name__ == "__main__":
 
         # Solve density-fitting linear system
         time_c = time.time()
-        q = 4.0 * np.pi * pwc_g0
+        q = 4.0 * np.pi * pwc_g0 # Charge of each basis function, q.c is the total charge
+        if args.hirshfeld:
+            # One constraint per atom, Q_iI = q_i for the s functions of atom I
+            atom_index = np.repeat(np.arange(natoms[iconf]), [nbasis[spe] for spe in atomic_symbols[iconf]]) # Assign each basis function to its atom
+            Q = np.zeros((ncoefs, natoms[iconf]))
+            Q[np.arange(ncoefs), atom_index] = q # Column I holds the q_i of atom I, so (Q^T c)_I is the charge of atom I
+        else:
+            Q = q[:, np.newaxis] # Total charge only: a single constraint, q.c = n_elec
         if args.eigcutoff is None and args.eigeta is None:
-            Sinv = np.linalg.solve(S, np.column_stack([w, q]))
+            Sinv = np.linalg.solve(S, np.column_stack([w, Q]))
             n_dropped = 0
         elif args.eigeta is not None:
             # LR (debug): smooth filter, S^-1 ~ U diag(lam/(lam^2 + eta^2)) U^T, i.e. each 1/lam damped by lam^2/(lam^2 + eta^2)
             # (S itself is kept: saved, used by --cond and for the energy)
             eigs, U = np.linalg.eigh(S)
-            Sinv = U @ ((U.T @ np.column_stack([w, q])) * (eigs / (eigs**2 + args.eigeta**2))[:, np.newaxis])
+            Sinv = U @ ((U.T @ np.column_stack([w, Q])) * (eigs / (eigs**2 + args.eigeta**2))[:, np.newaxis])
             n_dropped = 0
             print(f"conf {iconf+1}: eigeta = {args.eigeta:.1e}", flush=True)
         else:
@@ -437,14 +492,20 @@ if __name__ == "__main__":
             keep = eigs >= args.eigcutoff
             n_dropped = int(np.sum(~keep))
             Uk = U[:, keep] # retained eigenvectors
-            Sinv = Uk @ ((Uk.T @ np.column_stack([w, q])) / eigs[keep][:, np.newaxis])
+            Sinv = Uk @ ((Uk.T @ np.column_stack([w, Q])) / eigs[keep][:, np.newaxis])
             S = (Uk * eigs[keep]) @ Uk.T # filtered S = U_k diag(lam_k) U_k^T, saved and used below
             cond_filtered = eigs[-1] / eigs[keep][0] # filtered S has rank ncoefs - n_dropped: largest / smallest kept eigenvalue
             print(f"conf {iconf+1}: eigcutoff = {args.eigcutoff:.1e}, dropped {n_dropped} of {ncoefs} eigenvectors "
                   f"(lam_min = {eigs[0]:.2e}, lam_min kept = {eigs[keep][0]:.2e})", flush=True)
-        Sinv_w, Sinv_q = Sinv[:, 0], Sinv[:, 1]
-        lagmult = (np.dot(q, Sinv_w) - n_elec) / np.dot(q, Sinv_q) # Lagrange multiplier
-        c = Sinv_w - lagmult * Sinv_q # Fitted coefficients
+        if args.hirshfeld:
+            # One Lagrange multiplier per atom, lam = (Q^T S^-1 Q)^-1 (Q^T S^-1 w - N)
+            Sinv_w, Sinv_Q = Sinv[:, 0], Sinv[:, 1:]
+            lagmult = np.linalg.solve(Q.T @ Sinv_Q, Q.T @ Sinv_w - n_atom) # Lagrange multipliers
+            c = Sinv_w - Sinv_Q @ lagmult # Fitted coefficients
+        else:
+            Sinv_w, Sinv_q = Sinv[:, 0], Sinv[:, 1]
+            lagmult = (np.dot(q, Sinv_w) - n_elec) / np.dot(q, Sinv_q) # Lagrange multiplier
+            c = Sinv_w - lagmult * Sinv_q # Fitted coefficients
 
         if inp.salted.verbose: print("Time to solve linear system:", time.time()-time_c)
 
@@ -454,8 +515,11 @@ if __name__ == "__main__":
 
         # Hartree energy calculation
         metrics = {"conf": int(iconf), "dfbasis_lr": dfbasis_lr, "natoms": int(natoms[iconf]), "ncoefs": int(ncoefs), "nG": int(nG),
-                   "n_elec": float(n_elec), "n_elec_grid": float(n_elec_grid), "lagmult": float(lagmult),
-                   "eigcutoff": args.eigcutoff, "n_dropped": n_dropped, "eigeta": args.eigeta}
+                   "n_elec": float(n_elec), "n_elec_grid": float(n_elec_grid),
+                   "lagmult": lagmult.tolist() if args.hirshfeld else float(lagmult),
+                   "eigcutoff": args.eigcutoff, "n_dropped": n_dropped, "eigeta": args.eigeta, "hirshfeld": args.hirshfeld}
+        if args.hirshfeld:
+            metrics.update({"hirshfeld_file": hirshfeld_files[0], "hirshfeld_shift": float(hirshfeld_shift)})
         time_c = time.time()
         if df_metric == "coulomb":
             # LR: core charges smoothed analytically
