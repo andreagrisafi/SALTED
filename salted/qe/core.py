@@ -174,9 +174,14 @@ class RIBasis(RIFunctions):
     -----------
         species (str): Chemical species associated with the basis
         origin (tuple[float, float, float]): Origin of all basis functions
-        n_max (int | List[int]): Maximum major quantum number for basis functions
+        n_max (int | List[int] | None): Maximum major quantum number for basis functions
             As int, same number is used for all l
             As list, each l can be assigned its own n_max
+            As None, the radial class is expected to determine n_max itself and is called without
+            an n_max argument here; RIBasis then reads n_max back off the constructed radial_funcs.
+            (e.g. Atomic_Rad takes its own n_max via radial_kwargs/radial_params instead of this
+            top-level argument, since the actual count it keeps per l can be less than requested
+            when the input data doesn't independently support that many functions at some l.)
         l_max (int): Maximum minor quantum number for basis functions
 
         radial_cls: Class of RadialFunctions, implementing the radial part of the basis
@@ -185,14 +190,28 @@ class RIBasis(RIFunctions):
         angular_kwards: Key-word arguments passed to AngularFunction
     """
 
-    def __init__(self, species: str, origin: tuple[float, float, float], n_max: int | List[int], l_max: int,
+    def __init__(self, species: str, origin: tuple[float, float, float], l_max: int,
                  radial_cls: type[RadialFunctions], angular_cls: type[AngularFunctions], cutoff: Cutoff,
+                 n_max: int | List[int] | None = None,
                  radial_kwargs: dict = None, angular_kwargs: dict = None,
                  cell_vectors: np.ndarray = None):
         super().__init__(species, origin)
 
-        self.n_max = normalize_n_max(n_max, l_max)
         self.l_max = l_max
+        self.radial_kwargs = radial_kwargs or {}
+        self.angular_kwargs = angular_kwargs or {}
+        self.cell_vectors = cell_vectors
+
+        # Instantiate the radial component. When n_max is given, it's passed straight through
+        # (e.g. Gaussian radial classes, whose shape depends on a requested n_max). When omitted,
+        # the radial class determines its own n_max per l and we read it back afterward.
+        if n_max is None:
+            self.radial_funcs = radial_cls(species, origin, l_max, **self.radial_kwargs)
+            self.n_max = normalize_n_max(self.radial_funcs.n_max, l_max)
+        else:
+            self.n_max = normalize_n_max(n_max, l_max)
+            self.radial_funcs = radial_cls(species, origin, self.n_max, l_max, **self.radial_kwargs)
+
         self._nl_pairs = enumerate_nl_pairs(self.n_max)
         self._nl_to_idx = {nl: idx for idx, nl in enumerate(self._nl_pairs)}
         self._angular_offsets = np.cumsum([0] + [2 * l + 1 for l in range(self.l_max + 1)])
@@ -201,13 +220,6 @@ class RIBasis(RIFunctions):
         self._basis_offsets = np.cumsum([0] + block_sizes)
         self._basis_size = int(self._basis_offsets[-1])
 
-        self.radial_kwargs = radial_kwargs or {}
-        self.angular_kwargs = angular_kwargs or {}
-
-        self.cell_vectors = cell_vectors
-        
-        # Instantiate radial and angular components
-        self.radial_funcs = radial_cls(species, origin, self.n_max, l_max, **self.radial_kwargs)
         self.angular_funcs = angular_cls(species, origin, l_max, **self.angular_kwargs)
 
         self.cutoff = self._resolve_cutoff(cutoff)

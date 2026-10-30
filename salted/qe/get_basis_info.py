@@ -14,16 +14,36 @@ specification file `{species}-{dfbasis}.json` must exist in the current working 
 basis specification consumed by `salted.qe.load_basis`, e.g.:
 
     {
-      "n_max": 3,
       "l_max": 2,
       "radial_method": "atomic",
       "angular_method": "real_spherical",
-      "radial_params": {"filename": "./atomic_densities/O_TZP_rc10.0_qe.dat"},
+      "radial_params": {
+        "filename": "./atomic_densities/O_TZP_rc10.0_qe.dat",
+        "n_max": [4, 4, 3],
+        "energy_file": "./atomic_densities/O_TZP_rc10.0_eigenvalues.dat",
+        "energy_scale": 1.0
+      },
       "n_gauss": 6
     }
 
 `n_gauss` (optional, default `DEFAULT_N_GAUSS`) sets how many primitive Gaussians are fitted per
 (n, l) radial channel.
+
+For the `"atomic"` radial method, `n_max` (required; `radial_params`, int or one value per l) sets
+exactly how many compressed radial functions to keep per l: the n_max[l] eigenvectors of that l's
+(generalized, when energy_file is given) overlap-matrix eigenproblem with the largest eigenvalue.
+There is no automatic eigenvalue cutoff: the atomic self-multiplication overlap matrix at a given l
+only has as many independent eigenvectors as the data supports, and asking for more than that
+returns near-zero-eigenvalue noise, which can make the downstream (density-fitting) overlap matrix
+ill-conditioned/singular or even produce NaN coefficients from Gaussian-fitting a near-zero-norm
+function -- pick n_max conservatively per l (e.g. guided by
+`salted.qe.density_fitting.diagnose_overlap_conditioning` on a prior run) rather than relying on an
+automatic cutoff. See `salted.qe.atomic.Atomic_Rad._compress_basis`.
+
+`energy_file`/`energy_scale` (both optional; `radial_params`, "atomic" method only) bias compression
+toward low-energy input orbitals rather than pure overlap/completeness -- see
+`salted.qe.atomic.Atomic_Rad._compress_basis`. Omit them to keep the original, purely
+overlap-based compression.
 
 Each (n, l) radial channel is fitted independently, with its own Gaussian exponents, so exponents
 are not shared across n the way a single CP2K basis "set" is. To stay compatible with the shared
@@ -46,8 +66,33 @@ from salted.sys_utils import ParseConfig
 from salted.qe.loader import load_basis
 from salted.qe.interpolate_gaussian import interpolate_atomic_basis
 from salted.qe.qe_types import CutoffType
+from salted.sys_utils import PLACEHOLDER
 
 DEFAULT_N_GAUSS = 6
+DEFAULT_ALPHA_THRESHOLD = 1e-3
+
+
+def max_safe_alpha(inp, threshold: float = DEFAULT_ALPHA_THRESHOLD) -> float:
+    """Largest Gaussian exponent whose reciprocal-space weight has decayed below `threshold` (of
+    its on-axis peak) by the density grid's own Nyquist wavevector -- i.e. the largest exponent
+    density_fitting.py's reciprocal-space fit can actually resolve on that grid, derived from
+    `ecutwfc`/`ecutrho` (Ry) alone, since no cube file exists yet at basis-generation time.
+
+    G_max (bohr^-1) = sqrt(ecutrho), QE's standard Ry-to-bohr^-1 plane-wave relation; ecutrho
+    defaults to QE's own norm-conserving-pseudopotential convention (4*ecutwfc) when not set.
+    Solving exp(-G_max^2/(4*alpha)) = threshold for alpha gives the bound below.
+
+    Exponents above this bound are only band-limited (not rejected) by density_fitting.py's own
+    machinery when actually used for fitting, so a function fit with such an exponent is
+    self-consistent within that reciprocal-space fit but mismatches an exact real-space
+    reconstruction of the same (alpha, contra) (e.g. salted.qe.df2cube) -- see fit_gaussians'
+    alpha_max docstring (salted.qe.interpolate_gaussian).
+    """
+    ecutrho = inp.qm.ecutrho
+    if ecutrho == PLACEHOLDER:
+        ecutrho = 4.0 * inp.qm.ecutwfc
+    g_max = np.sqrt(ecutrho)
+    return g_max**2 / (4.0 * np.log(1.0 / threshold))
 
 
 def build(dryrun: bool = False, force_overwrite: bool = False):
@@ -57,7 +102,10 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
     inp = ParseConfig().parse_input()
     assert inp.qm.qmcode.lower() == "qe", f"{inp.qm.qmcode=}, but expected 'qe'"
 
-    lmax, nmax, alphas, contra = fit_basis_info(inp.system.species, inp.qm.dfbasis)
+    alpha_max = max_safe_alpha(inp)
+    print(f"Capping fitted Gaussian exponents at alpha_max={alpha_max:.3g} bohr^-2 "
+          f"(derived from ecutwfc/ecutrho, so fits stay resolvable on the density-fitting grid)")
+    lmax, nmax, alphas, contra = fit_basis_info(inp.system.species, inp.qm.dfbasis, alpha_max)
 
     """Convert to basis_client format"""
     basis_data: dict[str, SpeciesBasisData] = {}
@@ -88,7 +136,7 @@ def build(dryrun: bool = False, force_overwrite: bool = False):
         BasisClient().write(inp.qm.dfbasis, basis_data, force_overwrite)
 
 
-def fit_basis_info(species: list[str], dfbasis: str) -> tuple[
+def fit_basis_info(species: list[str], dfbasis: str, alpha_max: float = 1e6) -> tuple[
     dict[str, int], dict[tuple[str, int], int], dict[tuple[str, int], np.ndarray], dict[tuple[str, int], np.ndarray]
 ]:
     """Build and Gaussian-fit the atomic RI basis for each species.
@@ -97,6 +145,9 @@ def fit_basis_info(species: list[str], dfbasis: str) -> tuple[
     No file IO besides reading those specification files; see module docstring for format and
     for the block-diagonal convention used to reconcile independently-fitted (n, l) channels with
     the shared alphas/contra file format.
+
+    alpha_max (see `max_safe_alpha`) bounds how sharp a fitted Gaussian primitive is allowed to be,
+    so the fit never produces exponents the actual density-fitting grid can't resolve.
     """
     lmax: dict[str, int] = {}
     nmax: dict[tuple[str, int], int] = {}
@@ -110,7 +161,7 @@ def fit_basis_info(species: list[str], dfbasis: str) -> tuple[
         n_gauss = spec.pop("n_gauss", DEFAULT_N_GAUSS)
 
         ribasis = load_basis(species=spe, origin=(0.0, 0.0, 0.0), cutoff=CutoffType.NON_PERIODIC, **spec)
-        fitted = interpolate_atomic_basis(ribasis, species=spe, position=(0.0, 0.0, 0.0), num_max=n_gauss)
+        fitted = interpolate_atomic_basis(ribasis, species=spe, position=(0.0, 0.0, 0.0), num_max=n_gauss, alpha_max=alpha_max)
 
         lmax[spe] = fitted.l_max
         for l, n_l in enumerate(fitted.n_max):

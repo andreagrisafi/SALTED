@@ -20,11 +20,11 @@ def register_angular(name: str, cls: Type[AngularFunctions]):
 
 def load_basis(species: str,
                origin: tuple[float, float, float],
-               n_max: int | list[int],
                l_max: int,
                radial_method: str,
                angular_method: str,
                cutoff: Cutoff,
+               n_max: int | list[int] | None = None,
                radial_params: Optional[Dict[str, Any]] = None,
                angular_params: Optional[Dict[str, Any]] = None,
                cell_vectors = None,
@@ -38,12 +38,16 @@ def load_basis(species: str,
         Chemical species label (e.g. 'O', 'H').
     origin : tuple[float, float, float]
         Center of the basis functions.
-    n_max : int | list[int]
+    l_max : int
+        Maximum angular momentum quantum number (inclusive).
+    n_max : int | list[int] | None, optional
         Maximum radial quantum number(s), interpreted as counts per angular momentum channel.
         If int, the same count is used for all l in [0, l_max].
         If list, ``n_max[l]`` is used for each l and the list must have length ``l_max + 1``.
-    l_max : int
-        Maximum angular momentum quantum number (inclusive).
+        If omitted (None), the radial method must determine n_max itself and take its own
+        ``n_max`` via ``radial_params`` instead (e.g. ``"atomic"``'s ``Atomic_Rad``, whose actual
+        count per l can come out below what was requested there if the input data doesn't
+        independently support that many functions at some l).
     radial_method : str, optional
         Name of the radial function method to use (default: 'gaussian').
     angular_method : str, optional
@@ -72,8 +76,9 @@ def load_basis(species: str,
     if not angular_cls:
         raise ValueError(f"Unknown angular method: '{angular_method}'. Available: {list(ANGULAR_REGISTRY.keys())}")
 
-    return RIBasis(species, origin, n_max, l_max,
+    return RIBasis(species, origin, l_max,
                    radial_cls, angular_cls,
+                   n_max=n_max,
                    radial_kwargs=radial_params,
                    angular_kwargs=angular_params,
                    cell_vectors=cell_vectors,

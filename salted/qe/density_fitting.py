@@ -101,6 +101,56 @@ def read_cube(conf_dir: str, natoms: int):
     return rho.reshape((nx, ny, nz)), (nx, ny, nz), (dx, dy, dz), origin
 
 
+def _basis_index_labels(ctx: "FitContext", geom_idx: int) -> list[tuple[int, str, int, int, int]]:
+    """(atom_idx, species, n, l, m) label for every row/column of this configuration's S, in the
+    same atom-major, l-then-n-then-m order salted.cp2k.utils's basis-indexing functions use (see
+    e.g. salted.qe.df2cube's identical iaux loop, which this mirrors).
+    """
+    atomic_symbols = ctx.atomic_symbols[geom_idx]
+    natoms = ctx.natoms[geom_idx]
+    labels = []
+    for iat in range(natoms):
+        spe = atomic_symbols[iat]
+        for l in range(ctx.lmax[spe] + 1):
+            for n in range(ctx.nmax[(spe, l)]):
+                for m in range(-l, l + 1):
+                    labels.append((iat, spe, n, l, m))
+    return labels
+
+
+def diagnose_overlap_conditioning(S: np.ndarray, labels: list[tuple[int, str, int, int, int]],
+                                   n_report: int = 5, rel_threshold: float = 1e-8) -> float:
+    """Report cond(S) and which specific (atom, species, n, l, m) basis functions dominate S's
+    smallest eigenvectors -- i.e. which functions are responsible for S being singular or
+    ill-conditioned, so cutoffs/thresholds can be tailored to the functions actually at fault
+    instead of by trial and error. Returns cond(S).
+
+    S's singularity (`np.linalg.solve` raising `LinAlgError: Singular matrix`) is an exact test on
+    whether LU factorization hits a zero pivot -- there's no single tunable "cutoff" number to
+    compare against in advance. cond(S) (ratio of largest to smallest eigenvalue; S is symmetric
+    positive (semi-)definite here) is the practical, continuous proxy: cond(S) approaching ~1e14-1e16
+    (double precision's own limit) is functionally singular, but coefficients are already
+    unreliable well before that, typically once cond(S) exceeds ~1e8-1e10.
+    """
+    eigenvalues, eigenvectors = np.linalg.eigh(S)
+    order = np.argsort(eigenvalues)
+    eigenvalues, eigenvectors = eigenvalues[order], eigenvectors[:, order]
+    max_eig = eigenvalues[-1]
+    cond = float(eigenvalues[-1] / eigenvalues[0]) if eigenvalues[0] > 0 else float("inf")
+
+    n_bad = int(np.sum(eigenvalues < rel_threshold * max_eig))
+    print(f"    cond(S) = {cond:.3e}  (eigenvalues span {eigenvalues[0]:.3e} .. {eigenvalues[-1]:.3e})")
+    print(f"    {n_bad} eigenvalue(s) below {rel_threshold:.0e} x largest -- these are what make S singular/ill-conditioned")
+
+    for k in range(min(n_report, len(eigenvalues))):
+        vec = eigenvectors[:, k]
+        top = np.argsort(np.abs(vec))[::-1][:5]
+        contributors = ", ".join(f"(atom {labels[i][0]} {labels[i][1]} n={labels[i][2]} l={labels[i][3]} m={labels[i][4]}):{vec[i]:+.2f}" for i in top)
+        print(f"    eigenvalue[{k}] = {eigenvalues[k]:.3e} (ratio {eigenvalues[k] / max_eig:.1e} of largest) -- dominated by {contributors}")
+
+    return cond
+
+
 @dataclass
 class FitContext:
     """Everything that is the same across all configurations, computed once in `main`."""
@@ -210,7 +260,16 @@ def fit_one(ctx: FitContext, geom_idx: int, rank: int) -> tuple[np.ndarray, np.n
         S = S_SR + S_LR
 
     q = 4.0 * np.pi * pwc_g0
-    Sinv = np.linalg.solve(S, np.column_stack([w, q]))
+    try:
+        Sinv = np.linalg.solve(S, np.column_stack([w, q]))
+    except np.linalg.LinAlgError as exc:
+        print(f"[conf {geom_idx + 1}] overlap matrix S is singular ({exc}); diagnosing which basis functions are at fault:", flush=True)
+        diagnose_overlap_conditioning(S, _basis_index_labels(ctx, geom_idx))
+        raise
+    if ctx.verbose:
+        cond = np.linalg.cond(S)
+        warning = " -- already large enough for coefficients to be unreliable" if cond > 1e8 else ""
+        print(f"[conf {geom_idx + 1}] cond(S) = {cond:.3e}{warning}", flush=True)
     Sinv_w, Sinv_q = Sinv[:, 0], Sinv[:, 1]
     lagmult = (np.dot(q, Sinv_w) - n_elec) / np.dot(q, Sinv_q)  # total-charge constraint
     c = Sinv_w - lagmult * Sinv_q

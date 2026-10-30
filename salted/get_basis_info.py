@@ -35,6 +35,8 @@ if __name__ == "__main__":
         from salted.cp2k.get_basis_info import build
     elif inp.qm.qmcode.lower() == "pyscf":
         from salted.pyscf.get_basis_info import build
+    elif inp.qm.qmcode.lower() == "qe":
+        from salted.qe.get_basis_info import build
     else:
         raise ValueError(f"Unknown qmcode: {inp.qm.qmcode}")
 
