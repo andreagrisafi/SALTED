@@ -27,6 +27,8 @@ dependencies = [
     "pyscf",
     "pyyaml",
     "packaging",
+    "spherical",
+    "quaternionic"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
