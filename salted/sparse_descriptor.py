@@ -133,6 +133,7 @@ def build():
             v2 = np.transpose(omega2,(1,3,0,2)).copy()
 
             # Compute equivariant features for the given structure
+            norm0 = np.empty(0)
             for lam in range(lmax_max+1):
 
                 [llmax,llvec] = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
@@ -146,18 +147,22 @@ def build():
                 # Compute complex to real transformation matrix for the given lambda value
                 c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
 
+                # rel_power: lambda > 0 is divided by the length of lambda = 0
+                if lam == 0 and inp.descriptor.normalisation == "rel_power":
+                    norm0 = sph_utils.lam0_norm(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec)
+
                 # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
                 if sparsify:
 
                     featsize = nspe1*nspe2*nrad1*nrad2*llmax
                     nfps = len(vfps[lam])
-                    p = sph_utils.equicombsparse_numba(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
+                    p = sph_utils.equicombsparse_numba(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam],norm0)
                     featsize = ncut
 
                 else:
 
                     featsize = nspe1*nspe2*nrad1*nrad2*llmax
-                    p = sph_utils.equicomb_numba(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
+                    p = sph_utils.equicomb_numba(natoms[iconf],nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,norm0)
                 
                 # Fill vector of equivariant descriptor
                 if lam==0:

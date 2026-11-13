@@ -119,6 +119,7 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     pvec = {}
+    norm0, dot0 = np.empty(0), np.empty((0, 0, 0))
     for lam in range(min(lmax_max,lcut)+1):
     
 #        print("lambda =", lam)
@@ -136,6 +137,13 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
         # Compute complex to real transformation matrix for the given lambda value
         c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
     
+        # rel_power: lambda > 0 is divided by the length of lambda = 0
+        if lam == 0 and inp.descriptor.normalisation == "rel_power":
+            if gradient:
+                norm0, dot0 = sph_utils.grad_lam0_norm(natoms_tot,natoms_range,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec)
+            else:
+                norm0 = sph_utils.lam0_norm(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec)
+
         # Perform symmetry-adapted combination following Eq.S19 of Grisafi et al., PRL 120, 036002 (2018)
         if sparsify:
 
@@ -144,11 +152,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
       
-                p, grad_p = sph_utils.grad_equicombsparse_numba(natoms_tot,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
+                p, grad_p = sph_utils.grad_equicombsparse_numba(natoms_tot,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam],norm0,dot0)
             
             else:
 
-                p = sph_utils.equicombsparse_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
+                p = sph_utils.equicombsparse_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam],norm0)
 
             featsize = ncut
 
@@ -158,11 +166,11 @@ def build(lmax,nmax,lmax_max,weights,power_env_sparse,Mspe,Vmat,vfps,charge_inte
 
             if gradient:
 
-                p, grad_p = sph_utils.grad_equicomb_numba(natoms_tot,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize)
+                p, grad_p = sph_utils.grad_equicomb_numba(natoms_tot,natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,dv1,dv2,wigner3j,llmax,llvec,lam,c2r,featsize,norm0,dot0)
 
             else:
 
-                p = sph_utils.equicomb_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
+                p = sph_utils.equicomb_numba(natoms_range,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,norm0)
 
         if lam==0: 
 
