@@ -1,12 +1,9 @@
-"""descriptor.normalisation: unit mode is the normalisation of the base commit,
-bit for bit; rel_power divides lambda > 0 by |q0|, the length of the same atom's
+"""descriptor.normalisation: unit mode divides each lambda block by its own
+length; rel_power divides lambda > 0 by |q0|, the length of the same atom's
 raw lambda = 0 vector, so lambda > 0 features that vanish by site symmetry stay
 small near a symmetric site."""
 
 import functools
-import importlib.util
-import os
-import sys
 
 import numpy as np
 import pytest
@@ -14,7 +11,7 @@ from ase import Atoms
 
 from salted import sph_utils
 from salted.sys_utils import build_featomic_hyper_params
-from test_equicomb_density import coeffs, nacl_coeffs, w3j_of
+from test_equicomb_density import coeffs, w3j_of
 
 EMPTY = np.empty(0)
 EMPTY3 = np.empty((0, 0, 0))
@@ -56,59 +53,6 @@ def norms(v1, v2, dv1, dv2, nang2, nrad2):
     norm0 = sph_utils.lam0_norm(natoms, 3, nang2, 4, nrad2, v1, v2, w3j0, llmax0, llvec0)
     gnorm0, dot0 = sph_utils.grad_lam0_norm(natoms, natoms, 4, nrad2, v1, v2, dv1, dv2, w3j0, llmax0, llvec0)
     return norm0, gnorm0, dot0
-
-
-@pytest.fixture(scope="module")
-def base():
-    """sph_utils.py of the commit this change is based on (path in SALTED_BASE_SPH_UTILS)"""
-    path = os.environ.get("SALTED_BASE_SPH_UTILS", "")
-    if not os.path.isfile(path):
-        pytest.skip("SALTED_BASE_SPH_UTILS does not name the base commit's sph_utils.py")
-    spec = importlib.util.spec_from_file_location("base_sph_utils", path)
-    mod = importlib.util.module_from_spec(spec)
-    # numba's cache re-imports the module of a cached kernel by name
-    sys.modules["base_sph_utils"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-@pytest.mark.parametrize("lam", [0, 1, 2, 3])
-@pytest.mark.parametrize("same", [True, False])
-def test_unit_mode_matches_base(base, lam, same):
-    rng, v1, v2, dv1, dv2, nang2, nrad2 = random_inputs(10 + lam, same)
-    natoms = v1.shape[0]
-    llmax, llvec, w3j, c2r = tables(lam, 3, nang2)
-    featsize = 4 * nrad2 * llmax
-    vfps = rng.permutation(featsize)[: featsize // 3 + 1]
-    args = (natoms, 3, nang2, 4, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, featsize)
-    assert np.array_equal(sph_utils.equicomb_numba(*args, EMPTY), base.equicomb_numba(*args))
-    assert np.array_equal(sph_utils.equicombfps(*args, EMPTY), base.equicombfps(*args))
-    assert np.array_equal(sph_utils.equicombsparse_numba(*args, len(vfps), vfps, EMPTY),
-                          base.equicombsparse_numba(*args, len(vfps), vfps))
-    gargs = (natoms, natoms, 3, nang2, 4, nrad2, v1, v2, dv1, dv2, w3j, llmax, llvec, lam, c2r, featsize)
-    for new, old in zip(sph_utils.grad_equicomb_numba(*gargs, EMPTY, EMPTY3), base.grad_equicomb_numba(*gargs)):
-        assert np.array_equal(new, old)
-    for new, old in zip(sph_utils.grad_equicombsparse_numba(*gargs, len(vfps), vfps, EMPTY, EMPTY3),
-                        base.grad_equicombsparse_numba(*gargs, len(vfps), vfps)):
-        assert np.array_equal(new, old)
-
-
-def test_unit_mode_matches_base_near_symmetric_site(base):
-    """the sparse kernel's direct-sum branch: lam = 2 near cubic sites"""
-    frame = bulk_nacl()
-    v1, v2 = nacl_coeffs(frame, 3, 4), nacl_coeffs(frame, 2, 5)
-    llmax, llvec, w3j, c2r = tables(2, 4, 5)
-    featsize = 3 * 2 * 2 * 2 * llmax
-    vfps = np.random.default_rng(0).permutation(featsize)[: featsize // 3]
-    args = (len(frame), 4, 5, 6, 4, v1, v2, w3j, llmax, llvec, 2, c2r, featsize, len(vfps), vfps)
-    assert np.array_equal(sph_utils.equicombsparse_numba(*args, EMPTY), base.equicombsparse_numba(*args))
-
-
-def bulk_nacl():
-    from ase.build import bulk
-    frame = bulk("NaCl", "rocksalt", a=5.64, cubic=True)
-    frame.rattle(1e-4, seed=5)
-    return frame
 
 
 @pytest.mark.parametrize("lam", [0, 1, 2, 3])

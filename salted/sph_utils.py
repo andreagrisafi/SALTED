@@ -753,9 +753,10 @@ def _wigner_tables(w3j, llmax, llvec, lam, c2r, nang1):
 
 
 @_njit_cached(fastmath = True)
-def _atom_norm2(W, cpm, llvec, lam, v1, v2, iat, nang1, nang2, nrad1, nrad2):
+def _atom_norm2(W, cpm, llvec, lam, v1, v2, iat, nang1, nang2, nrad1, nrad2, direct):
     """sum of the squares of all features of atom iat, and the bound of _norm2;
-    the sum is valid only where the bound is finite"""
+    the sum is valid only where the bound is finite, and near cancellation only
+    with direct"""
     A1 = _density_matrix(v1, iat, nang1, nrad1)
     # v2 is a copy of v1 when rep1 == rep2
     if nang1 == nang2 and nrad1 == nrad2 and _same_atom(v1, v2, iat):
@@ -766,7 +767,7 @@ def _atom_norm2(W, cpm, llvec, lam, v1, v2, iat, nang1, nang2, nrad1, nrad2):
     # bound sums |v|^2 over every coefficient the features read; the terms of the
     # density-matrix sum are of size bound, and where they cancel to a small
     # fraction of it the features are summed directly
-    if _finite(bound) and inner < 1e-3 * bound:
+    if direct and _finite(bound) and inner < 1e-3 * bound:
         inner = _norm2_direct(W, cpm, llvec, lam, v1, v2, iat, nrad1, nrad2)
     return inner, bound
 
@@ -778,17 +779,17 @@ def lam0_norm(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec):
     w3j, llmax and llvec are those of lambda = 0.
 
     The equicomb kernels take it as norm0: with descriptor.normalisation
-    rel_power, lambda > 0 is divided by norm0 in place of its own length;
-    an empty norm0 is unit normalisation."""
+    rel_power, lambda > 0 is divided by norm0; an empty norm0 is unit
+    normalisation."""
     W, cpm = _wigner_tables(w3j, llmax, llvec, 0, np.ones((1, 1), dtype=np.complex128), nang1)
     norm0 = np.zeros(natoms, dtype=np.float64)
     for iat in prange(natoms):
-        inner, bound = _atom_norm2(W, cpm, llvec, 0, v1, v2, iat, nang1, nang2, nrad1, nrad2)
+        inner, bound = _atom_norm2(W, cpm, llvec, 0, v1, v2, iat, nang1, nang2, nrad1, nrad2, True)
         norm0[iat] = np.sqrt(inner)
     return norm0
 
 
-@njit(parallel=True, fastmath = True)
+@_njit_cached(parallel=True, fastmath = True)
 def grad_lam0_norm(natoms,natoms_range,nrad1,nrad2,v1,v2,dv1,dv2,w3j,llmax,llvec):
     """|q0| of each atom as the gradient kernels compute it for lambda = 0, and
     dot0[iat, i_grad, x] = q0 . dq0 / dr_x(i_grad): the norm0 and dot0 arguments
@@ -825,7 +826,7 @@ def grad_lam0_norm(natoms,natoms_range,nrad1,nrad2,v1,v2,dv1,dv2,w3j,llmax,llvec
 def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps,norm0):
     """The nfps features vfps of each atom's lam-SOAP vector, normalised over
     all featsize = nrad1*nrad2*llmax features.  Only the nfps features are built.
-    With a non-empty norm0 (lam0_norm), lam > 0 is divided by norm0 instead.
+    With a non-empty norm0 (lam0_norm), lam > 0 is divided by norm0.
     An atom whose features are all zero gets zero features; an atom with a NaN
     or inf coefficient gets NaN features.
 
@@ -867,7 +868,9 @@ def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,la
 
     p = np.zeros((natoms, nmu, nfps), dtype=np.float64)
     for iat in prange(natoms):
-        inner, bound = _atom_norm2(W, cpm, llvec, lam, v1, v2, iat, nang1, nang2, nrad1, nrad2)
+        # with rel_power only the bound of lam > 0 is used
+        inner, bound = _atom_norm2(W, cpm, llvec, lam, v1, v2, iat, nang1, nang2, nrad1, nrad2,
+                                   norm0.size == 0 or lam == 0)
         if not _finite(bound):
             p[iat,:,:] = np.nan
             continue

@@ -65,7 +65,7 @@ For all the path-related variables, the path can be either a relative path or an
 
 | var name | type | default | usage |
 | -:| :-: | :-: | :- |
-| `normalisation` | `str` | `unit` | Normalisation of each atom's lambda-SOAP vectors. `unit`: every lambda block is divided by its own length. `rel_power`: lambda = 0 is divided by its own length and every lambda > 0 block by the length of the same atom's lambda = 0 vector, so lambda > 0 features that vanish by site symmetry stay small near a symmetric site. Training and prediction must use the same value. |
+| `normalisation` | `Literal["unit"] \| Literal["rel_power"]` | `"unit"` | Normalisation of each atom's lambda-SOAP vectors. `unit`: every lambda block is divided by its own length. `rel_power`: lambda = 0 is divided by its own length and every lambda > 0 block by the length of the same atom's lambda = 0 vector, so lambda > 0 features that vanish by site symmetry stay small near a symmetric site. With `rel_power` the lambda > 0 kernels are no longer of unit scale, so `gpr.eigcut` and `gpr.regul` act on them on a different scale. Training and prediction must use the same value. |
 
 ### Prediction variabls `inp.predict`
 
