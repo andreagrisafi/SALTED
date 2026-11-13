@@ -64,3 +64,11 @@ To run a parallel job usig Slurm, use `srun` with the Apptainer image:
 ```
 
 This setup allows seamless integration of SALTED across local development environments and HPC systems, maintaining consistent dependencies and runtime behavior.
+
+### Numba cache
+
+SALTED's numba kernels are compiled on their first call and stored in numba's cache, so later runs load them in a fraction of a second. Inside the image the SALTED installation is read-only, and numba then writes its cache to the user's home directory. If the home directory is not writable inside the container either, numba has nowhere to write: the sparse equicomb kernels then print a warning and are compiled in every run, and the modules that import `salted.cp2k.utils` or `salted.numba_sparse` (for example `salted_prediction` and `hessian_matrix`) fail at import. Point `NUMBA_CACHE_DIR` to a writable folder that persists between runs:
+
+```bash
+  apptainer exec --env NUMBA_CACHE_DIR=$HOME/.cache/numba salted.sif [COMMAND]
+```

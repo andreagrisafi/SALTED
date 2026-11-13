@@ -1,7 +1,7 @@
-import functools
 import sys
 import math
 import time
+import warnings
 import numpy as np
 from scipy import special
 from ase import Atoms
@@ -580,147 +580,193 @@ def grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv
                     grad_p[i_grad,2,iat,imu,ifeat] = (grad_ptemp[ifeat,imu,i_grad,2] / normfact) - ptemp[ifeat,imu] * dot3[i_grad] / (normfact3)
     return p, grad_p
 
-@njit(fastmath = True, cache = True)
+def _njit_cached(**options):
+    """njit with cache=True; numba raises at decoration when it has no writable
+    cache location, and the function is then compiled in every process."""
+    def decorate(func):
+        try:
+            return njit(cache=True, **options)(func)
+        except RuntimeError as err:
+            if "no locator available" not in str(err):
+                raise
+            warnings.warn("numba cannot write its cache here; SALTED compiles its sparse "
+                          "equicomb kernel in every run. Set NUMBA_CACHE_DIR to a writable folder.")
+            return njit(**options)(func)
+    return decorate
+
+
+@_njit_cached(fastmath = True)
 def _density_matrix(v, iat, nang, nrad):
-    """A[l, m, m'] = sum_n v[n, l, m] conj(v[n, l, m']) of one atom."""
+    """Lower triangle (m >= m') of A[l, m, m'] = sum_n v[n, l, m] conj(v[n, l, m'])
+    of one atom.  Only m >= m' is filled."""
     nm = 2*nang+1
-    A = np.zeros((nang+1, nm, nm), dtype=np.complex128)
+    A = np.empty((nang+1, nm, nm), dtype=np.complex128)
+    X = np.empty((nm, nrad), dtype=np.complex128)
     for l in range(nang+1):
+        # X[m, n] = v[n, l, m]: the sums over n run over contiguous memory
         for n in range(nrad):
             for i in range(2*l+1):
-                x = v[iat,n,l,i]
-                for j in range(i, 2*l+1):  # upper triangle; A is Hermitian
-                    A[l,i,j] += x * np.conj(v[iat,n,l,j])
-        for i in range(2*l+1):
-            for j in range(i):
-                A[l,i,j] = np.conj(A[l,j,i])
+                X[i,n] = v[iat,n,l,i]
+        # A[-m', -m] = (-1)^(m+m') A[m, m'] for a real density
+        for i in range(l+1):
+            for j in range(i, 2*l+1-i):
+                s = 0j
+                for n in range(nrad):
+                    s += X[j,n] * np.conj(X[i,n])
+                A[l,j,i] = s
+                A[l,2*l-i,2*l-j] = (1.0 - 2.0*((i+j) % 2)) * s
+        # the diagonal of m > 0 summed directly, so every coefficient enters the trace
+        for i in range(l+1, 2*l+1):
+            d = 0.0
+            for n in range(nrad):
+                d += X[i,n].real * X[i,n].real + X[i,n].imag * X[i,n].imag
+            A[l,i,i] = d
     return A
 
 
-@njit(cache = True)
+@_njit_cached(fastmath = False)
+def _finite(x):
+    """x is neither NaN nor inf"""
+    return np.isfinite(x)
+
+
+@_njit_cached()
 def _same_atom(v1, v2, iat):
-    """v1[iat] == v2[iat]"""
+    """v1[iat] == v2[iat], compared on m <= 0 (m > 0 follows for a real density)"""
     for n in range(v1.shape[1]):
         for l in range(v1.shape[2]):
-            for m in range(v1.shape[3]):
+            for m in range(l+1):
                 if v1[iat,n,l,m] != v2[iat,n,l,m]:
                     return False
     return True
 
 
-@njit(fastmath = True, cache = True)
-def _pair_sum(W, il, imu, imu2, l1, l2, lam, M1, M2):
-    """sum over m1, m1' of W[il, mu, m1] W[il, mu', m1'] M1[l1, m1, m1']
-    conj(M2[l2, m1 - mu, m1' - mu'])."""
-    s = 0j
-    for i in range(2*l1+1):
-        j = i-l1-(imu-lam)+l2
-        if j < 0 or j > 2*l2 or W[il,imu,i] == 0.0:
-            continue
-        for i2 in range(2*l1+1):
-            j2 = i2-l1-(imu2-lam)+l2
-            if j2 < 0 or j2 > 2*l2:
-                continue
-            s += W[il,imu,i] * W[il,imu2,i2] * M1[l1,i,i2] * np.conj(M2[l2,j,j2])
-    return s
+@_njit_cached(fastmath = True)
+def _norm2(W, llvec, lam, A1, A2):
+    """sum over all features of |pc|^2 from the density matrices:
+    sum_il sum_mu sum_{m1, m1'} W[il, mu, m1] W[il, mu, m1']
+    Re(A1[l1, m1, m1'] conj(A2[l2, m1 - mu, m1' - mu])),
+    and its upper bound sum_il tr(A1[l1]) tr(A2[l2]) / (2 lam + 1)."""
+    inner = 0.0
+    bound = 0.0
+    for il in range(llvec.shape[0]):
+        l1, l2 = llvec[il,0], llvec[il,1]
+        tr1 = 0.0
+        for i in range(2*l1+1):
+            tr1 += A1[l1,i,i].real
+        tr2 = 0.0
+        for j in range(2*l2+1):
+            tr2 += A2[l2,j,j].real
+        bound += tr1 * tr2
+        for mu in range(lam+1):
+            # im1 = i0+t pairs with im2 = j0+t (m2 = m1-mu), t = 0..cnt-1
+            i0 = max(0, l1+mu-l2)
+            j0 = max(0, l2-l1-mu)
+            cnt = min(2*l1-i0, 2*l2-j0)+1
+            # s is half the sum over (m1, m1'): diagonal halved, each pair m1 > m1' once
+            s = 0.0
+            for t in range(cnt):
+                x = 0.5 * W[il,mu,i0+t] * A1[l1,i0+t,i0+t].real * A2[l2,j0+t,j0+t].real
+                for u in range(t):
+                    x += W[il,mu,i0+u] * (A1[l1,i0+t,i0+u] * np.conj(A2[l2,j0+t,j0+u])).real
+                s += W[il,mu,i0+t] * x
+            # mu and -mu give the same term
+            inner += (2.0 if mu == 0 else 4.0) * s
+    return inner, bound / (2*lam+1)
 
 
-@njit(parallel=True, fastmath = True, cache = True)
-def equicombsparse_full_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
-    """Builds all featsize features of each atom, normalises, keeps the nfps in vfps."""
-    p = np.zeros((natoms, 2*lam+1, nfps), dtype=np.float64)
-    v2c  = np.conj(v2)
-
-    for iat in prange(natoms):
-        inner = 0.0
-        ptemp = np.zeros((featsize, 2*lam+1), dtype=np.float64)
-        ifeat = 0
+@_njit_cached(fastmath = False)
+def _norm2_direct(W, cpm, llvec, lam, v1, v2, iat, nrad1, nrad2):
+    """sum of the squares of all features of one atom, each feature computed
+    as in the feature loop of equicombsparse_numba, in strict floating point so
+    that a compiled and a cache-loaded kernel give the same sum"""
+    inner = 0.0
+    for il in range(llvec.shape[0]):
+        l1, l2 = llvec[il,0], llvec[il,1]
+        i0 = max(0, l1-l2)
+        j0 = max(0, l2-l1)
+        cnt = min(l1, l2)
         for n1 in range(nrad1):
             for n2 in range(nrad2):
-                iwig = 0
-                for il in range(llmax):
-                    l1 = llvec[il,0]
-                    l2 = llvec[il,1]
-                    pcmplx = np.zeros(2*lam+1, dtype=np.complex128)
-                    for imu in range(2*lam+1):
-                        mu = imu-lam
-                        for im1 in range(2*l1+1):
-                            m1 = im1-l1
-                            m2 = m1-mu
-                            if (abs(m2)<=l2):
-                               im2 = m2+l2
-                               v2cv  = v2c[iat,n2,l2,im2]
-                               v1v = v1[iat,n1,l1,im1]
-                               pcmplx[imu] = pcmplx[imu] + w3j[iwig] * v1v * v2cv
-                               iwig = iwig + 1
-                    preal = np.zeros(2*lam+1, dtype=np.float64)
-                    for imu in range(2*lam+1):
-                        for im1 in range(2*lam+1):
-                             preal[imu] = preal[imu] + np.real(c2r[imu,im1] * pcmplx[im1])
-                        inner = inner + preal[imu]**2
-                        ptemp[ifeat,imu] = preal[imu]
-                    ifeat = ifeat + 1
-        normfact = np.sqrt(inner)
-        for n in range(nfps):
-            ifps = vfps[n]
-            for imu in range(2*lam+1):
-                p[iat,imu,n] = ptemp[ifps,imu] / normfact
-    return p
+                x = 0.0
+                for t in range(cnt):
+                    x += W[il,0,i0+t] * (v1[iat,n1,l1,i0+t] * np.conj(v2[iat,n2,l2,j0+t])).real
+                x = 2*x + W[il,0,l1] * v1[iat,n1,l1,l1].real * v2[iat,n2,l2,l2].real
+                q = cpm[lam].real * x
+                inner += q * q
+        for mu in range(1, lam+1):
+            i0 = max(0, l1+mu-l2)
+            j0 = max(0, l2-l1-mu)
+            cnt = min(2*l1-i0, 2*l2-j0)+1
+            for n1 in range(nrad1):
+                for n2 in range(nrad2):
+                    s = 0j
+                    for t in range(cnt):
+                        s += W[il,mu,i0+t] * v1[iat,n1,l1,i0+t] * np.conj(v2[iat,n2,l2,j0+t])
+                    qp = (cpm[lam+mu] * s).real
+                    qm = (cpm[lam-mu] * s).real
+                    inner += qp * qp + qm * qm
+    return inner
 
 
-@functools.lru_cache(maxsize=None)
-def equicombsparse_costs(nang1,nang2,nrad1,nrad2,lam,nfps,same):
-    """Operation counts per atom of equicombsparse_full_numba and
-    equicombsparse_density_numba."""
-    llvec = get_angular_indexes_symmetric(lam,nang1,nang2)[1]
-    l1 = llvec[:,0,None]
-    l2 = llvec[:,1,None]
-    mu = np.arange(-lam, lam+1)[None,:]
-    # valid m1 per (il, mu): m1 in [-l1, l1] and m1 - mu in [-l2, l2]
-    cnt = np.clip(np.minimum(l1, mu+l2) - np.maximum(-l1, mu-l2) + 1, 0, None)
-    nmu = 2*lam+1
-    per_feat = 10*cnt.sum(axis=1) + 4*nmu*nmu
-    full = nrad1*nrad2*(per_feat.sum() + 2*nmu*len(llvec)) + nfps*nmu
-    reps = ((nang1,nrad1),) if same else ((nang1,nrad1),(nang2,nrad2))
-    dens = sum(8*nrad*sum((2*l+1)*(l+1) for l in range(nang+1)) for nang, nrad in reps)
-    norm = (11*cnt*cnt + 2).sum()
-    return full, dens + norm + nfps*(per_feat.mean() + nmu)
-
-
-# time per counted operation of the density kernel relative to the full kernel
-EQUICOMB_DENSITY_K = 1.0
-
-
+@_njit_cached(parallel=True, fastmath = True)
 def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
-    """Sparse lam-SOAP features: picks whichever of the two kernels is cheaper."""
-    same = v1.shape == v2.shape and np.array_equal(v1[0], v2[0])  # v2 is a copy of v1 when rep1 == rep2
-    full, density = equicombsparse_costs(nang1,nang2,nrad1,nrad2,lam,nfps,same)
-    kernel = equicombsparse_density_numba if EQUICOMB_DENSITY_K*density < full else equicombsparse_full_numba
-    return kernel(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps)
-
-
-@njit(parallel=True, fastmath = True, cache = True)
-def equicombsparse_density_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
     """The nfps features vfps of each atom's lam-SOAP vector, normalised over
-    all featsize features, without computing the features that are dropped.
+    all featsize = nrad1*nrad2*llmax features.  Only the nfps features are built.
+    An atom whose features are all zero gets zero features; an atom with a NaN
+    or inf coefficient gets NaN features.
+
+    Requires v1 and v2 from real densities, v[n, l, -m] = (-1)^m conj(v[n, l, m]),
+    llvec from get_angular_indexes_symmetric (l1 + l2 + lam even), w3j as written
+    by salted/wigner.py, and c2r from complex_to_real_transformation.
 
     Feature ifeat = (n1*nrad2 + n2)*llmax + il is q = Re(c2r @ pc) with
     pc[mu] = sum_m1 w3j * v1[n1, l1, m1] * conj(v2[n2, l2, m1 - mu]).
-    v1 and v2 expand real densities and l1 + l2 + lam is even, so c2r @ pc is
-    real and sum_mu q_mu^2 = |pc|^2 (c2r is unitary).  Summed over n1, n2 that
-    factors into the per-l density matrices of _density_matrix."""
+    Then w3j[-mu, -m1] = w3j[mu, m1] and pc[-mu] = (-1)^mu conj(pc[mu]): only
+    mu >= 0 is computed.  Row mu of c2r has entries in columns mu and -mu only,
+    so q[mu] and q[-mu] are the real parts of two complex multiples of pc[|mu|].
+    c2r @ pc is real and sum_mu q_mu^2 = |pc|^2 (c2r is unitary); summed over
+    n1, n2 that factors into the per-l density matrices of _density_matrix.
+    Where that sum cancels to a small fraction of its terms (features that
+    nearly vanish by site symmetry), the norm is summed feature by feature.
+
+    The m loops index with i0+t, j0+t (i0, j0, t >= 0), so each loop reads
+    contiguous memory."""
     nmu = 2*lam+1
-    # W[il, imu, im1]: w3j in the order the per-feature loop reads it
-    W = np.zeros((llmax, nmu, 2*nang1+1))
+    # W[il, mu, im1]: w3j of mu >= 0 in the order the per-feature loop reads it
+    W = np.zeros((llmax, lam+1, 2*nang1+1))
     iwig = 0
     for il in range(llmax):
-        l1 = llvec[il,0]
-        l2 = llvec[il,1]
+        l1, l2 = llvec[il,0], llvec[il,1]
         for imu in range(nmu):
             for im1 in range(2*l1+1):
                 if abs(im1-l1-(imu-lam)) <= l2:
-                    W[il,imu,im1] = w3j[iwig]
+                    if imu >= lam:
+                        W[il,imu-lam,im1] = w3j[iwig]
                     iwig = iwig + 1
+    # q[imu] = Re(cpm[imu] * pc[|mu|])
+    cpm = np.zeros(nmu, dtype=np.complex128)
+    cpm[lam] = c2r[lam,lam].real
+    for mu in range(1, lam+1):
+        for imu in (lam-mu, lam+mu):
+            cpm[imu] = c2r[imu,lam+mu] + (1.0 - 2.0*(mu % 2)) * np.conj(c2r[imu,lam-mu])
+    # the selected features grouped by il: features start[il]:start[il+1] have
+    # channels sn1, sn2 and go to column scol of p
+    start = np.zeros(llmax+1, dtype=np.int64)
+    for n in range(nfps):
+        start[vfps[n] % llmax + 1] += 1
+    for il in range(llmax):
+        start[il+1] += start[il]
+    nextpos = start[:-1].copy()
+    sn1 = np.empty(nfps, dtype=np.int64)
+    sn2 = np.empty(nfps, dtype=np.int64)
+    scol = np.empty(nfps, dtype=np.int64)
+    for n in range(nfps):
+        k = nextpos[vfps[n] % llmax]
+        nextpos[vfps[n] % llmax] = k + 1
+        sn1[k] = vfps[n] // (llmax * nrad2)
+        sn2[k] = (vfps[n] // llmax) % nrad2
+        scol[k] = n
 
     p = np.zeros((natoms, nmu, nfps), dtype=np.float64)
     for iat in prange(natoms):
@@ -730,35 +776,44 @@ def equicombsparse_density_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,
             A2 = A1
         else:
             A2 = _density_matrix(v2, iat, nang2, nrad2)
-        inner = 0.0
+        inner, bound = _norm2(W, llvec, lam, A1, A2)
+        # bound sums |v|^2 over every coefficient the features read
+        if not _finite(bound):
+            p[iat,:,:] = np.nan
+            continue
+        # the terms of the density-matrix sum are of size bound; where they cancel
+        # to a small fraction of it, sum the features directly
+        if inner < 1e-3 * bound:
+            inner = _norm2_direct(W, cpm, llvec, lam, v1, v2, iat, nrad1, nrad2)
+        normfact = 1 / np.sqrt(inner) if inner > 0.0 else 0.0
         for il in range(llmax):
-            l1 = llvec[il,0]
-            l2 = llvec[il,1]
-            for imu in range(nmu):
-                inner += _pair_sum(W, il, imu, imu, l1, l2, lam, A1, A2).real
-        if inner <= 0.0:
-            normfact = 0.0
-        else:
-            normfact = 1 / np.sqrt(inner)
-        pc = np.zeros(nmu, dtype=np.complex128)
-        for n in range(nfps):
-            f = vfps[n]
-            il = f % llmax
-            n2 = (f // llmax) % nrad2
-            n1 = f // (llmax * nrad2)
-            l1 = llvec[il,0]
-            l2 = llvec[il,1]
-            pc[:] = 0.0
-            for imu in range(nmu):
-                for im1 in range(2*l1+1):
-                    im2 = im1-l1-(imu-lam)+l2
-                    if im2 >= 0 and im2 <= 2*l2:
-                        pc[imu] += W[il,imu,im1] * v1[iat,n1,l1,im1] * np.conj(v2[iat,n2,l2,im2])
-            for imu in range(nmu):
-                s = 0.0
-                for k in range(nmu):
-                    s += (c2r[imu,k] * pc[k]).real
-                p[iat,imu,n] = s * normfact
+            l1, l2 = llvec[il,0], llvec[il,1]
+            # mu = 0: the terms m1 and -m1 are complex conjugates and the m1 = 0 term
+            # is real, so pc[0] = 2 Re(sum over m1 < 0) + the m1 = 0 term
+            i0 = max(0, l1-l2)
+            j0 = max(0, l2-l1)
+            cnt = min(l1, l2)
+            for k in range(start[il], start[il+1]):
+                n1 = sn1[k]
+                n2 = sn2[k]
+                x = 0.0
+                for t in range(cnt):
+                    x += W[il,0,i0+t] * (v1[iat,n1,l1,i0+t] * np.conj(v2[iat,n2,l2,j0+t])).real
+                x = 2*x + W[il,0,l1] * v1[iat,n1,l1,l1].real * v2[iat,n2,l2,l2].real
+                p[iat,lam,scol[k]] = cpm[lam].real * x * normfact
+            for mu in range(1, lam+1):
+                # im1 = i0+t pairs with im2 = j0+t (m2 = m1-mu), t = 0..cnt-1
+                i0 = max(0, l1+mu-l2)
+                j0 = max(0, l2-l1-mu)
+                cnt = min(2*l1-i0, 2*l2-j0)+1
+                for k in range(start[il], start[il+1]):
+                    n1 = sn1[k]
+                    n2 = sn2[k]
+                    s = 0j
+                    for t in range(cnt):
+                        s += W[il,mu,i0+t] * v1[iat,n1,l1,i0+t] * np.conj(v2[iat,n2,l2,j0+t])
+                    p[iat,lam+mu,scol[k]] = (cpm[lam+mu] * s).real * normfact
+                    p[iat,lam-mu,scol[k]] = (cpm[lam-mu] * s).real * normfact
     return p
 
 @njit(parallel=True, fastmath = True)
