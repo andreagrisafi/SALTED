@@ -444,7 +444,7 @@ def get_representation_gradient_coeffs_atomrange(
     return omega, domega
 
 @njit(parallel=True, fastmath = True)
-def grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
+def grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps,norm0,dot0):
     p = np.zeros((natoms_range, 2*lam+1, nfps), dtype=np.float64)
     grad_p = np.zeros((natoms, 3, natoms_range, 2*lam+1, nfps), dtype=np.float64)
     dv2c = np.conj(dv2)
@@ -501,6 +501,16 @@ def grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,
                             grad_ptemp[ifeat,imu,i_grad,2] = grad_preal[imu,i_grad,2]
                     ifeat = ifeat + 1
         normfact = np.sqrt(inner)
+        if norm0.size > 0:
+            # rel_power: lam > 0 is divided by |q0| and differentiated with q0 . dq0
+            if lam > 0:
+                normfact = norm0[iat]
+                for i_grad in range(natoms):
+                    dot1[i_grad] = dot0[iat,i_grad,0]
+                    dot2[i_grad] = dot0[iat,i_grad,1]
+                    dot3[i_grad] = dot0[iat,i_grad,2]
+            if normfact == 0.0:
+                continue
         normfact3 = normfact**3
         for n in range(nfps):
             ifps = vfps[n]
@@ -513,7 +523,7 @@ def grad_equicombsparse_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,
     return p, grad_p
 
 @njit(parallel=True, fastmath = True)
-def grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,w3j,llmax,llvec,lam,c2r,featsize):
+def grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv2,w3j,llmax,llvec,lam,c2r,featsize,norm0,dot0):
     p = np.zeros((natoms_range, 2*lam+1, featsize), dtype=np.float64)
     grad_p = np.zeros((natoms, 3, natoms_range, 2*lam+1, featsize), dtype=np.float64)
     dv2c = np.conj(dv2)
@@ -570,6 +580,16 @@ def grad_equicomb_numba(natoms,natoms_range,nang1,nang2,nrad1,nrad2,v1,v2,dv1,dv
                             grad_ptemp[ifeat,imu,i_grad,2] = grad_preal[imu,i_grad,2]
                     ifeat = ifeat + 1
         normfact = np.sqrt(inner)
+        if norm0.size > 0:
+            # rel_power: lam > 0 is divided by |q0| and differentiated with q0 . dq0
+            if lam > 0:
+                normfact = norm0[iat]
+                for i_grad in range(natoms):
+                    dot1[i_grad] = dot0[iat,i_grad,0]
+                    dot2[i_grad] = dot0[iat,i_grad,1]
+                    dot3[i_grad] = dot0[iat,i_grad,2]
+            if normfact == 0.0:
+                continue
         normfact3 = normfact**3
         for ifeat in range(featsize):
             for imu in range(2*lam+1):
@@ -709,10 +729,103 @@ def _norm2_direct(W, cpm, llvec, lam, v1, v2, iat, nrad1, nrad2):
     return inner
 
 
+@_njit_cached(fastmath = True)
+def _wigner_tables(w3j, llmax, llvec, lam, c2r, nang1):
+    """W[il, mu, im1]: w3j of mu >= 0 in the order the per-feature loop reads it,
+    and cpm with q[imu] = Re(cpm[imu] * pc[|mu|])"""
+    nmu = 2*lam+1
+    W = np.zeros((llmax, lam+1, 2*nang1+1))
+    iwig = 0
+    for il in range(llmax):
+        l1, l2 = llvec[il,0], llvec[il,1]
+        for imu in range(nmu):
+            for im1 in range(2*l1+1):
+                if abs(im1-l1-(imu-lam)) <= l2:
+                    if imu >= lam:
+                        W[il,imu-lam,im1] = w3j[iwig]
+                    iwig = iwig + 1
+    cpm = np.zeros(nmu, dtype=np.complex128)
+    cpm[lam] = c2r[lam,lam].real
+    for mu in range(1, lam+1):
+        for imu in (lam-mu, lam+mu):
+            cpm[imu] = c2r[imu,lam+mu] + (1.0 - 2.0*(mu % 2)) * np.conj(c2r[imu,lam-mu])
+    return W, cpm
+
+
+@_njit_cached(fastmath = True)
+def _atom_norm2(W, cpm, llvec, lam, v1, v2, iat, nang1, nang2, nrad1, nrad2):
+    """sum of the squares of all features of atom iat, and the bound of _norm2;
+    the sum is valid only where the bound is finite"""
+    A1 = _density_matrix(v1, iat, nang1, nrad1)
+    # v2 is a copy of v1 when rep1 == rep2
+    if nang1 == nang2 and nrad1 == nrad2 and _same_atom(v1, v2, iat):
+        A2 = A1
+    else:
+        A2 = _density_matrix(v2, iat, nang2, nrad2)
+    inner, bound = _norm2(W, llvec, lam, A1, A2)
+    # bound sums |v|^2 over every coefficient the features read; the terms of the
+    # density-matrix sum are of size bound, and where they cancel to a small
+    # fraction of it the features are summed directly
+    if _finite(bound) and inner < 1e-3 * bound:
+        inner = _norm2_direct(W, cpm, llvec, lam, v1, v2, iat, nrad1, nrad2)
+    return inner, bound
+
+
 @_njit_cached(parallel=True, fastmath = True)
-def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps):
+def lam0_norm(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec):
+    """|q0| of each atom: the length of its raw lambda = 0 vector over all
+    nrad1*nrad2*llmax features, as equicombsparse_numba computes it for lambda = 0.
+    w3j, llmax and llvec are those of lambda = 0.
+
+    The equicomb kernels take it as norm0: with descriptor.normalisation
+    rel_power, lambda > 0 is divided by norm0 in place of its own length;
+    an empty norm0 is unit normalisation."""
+    W, cpm = _wigner_tables(w3j, llmax, llvec, 0, np.ones((1, 1), dtype=np.complex128), nang1)
+    norm0 = np.zeros(natoms, dtype=np.float64)
+    for iat in prange(natoms):
+        inner, bound = _atom_norm2(W, cpm, llvec, 0, v1, v2, iat, nang1, nang2, nrad1, nrad2)
+        norm0[iat] = np.sqrt(inner)
+    return norm0
+
+
+@njit(parallel=True, fastmath = True)
+def grad_lam0_norm(natoms,natoms_range,nrad1,nrad2,v1,v2,dv1,dv2,w3j,llmax,llvec):
+    """|q0| of each atom as the gradient kernels compute it for lambda = 0, and
+    dot0[iat, i_grad, x] = q0 . dq0 / dr_x(i_grad): the norm0 and dot0 arguments
+    of grad_equicomb_numba and grad_equicombsparse_numba"""
+    norm0 = np.zeros(natoms_range, dtype=np.float64)
+    dot0 = np.zeros((natoms_range, natoms, 3), dtype=np.float64)
+    for iat in prange(natoms_range):
+        inner = 0.0
+        dpc = np.zeros((natoms, 3), dtype=np.complex128)
+        for n1 in range(nrad1):
+            for n2 in range(nrad2):
+                iwig = 0
+                for il in range(llmax):
+                    l = llvec[il,0]
+                    pc = 0j
+                    dpc[:] = 0.0
+                    for im in range(2*l+1):
+                        a = v1[iat,n1,l,im]
+                        b = np.conj(v2[iat,n2,l,im])
+                        pc += w3j[iwig] * a * b
+                        for i_grad in range(natoms):
+                            for x in range(3):
+                                dpc[i_grad,x] += w3j[iwig] * (dv1[iat,n1,l,im,i_grad,x] * b + a * np.conj(dv2[iat,n2,l,im,i_grad,x]))
+                        iwig = iwig + 1
+                    inner = inner + pc.real**2
+                    for i_grad in range(natoms):
+                        for x in range(3):
+                            dot0[iat,i_grad,x] += pc.real * dpc[i_grad,x].real
+        norm0[iat] = np.sqrt(inner)
+    return norm0, dot0
+
+
+@_njit_cached(parallel=True, fastmath = True)
+def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,nfps,vfps,norm0):
     """The nfps features vfps of each atom's lam-SOAP vector, normalised over
     all featsize = nrad1*nrad2*llmax features.  Only the nfps features are built.
+    With a non-empty norm0 (lam0_norm), lam > 0 is divided by norm0 instead.
     An atom whose features are all zero gets zero features; an atom with a NaN
     or inf coefficient gets NaN features.
 
@@ -733,23 +846,7 @@ def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,la
     The m loops index with i0+t, j0+t (i0, j0, t >= 0), so each loop reads
     contiguous memory."""
     nmu = 2*lam+1
-    # W[il, mu, im1]: w3j of mu >= 0 in the order the per-feature loop reads it
-    W = np.zeros((llmax, lam+1, 2*nang1+1))
-    iwig = 0
-    for il in range(llmax):
-        l1, l2 = llvec[il,0], llvec[il,1]
-        for imu in range(nmu):
-            for im1 in range(2*l1+1):
-                if abs(im1-l1-(imu-lam)) <= l2:
-                    if imu >= lam:
-                        W[il,imu-lam,im1] = w3j[iwig]
-                    iwig = iwig + 1
-    # q[imu] = Re(cpm[imu] * pc[|mu|])
-    cpm = np.zeros(nmu, dtype=np.complex128)
-    cpm[lam] = c2r[lam,lam].real
-    for mu in range(1, lam+1):
-        for imu in (lam-mu, lam+mu):
-            cpm[imu] = c2r[imu,lam+mu] + (1.0 - 2.0*(mu % 2)) * np.conj(c2r[imu,lam-mu])
+    W, cpm = _wigner_tables(w3j, llmax, llvec, lam, c2r, nang1)
     # the selected features grouped by il: features start[il]:start[il+1] have
     # channels sn1, sn2 and go to column scol of p
     start = np.zeros(llmax+1, dtype=np.int64)
@@ -770,22 +867,13 @@ def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,la
 
     p = np.zeros((natoms, nmu, nfps), dtype=np.float64)
     for iat in prange(natoms):
-        A1 = _density_matrix(v1, iat, nang1, nrad1)
-        # v2 is a copy of v1 when rep1 == rep2
-        if nang1 == nang2 and nrad1 == nrad2 and _same_atom(v1, v2, iat):
-            A2 = A1
-        else:
-            A2 = _density_matrix(v2, iat, nang2, nrad2)
-        inner, bound = _norm2(W, llvec, lam, A1, A2)
-        # bound sums |v|^2 over every coefficient the features read
+        inner, bound = _atom_norm2(W, cpm, llvec, lam, v1, v2, iat, nang1, nang2, nrad1, nrad2)
         if not _finite(bound):
             p[iat,:,:] = np.nan
             continue
-        # the terms of the density-matrix sum are of size bound; where they cancel
-        # to a small fraction of it, sum the features directly
-        if inner < 1e-3 * bound:
-            inner = _norm2_direct(W, cpm, llvec, lam, v1, v2, iat, nrad1, nrad2)
         normfact = 1 / np.sqrt(inner) if inner > 0.0 else 0.0
+        if norm0.size > 0 and lam > 0:
+            normfact = 1 / norm0[iat] if norm0[iat] > 0.0 else 0.0
         for il in range(llmax):
             l1, l2 = llvec[il,0], llvec[il,1]
             # mu = 0: the terms m1 and -m1 are complex conjugates and the m1 = 0 term
@@ -817,7 +905,7 @@ def equicombsparse_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,la
     return p
 
 @njit(parallel=True, fastmath = True)
-def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize):
+def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,featsize,norm0):
     p = np.zeros((natoms, 2*lam+1, featsize), dtype=np.float64)
     v2c  = np.conj(v2)
 
@@ -851,13 +939,19 @@ def equicomb_numba(natoms,nang1,nang2,nrad1,nrad2,v1,v2,w3j,llmax,llvec,lam,c2r,
                         ptemp[ifeat,imu] = preal[imu]
                     ifeat = ifeat + 1
         normfact = np.sqrt(inner)
+        if norm0.size > 0:
+            # rel_power: lam > 0 is divided by |q0|; an atom without density keeps zeros
+            if lam > 0:
+                normfact = norm0[iat]
+            if normfact == 0.0:
+                continue
         for ifeat in range(featsize):
             for imu in range(2*lam+1):
                 p[iat,imu,ifeat] = ptemp[ifeat,imu] / normfact
     return p
 
 @njit(parallel=True, fastmath = True)
-def equicombfps(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, featsize):
+def equicombfps(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, featsize, norm0):
     p = np.zeros((featsize, natoms * (2*lam+1)), dtype=np.float64)
     v2c  = np.conj(v2)
     for iat in prange(natoms):
@@ -890,6 +984,12 @@ def equicombfps(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, l
                         ptemp[ifeat, imu] = preal[imu]
                     ifeat = ifeat + 1
         normfact = np.sqrt(inner)
+        if norm0.size > 0:
+            # rel_power: lam > 0 is divided by |q0|; an atom without density keeps zeros
+            if lam > 0:
+                normfact = norm0[iat]
+            if normfact == 0.0:
+                continue
         for ifeat in range(featsize):
             for imu in range(2*lam+1):
                 p[ifeat, iat*(2*lam+1) + imu] = ptemp[ifeat, imu] / normfact

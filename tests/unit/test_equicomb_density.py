@@ -46,7 +46,7 @@ def sparse_and_dense(v1, v2, nang1, nang2, lam, rng):
     featsize = nrad1 * nrad2 * llmax
     vfps = rng.permutation(featsize)[: max(1, featsize // 3)]
     args = (natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, featsize)
-    return sph_utils.equicombsparse_numba(*args, len(vfps), vfps), sph_utils.equicomb_numba(*args)[:, :, vfps]
+    return sph_utils.equicombsparse_numba(*args, len(vfps), vfps, np.empty(0)), sph_utils.equicomb_numba(*args, np.empty(0))[:, :, vfps]
 
 
 @pytest.mark.parametrize("lam", [0, 1, 2, 3])
@@ -115,7 +115,7 @@ def test_import_without_writable_numba_cache(tmp_path):
               "v = np.zeros((1, 1, 2, 3), complex); v[0, 0, 0, 0] = 1.0\n"
               "c2r = sph_utils.complex_to_real_transformation([1])[0]\n"
               "p = sph_utils.equicombsparse_numba(1, 1, 1, 1, 1, v, v.copy(), np.array([1.0, -1/np.sqrt(3), 1/np.sqrt(3), -1/np.sqrt(3)]),\n"
-              "                                   llmax, llvec, 0, c2r, llmax, 1, np.array([0]))\n"
+              "                                   llmax, llvec, 0, c2r, llmax, 1, np.array([0]), np.empty(0))\n"
               "assert abs(abs(p[0, 0, 0]) - 1.0) < 1e-12, p\n")
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")

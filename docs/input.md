@@ -61,6 +61,12 @@ For all the path-related variables, the path can be either a relative path or an
 | `nsamples` | `int` | `100` | Number of structures to use for feature sparsification. |
 | `ncut` | `int` | `0` | Sets maximum number of sparse (by FPS) descriptor features to retain. `0` for no sparsification. |
 
+### Descriptor normalisation `inp.descriptor.normalisation`
+
+| var name | type | default | usage |
+| -:| :-: | :-: | :- |
+| `normalisation` | `str` | `unit` | Normalisation of each atom's lambda-SOAP vectors. `unit`: every lambda block is divided by its own length. `rel_power`: lambda = 0 is divided by its own length and every lambda > 0 block by the length of the same atom's lambda = 0 vector, so lambda > 0 features that vanish by site symmetry stay small near a symmetric site. Training and prediction must use the same value. |
+
 ### Prediction variabls `inp.predict`
 
 Remember to set `inp.predict` if one wants to predict densities.
