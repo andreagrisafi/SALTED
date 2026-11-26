@@ -10,6 +10,7 @@ system:
 
 # quantum mechanical info
 qm:
+  numbering_start: 0  # Published SALTED-datasets numbering
   path2qm: ./
   qmcode: aims
   dfbasis: FHI-aims-clusters

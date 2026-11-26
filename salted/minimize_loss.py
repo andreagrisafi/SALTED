@@ -10,6 +10,7 @@ from scipy import sparse
 from salted import get_averages
 from salted.sys_utils import (
     ParseConfig,
+    check_reference_file_numbering,
     check_MPI_tasks_count,
     detect_mpi,
     distribute_jobs,
@@ -42,6 +43,7 @@ def build():
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = (
         read_system()
     )
+    check_reference_file_numbering(inp, inp.salted.saltedpath, check_names=("coefficients", "overlap", "rkhs"))
 
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata, natoms, species, atomic_symbols)
 
@@ -87,8 +89,9 @@ def build():
     if rank == 0:
         np.savetxt(
             osp.join(saltedpath, rdir, f"training_set_N{Ntrain}.txt"),
-            trainrangetot,
+            np.asarray(trainrangetot, dtype=int) + inp.qm.numbering_start,
             fmt="%i",
+            header=f"numbering_start: {inp.qm.numbering_start}",
         )
     # trainrangetot = np.loadtxt("training_set.txt",int)
 
@@ -123,7 +126,7 @@ def build():
                     osp.join(
                         saltedpath,
                         "coefficients",
-                        f"coefficients_conf{trainrange[iconf]}.npy",
+                        f"coefficients_conf{trainrange[iconf] + inp.qm.numbering_start}.npy",
                     )
                 )
 
@@ -168,7 +171,7 @@ def build():
                         osp.join(
                             saltedpath,
                             f"coefficients/{icart}/",
-                            f"coefficients_conf{trainrange[iconf]}.npy",
+                            f"coefficients_conf{trainrange[iconf] + inp.qm.numbering_start}.npy",
                         )
                     )
 
@@ -212,7 +215,7 @@ def build():
 
                 # load reference QM data
                 ref_coefs = np.load(osp.join(
-                    saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf]}.npy"
+                    saltedpath, "coefficients", f"coefficients_conf{trainrange[iconf] + inp.qm.numbering_start}.npy"
                 ))
 
                 if average:
@@ -251,7 +254,7 @@ def build():
 
                     # load reference QM data
                     ref_coefs = np.load(osp.join(
-                        saltedpath, "coefficients", f"{icart}/coefficients_conf{trainrange[iconf]}.npy"
+                        saltedpath, "coefficients", f"{icart}/coefficients_conf{trainrange[iconf] + inp.qm.numbering_start}.npy"
                     ))
 
                     # rebuild predicted coefficients
@@ -332,17 +335,17 @@ def build():
     psi_list = []
     for iconf in trainrange:
         ovlp_list.append(
-            load_overlap(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf}.npy"))
+            load_overlap(osp.join(saltedpath, "overlaps", f"overlap_conf{iconf + inp.qm.numbering_start}.npy"))
         )
         # load feature vector as a scipy sparse object
         if saltedtype=="density":
             psi_list.append(sparse.load_npz(osp.join(
-              saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+              saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf + inp.qm.numbering_start}.npz"
             )))
         elif saltedtype=="density-response":
             for icart in ["x","y","z"]:
                 psi_list.append(sparse.load_npz(osp.join(
-                  saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
+                  saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf + inp.qm.numbering_start}_{icart}.npz"
                 )))
 
     totsize = psi_list[0].shape[1]

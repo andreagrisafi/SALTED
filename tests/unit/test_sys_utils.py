@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from salted.sys_utils import detect_mpi, distribute_jobs
+from salted.sys_utils import detect_mpi, distribute_jobs, load_training_set
 
 
 def test_detect_mpi_serial():
@@ -64,3 +64,16 @@ def test_distribute_jobs_preserves_type():
     comm2 = FakeComm(2)
     out2 = distribute_jobs(comm2, [0, 1, 2, 3, 4])
     assert isinstance(out2, list)
+
+
+def test_training_set_disk_numbering(tmp_path):
+    path = tmp_path / "training_set_N2.txt"
+    for start in (0, 1):
+        path.write_text(f"# numbering_start: {start}\n{5 + start}\n{2 + start}\n")
+        np.testing.assert_array_equal(load_training_set(path), [5, 2])
+
+
+def test_headerless_training_set_uses_zero_based_indices(tmp_path):
+    path = tmp_path / "training_set_N2.txt"
+    path.write_text("5\n2\n")
+    np.testing.assert_array_equal(load_training_set(path), [5, 2])

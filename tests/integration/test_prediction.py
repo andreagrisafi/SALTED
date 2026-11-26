@@ -63,8 +63,6 @@ def test_prediction_matches_validation(serial_run: PipelineWorkspace, predictor:
     frames = read(serial_run.root / serial_run.inp["system"]["filename"], ":")
 
     vdir = serial_run.validation_output_dir
-    # COEFFS-<n>.dat is named by the 1-based configuration index (works for
-    # both sequential and random training-set selection)
     coeff_files = sorted(
         vdir.glob("COEFFS-*.dat"),
         key=lambda f: int(re.fullmatch(r"COEFFS-(\d+)\.dat", f.name).group(1)),
@@ -74,7 +72,7 @@ def test_prediction_matches_validation(serial_run: PipelineWorkspace, predictor:
     # all validation configurations must match; collect every deviation
     failures = []
     for fpath in coeff_files:
-        iconf = int(re.fullmatch(r"COEFFS-(\d+)\.dat", fpath.name).group(1)) - 1
+        iconf = int(re.fullmatch(r"COEFFS-(\d+)\.dat", fpath.name).group(1)) - serial_run.predict_coeffs_numbering_start
         coefs = predictor(frames[iconf].copy())[0]
         ref = np.loadtxt(fpath)
         assert coefs.shape == ref.shape
@@ -139,7 +137,7 @@ def test_prediction_step_matches_validation(serial_run: PipelineWorkspace, valse
     vdir = ws.validation_output_dir
     # the validation step must have predicted exactly these structures,
     # else the training-set selection logic changed and the mapping below is wrong
-    written = {int(f.stem.split("-")[1]) - 1 for f in ws.coeff_dirs(vdir)[0].glob("COEFFS-*.dat")}
+    written = {int(f.stem.split("-")[1]) - ws.predict_coeffs_numbering_start for f in ws.coeff_dirs(vdir)[0].glob("COEFFS-*.dat")}
     assert written == set(vidx.tolist()), (
         f"{ws.name}: validation COEFFS indices disagree with the training-set "
         f"complement (train/validation split logic changed?)"
@@ -151,7 +149,7 @@ def test_prediction_step_matches_validation(serial_run: PipelineWorkspace, valse
         # one file per structure for density, one per Cartesian component for
         # density-response; both lists come back in the same component order
         for pred_f, ref_f in zip(
-            ws.coeff_files(valset_prediction, k + 1), ws.coeff_files(vdir, iconf + 1)
+            ws.coeff_files(valset_prediction, k), ws.coeff_files(vdir, iconf)
         ):
             pred = np.loadtxt(pred_f)
             ref = np.loadtxt(ref_f)
@@ -184,7 +182,7 @@ def test_prediction_step_mpi_matches_serial(
         ws.run_step("prediction", mpi=workspaces.mpi_cmd)
 
     mdir = ws.prediction_output_dir("valmpi")
-    for k in range(1, len(ws.validation_indices()) + 1):
+    for k in range(len(ws.validation_indices())):
         # one file per structure for density, one per Cartesian component for
         # density-response; both lists come back in the same component order
         for serial_f, mpi_f in zip(ws.coeff_files(valset_prediction, k), ws.coeff_files(mdir, k)):

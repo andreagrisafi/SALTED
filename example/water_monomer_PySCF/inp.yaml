@@ -11,6 +11,7 @@ system:
 
 # quantum mechanical info
 qm:
+  numbering_start: 0  # Published SALTED-datasets numbering
   path2qm: ./
   qmcode: pyscf
   dfbasis: RI-cc-pvqz
@@ -22,7 +23,7 @@ prediction:
   filename: ./water_dimers_10.xyz
   predname: dimer
 
-# descriptor parameters 
+# descriptor parameters
 descriptor:
   rep1:
     type: rho

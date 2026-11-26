@@ -5,7 +5,7 @@ import os.path as osp
 
 import numpy as np
 
-from salted.sys_utils import ParseConfig, detect_mpi, distribute_jobs, read_system
+from salted.sys_utils import ParseConfig, load_training_set, detect_mpi, distribute_jobs, read_system
 
 
 def build():
@@ -32,13 +32,16 @@ def build():
         rdir = f"regrdir_{saltedname}"
 
         # define validation set
-        trainrangetot = np.loadtxt(osp.join(
+        trainrangetot = load_training_set(osp.join(
             inp.salted.saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
-        ), int)
+        ))
         structure_list = np.setdiff1d(list(range(ndata)),trainrangetot)
-        np.savetxt(osp.join(
-            inp.salted.saltedpath, f"temp_validation_set.txt"), structure_list,fmt='%i'
-        )
+        if rank == 0:
+            np.savetxt(
+                osp.join(inp.salted.saltedpath, "temp_validation_set.txt"),
+                structure_list + inp.qm.numbering_start,
+                fmt="%i",
+            )
         datadir = 'data'
 
     else:
@@ -66,7 +69,7 @@ def build():
                 t = np.loadtxt(os.path.join(
                     inp.salted.saltedpath, pdir,
                     f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
-                    x[j], f"COEFFS-{i+1}.dat",
+                    x[j], f"COEFFS-{i + inp.qm.predict_coeffs_numbering_start}.dat",
                 ))
                 n = len(t)
  
@@ -75,7 +78,7 @@ def build():
             t = np.loadtxt(os.path.join(
                 inp.salted.saltedpath, pdir,
                 f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
-                f"COEFFS-{i+1}.dat",
+                f"COEFFS-{i + inp.qm.predict_coeffs_numbering_start}.dat",
             ))
             n = len(t)
     

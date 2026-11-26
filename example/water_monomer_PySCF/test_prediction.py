@@ -31,5 +31,5 @@ for i in range(len(frames)):
         comm.Barrier()
         coefs = comm.allreduce(coefs)
     if rank==0:
-        ref_coefs = np.loadtxt(dirpath+"/COEFFS-"+str(inp.gpr.Ntrain+i+1)+".dat")
+        ref_coefs = np.loadtxt(os.path.join(dirpath, f"COEFFS-{inp.gpr.Ntrain + i + inp.qm.predict_coeffs_numbering_start}.dat"))
         print("Conf", i+1, "Consistent prediction?", np.allclose(coefs,ref_coefs)) 

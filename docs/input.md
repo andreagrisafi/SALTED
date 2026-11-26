@@ -35,6 +35,8 @@ For all the path-related variables, the path can be either a relative path or an
 | var name | type | default | usage |
 | -:| :-: | :-: | :- |
 | `path2qm` | `str` | **Required** | Location of the quantum-mechanical training data. |
+| `numbering_start` | `0` or `1` | `1` | Starting number for structures stored on disk. |
+| `predict_coeffs_numbering_start` | `0` or `1` | `qm.numbering_start` | Starting number in validation and prediction filenames `COEFFS-<n>.dat`. |
 | `qmcode` | `Literal["aims"] \| Literal["cp2k"] \| Literal["pyscf"]` | **Required** | Ab initio software used to generate training data. |
 | `dfbasis` | `str` | **Required** | A label for the auxiliary basis set used to expand the density. |
 | `dfbasis_file` | `str` | Optional | Path to an external basis dataset yaml file holding `dfbasis`. If unset, the `basis_data.yaml` inside to the installed salted package is used. Mainly intended for testing purposes. |

@@ -9,7 +9,7 @@ from scipy import special
 
 from salted.constants import bohr2angs, hart2kcal
 from salted.basis_client import BasisClient
-from salted.sys_utils import ParseConfig
+from salted.sys_utils import ParseConfig, load_training_set
 
 inp = ParseConfig().parse_input()
 
@@ -46,7 +46,7 @@ natmax = max(natoms)
 
 # load predicted coefficients for test structures
 rdir = osp.join(inp.salted.saltedpath, f"regrdir_{inp.salted.saltedname}")
-trainrangetot = np.loadtxt(osp.join(rdir,f"training_set_N{inp.gpr.Ntrain}.txt"),int)
+trainrangetot = load_training_set(osp.join(rdir,f"training_set_N{inp.gpr.Ntrain}.txt"))
 testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
 print(ntest)
@@ -124,7 +124,7 @@ for iconf in testrange:
     nele = np.sum(valences)
     natoms = len(atoms)
     # Load projections and overlaps
-    rcoeffs = np.loadtxt(os.path.join(vdir, f"COEFFS-{iconf+1}.dat"))
+    rcoeffs = np.loadtxt(os.path.join(vdir, f"COEFFS-{iconf + inp.qm.predict_coeffs_numbering_start}.dat"))
     ref_coeffs = np.zeros((natoms,llmax+1,nnmax,llmax*2+1))
     ref_rho = np.zeros(rcoeffs.shape,float)
     icoeff = 0

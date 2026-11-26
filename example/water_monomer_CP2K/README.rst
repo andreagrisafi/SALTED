@@ -37,6 +37,7 @@ In what follows, we describe how to generate training electron densities to be u
 
    :code:`python3 -m salted.cp2k.density_fitting conf_start conf_end` (MPI parallelizible)
 
+   :code:`conf_start` and :code:`conf_end` are inclusive, zero-based XYZ frame indices. Frame 0 reads its cube from :code:`conf_1/`. The reference coefficient and overlap filenames start at :code:`qm.numbering_start`.
    A Lagrange multiplier is adopted to solve the linear problem under total charge conservation. The fitted coefficients and 2-center integral (overlap) matrices are saved in the :code:`coefficients` and :code:`overlaps` folders, respectively, in :code:`inp.salted.saltedpath`.
 
 Derived properties

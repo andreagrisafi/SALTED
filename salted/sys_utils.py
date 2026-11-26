@@ -9,8 +9,50 @@ import numpy as np
 import yaml
 from ase.io import read
 
-from salted.constants import bohr2angs
 from salted.basis_client import BasisClient
+from salted.constants import bohr2angs
+
+
+def load_training_set(path):
+    """Return zero-based XYZ frame indices. Headerless training lists store these indices directly."""
+    with open(path) as stream:
+        first_line = stream.readline().strip()
+        index_start = 0
+        if first_line.startswith("# numbering_start:"):
+            value = first_line.split(":", 1)[1].strip()
+            if value not in ("0", "1"):
+                raise ValueError(f"Invalid numbering_start in {path}: {value!r}")
+            index_start = int(value)
+        else:
+            stream.seek(0)  # return to the beginning of the file
+        return np.loadtxt(stream, dtype=int, ndmin=1) - index_start
+
+
+def check_reference_file_numbering(inp, root, check_names=("coefficients", "overlap")):
+    """Check the conf0 boundary of each requested data file series."""
+    start = inp.qm.numbering_start
+    components = ("x", "y", "z") if inp.salted.saltedtype == "density-response" else ("",)
+    for name in check_names:
+        if name == "coefficients":
+            files = [osp.join(root, "coefficients", c, "coefficients_conf0.npy") for c in components]
+        elif name == "overlap":
+            files = [osp.join(root, "overlaps", "overlap_conf0.npy")]
+        elif name == "rkhs":
+            directory = osp.join(root, f"rkhs-vectors_{inp.salted.saltedname}", f"M{inp.gpr.Menv}_zeta{inp.gpr.z}")
+            files = [osp.join(directory, f"psi-nm_conf0{'_' + c if c else ''}.npz") for c in components]
+        else:
+            raise ValueError(f"Unknown file series: {name}")
+        for path in files:
+            if start == 0 and not osp.isfile(path):
+                raise ValueError(
+                    f"Missing {path} with qm.numbering_start = 0. "
+                    "For one-based data, use numbering_start: 1."
+                )
+            if start == 1 and osp.isfile(path):
+                raise ValueError(
+                    f"Found {path} with qm.numbering_start = 1. "
+                    "For zero-based data, use numbering_start: 0."
+                )
 
 
 def build_featomic_hyper_params(rep_cfg) -> dict:
@@ -351,10 +393,6 @@ def rkhs_proj(kernel):
     eve = eve[:, -len(eva) :]
     V = np.dot(eve, np.diag(1.0 / np.sqrt(eva)))
     return V
-
-
-ARGHELP_INDEX_STR = """Indexes to calculate, start from 0. Format: 1,3-5,7-10. \
-Default is "all", which means all structures."""
 
 
 def parse_index_str(index_str: str | Literal["all"]) -> tuple | None:
@@ -772,6 +810,12 @@ class ParseConfig:
                 ),  # if bias the GPR by the average of predictions
             },
             "qm": {
+                "numbering_start": (
+                    False, 1, int, valid_numbering_start
+                ),
+                "predict_coeffs_numbering_start": (
+                    False, inp.get("qm", {}).get("numbering_start", 1), int, valid_numbering_start
+                ),
                 "path2qm": (
                     True,
                     None,
@@ -1091,6 +1135,9 @@ check_conditions_alpha_only.parse_error_msg = (
     " and inp.qm.qmcode=cp2k. Otherwise, please don't specify it in the input file."
 )
 
+
+def valid_numbering_start(inp: dict, val: int) -> bool:
+    return type(val) is int and val in (0, 1)
 
 def test_inp():
     """test your `inp.yaml` file by trying to parse it"""

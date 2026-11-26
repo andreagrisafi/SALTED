@@ -9,6 +9,7 @@ from scipy import sparse
 from salted import get_averages
 from salted.sys_utils import (
     ParseConfig,
+    check_reference_file_numbering,
     check_MPI_tasks_count,
     detect_mpi,
     distribute_jobs,
@@ -27,6 +28,7 @@ def build():
     comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
+    check_reference_file_numbering(inp, inp.salted.saltedpath, check_names=("coefficients", "overlap", "rkhs"))
 
     rdir = f"regrdir_{saltedname}"
 
@@ -62,9 +64,14 @@ def build():
         trainrangetot = dataset[:inp.gpr.Ntrain]
     else:
         raise ValueError(f"training set selection {inp.gpr.trainsel=} not available!")
-    np.savetxt(osp.join(
-        saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
-    ), trainrangetot, fmt='%i')
+    if rank == 0:
+        index_start = inp.qm.numbering_start
+        np.savetxt(
+            osp.join(saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"),
+            np.asarray(trainrangetot, dtype=int) + index_start,
+            fmt="%i",
+            header=f"numbering_start: {index_start}",
+        )
     ntrain = round(inp.gpr.trainfrac*inp.gpr.Ntrain)
     trainrange = sorted(trainrangetot[:ntrain])
 
@@ -159,11 +166,11 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
     if inp.salted.saltedtype=="density-response":
         p = sparse.load_npz(osp.join(
-            saltedpath, fdir, f"M{Menv}_zeta{zeta}", "psi-nm_conf0_x.npz"
+            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{inp.qm.numbering_start}_x.npz"
         ))
     else:
         p = sparse.load_npz(osp.join(
-            saltedpath, fdir, f"M{Menv}_zeta{zeta}", "psi-nm_conf0.npz"
+            saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{inp.qm.numbering_start}.npz"
         ))
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
@@ -190,13 +197,13 @@ def matrices(trainrange,ntrain,av_coefs,rank):
             # load reference QM data
             t0 = time.time()
             ref_coefs = np.load(osp.join(
-                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+                saltedpath, "coefficients", f"coefficients_conf{iconf + inp.qm.numbering_start}.npy"
             ))
             over = load_overlap(osp.join(
-                saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+                saltedpath, "overlaps", f"overlap_conf{iconf + inp.qm.numbering_start}.npy"
             ))
             psivec = sparse.load_npz(osp.join(
-                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf + inp.qm.numbering_start}.npz"
             ))
             t1 = time.time()
             io_time += t1 - t0
@@ -237,7 +244,7 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
             t0 = time.time()
             over = load_overlap(osp.join(
-                saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+                saltedpath, "overlaps", f"overlap_conf{iconf + inp.qm.numbering_start}.npy"
             ))
             io_time += time.time() - t0
 
@@ -245,10 +252,10 @@ def matrices(trainrange,ntrain,av_coefs,rank):
 
                 t0 = time.time()
                 ref_coefs = np.load(osp.join(
-                    saltedpath, "coefficients", f"{icart}/coefficients_conf{iconf}.npy"
+                    saltedpath, "coefficients", f"{icart}/coefficients_conf{iconf + inp.qm.numbering_start}.npy"
                 ))
                 psivec = sparse.load_npz(osp.join(
-                    saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
+                    saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf + inp.qm.numbering_start}_{icart}.npz"
                 ))
                 t1 = time.time()
                 io_time += t1 - t0

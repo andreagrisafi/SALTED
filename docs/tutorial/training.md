@@ -85,7 +85,7 @@ We then calculate the kernels across the full dataset, $k_{NM}^{\lambda}$, and p
 mpirun -np $ntasks python -m salted.rkhs_vector
 ```
 
-These input vectors are stored in the files: `rkhs-vectors_[inp.salted.saltedname]/M[inp.gpr.Menv]_zeta[inp.gpr.z]/psi-nm_conf[n].npz`, where `i` runs over each structure in the training dataset.
+These input vectors are stored in the files: `rkhs-vectors_[inp.salted.saltedname]/M[inp.gpr.Menv]_zeta[inp.gpr.z]/psi-nm_conf[n].npz`, where `n` is the XYZ frame index plus `inp.qm.numbering_start`.
 
 ## Regression
 
@@ -116,6 +116,7 @@ mpirun -np $ntasks python -m salted.minimize_loss
 The minimization might take relatively long, and checkpoint files are stored at `regrdir_[inp.salted.saltedname]/M[inp.gpr.Menv]_zeta[inp.gpr.z]`.
 The final GPR weights are stored in `regrdir_[inp.salted.saltedname]/M[inp.gpr.Menv]_zeta[inp.gpr.z]/weights_N[ntrain]_reg[log10(inp.gpr.regul)].npy`.
 Part of the training dataset is sampled for training, and their indexes are written to file `regrdir_[inp.salted.saltedname]/training_set_N[inp.gpr.Ntrain].txt`.
+The structure indexing in this file is controlled by `inp.qm.numbering_start` (default: `1`), indicated by the first line of the file, which is either `# numbering_start: 0` or `# numbering_start: 1`.
 
 ## Validation
 
