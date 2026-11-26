@@ -29,25 +29,29 @@ def load_training_set(path):
 
 
 def check_reference_file_numbering(inp, root, check_names=("coefficients", "overlap")):
-    """Check for each reference series' conf0 file: required for base 0 and unexpected for base 1."""
+    """Check the conf0 boundary of each requested data file series."""
     start = inp.qm.numbering_start
     components = ("x", "y", "z") if inp.salted.saltedtype == "density-response" else ("",)
-    directories = {
-        "coefficients": [osp.join(root, "coefficients", component) for component in components],
-        "overlap": [osp.join(root, "overlaps")],
-    }
     for name in check_names:
-        for directory in directories[name]:
-            zero = osp.join(directory, f"{name}_conf0.npy")
-            if start == 1 and osp.isfile(zero):
+        if name == "coefficients":
+            files = [osp.join(root, "coefficients", c, "coefficients_conf0.npy") for c in components]
+        elif name == "overlap":
+            files = [osp.join(root, "overlaps", "overlap_conf0.npy")]
+        elif name == "rkhs":
+            directory = osp.join(root, f"rkhs-vectors_{inp.salted.saltedname}", f"M{inp.gpr.Menv}_zeta{inp.gpr.z}")
+            files = [osp.join(directory, f"psi-nm_conf0{'_' + c if c else ''}.npz") for c in components]
+        else:
+            raise ValueError(f"Unknown file series: {name}")
+        for path in files:
+            if start == 0 and not osp.isfile(path):
                 raise ValueError(
-                    f"Found {zero} with qm.numbering_start = 1. "
-                    "For zero-based data, set numbering_start: 0 in the qm section of inp.yaml."
+                    f"Missing {path} with qm.numbering_start = 0. "
+                    "For one-based data, use numbering_start: 1."
                 )
-            if start == 0 and not osp.isfile(zero):
+            if start == 1 and osp.isfile(path):
                 raise ValueError(
-                    f"Missing {zero} with qm.numbering_start = 0. "
-                    "Check that the reference files are present. For one-based data, set numbering_start: 1 in the qm section of inp.yaml."
+                    f"Found {path} with qm.numbering_start = 1. "
+                    "For zero-based data, use numbering_start: 0."
                 )
 
 
@@ -807,7 +811,10 @@ class ParseConfig:
             },
             "qm": {
                 "numbering_start": (
-                    False, 1, int, lambda inp, val: type(val) is int and val in (0, 1)
+                    False, 1, int, valid_numbering_start
+                ),
+                "predict_coeffs_numbering_start": (
+                    False, inp.get("qm", {}).get("numbering_start", 1), int, valid_numbering_start
                 ),
                 "path2qm": (
                     True,
@@ -1128,6 +1135,9 @@ check_conditions_alpha_only.parse_error_msg = (
     " and inp.qm.qmcode=cp2k. Otherwise, please don't specify it in the input file."
 )
 
+
+def valid_numbering_start(inp: dict, val: int) -> bool:
+    return type(val) is int and val in (0, 1)
 
 def test_inp():
     """test your `inp.yaml` file by trying to parse it"""

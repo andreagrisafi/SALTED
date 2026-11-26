@@ -43,7 +43,7 @@ def build():
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = (
         read_system()
     )
-    check_reference_file_numbering(inp, inp.salted.saltedpath)
+    check_reference_file_numbering(inp, inp.salted.saltedpath, check_names=("coefficients", "overlap", "rkhs"))
 
     atom_per_spe, natoms_per_spe = get_atom_idx(ndata, natoms, species, atomic_symbols)
 

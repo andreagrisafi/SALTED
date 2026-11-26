@@ -239,8 +239,7 @@ class PipelineWorkspace:
 
     @property
     def validation_output_dir(self) -> Path:
-        """Where salted.validation writes its COEFFS-<iconf+1>.dat files
-        (1-based index into the full dataset)."""
+        """Validation coefficients, numbered by frame in the full dataset."""
         return self.root / f"validations_{self.saltedname}" / self.mz / f"N{self.ntrain}_{self.reg_str}"
 
     def validation_property(self, name: str) -> np.ndarray:
@@ -248,8 +247,7 @@ class PipelineWorkspace:
         return np.loadtxt(self.validation_output_dir / f"{name}.dat", ndmin=2)
 
     def prediction_output_dir(self, predname: str) -> Path:
-        """Where salted.prediction writes its COEFFS-<k+1>.dat files
-        (1-based position in the prediction xyz)."""
+        """Prediction coefficients, numbered by frame in the prediction XYZ."""
         return (
             self.root / f"predictions_{self.saltedname}_{predname}" / self.mz / f"N{self.ntrain}_{self.reg_str}"
         )
@@ -261,10 +259,14 @@ class PipelineWorkspace:
             return [base / icart for icart in self.cart_components]
         return [base]
 
+    @property
+    def predict_coeffs_numbering_start(self) -> int:
+        qm = self.inp["qm"]
+        return qm.get("predict_coeffs_numbering_start", qm.get("numbering_start", 1))
+
     def coeff_files(self, base: Path, index: int) -> list[Path]:
-        """COEFFS paths for structure ``index`` (1-based) under ``base``.
-        """
-        return [d / f"COEFFS-{index}.dat" for d in self.coeff_dirs(base)]
+        """COEFFS paths for a zero-based frame index."""
+        return [d / f"COEFFS-{index + self.predict_coeffs_numbering_start}.dat" for d in self.coeff_dirs(base)]
 
     def validation_indices(self) -> np.ndarray:
         """Sorted 0-based indices of the validation structures."""

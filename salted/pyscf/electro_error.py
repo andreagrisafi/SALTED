@@ -124,7 +124,7 @@ for iconf in testrange:
     nele = np.sum(valences)
     natoms = len(atoms)
     # Load projections and overlaps
-    rcoeffs = np.loadtxt(os.path.join(vdir, f"COEFFS-{iconf+1}.dat"))
+    rcoeffs = np.loadtxt(os.path.join(vdir, f"COEFFS-{iconf + inp.qm.predict_coeffs_numbering_start}.dat"))
     ref_coeffs = np.zeros((natoms,llmax+1,nnmax,llmax*2+1))
     ref_rho = np.zeros(rcoeffs.shape,float)
     icoeff = 0

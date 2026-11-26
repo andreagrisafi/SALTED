@@ -55,7 +55,7 @@ def build():
     comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
-    check_reference_file_numbering(inp, inp.salted.saltedpath)
+    check_reference_file_numbering(inp, inp.salted.saltedpath, check_names=("coefficients", "overlap", "rkhs"))
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     vdir = f"validations_{saltedname}"
@@ -232,7 +232,7 @@ def build():
                                        hartree,file=ufile)
             
             np.savetxt(osp.join(dirpath,
-                                f"COEFFS-{iconf+1}.dat"
+                f"COEFFS-{iconf + inp.qm.predict_coeffs_numbering_start}.dat"
             ), pred_coefs)
 
         elif saltedtype=="density-response":
@@ -268,8 +268,8 @@ def build():
                 pred_projs[icart] = np.dot(overl,pred_coefs[icart])
 
                 np.savetxt(osp.join(dirpath,
-                                    f"{icart}", 
-                                    f"COEFFS-{iconf+1}.dat"
+                    f"{icart}",
+                    f"COEFFS-{iconf + inp.qm.predict_coeffs_numbering_start}.dat"
                 ), pred_coefs[icart])
 
                 # Compute error

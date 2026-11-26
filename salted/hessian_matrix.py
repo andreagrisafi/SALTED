@@ -28,7 +28,7 @@ def build():
     comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
-    check_reference_file_numbering(inp, inp.salted.saltedpath)
+    check_reference_file_numbering(inp, inp.salted.saltedpath, check_names=("coefficients", "overlap", "rkhs"))
 
     rdir = f"regrdir_{saltedname}"
 

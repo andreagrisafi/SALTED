@@ -69,7 +69,7 @@ def build():
                 t = np.loadtxt(os.path.join(
                     inp.salted.saltedpath, pdir,
                     f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
-                    x[j], f"COEFFS-{i+1}.dat",
+                    x[j], f"COEFFS-{i + inp.qm.predict_coeffs_numbering_start}.dat",
                 ))
                 n = len(t)
  
@@ -78,7 +78,7 @@ def build():
             t = np.loadtxt(os.path.join(
                 inp.salted.saltedpath, pdir,
                 f"M{inp.gpr.Menv}_zeta{inp.gpr.z}", f"N{ntrain}_reg{int(np.log10(inp.gpr.regul))}",
-                f"COEFFS-{i+1}.dat",
+                f"COEFFS-{i + inp.qm.predict_coeffs_numbering_start}.dat",
             ))
             n = len(t)
     

@@ -61,6 +61,7 @@ def test_defaults_are_applied(tmp_path, monkeypatch):
     assert inp.gpr.regul == pytest.approx(1e-6)
     assert inp.gpr.trainfrac == pytest.approx(1.0)
     assert inp.qm.numbering_start == 1
+    assert inp.qm.predict_coeffs_numbering_start == 1
     assert inp.gpr.trainsel in ("random", "sequential")
     assert inp.descriptor.sparsify.ncut == 0
 
@@ -122,15 +123,28 @@ def test_numbering_start(tmp_path, monkeypatch, start):
     data = {**MINIMAL_INP, "qm": {**MINIMAL_INP["qm"], "numbering_start": start}}
     write_inp(tmp_path, data)
     monkeypatch.chdir(tmp_path)
-    assert ParseConfig().parse_input().qm.numbering_start == start
+    qm = ParseConfig().parse_input().qm
+    assert qm.numbering_start == start
+    assert qm.predict_coeffs_numbering_start == start
 
 
+@pytest.mark.parametrize("start, override", [(0, 1), (1, 0)])
+def test_predicted_coefficients_numbering_override(tmp_path, monkeypatch, start, override):
+    qm = {**MINIMAL_INP["qm"], "numbering_start": start, "predict_coeffs_numbering_start": override}
+    write_inp(tmp_path, {**MINIMAL_INP, "qm": qm})
+    monkeypatch.chdir(tmp_path)
+    parsed = ParseConfig().parse_input().qm
+    assert parsed.numbering_start == start
+    assert parsed.predict_coeffs_numbering_start == override
+
+
+@pytest.mark.parametrize("key", ["numbering_start", "predict_coeffs_numbering_start"])
 @pytest.mark.parametrize("start", [-1, 2, True, 1.0, "0"])
-def test_invalid_numbering_start(tmp_path, monkeypatch, start):
-    data = {**MINIMAL_INP, "qm": {**MINIMAL_INP["qm"], "numbering_start": start}}
+def test_invalid_numbering_start(tmp_path, monkeypatch, start, key):
+    data = {**MINIMAL_INP, "qm": {**MINIMAL_INP["qm"], key: start}}
     write_inp(tmp_path, data)
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(ValueError, match="numbering_start"):
+    with pytest.raises(ValueError, match=key):
         ParseConfig().parse_input()
 
 
@@ -170,3 +184,30 @@ def test_reference_numbering_guard(tmp_path, monkeypatch, filename, response):
     first.unlink()
     with pytest.raises(ValueError, match="numbering_start: 1"):
         check_reference_file_numbering(inp, tmp_path)
+
+
+@pytest.mark.parametrize("response", [False, True])
+@pytest.mark.parametrize("start", [0, 1])
+def test_rkhs_numbering_guard(tmp_path, monkeypatch, response, start):
+    from salted.sys_utils import check_reference_file_numbering
+
+    data = {**MINIMAL_INP, "qm": {**MINIMAL_INP["qm"], "numbering_start": start}}
+    if response:
+        data["salted"] = {**data["salted"], "saltedtype": "density-response"}
+    write_inp(tmp_path, data)
+    monkeypatch.chdir(tmp_path)
+    inp = ParseConfig().parse_input()
+    directory = tmp_path / "rkhs-vectors_test" / "M100_zeta2.0"
+    directory.mkdir(parents=True)
+    suffixes = ("_x", "_y", "_z") if response else ("",)
+    for suffix in suffixes:
+        (directory / f"psi-nm_conf{start}{suffix}.npz").touch()
+    check_reference_file_numbering(inp, tmp_path, check_names=("rkhs",))
+
+    zero = directory / f"psi-nm_conf0{suffixes[-1]}.npz"
+    if start == 0:
+        zero.unlink()
+    else:
+        zero.touch()
+    with pytest.raises(ValueError, match=zero.name):
+        check_reference_file_numbering(inp, tmp_path, check_names=("rkhs",))

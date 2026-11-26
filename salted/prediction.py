@@ -299,7 +299,7 @@ def build():
                 print(iconf+1,dipole["x"],dipole["y"],dipole["z"],file=dfile)
             
             # save predicted coefficients 
-            np.savetxt(osp.join(dirpath, f"COEFFS-{iconf+1}.dat"), pred_coefs)
+            np.savetxt(osp.join(dirpath, f"COEFFS-{iconf + inp.qm.predict_coeffs_numbering_start}.dat"), pred_coefs)
 
     
     elif saltedtype=="density-response":
@@ -576,7 +576,7 @@ def build():
                     ispe[spe] += 1
 
                 # save predicted coefficients 
-                np.savetxt(osp.join(dirpath, f"{icart}", f"COEFFS-{iconf+1}.dat"), pred_coefs[icart])
+                np.savetxt(osp.join(dirpath, f"{icart}", f"COEFFS-{iconf + inp.qm.predict_coeffs_numbering_start}.dat"), pred_coefs[icart])
             
             if qmcode=="cp2k":
                 # Compute polarizability
