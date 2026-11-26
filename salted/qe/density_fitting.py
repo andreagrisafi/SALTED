@@ -15,8 +15,12 @@ none of that module needed changing; only two things did:
       field (`read_pseudocharge`) instead of CP2K's `{spe}-local_pseudo.dat` (a GTH-specific format).
 
 `rloc` and the GTH-specific Hartree-energy diagnostic (`salted.cp2k.utils.compute_hartree_energy`)
-are intentionally not ported: `rloc` is never used anywhere in the fitting computation itself (only
-in that diagnostic), so there is nothing QE-equivalent to supply yet.
+are intentionally not ported (they rely on GTH's analytic Gaussian ion charge). Instead, with the
+coulomb metric, every configuration also reports the QE analogue of that diagnostic -- the
+electrostatic energy E_ee + E_en + E_nn of the fitted density (`electrostatic_energies` below) --
+computed in reciprocal space from quantities the fit already has in memory, so it needs neither
+`salted.qe.df2cube` nor a reconstructed cube. See `salted.qe.electrostatic_energy` for the method
+and its caveats (local pseudopotential only, G=0 dropped).
 
 Requires `inp.qm.dfmetric` ("identity" or "coulomb", same meaning as for CP2K) and the
 `salted.qe.run_qe` / `salted.qe.qe2cube` / `salted.qe.get_basis_info` outputs to already exist.
@@ -49,6 +53,13 @@ from salted.cp2k.utils import (
     setup_pyscf_ewald,
     setup_pyscf_species,
 )
+from salted.qe.electrostatic_energy import (
+    ESPRESSO_PWO_FNAME,
+    EWALD_RE,
+    HARTREE_RE,
+    compute_vloc_of_g,
+    parse_upf_local,
+)
 from salted.qe.qe2cube import CUBE_FNAME
 from salted.sys_utils import (
     ARGHELP_INDEX_STR,
@@ -76,6 +87,13 @@ def read_pseudocharge(species: list[str], inp) -> dict[str, float]:
             raise ValueError(f"Could not find z_valence in {upf_path}")
         pseudocharge[spe] = float(match.group(1))
     return pseudocharge
+
+
+def read_upf_local(species: list[str], inp) -> dict:
+    """Each species' local pseudopotential (r_mesh, v_loc_ry, z_valence) from its UPF file, for
+    the coulomb-metric electrostatic-energy report."""
+    pseudo_map = inp.qm.pseudopotentials.to_dict()
+    return {spe: parse_upf_local(osp.join(inp.qm.pseudo_dir, pseudo_map[spe])) for spe in species}
 
 
 def read_cube(conf_dir: str, natoms: int):
@@ -151,6 +169,96 @@ def diagnose_overlap_conditioning(S: np.ndarray, labels: list[tuple[int, str, in
     return cond
 
 
+def ion_local_potential_rec(upf_local: dict, atomic_symbols, atomic_coords, Gvec_half, knorm_vec, volume) -> np.ndarray:
+    """Fourier coefficients V_ion(G) [Ha] of the summed local pseudopotentials on `Gvec_half`
+    (QE convention V(r) = sum_G V_ion(G) e^{iG.r}, i.e. V_ion(G) = (1/Omega) int V(r) e^{-iG.r} dr),
+    using `salted.qe.electrostatic_energy.compute_vloc_of_g` (port of QE's vloc_of_g.f90).
+
+    vloc(|G|) only depends on |G|, so it is evaluated once per unique |G| shell rather than once
+    per G-vector -- on a regular grid that is far fewer radial quadratures.
+    """
+    knorm_unique, inverse = np.unique(np.round(knorm_vec, 10), return_inverse=True)
+    v_ion_rec = np.zeros(len(Gvec_half), dtype=np.complex128)
+    for spe in sorted(set(atomic_symbols)):
+        r_mesh, v_loc_ry, z_valence = upf_local[spe]
+        vloc_g = compute_vloc_of_g(r_mesh, v_loc_ry, z_valence, knorm_unique, volume)[inverse]
+        structure_factor = np.zeros(len(Gvec_half), dtype=np.complex128)
+        for iat, s in enumerate(atomic_symbols):
+            if s == spe:
+                structure_factor += np.exp(-1j * (Gvec_half @ atomic_coords[iat]))
+        v_ion_rec += vloc_g * structure_factor
+    return v_ion_rec
+
+
+def read_qe_energies(conf_dir: str) -> tuple[float | None, float | None]:
+    """(E_nn, E_hartree) in Ha from QE's `espresso.pwo` ("ewald contribution" / "hartree
+    contribution"), or None for whichever is unavailable."""
+    pwo_path = osp.join(conf_dir, ESPRESSO_PWO_FNAME)
+    if not osp.exists(pwo_path):
+        return None, None
+    with open(pwo_path) as f:
+        text = f.read()
+    m_ewald, m_hartree = EWALD_RE.search(text), HARTREE_RE.search(text)
+    e_nn = float(m_ewald.group(1)) / 2.0 if m_ewald else None  # Ry -> Ha
+    e_hartree = float(m_hartree.group(1)) / 2.0 if m_hartree else None
+    return e_nn, e_hartree
+
+
+def electrostatic_energies(ctx: "FitContext", conf_dir: str, c, S, C, Gvec_half, knorm_vec, volume, natoms,
+                           atomic_symbols, atomic_coords, pwc_prim_re, pwc_prim_im, gcuts, rho_KS_rec, rank) -> dict:
+    """E_ee, E_en, E_nn (Ha) of the fitted density, coulomb metric only, all from in-memory fit data.
+
+      E_ee = 1/2 c^T S c  (S is the coulomb-metric overlap, G=0 excluded)
+      E_en = sum_i c_i <Phi_i|V_ion> = c . w_V
+      E_nn = QE's own "ewald contribution"
+
+    w_V reuses `get_w_prim` (the same projection that builds the fit's w = (Phi|rho_KS)_coulomb):
+    the coulomb projection of a density rho_V equals <Phi|v_H[rho_V]>, with v_H(G) = 4*pi*rho_V(G)/G^2,
+    so passing rho_V(G) = G^2 * Omega * V_ion(G) / (4*pi) (Omega converts V_ion's Fourier coefficients
+    to the FFT*dV convention of rho_KS_rec) yields exactly <Phi_i|V_ion>. This is equivalent to
+    `salted.qe.electrostatic_energy`'s cube-based E_en, but with the basis functions' exact Fourier
+    transforms instead of a real-space reconstruction truncated at rcut.
+
+    Also returns E_en and the total for QE's true density (rho_KS, the fit's target) for comparison.
+    """
+    v_ion_rec = ion_local_potential_rec(ctx.upf_local, atomic_symbols, atomic_coords, Gvec_half, knorm_vec, volume)
+
+    rho_v_rec = knorm_vec**2 * volume * v_ion_rec / (4.0 * np.pi)
+    wp_v = get_w_prim(
+        Gvec_half, natoms, atomic_coords, ctx.npgf, ctx.lmax_numba, atomic_symbols,
+        pwc_prim_re, pwc_prim_im, volume, rho_v_rec, "coulomb", gcuts, rank,
+    )
+    e_en = float(c @ (C.T @ wp_v))
+    e_ee = 0.5 * float(c @ (S @ c))
+    e_en_true = 2.0 * float(np.sum((np.conj(rho_KS_rec) * v_ion_rec).real))  # half-sphere, G != 0
+
+    e_nn, e_hartree_qe = read_qe_energies(conf_dir)
+    result = {"e_ee": e_ee, "e_en": e_en, "e_nn": e_nn, "e_en_true": e_en_true, "e_hartree_qe": e_hartree_qe,
+              "e_total": None, "e_total_true": None}
+    if e_nn is not None:
+        result["e_total"] = e_ee + e_en + e_nn
+        if e_hartree_qe is not None:
+            result["e_total_true"] = e_hartree_qe + e_en_true + e_nn
+    return result
+
+
+def format_electrostatics(conf_n: int, en: dict, verbose: bool) -> str:
+    """Per-configuration report, mirroring salted.cp2k.density_fitting's Hartree-energy line."""
+    def fmt(x):
+        return f"{x:.8f}" if x is not None else "n/a"
+
+    lines = [f"conf {conf_n}: electrostatic energy E_ee+E_en+E_nn = {fmt(en['e_total'])} Ha "
+             f"(E_ee = {fmt(en['e_ee'])}, E_en = {fmt(en['e_en'])}, E_nn = {fmt(en['e_nn'])} Ha)"]
+    if en["e_nn"] is None:
+        lines.append(f"conf {conf_n}:   no QE ewald contribution found in {ESPRESSO_PWO_FNAME}; total not available")
+    if verbose:
+        lines.append(f"conf {conf_n}:   true QE density: E_en = {fmt(en['e_en_true'])} Ha (fit - true: {en['e_en'] - en['e_en_true']:+.6f}), "
+                     f"E_ee(QE hartree) = {fmt(en['e_hartree_qe'])} Ha, total = {fmt(en['e_total_true'])} Ha")
+        if en["e_total"] is not None and en["e_total_true"] is not None:
+            lines[-1] += f" (fit - true: {en['e_total'] - en['e_total_true']:+.6f})"
+    return "\n".join(lines)
+
+
 @dataclass
 class FitContext:
     """Everything that is the same across all configurations, computed once in `main`."""
@@ -176,10 +284,13 @@ class FitContext:
     sigma_ewald: float | None
     pseudocharge: dict
     verbose: bool
+    upf_local: dict | None = None  # species -> (r_mesh, v_loc_ry, z_valence); coulomb metric only
 
 
-def fit_one(ctx: FitContext, geom_idx: int, rank: int) -> tuple[np.ndarray, np.ndarray]:
-    """Fit a single configuration's density onto the RI basis. Returns (coefficients, overlap)."""
+def fit_one(ctx: FitContext, geom_idx: int, rank: int) -> tuple[np.ndarray, np.ndarray, dict | None]:
+    """Fit a single configuration's density onto the RI basis. Returns (coefficients, overlap,
+    electrostatic energies) -- the latter only for the coulomb metric, else None (also None, with a
+    warning, if the energy evaluation itself fails: that must never discard a successful fit)."""
     conf_dir = osp.join(ctx.path2qm, f"conf_{geom_idx + 1}")
     atomic_symbols = ctx.atomic_symbols[geom_idx]
     atomic_coords = ctx.atomic_coords[geom_idx]
@@ -274,7 +385,20 @@ def fit_one(ctx: FitContext, geom_idx: int, rank: int) -> tuple[np.ndarray, np.n
     lagmult = (np.dot(q, Sinv_w) - n_elec) / np.dot(q, Sinv_q)  # total-charge constraint
     c = Sinv_w - lagmult * Sinv_q
 
-    return c, S
+    energies = None
+    if ctx.df_metric == "coulomb" and ctx.upf_local is not None:
+        time_e = time.time()
+        try:
+            energies = electrostatic_energies(
+                ctx, conf_dir, c, S, C, Gvec_half, knorm_vec, volume, natoms, atomic_symbols, atomic_coords,
+                partial_wave_coefs_prim_re, partial_wave_coefs_prim_im, gcuts, rho_KS_rec, rank,
+            )
+        except Exception as exc:
+            print(f"[conf {geom_idx + 1}] WARNING: electrostatic energy evaluation failed ({exc}); fit is unaffected", flush=True)
+        if ctx.verbose:
+            print(f"[conf {geom_idx + 1}] time to compute electrostatic energy: {time.time() - time_e:.2f}s", flush=True)
+
+    return c, S, energies
 
 
 def main(geom_indexes: list[int] | None):
@@ -323,6 +447,7 @@ def main(geom_indexes: list[int] | None):
         lmax_numba=lmax_numba, nmax_numba=nmax_numba, nbasis=nbasis,
         pyscf_data=pyscf_data, pyscf_ewald=pyscf_ewald, rcut_pairs=rcut_pairs,
         sigma_ewald=sigma_ewald, pseudocharge=pseudocharge, verbose=inp.salted.verbose,
+        upf_local=read_upf_local(species, inp) if df_metric == "coulomb" else None,
     )
 
     time_start = time.time()
@@ -330,9 +455,11 @@ def main(geom_indexes: list[int] | None):
         if ctx.verbose:
             print(f"[rank {rank}] conf: {geom_idx + 1}", flush=True)
         try:
-            c, S = fit_one(ctx, geom_idx, rank)
+            c, S, energies = fit_one(ctx, geom_idx, rank)
             np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{geom_idx}.npy"), c)
             np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{geom_idx}.npy"), S)
+            if energies is not None:
+                print(format_electrostatics(geom_idx + 1, energies, ctx.verbose), flush=True)
         except Exception as exc:
             print(f"[rank {rank}] FAILED conf_{geom_idx + 1}: {exc}", flush=True)
 
