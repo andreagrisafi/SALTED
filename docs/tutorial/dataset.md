@@ -65,4 +65,4 @@ A detailed description of how to generate the training data for SALTED using FHI
     ```bash
     python3 -m salted.cp2k.density_fitting conf_start conf_end
     ```
-   (MPI parallelizable). A Lagrange multiplier is adopted to solve the linear problem under total charge conservation. The fitted coefficients and 2-center integral (overlap) matrices are saved in the `coefficients` and `overlaps` folders, respectively, in `inp.salted.saltedpath`.
+   (MPI parallelizable). `conf_start` and `conf_end` are inclusive, zero-based XYZ frame indices. Frame 0 reads its cube from `conf_1/`. The reference coefficient and overlap filenames start at `qm.numbering_start`. A Lagrange multiplier is adopted to solve the linear problem under total charge conservation. The fitted coefficients and 2-center integral (overlap) matrices are saved in the `coefficients` and `overlaps` folders, respectively, in `inp.salted.saltedpath`.

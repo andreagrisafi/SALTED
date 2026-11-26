@@ -7,7 +7,7 @@ import numpy as np
 from ase.io import read
 from pyscf import dft, gto, lib
 
-from salted.sys_utils import ARGHELP_INDEX_STR, ParseConfig, parse_index_str
+from salted.sys_utils import ParseConfig, parse_index_str
 
 
 def run_pyscf(
@@ -27,7 +27,7 @@ def main(geom_indexes: list[int] | None, num_threads: int = None):
     if geom_indexes is None:
         geom_indexes = list(range(len(geoms_all)))
     else:
-        geom_indexes = [i for i in geom_indexes if i < len(geoms_all)]  # indexes start from 0
+        geom_indexes = [i for i in geom_indexes if i < len(geoms_all)]  # zero-based XYZ frame indices
     print(f"Calculating density matrix for configurations: {geom_indexes}")
     geoms = [geoms_all[i] for i in geom_indexes]
 
@@ -57,11 +57,10 @@ def main(geom_indexes: list[int] | None, num_threads: int = None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # create a parser obj, which accepts the indexes to calculate, start from 0
     # formats: 1,2,3 or 1-3 or None (all structures)
     parser.add_argument(
         "-i", "--idx", type=str, default="all",
-        help=ARGHELP_INDEX_STR,
+        help="Zero-based XYZ frame indices, e.g. 0,3-5,7-10. Defaults to all frames.",
     )
     parser.add_argument(
         "-c", "--cpu", type=int, default=None,

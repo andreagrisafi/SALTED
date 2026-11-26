@@ -9,7 +9,7 @@ from pyscf import df, gto, lib
 from pyscf.gto import basis
 
 from salted.basis_client import BasisClient
-from salted.sys_utils import ARGHELP_INDEX_STR, Irreps, ParseConfig, parse_index_str
+from salted.sys_utils import Irreps, ParseConfig, parse_index_str
 
 __doc__ = """
 PySCF orders all angular momentum components for L>1 as -L,...,0,...,+L,
@@ -105,7 +105,7 @@ def main(geom_indexes: list[int] | None, num_threads: int = None):
     if geom_indexes is None:
         geom_indexes = list(range(len(geoms_all)))
     else:
-        geom_indexes = [i for i in geom_indexes if i < len(geoms_all)]  # indexes start from 0
+        geom_indexes = [i for i in geom_indexes if i < len(geoms_all)]  # zero-based XYZ frame indices
     print(f"Calculate density fitting coefficients for these structures: {geom_indexes}")
     geoms = [geoms_all[i] for i in geom_indexes]
 
@@ -133,8 +133,8 @@ def main(geom_indexes: list[int] | None, num_threads: int = None):
         irreps = sum([df_irreps_by_spe[spe] for spe in symb], Irreps([]))
         dm = np.load(osp.join(inp.qm.path2qm, "density_matrices", f"dm_conf{geom_idx+1}.npy"))
         reordered_data = cal_df_coeffs(atoms, inp.qm.qmbasis, ribasis, dm, irreps)
-        np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{geom_idx}.npy"), reordered_data["coef"])
-        np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{geom_idx}.npy"), reordered_data["over"])
+        np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{geom_idx + inp.qm.numbering_start}.npy"), reordered_data["coef"])
+        np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{geom_idx + inp.qm.numbering_start}.npy"), reordered_data["over"])
         pyscf_time += reordered_data["pyscf_time"]
         reorder_time += reordered_data["reorder_time"]
     end_time = time.time()
@@ -144,11 +144,10 @@ def main(geom_indexes: list[int] | None, num_threads: int = None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # create a parser obj, which accepts the indexes to calculate, start from 0
     # formats: 1,2,3 or 1-3 or None (all structures)
     parser.add_argument(
         "-i", "--idx", type=str, default="all",
-        help=ARGHELP_INDEX_STR,
+        help="Zero-based XYZ frame indices, e.g. 0,3-5,7-10. Defaults to all frames.",
     )
     parser.add_argument(
         "-c", "--cpu", type=int, default=None,

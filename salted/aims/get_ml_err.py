@@ -6,7 +6,7 @@ import time
 
 import numpy as np
 
-from salted.sys_utils import ParseConfig, read_system, sort_grid_data
+from salted.sys_utils import ParseConfig, load_training_set, read_system, sort_grid_data
 
 def build():
     # load prediction dataset
@@ -25,9 +25,9 @@ def build():
         spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
         dirname = osp.join(inp.qm.path2qm, 'data')
         rdir = f"regrdir_{inp.salted.saltedname}"
-        trainrangetot = np.loadtxt(osp.join(
+        trainrangetot = load_training_set(osp.join(
             inp.salted.saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
-        ), int)
+        ))
         testset = np.setdiff1d(list(range(ndata)),trainrangetot)
         g = open('validation_ml_maes', 'w+')
 

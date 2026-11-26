@@ -11,13 +11,14 @@ system:
 
 # quantum mechanical info
 qm:
+  numbering_start: 0  # Published SALTED-datasets numbering
   path2qm: ./
   qmcode: cp2k
   periodic: 3D
   dfbasis: RI-basis
   dfmetric: coulomb
 
-# descriptor parameters 
+# descriptor parameters
 descriptor:
   rep1:
     type: rho
@@ -27,7 +28,7 @@ descriptor:
     nang: 6
     neighspe: [H, O]
   rep2:
-    type: rho 
+    type: rho
     rcut: 4.0
     sig: 0.3
     nrad: 8

@@ -9,8 +9,46 @@ import numpy as np
 import yaml
 from ase.io import read
 
-from salted.constants import bohr2angs
 from salted.basis_client import BasisClient
+from salted.constants import bohr2angs
+
+
+def load_training_set(path):
+    """Return zero-based XYZ frame indices. Headerless training lists store these indices directly."""
+    with open(path) as stream:
+        first_line = stream.readline().strip()
+        index_start = 0
+        if first_line.startswith("# numbering_start:"):
+            value = first_line.split(":", 1)[1].strip()
+            if value not in ("0", "1"):
+                raise ValueError(f"Invalid numbering_start in {path}: {value!r}")
+            index_start = int(value)
+        else:
+            stream.seek(0)  # return to the beginning of the file
+        return np.loadtxt(stream, dtype=int, ndmin=1) - index_start
+
+
+def check_reference_file_numbering(inp, root, check_names=("coefficients", "overlap")):
+    """Check for each reference series' conf0 file: required for base 0 and unexpected for base 1."""
+    start = inp.qm.numbering_start
+    components = ("x", "y", "z") if inp.salted.saltedtype == "density-response" else ("",)
+    directories = {
+        "coefficients": [osp.join(root, "coefficients", component) for component in components],
+        "overlap": [osp.join(root, "overlaps")],
+    }
+    for name in check_names:
+        for directory in directories[name]:
+            zero = osp.join(directory, f"{name}_conf0.npy")
+            if start == 1 and osp.isfile(zero):
+                raise ValueError(
+                    f"Found {zero} with qm.numbering_start = 1. "
+                    "For zero-based data, set numbering_start: 0 in the qm section of inp.yaml."
+                )
+            if start == 0 and not osp.isfile(zero):
+                raise ValueError(
+                    f"Missing {zero} with qm.numbering_start = 0. "
+                    "Check that the reference files are present. For one-based data, set numbering_start: 1 in the qm section of inp.yaml."
+                )
 
 
 def build_featomic_hyper_params(rep_cfg) -> dict:
@@ -351,10 +389,6 @@ def rkhs_proj(kernel):
     eve = eve[:, -len(eva) :]
     V = np.dot(eve, np.diag(1.0 / np.sqrt(eva)))
     return V
-
-
-ARGHELP_INDEX_STR = """Indexes to calculate, start from 0. Format: 1,3-5,7-10. \
-Default is "all", which means all structures."""
 
 
 def parse_index_str(index_str: str | Literal["all"]) -> tuple | None:
@@ -772,6 +806,9 @@ class ParseConfig:
                 ),  # if bias the GPR by the average of predictions
             },
             "qm": {
+                "numbering_start": (
+                    False, 1, int, lambda inp, val: type(val) is int and val in (0, 1)
+                ),
                 "path2qm": (
                     True,
                     None,

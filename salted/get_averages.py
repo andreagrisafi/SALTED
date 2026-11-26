@@ -3,13 +3,14 @@ import sys
 import numpy as np
 import os.path as osp
 
-from salted.sys_utils import ParseConfig, read_system
+from salted.sys_utils import ParseConfig, check_reference_file_numbering, read_system
 
 def build():
 
     inp = ParseConfig().parse_input()
 
     spelist, lmax, nmax, llmax, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
+    check_reference_file_numbering(inp, inp.salted.saltedpath, check_names=("coefficients",))
 
     avcoefs = {}
     nat_per_species = {}
@@ -20,7 +21,7 @@ def build():
     print("computing averages...")
     for iconf in range(ndata):
         atoms = atomic_symbols[iconf]
-        coefs = np.load(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"))
+        coefs = np.load(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf + inp.qm.numbering_start}.npy"))
         i = 0
         for iat in range(natoms[iconf]):
             spe = atoms[iat]

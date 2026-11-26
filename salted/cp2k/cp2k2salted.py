@@ -75,7 +75,7 @@ for iconf in conf_range:
     dirpath = os.path.join(inp.salted.saltedpath, "overlaps")
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
-    np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"), overlap)
+    np.save(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{iconf + inp.qm.numbering_start}.npy"), overlap)
 
     if inp.salted.saltedtype=="density":
 
@@ -88,7 +88,7 @@ for iconf in conf_range:
         # save coefficients vector in SALTED format
         #if natoms%2 != 0:
         #    coefficients = np.sum(coefficients,axis=1)
-        np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), coefficients)
+        np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf + inp.qm.numbering_start}.npy"), coefficients)
 
 
     elif inp.salted.saltedtype=="density-response":
@@ -104,7 +104,7 @@ for iconf in conf_range:
                 sys.exit(0)
 
             # save coefficients vector in SALTED format
-            np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"{icart}", f"coefficients_conf{iconf}.npy"), coefficients)
+            np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"{icart}", f"coefficients_conf{iconf + inp.qm.numbering_start}.npy"), coefficients)
 
     ## save projections vector in SALTED format
     #projections = np.dot(overlap,coefficients)

@@ -3,7 +3,9 @@ import os.path as osp
 
 import numpy as np
 from ase.io import read
+
 from salted.sys_utils import ParseConfig, detect_mpi, distribute_jobs
+
 
 def build():
     inp = ParseConfig().parse_input()
@@ -114,15 +116,15 @@ def build():
             ovlp = ovlp[idx,:]
             ovlp = ovlp[:,idx]
         
-        np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{i}.npy"), ovlp)
-        np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{i}.npy"), o)
-        np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{i}.npy"), t)
+        np.save(osp.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{i + inp.qm.numbering_start}.npy"), ovlp)
+        np.save(osp.join(inp.salted.saltedpath, "projections", f"projections_conf{i + inp.qm.numbering_start}.npy"), o)
+        np.save(osp.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{i + inp.qm.numbering_start}.npy"), t)
 
         if inp.salted.saltedtype == 'density-response':
             x = ["x","y","z"]
             for j in range(3):
-                np.save(osp.join(inp.salted.saltedpath, "projections", x[j], f"projections_conf{i}.npy"), o1[j,:])
-                np.save(osp.join(inp.salted.saltedpath, "coefficients", x[j], f"coefficients_conf{i}.npy"), t1[j,:])
+                np.save(osp.join(inp.salted.saltedpath, "projections", x[j], f"projections_conf{i + inp.qm.numbering_start}.npy"), o1[j,:])
+                np.save(osp.join(inp.salted.saltedpath, "coefficients", x[j], f"coefficients_conf{i + inp.qm.numbering_start}.npy"), t1[j,:])
 
 
     if parallel:

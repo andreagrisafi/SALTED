@@ -8,7 +8,7 @@ from ase.io import read
 from scipy import special
 
 from salted.constants import bohr2angs, hart2kcal
-from salted.sys_utils import ParseConfig
+from salted.sys_utils import ParseConfig, check_reference_file_numbering
 
 from salted.basis_client import BasisClient
 
@@ -35,6 +35,7 @@ nnmax = max(nlist)
 # read system
 xyzfile = read(inp.system.filename,":")
 ndata = len(xyzfile)
+check_reference_file_numbering(inp, inp.qm.path2qm, check_names=("coefficients",))
 
 #======================= system parameters
 atomic_symbols = []
@@ -107,7 +108,7 @@ for iconf in range(ndata):
     natoms = len(atoms)
     # Load projections and overlaps
     rcoeffs = np.load(os.path.join(
-        inp.qm.path2qm, "coefficients", f"coefficients_conf{iconf}.npy"
+        inp.qm.path2qm, "coefficients", f"coefficients_conf{iconf + inp.qm.numbering_start}.npy"
     ))
     ref_coeffs = np.zeros((natoms,llmax+1,nnmax,2*llmax+1))
     ref_rho = np.zeros(len(rcoeffs))

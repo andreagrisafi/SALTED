@@ -205,8 +205,8 @@ for iconf in conf_range:
     if inp.salted.verbose: print("Time to solve linear system:", time.time()-time_c)
 
     # Save data
-    np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"), c)
-    save_overlap(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{iconf}.npy"), S) # lower triangle only
+    np.save(os.path.join(inp.salted.saltedpath, "coefficients", f"coefficients_conf{iconf + inp.qm.numbering_start}.npy"), c)
+    save_overlap(os.path.join(inp.salted.saltedpath, "overlaps", f"overlap_conf{iconf + inp.qm.numbering_start}.npy"), S) # lower triangle only
 
     # Hartree energy calculation
     time_c = time.time()

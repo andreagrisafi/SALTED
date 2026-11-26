@@ -123,7 +123,7 @@ _SPECS = [
         inp={
             "salted": {"saltedname": "test", "saltedpath": "./", "verbose": True},
             "system": {"filename": "./water_monomers_100.xyz", "species": ["H", "O"]},
-            "qm": {"path2qm": "./", "qmcode": "aims", "dfbasis": "FHI-aims-light"},
+            "qm": {"numbering_start": 0, "path2qm": "./", "qmcode": "aims", "dfbasis": "FHI-aims-light"},
             "prediction": {"filename": "./water_dimers_10.xyz", "predname": "prediction"},
             "descriptor": DESCRIPTOR_TEMPLATE,
             "gpr": {
@@ -156,7 +156,7 @@ _SPECS = [
                 "species": ["H", "O"],
                 "average": False,
             },
-            "qm": {"path2qm": "./", "qmcode": "aims", "dfbasis": "RI-aims"},
+            "qm": {"numbering_start": 0, "path2qm": "./", "qmcode": "aims", "dfbasis": "RI-aims"},
             "prediction": {"filename": "./pred_placeholder.xyz", "predname": "prediction"},
             "descriptor": DESCRIPTOR_TEMPLATE,
             "gpr": {
@@ -185,6 +185,7 @@ _SPECS = [
             "system": {"filename": "./water_monomers_100.xyz", "species": ["H", "O"]},
             "qm": {
                 "path2qm": "./",
+                "numbering_start": 0,
                 "qmcode": "cp2k",
                 "periodic": "3D",
                 "dfmetric": "coulomb",
@@ -222,6 +223,7 @@ _SPECS = [
             "system": {"filename": "./water_monomers_100.xyz", "species": ["H", "O"]},
             "qm": {
                 "path2qm": "./",
+                "numbering_start": 0,
                 "qmcode": "pyscf",
                 "dfbasis": "RI-cc-pvqz",
                 "qmbasis": "cc-pvqz",

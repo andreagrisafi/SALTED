@@ -52,20 +52,13 @@ def _check_rkhs_projector(ws: PipelineWorkspace) -> None:
 
 
 def _check_rkhs_vector(ws: PipelineWorkspace) -> None:
-    # one vector per configuration, and per Cartesian component of dn/dE
-    psi_files = list(ws.rkhs_vector_dir.glob("psi-nm_conf*.npz"))
-    if ws.is_response:
-        n_expected = ws.nconf * len(ws.cart_components)
-        for icart in ws.cart_components:
-            n_cart = len(list(ws.rkhs_vector_dir.glob(f"psi-nm_conf*_{icart}.npz")))
-            assert n_cart == ws.nconf, (
-                f"expected {ws.nconf} psi-nm vectors for component {icart}, found {n_cart}"
-            )
-    else:
-        n_expected = ws.nconf
-    assert len(psi_files) == n_expected, (
-        f"expected {n_expected} psi-nm vectors, found {len(psi_files)}"
-    )
+    start = ws.inp["qm"].get("numbering_start", 1)
+    suffixes = [f"_{cart}" for cart in ws.cart_components] if ws.is_response else [""]
+    expected = {
+        f"psi-nm_conf{i + start}{suffix}.npz"
+        for i in range(ws.nconf) for suffix in suffixes
+    }
+    assert {path.name for path in ws.rkhs_vector_dir.glob("psi-nm_conf*.npz")} == expected
 
 
 def _check_finite(ws: PipelineWorkspace, *names: str) -> None:

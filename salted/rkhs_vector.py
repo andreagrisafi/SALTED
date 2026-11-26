@@ -238,7 +238,7 @@ def build():
 
             sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
             sparse.save_npz(osp.join(
-                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf + inp.qm.numbering_start}.npz"
             ), sparse_psi)
 
             del sparse_psi
@@ -575,7 +575,7 @@ def build():
     
                 sparse_psi = sparse.coo_matrix((psi_nonzero, ij), shape=(nrows, ncols))
                 sparse.save_npz(osp.join(
-                    saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{cart[icart]}.npz"
+                    saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf + inp.qm.numbering_start}_{cart[icart]}.npz"
                 ), sparse_psi)
     
                 del sparse_psi

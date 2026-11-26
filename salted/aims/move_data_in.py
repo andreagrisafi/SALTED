@@ -5,7 +5,7 @@ import os.path as osp
 
 import numpy as np
 
-from salted.sys_utils import ParseConfig, detect_mpi, distribute_jobs, read_system
+from salted.sys_utils import ParseConfig, load_training_set, detect_mpi, distribute_jobs, read_system
 
 
 def build():
@@ -32,13 +32,16 @@ def build():
         rdir = f"regrdir_{saltedname}"
 
         # define validation set
-        trainrangetot = np.loadtxt(osp.join(
+        trainrangetot = load_training_set(osp.join(
             inp.salted.saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
-        ), int)
+        ))
         structure_list = np.setdiff1d(list(range(ndata)),trainrangetot)
-        np.savetxt(osp.join(
-            inp.salted.saltedpath, f"temp_validation_set.txt"), structure_list,fmt='%i'
-        )
+        if rank == 0:
+            np.savetxt(
+                osp.join(inp.salted.saltedpath, "temp_validation_set.txt"),
+                structure_list + inp.qm.numbering_start,
+                fmt="%i",
+            )
         datadir = 'data'
 
     else:

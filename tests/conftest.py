@@ -269,7 +269,9 @@ class PipelineWorkspace:
     def validation_indices(self) -> np.ndarray:
         """Sorted 0-based indices of the validation structures."""
         train_fpath = self.root / f"regrdir_{self.saltedname}" / f"training_set_N{self.inp['gpr']['Ntrain']}.txt"
-        trainrangetot = np.loadtxt(train_fpath, dtype=int)
+        from salted.sys_utils import load_training_set
+
+        trainrangetot = load_training_set(train_fpath)
         return np.setdiff1d(np.arange(self.nconf), trainrangetot)
 
     def run_python(self, args: list[str], label: str, mpi: list[str] | None = None, timeout: float = 7200):

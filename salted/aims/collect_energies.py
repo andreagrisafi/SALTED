@@ -5,7 +5,7 @@ import os.path as osp
 
 import numpy as np
 
-from salted.sys_utils import ParseConfig, read_system
+from salted.sys_utils import ParseConfig, load_training_set, read_system
 inp = ParseConfig().parse_input()
 
 def add_command_line_arguments_contraction():
@@ -23,9 +23,9 @@ if validation:
     dn = os.path.join(inp.qm.path2qm, 'data')
     # define validation set
     rdir = f"regrdir_{inp.salted.saltedname}"
-    trainrangetot = np.loadtxt(osp.join(
+    trainrangetot = load_training_set(osp.join(
         inp.salted.saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
-    ), int)
+    ))
     testset = np.setdiff1d(list(range(ndata)),trainrangetot)
 else:
     dn = os.path.join(inp.qm.path2qm, inp.prediction.predict_data)

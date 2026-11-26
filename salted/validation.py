@@ -10,6 +10,8 @@ from salted import basis
 from salted.constants import bohr2angs
 from salted.sys_utils import (
     ParseConfig,
+    load_training_set,
+    check_reference_file_numbering,
     check_MPI_tasks_count,
     detect_mpi,
     distribute_jobs,
@@ -53,6 +55,7 @@ def build():
     comm, size, rank, parallel = detect_mpi()
 
     species, lmax, nmax, lmax_max, nnmax, ndata, atomic_symbols, atomic_coords, natoms, natmax = read_system()
+    check_reference_file_numbering(inp, inp.salted.saltedpath)
     atom_idx, natom_dict = get_atom_idx(ndata,natoms,species,atomic_symbols)
 
     vdir = f"validations_{saltedname}"
@@ -60,9 +63,9 @@ def build():
     fdir = f"rkhs-vectors_{saltedname}"
 
     # define test set
-    trainrangetot = np.loadtxt(osp.join(
+    trainrangetot = load_training_set(osp.join(
         saltedpath, rdir, f"training_set_N{inp.gpr.Ntrain}.txt"
-    ), int)
+    ))
     ntrain = round(inp.gpr.trainfrac*len(trainrangetot))
     testrange = np.setdiff1d(list(range(ndata)),trainrangetot)
 
@@ -124,21 +127,21 @@ def build():
     for iconf in testrange:
 
         overl = load_overlap(osp.join(
-            saltedpath, "overlaps", f"overlap_conf{iconf}.npy"
+            saltedpath, "overlaps", f"overlap_conf{iconf + inp.qm.numbering_start}.npy"
         ))
 
         if saltedtype=="density":
 
             # Load reference coefficients
             ref_coefs = np.load(osp.join(
-                saltedpath, "coefficients", f"coefficients_conf{iconf}.npy"
+                saltedpath, "coefficients", f"coefficients_conf{iconf + inp.qm.numbering_start}.npy"
             ))
             ref_projs = np.dot(overl,ref_coefs)
             Tsize = len(ref_coefs)
 
             # Load RKHS descriptor
             psivec = sparse.load_npz(osp.join(
-                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}.npz"
+                saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf + inp.qm.numbering_start}.npz"
             ))
             psi = psivec.toarray()
 
@@ -247,14 +250,14 @@ def build():
 
                 # Load reference coefficients for the given Cartesian component
                 ref_coefs[icart] = np.load(osp.join(
-                    saltedpath, "coefficients", f"{icart}/coefficients_conf{iconf}.npy"
+                    saltedpath, "coefficients", f"{icart}/coefficients_conf{iconf + inp.qm.numbering_start}.npy"
                 ))
                 ref_projs[icart] = np.dot(overl,ref_coefs[icart])
                 Tsize = len(ref_coefs[icart])
 
                 # Load RKHS descriptor for the given Cartesian component
                 psivec = sparse.load_npz(osp.join(
-                    saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf}_{icart}.npz"
+                    saltedpath, fdir, f"M{Menv}_zeta{zeta}", f"psi-nm_conf{iconf + inp.qm.numbering_start}_{icart}.npz"
                 ))
                 psi = psivec.toarray()
 
