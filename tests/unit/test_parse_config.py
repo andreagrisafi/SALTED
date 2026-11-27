@@ -62,6 +62,20 @@ def test_defaults_are_applied(tmp_path, monkeypatch):
     assert inp.gpr.trainfrac == pytest.approx(1.0)
     assert inp.gpr.trainsel in ("random", "sequential")
     assert inp.descriptor.sparsify.ncut == 0
+    assert inp.descriptor.normalisation == "unit"
+
+
+@pytest.mark.parametrize("value, ok", [("rel_power", True), ("relpower", False)])
+def test_descriptor_normalisation(tmp_path, monkeypatch, value, ok):
+    data = yaml.safe_load(yaml.safe_dump(MINIMAL_INP))
+    data["descriptor"]["normalisation"] = value
+    write_inp(tmp_path, data)
+    monkeypatch.chdir(tmp_path)
+    if ok:
+        assert ParseConfig().parse_input().descriptor.normalisation == value
+    else:
+        with pytest.raises(Exception):
+            ParseConfig().parse_input()
 
 
 def test_missing_required_field_raises(tmp_path, monkeypatch):

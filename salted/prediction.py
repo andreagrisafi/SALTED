@@ -169,6 +169,7 @@ def build():
 
         # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
         pvec = {}
+        norm0 = np.empty(0)
         for lam in range(lmax_max+1):
 
             if rank == 0: print(f"lambda = {lam}")
@@ -184,17 +185,21 @@ def build():
             # Compute complex to real transformation matrix for the given lambda value
             c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
 
+            # rel_power: lambda > 0 is divided by the length of lambda = 0
+            if lam == 0 and inp.descriptor.normalisation == "rel_power":
+                norm0 = sph_utils.lam0_norm(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec)
+
             if sparsify:
 
                 featsize = nspe1*nspe2*nrad1*nrad2*llmax
                 nfps = len(vfps[lam])
-                p = sph_utils.equicombsparse_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam])
+                p = sph_utils.equicombsparse_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,nfps,vfps[lam],norm0)
                 featsize = ncut
 
             else:
 
                 featsize = nspe1*nspe2*nrad1*nrad2*llmax
-                p = sph_utils.equicomb_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
+                p = sph_utils.equicomb_numba(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,norm0)
 
             # Fill vector of equivariant descriptor
             if lam==0:

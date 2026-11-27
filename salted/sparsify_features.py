@@ -81,6 +81,7 @@ def build():
     
     del omega1, omega2
     # Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
+    norm0 = np.empty(0)
     for lam in range(lmax_max+1):
 
         llmax, llvec = sph_utils.get_angular_indexes_symmetric(lam,nang1,nang2)
@@ -92,6 +93,10 @@ def build():
         # Compute complex to real transformation matrix for the given lambda value
         c2r = sph_utils.complex_to_real_transformation([2*lam+1])[0]
 
+        # rel_power: lambda > 0 is divided by the length of lambda = 0
+        if lam == 0 and inp.descriptor.normalisation == "rel_power":
+            norm0 = sph_utils.lam0_norm(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec)
+
         # compute normalized equivariant descriptor
         featsize = nspe1*nspe2*nrad1*nrad2*llmax
 
@@ -102,7 +107,7 @@ def build():
             print(f"ERROR: requested number of sparse features larger than total feature space size: {ncut} > {featsize}. Please remove the inp.descriptor.sparsify section or reduce ncut value.")
             sys.exit(1)
         
-        pvec = equicombfps(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize)
+        pvec = equicombfps(natoms_total,nang1,nang2,nspe1*nrad1,nspe2*nrad2,v1,v2,wigner3j,llmax,llvec,lam,c2r,featsize,norm0)
         vfps = do_fps(pvec,ncut,verbose=inp.salted.verbose)
         np.save(osp.join(sdir, f"fps{ncut}-{lam}.npy"), vfps)
 

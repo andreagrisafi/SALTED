@@ -867,6 +867,12 @@ class ParseConfig:
                         lambda inp, val: (val == 0) or (val > 0),
                     ),  # number of features to keep
                 },
+                "normalisation": (
+                    False,
+                    "unit",
+                    str,
+                    lambda inp, val: val in ("unit", "rel_power"),
+                ),  # lambda > 0 divided by its own length (unit) or by the lambda = 0 length (rel_power)
             },
             "gpr": {
                 "z": (False, 2.0, float, lambda inp, val: val > 0),  # kernel exponent
