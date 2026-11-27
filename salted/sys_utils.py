@@ -920,9 +920,9 @@ class ParseConfig:
                 ),  # if shuffle the training set
                 "sparse_algorithm": (
                     False,
-                    "numba",
+                    "dense_blocks",
                     str,
-                    lambda inp, val: val in ("dense", "omp_sparse", "numba"),
+                    lambda inp, val: val in ("dense", "omp_sparse", "numba", "dense_blocks"),
                 ),
                 "Mcut": (
                     False,

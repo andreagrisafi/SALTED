@@ -2,6 +2,7 @@ import os.path as osp
 import time
 
 import numpy as np
+from scipy.linalg import solve
 
 from salted.sys_utils import ParseConfig
 
@@ -33,7 +34,7 @@ def build():
     start = time.time()
 
     Bmat[np.diag_indices_from(Bmat)] += regul
-    w = np.linalg.solve(Bmat,Avec)
+    w = solve(Bmat.T, Avec, overwrite_a=True, check_finite=False, transposed=True)
 
     print(f"regression time: {time.time() - start} seconds",flush=True)
 
