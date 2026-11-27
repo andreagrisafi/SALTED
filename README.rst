@@ -27,7 +27,13 @@ References
 
 Installation
 ------------
-Install SALTED directly from GitHub:
+Install SALTED from PyPI (Python 3.10 to 3.14; the import name stays :code:`salted`):
+
+.. code:: bash
+
+   pip install salted-gpr
+
+or the development version directly from GitHub:
 
 .. code:: bash
 

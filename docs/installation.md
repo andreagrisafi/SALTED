@@ -5,11 +5,29 @@
 
 ## Install SALTED
 
-Install SALTED directly from [GitHub](https://github.com/andreagrisafi/SALTED):
+Install SALTED from [PyPI](https://pypi.org/project/salted-gpr/) (Python 3.10 to 3.14; the package is `salted-gpr`, the import name stays `salted`):
+
+```bash
+pip install salted-gpr
+```
+
+or the development version directly from [GitHub](https://github.com/andreagrisafi/SALTED):
 
 ```bash
 pip install git+https://github.com/andreagrisafi/SALTED.git
 ```
+
+### Supported Python versions
+
+SALTED supports **Python 3.10, 3.11, 3.12, 3.13 and 3.14** on Linux and macOS; CI runs the unit tests on each of them.
+It is pure Python, so the one `salted-gpr` package serves all of these versions.
+
+What sets the limits:
+
+- **Oldest: 3.10.** SALTED uses the `X | Y` type-union syntax, which needs Python 3.10, and `featomic` 0.6.4 and later require Python 3.10.
+  Python 3.9 reached end of life in October 2025, and current releases of NumPy, SciPy and Numba no longer support it.
+  Python 2 has never been supported.
+- **Newest: 3.14.** Python 3.15 will be added once all dependencies publish packages for it (h5py does not yet).
 
 
 ## Install electronic-structure codes
